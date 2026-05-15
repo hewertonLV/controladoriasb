@@ -1,0 +1,110 @@
+# =============================================================================
+# Repositório facigam (Laravel 13)
+# Política: subir somente o código-fonte. Nunca subir .env, dumps, planilhas,
+# PDFs gerados, logs, dependências instaladas ou caches.
+# =============================================================================
+
+# ---- Dependências instaladas ------------------------------------------------
+/vendor
+/node_modules
+
+# ---- Ambiente / segredos ----------------------------------------------------
+.env
+.env.*
+!.env.example
+!.env.testing.example
+auth.json
+
+# ---- Caches do Laravel ------------------------------------------------------
+/bootstrap/cache/*
+!/bootstrap/cache/.gitignore
+/.phpunit.cache
+.phpunit.result.cache
+.phpactor.json
+_ide_helper.php
+
+# ---- Storage runtime --------------------------------------------------------
+# storage/app/private/<...>     — uploads de importação / PDFs gerados
+# storage/app/public/<...>      — uploads expostos
+# storage/framework/{cache,sessions,views} — caches do Laravel
+# storage/logs/                 — logs de aplicação
+# Os .gitignore internos do Laravel já preservam a estrutura mínima.
+/storage/*.key
+/storage/pail
+/storage/app/private/*
+!/storage/app/private/.gitignore
+/storage/app/public/*
+!/storage/app/public/.gitignore
+/storage/framework/cache/*
+!/storage/framework/cache/.gitignore
+/storage/framework/sessions/*
+!/storage/framework/sessions/.gitignore
+/storage/framework/views/*
+!/storage/framework/views/.gitignore
+/storage/framework/testing/*
+!/storage/framework/testing/.gitignore
+/storage/logs/*
+!/storage/logs/.gitignore
+
+# ---- Build / assets gerados --------------------------------------------------
+# Atenção: NÃO ignorar /public/assets (tema Highdmin embarcado).
+/public/build
+/public/hot
+/public/storage
+/public/fonts-manifest.dev.json
+
+# ---- IDE / editores ---------------------------------------------------------
+/.idea
+/.vscode
+/.nova
+/.zed
+/.codex
+/.cursor/
+*.swp
+*.swo
+
+# ---- Sistemas operacionais --------------------------------------------------
+.DS_Store
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# ---- Logs / temp -----------------------------------------------------------
+*.log
+*.tmp
+*.bak
+*.cache
+yarn-error.log
+npm-debug.log*
+
+# ---- Dumps de banco / backups ----------------------------------------------
+*.sql
+*.sql.gz
+*.dump
+*.sqlite
+*.sqlite3
+*.sqlite-journal
+
+# ---- Arquivos compactados (provavelmente backup / planilhas zipadas) -------
+*.zip
+*.rar
+*.7z
+*.tar
+*.tar.gz
+*.tgz
+
+# ---- Arquivos de planilhas e PDFs reais ------------------------------------
+# Bloqueio defensivo: o storage privado já não sobe, mas se alguém colocar
+# uma planilha real na raiz por engano, ela não vai parar no repositório.
+*.xlsx
+*.xls
+*.csv
+*.ods
+*.pdf
+
+# ---- Volumes / dados do Docker local ---------------------------------------
+/docker/mysql
+
+# ---- Homestead (não usamos, mas redundância barata) ------------------------
+Homestead.json
+Homestead.yaml

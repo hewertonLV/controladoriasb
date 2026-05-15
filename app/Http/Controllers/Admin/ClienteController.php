@@ -1,0 +1,163 @@
+<?php
+
+namespace App\Http\Controllers\Admin;
+
+use App\Http\Controllers\Controller;
+use App\Http\Requests\Admin\StoreClienteRequest;
+use App\Http\Requests\Admin\UpdateClienteRequest;
+use App\Models\Cliente;
+use App\Models\ClienteHistorico;
+use App\Models\Grupo;
+use App\Models\Praca;
+use App\Queries\ClienteQuery;
+use App\Services\Clientes\ClienteAuditoriaService;
+use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Illuminate\View\View;
+
+class ClienteController extends Controller
+{
+    public function __construct(
+        private readonly ClienteAuditoriaService $auditoria,
+        private readonly ClienteQuery $clienteQuery,
+    ) {}
+
+    public function index(Request $request): View
+    {
+        $filtros = $this->clienteQuery->filtrosFromRequest($request);
+        $query = $this->clienteQuery->aplicarFiltros(
+            Cliente::query()->with(['praca', 'grupo']),
+            $filtros,
+        );
+
+        if ($filtros['per_page'] === 'all') {
+            $total = (clone $query)->toBase()->count();
+            $resultados = $query->get();
+            $clientes = $resultados;
+            $exibindo = $resultados->count();
+        } else {
+            $paginator = $query->paginate((int) $filtros['per_page'])->appends($filtros);
+            $clientes = $paginator;
+            $total = $paginator->total();
+            $exibindo = count((array) $paginator->items());
+        }
+
+        $payload = [
+            'clientes' => $clientes,
+            'filtros' => $filtros,
+            'perPageOptions' => ClienteQuery::PER_PAGE_OPTIONS,
+            'total' => $total,
+            'exibindo' => $exibindo,
+        ];
+
+        if ($request->ajax()) {
+            return view('admin.clientes._table', $payload);
+        }
+
+        return view('admin.clientes.index', $payload);
+    }
+
+    public function create(): View
+    {
+        return view('admin.clientes.create', [
+            'cliente' => new Cliente([
+                'desconto_nf' => '0.00',
+                'desconto_contrato' => '0.00',
+            ]),
+            'pracas' => $this->pracasParaFormulario(),
+            'grupos' => $this->gruposParaFormulario(),
+        ]);
+    }
+
+    public function store(StoreClienteRequest $request): RedirectResponse
+    {
+        $user = $request->user();
+        $dados = $request->validated();
+
+        $cliente = DB::transaction(function () use ($dados, $user) {
+            $cliente = Cliente::create($dados);
+
+            $this->auditoria->registrarCriacao(
+                $cliente,
+                $user,
+                ClienteHistorico::ORIGEM_MANUAL,
+            );
+
+            return $cliente;
+        });
+
+        return redirect()
+            ->route('admin.clientes.index')
+            ->with('success', "Cliente \"{$cliente->razao_social}\" cadastrado com sucesso.");
+    }
+
+    public function edit(Cliente $cliente): View
+    {
+        return view('admin.clientes.edit', [
+            'cliente' => $cliente->load(['praca', 'grupo']),
+            'pracas' => $this->pracasParaFormulario(),
+            'grupos' => $this->gruposParaFormulario(),
+        ]);
+    }
+
+    public function update(UpdateClienteRequest $request, Cliente $cliente): RedirectResponse
+    {
+        $user = $request->user();
+        $dados = $request->validated();
+
+        DB::transaction(function () use ($cliente, $dados, $user) {
+            $antes = $this->auditoria->snapshot($cliente);
+
+            $cliente->update($dados);
+
+            $depois = $this->auditoria->snapshot($cliente->fresh());
+
+            $this->auditoria->registrarAtualizacao(
+                $cliente,
+                $antes,
+                $depois,
+                $user,
+                ClienteHistorico::ORIGEM_MANUAL,
+            );
+        });
+
+        return redirect()
+            ->route('admin.clientes.index')
+            ->with('success', "Cliente \"{$cliente->razao_social}\" atualizado com sucesso.");
+    }
+
+    public function historico(Cliente $cliente): View
+    {
+        $historicos = $cliente->historicos()
+            ->with('user')
+            ->paginate(50);
+
+        return view('admin.clientes.historico', [
+            'cliente' => $cliente->load(['praca', 'grupo']),
+            'historicos' => $historicos,
+        ]);
+    }
+
+    /**
+     * @return Collection<int, Praca>
+     */
+    private function pracasParaFormulario()
+    {
+        return Praca::query()
+            ->with('unidadeNegocio:id,nome')
+            ->orderBy('nome')
+            ->get(['id', 'nome', 'id_unidade_negocio']);
+    }
+
+    /**
+     * @return Collection<int, Grupo>
+     */
+    private function gruposParaFormulario()
+    {
+        return Grupo::query()
+            ->orderBy('nome')
+            ->get(['id', 'nome']);
+    }
+}

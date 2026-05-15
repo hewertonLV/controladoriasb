@@ -1,0 +1,117 @@
+services:
+  facigam:
+    build: .
+    image: facigam-app:latest
+    restart: unless-stopped
+    container_name: facigam-app
+    ports:
+      - '44432:80'
+    volumes:
+      - ./:/var/www/html
+      - ./docker/php/conf.d/99-uploads.ini:/usr/local/etc/php/conf.d/99-uploads.ini:ro
+    networks:
+      - facigam-network
+    depends_on:
+      - mysql
+
+  # ------------------------------------------------------------------
+  # Worker dedicado para importações em planilha (Empresas + Unidades de Negócio).
+  # Separado da exportação PDF para que processos pesados não bloqueiem
+  # filas entre si.
+  # ------------------------------------------------------------------
+  worker-importacao:
+    build: .
+    image: facigam-app:latest
+    restart: unless-stopped
+    container_name: facigam-worker-importacao
+    # Formato em lista (exec): `php` vira PID 1 — SIGTERM do Docker chega direto ao
+    # artisan queue:work (evita shell intermediário atrasando encerramento).
+    # `--timeout=900` é intencional: previews Excel/PDF podem exceder 120s; reduzir
+    # quebra importação/exportação (ver §12 / README).
+    command:
+      - php
+      - artisan
+      - queue:work
+      - --queue=empresas-importacao,unidades-negocio-importacao,fornecedores-importacao,clientes-importacao,grupos-importacao,veiculos-importacao,fretes-importacao,frutas-importacao,pracas-importacao,estoques-importacao
+      - --sleep=1
+      - --tries=1
+      - --timeout=900
+      - --max-time=3600
+    working_dir: /var/www/html
+    volumes:
+      - ./:/var/www/html
+      - ./docker/php/conf.d/99-uploads.ini:/usr/local/etc/php/conf.d/99-uploads.ini:ro
+    networks:
+      - facigam-network
+    depends_on:
+      - mysql
+      - facigam
+    stop_signal: SIGTERM
+    # Teto após SIGTERM: deve ser ≥ `--timeout` do worker para job longo terminar com segurança.
+    stop_grace_period: 930s
+
+  # ------------------------------------------------------------------
+  # Worker dedicado para exportações PDF.
+  # PDFs grandes consomem CPU/memória; manter fila isolada evita que
+  # relatórios bloqueiem importações de Empresas.
+  # ------------------------------------------------------------------
+  worker-exportacao:
+    build: .
+    image: facigam-app:latest
+    restart: unless-stopped
+    container_name: facigam-worker-exportacao
+    command:
+      - php
+      - artisan
+      - queue:work
+      - --queue=empresas-exportacao,fornecedores-exportacao,clientes-exportacao,grupos-exportacao,unidades-negocio-exportacao,veiculos-exportacao,fretes-exportacao,frutas-exportacao,pracas-exportacao,estoques-exportacao
+      - --sleep=1
+      - --tries=1
+      - --timeout=900
+      - --max-time=3600
+    working_dir: /var/www/html
+    volumes:
+      - ./:/var/www/html
+      - ./docker/php/conf.d/99-uploads.ini:/usr/local/etc/php/conf.d/99-uploads.ini:ro
+    networks:
+      - facigam-network
+    depends_on:
+      - mysql
+      - facigam
+    stop_signal: SIGTERM
+    stop_grace_period: 930s
+
+  mysql:
+    image: mysql:8.0
+    restart: unless-stopped
+    container_name: facigam-mysql
+    ports:
+      - '44433:3306'
+    environment:
+      MYSQL_ROOT_PASSWORD: ${DB_PASSWORD}
+      MYSQL_DATABASE: ${DB_DATABASE}
+    volumes:
+      - facigam_mysql_data:/var/lib/mysql
+    networks:
+      - facigam-network
+
+  phpmyadmin:
+    image: phpmyadmin/phpmyadmin
+    restart: unless-stopped
+    container_name: facigam-phpmyadmin
+    ports:
+      - '44434:80'
+    environment:
+      PMA_HOST: mysql
+      UPLOAD_LIMIT: 50M
+    networks:
+      - facigam-network
+    depends_on:
+      - mysql
+
+networks:
+  facigam-network:
+    driver: bridge
+
+volumes:
+  facigam_mysql_data:

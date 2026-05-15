@@ -1,0 +1,97 @@
+<?php
+
+namespace Tests\Feature\Admin\Veiculos;
+
+use App\Enums\Permissions;
+use App\Models\Veiculo;
+
+class VeiculoTest extends VeiculoTestCase
+{
+    public function test_convidado_e_redirecionado_para_login_na_listagem(): void
+    {
+        $this->get(route('admin.veiculos.index'))
+            ->assertRedirect(route('login'));
+    }
+
+    public function test_usuario_sem_permissao_recebe_403_na_listagem(): void
+    {
+        $this->actingAs($this->userWithoutEmpresaPermissions())
+            ->get(route('admin.veiculos.index'))
+            ->assertForbidden();
+    }
+
+    public function test_usuario_com_visualizar_acessa_listagem(): void
+    {
+        $this->actingAs($this->userWithPermissions([Permissions::VEICULOS_VISUALIZAR]))
+            ->get(route('admin.veiculos.index'))
+            ->assertOk();
+    }
+
+    public function test_listagem_ajax_retorna_partial_da_tabela(): void
+    {
+        Veiculo::factory()->create(['nome' => 'AJAX VEICULO']);
+
+        $this->actingAs($this->veiculosManager())
+            ->withHeaders([
+                'X-Requested-With' => 'XMLHttpRequest',
+                'Accept' => 'text/html',
+            ])
+            ->get(route('admin.veiculos.index'))
+            ->assertOk()
+            ->assertSee('AJAX VEICULO', false);
+    }
+
+    public function test_cadastro_com_sucesso_normaliza_campos(): void
+    {
+        $payload = $this->veiculoPayload([
+            'id_sbs' => '12.3-4',
+            'nome' => 'veICuLo teste',
+            'tipo' => 'cARrO',
+            'status' => 'inATIVO',
+        ]);
+
+        $this->actingAs($this->userWithPermissions([Permissions::VEICULOS_CRIAR]))
+            ->post(route('admin.veiculos.store'), $payload)
+            ->assertRedirect(route('admin.veiculos.index'))
+            ->assertSessionHas('success');
+
+        $this->assertDatabaseHas('veiculos', [
+            'id_sbs' => 1234,
+            'nome' => 'VEICULO TESTE',
+            'tipo' => 'CARRO',
+            'status' => 'INATIVO',
+        ]);
+    }
+
+    public function test_cadastro_com_status_invalido_falha_validacao(): void
+    {
+        $payload = $this->veiculoPayload([
+            'status' => 'PENDENTE',
+        ]);
+
+        $this->actingAs($this->userWithPermissions([Permissions::VEICULOS_CRIAR]))
+            ->post(route('admin.veiculos.store'), $payload)
+            ->assertSessionHasErrors('status');
+    }
+
+    public function test_edicao_atualiza_registro(): void
+    {
+        $veiculo = Veiculo::factory()->create([
+            'id_sbs' => 9991,
+            'nome' => 'ANTES',
+        ]);
+
+        $this->actingAs($this->userWithPermissions([Permissions::VEICULOS_EDITAR]))
+            ->put(route('admin.veiculos.update', $veiculo), [
+                'id_sbs' => 9991,
+                'nome' => 'DEPOIS',
+                'tipo' => 'CAMINHÃO',
+                'id_unidade_negocio' => $veiculo->id_unidade_negocio,
+                'status' => 'ATIVO',
+            ])
+            ->assertRedirect(route('admin.veiculos.index'))
+            ->assertSessionHas('success');
+
+        $this->assertSame('DEPOIS', $veiculo->fresh()->nome);
+    }
+}
