@@ -2,17 +2,25 @@
 
 namespace App\Providers;
 
+use App\Contracts\Movimentacoes\ReprocessaEstoqueDestinoCompra;
+use App\Contracts\Movimentacoes\ReprocessaSaidasDoacaoOrigem;
+use App\Contracts\Movimentacoes\ReprocessaSaidasTransferenciaOrigem;
 use App\Enums\CategoriaMovimentacaoTipo;
+use App\Enums\MovimentacaoStatusRegistro;
 use App\Enums\Roles;
 use App\Models\Cliente;
 use App\Models\Fornecedor;
 use App\Models\Movimentacao;
+use App\Models\StatusMovimentacao;
 use App\Models\UnidadeNegocio;
 use App\Models\User;
 use App\Observers\ClienteObserver;
 use App\Observers\FornecedorObserver;
 use App\Observers\MovimentacaoObserver;
 use App\Observers\UnidadeNegocioObserver;
+use App\Services\Movimentacoes\ReplayEstoqueCompraService;
+use App\Services\Movimentacoes\ReplayEstoqueDoacaoService;
+use App\Services\Movimentacoes\ReplayEstoqueTransferenciaService;
 use Illuminate\Pagination\Paginator;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Route;
@@ -22,7 +30,9 @@ class AppServiceProvider extends ServiceProvider
 {
     public function register(): void
     {
-        //
+        $this->app->bind(ReprocessaEstoqueDestinoCompra::class, ReplayEstoqueCompraService::class);
+        $this->app->bind(ReprocessaSaidasTransferenciaOrigem::class, ReplayEstoqueTransferenciaService::class);
+        $this->app->bind(ReprocessaSaidasDoacaoOrigem::class, ReplayEstoqueDoacaoService::class);
     }
 
     public function boot(): void
@@ -39,6 +49,27 @@ class AppServiceProvider extends ServiceProvider
             return Movimentacao::query()
                 ->whereKey($value)
                 ->where('categoria_movimentacao_id', CategoriaMovimentacaoTipo::Compra->value)
+                ->firstOrFail();
+        });
+
+        Route::bind('transferenciaOrigem', function (string $value): Movimentacao {
+            $anchor = (int) $value;
+
+            return Movimentacao::query()
+                ->where('categoria_movimentacao_id', CategoriaMovimentacaoTipo::Transferencia->value)
+                ->where('status_movimentacao_id', StatusMovimentacao::ID_SAIDA)
+                ->where('transferencia_origem_id', $anchor)
+                ->where('status_registro', MovimentacaoStatusRegistro::ATIVO->value)
+                ->orderByDesc('versao')
+                ->orderByDesc('id')
+                ->firstOrFail();
+        });
+
+        Route::bind('movimentacaoDoacao', function (string $value): Movimentacao {
+            return Movimentacao::query()
+                ->whereKey($value)
+                ->where('categoria_movimentacao_id', CategoriaMovimentacaoTipo::Doacao->value)
+                ->where('status_movimentacao_id', StatusMovimentacao::ID_SAIDA)
                 ->firstOrFail();
         });
 

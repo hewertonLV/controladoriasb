@@ -25,6 +25,11 @@ trait NormalizaAtributosMonetariosMovimentacao
         $this->attributes['valor_nf_kg'] = TextoCadastro::normalizarValorMonetarioBrasileiro($value);
     }
 
+    protected function setValorTotalMovimentacaoAttribute(mixed $value): void
+    {
+        $this->attributes['valor_total_movimentacao'] = TextoCadastro::normalizarValorMonetarioBrasileiro($value);
+    }
+
     protected function setValorFreteRateioAttribute(mixed $value): void
     {
         $this->attributes['valor_frete_rateio'] = TextoCadastro::normalizarValorMonetarioBrasileiro($value);

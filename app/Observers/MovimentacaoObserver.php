@@ -14,7 +14,11 @@ class MovimentacaoObserver
 
     public function saving(Movimentacao $movimentacao): void
     {
-        if ((int) $movimentacao->categoria_movimentacao_id === CategoriaMovimentacaoTipo::Compra->value) {
+        if (in_array((int) $movimentacao->categoria_movimentacao_id, [
+            CategoriaMovimentacaoTipo::Compra->value,
+            CategoriaMovimentacaoTipo::Transferencia->value,
+            CategoriaMovimentacaoTipo::Doacao->value,
+        ], true)) {
             return;
         }
 

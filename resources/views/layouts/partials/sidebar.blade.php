@@ -180,20 +180,24 @@
             @canany([
                 'movimentacoes.compras.visualizar',
                 'movimentacoes.compras.criar',
+                'movimentacoes.transferencias.visualizar',
+                'movimentacoes.transferencias.criar',
+                'movimentacoes.doacoes.visualizar',
+                'movimentacoes.doacoes.criar',
             ])
                 <li class="side-nav-title mt-2">Movimentações</li>
 
                 <li class="side-nav-item">
                     <a data-bs-toggle="collapse"
                        href="#sidebarMovimentacoes"
-                       aria-expanded="{{ request()->routeIs('admin.movimentacoes.compras.*') ? 'true' : 'false' }}"
+                       aria-expanded="{{ request()->routeIs('admin.movimentacoes.compras.*') || request()->routeIs('admin.movimentacoes.transferencias.*') || request()->routeIs('admin.movimentacoes.doacoes.*') ? 'true' : 'false' }}"
                        aria-controls="sidebarMovimentacoes"
-                       class="side-nav-link {{ request()->routeIs('admin.movimentacoes.compras.*') ? '' : 'collapsed' }}">
+                       class="side-nav-link {{ request()->routeIs('admin.movimentacoes.compras.*') || request()->routeIs('admin.movimentacoes.transferencias.*') || request()->routeIs('admin.movimentacoes.doacoes.*') ? '' : 'collapsed' }}">
                         <span class="menu-icon"><i class="ri-exchange-funds-line"></i></span>
                         <span class="menu-text"> Movimentações </span>
                         <span class="menu-arrow"></span>
                     </a>
-                    <div class="collapse {{ request()->routeIs('admin.movimentacoes.compras.*') ? 'show' : '' }}" id="sidebarMovimentacoes">
+                    <div class="collapse {{ request()->routeIs('admin.movimentacoes.compras.*') || request()->routeIs('admin.movimentacoes.transferencias.*') || request()->routeIs('admin.movimentacoes.doacoes.*') ? 'show' : '' }}" id="sidebarMovimentacoes">
                         <ul class="sub-menu">
                             @can('movimentacoes.compras.visualizar')
                                 <li class="side-nav-item">
@@ -208,6 +212,42 @@
                                         <a href="{{ route('admin.movimentacoes.compras.create') }}"
                                            class="side-nav-link {{ request()->routeIs('admin.movimentacoes.compras.*') ? 'active' : '' }}">
                                             <span class="menu-text">Compra</span>
+                                        </a>
+                                    </li>
+                                @endcan
+                            @endcan
+
+                            @can('movimentacoes.transferencias.visualizar')
+                                <li class="side-nav-item">
+                                    <a href="{{ route('admin.movimentacoes.transferencias.index') }}"
+                                       class="side-nav-link {{ request()->routeIs('admin.movimentacoes.transferencias.*') ? 'active' : '' }}">
+                                        <span class="menu-text">Transferência</span>
+                                    </a>
+                                </li>
+                            @else
+                                @can('movimentacoes.transferencias.criar')
+                                    <li class="side-nav-item">
+                                        <a href="{{ route('admin.movimentacoes.transferencias.create') }}"
+                                           class="side-nav-link {{ request()->routeIs('admin.movimentacoes.transferencias.*') ? 'active' : '' }}">
+                                            <span class="menu-text">Transferência</span>
+                                        </a>
+                                    </li>
+                                @endcan
+                            @endcan
+
+                            @can('movimentacoes.doacoes.visualizar')
+                                <li class="side-nav-item">
+                                    <a href="{{ route('admin.movimentacoes.doacoes.index') }}"
+                                       class="side-nav-link {{ request()->routeIs('admin.movimentacoes.doacoes.*') ? 'active' : '' }}">
+                                        <span class="menu-text">Doação</span>
+                                    </a>
+                                </li>
+                            @else
+                                @can('movimentacoes.doacoes.criar')
+                                    <li class="side-nav-item">
+                                        <a href="{{ route('admin.movimentacoes.doacoes.create') }}"
+                                           class="side-nav-link {{ request()->routeIs('admin.movimentacoes.doacoes.*') ? 'active' : '' }}">
+                                            <span class="menu-text">Doação</span>
                                         </a>
                                     </li>
                                 @endcan

@@ -23,7 +23,15 @@ class MovimentacaoHistorico extends Model
 {
     public const ACAO_SUBSTITUICAO_VERSAO = 'SUBSTITUICAO_VERSAO';
 
+    public const ACAO_CANCELAMENTO_ADMIN = 'CANCELAMENTO_ADMIN';
+
+    public const ACAO_REGISTRO_DOACAO = 'REGISTRO_DOACAO';
+
     public const ORIGEM_VERSIONAMENTO = 'versionamento';
+
+    public const ORIGEM_CANCELAMENTO_ADMIN = 'cancelamento_admin';
+
+    public const ORIGEM_DOACAO = 'doacao';
 
     public $timestamps = false;
 

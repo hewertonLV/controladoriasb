@@ -236,4 +236,34 @@ trait CreatesUsersWithRoles
             Permissions::MOVIMENTACOES_COMPRAS_EDITAR,
         ], $extra))));
     }
+
+    /**
+     * Permissões típicas do fluxo web de transferência (testes).
+     *
+     * @param  list<string>  $extra
+     */
+    protected function movimentacoesTransferenciasUsuario(array $extra = []): User
+    {
+        return $this->userWithPermissions(array_values(array_unique(array_merge([
+            Permissions::MOVIMENTACOES_TRANSFERENCIAS_VISUALIZAR,
+            Permissions::MOVIMENTACOES_TRANSFERENCIAS_CRIAR,
+            Permissions::MOVIMENTACOES_TRANSFERENCIAS_RECEBER,
+            Permissions::MOVIMENTACOES_TRANSFERENCIAS_REENVIAR,
+            Permissions::MOVIMENTACOES_TRANSFERENCIAS_CANCELAR,
+        ], $extra))));
+    }
+
+    /**
+     * Permissões típicas do fluxo web de doação (testes).
+     *
+     * @param  list<string>  $extra
+     */
+    protected function movimentacoesDoacoesUsuario(array $extra = []): User
+    {
+        return $this->userWithPermissions(array_values(array_unique(array_merge([
+            Permissions::MOVIMENTACOES_DOACOES_VISUALIZAR,
+            Permissions::MOVIMENTACOES_DOACOES_CRIAR,
+            Permissions::MOVIMENTACOES_DOACOES_EDITAR,
+        ], $extra))));
+    }
 }

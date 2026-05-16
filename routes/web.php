@@ -22,7 +22,13 @@ use App\Http\Controllers\Admin\GrupoController;
 use App\Http\Controllers\Admin\GrupoExportacaoController;
 use App\Http\Controllers\Admin\GrupoImportacaoController;
 use App\Http\Controllers\Admin\GrupoPermissaoController;
+use App\Http\Controllers\Admin\Movimentacoes\CancelarCompraMovimentacaoController;
+use App\Http\Controllers\Admin\Movimentacoes\CancelarDoacaoMovimentacaoAdminController;
+use App\Http\Controllers\Admin\Movimentacoes\CancelarTransferenciaMovimentacaoAdminController;
 use App\Http\Controllers\Admin\Movimentacoes\CompraMovimentacaoController;
+use App\Http\Controllers\Admin\Movimentacoes\DoacaoMovimentacaoController;
+use App\Http\Controllers\Admin\Movimentacoes\RecebimentoTransferenciaController;
+use App\Http\Controllers\Admin\Movimentacoes\TransferenciaMovimentacaoController;
 use App\Http\Controllers\Admin\PracaController;
 use App\Http\Controllers\Admin\PracaExportacaoController;
 use App\Http\Controllers\Admin\PracaImportacaoController;
@@ -705,6 +711,74 @@ Route::middleware(['auth', 'verified', 'user.active', 'password.changed'])->grou
             Route::put('/{movimentacao}', [CompraMovimentacaoController::class, 'update'])
                 ->middleware('permission:movimentacoes.compras.editar')
                 ->name('update');
+
+            Route::post('/{movimentacao}/cancelar-admin', CancelarCompraMovimentacaoController::class)
+                ->middleware('role_or_permission:Administrador|movimentacoes.compras.cancelar-admin')
+                ->name('cancelar-admin');
+        });
+
+        Route::prefix('movimentacoes/transferencias')->name('movimentacoes.transferencias.')->group(function () {
+            Route::get('/', [TransferenciaMovimentacaoController::class, 'index'])
+                ->middleware('permission:movimentacoes.transferencias.visualizar')
+                ->name('index');
+
+            Route::get('/criar', [TransferenciaMovimentacaoController::class, 'create'])
+                ->middleware('permission:movimentacoes.transferencias.criar')
+                ->name('create');
+
+            Route::post('/', [TransferenciaMovimentacaoController::class, 'store'])
+                ->middleware('permission:movimentacoes.transferencias.criar')
+                ->name('store');
+
+            Route::get('/{transferenciaOrigem}', [TransferenciaMovimentacaoController::class, 'show'])
+                ->middleware('permission:movimentacoes.transferencias.visualizar')
+                ->name('show');
+
+            Route::post('/{transferenciaOrigem}/recebimento', [RecebimentoTransferenciaController::class, 'store'])
+                ->middleware('permission:movimentacoes.transferencias.receber')
+                ->name('recebimento.store');
+
+            Route::post('/{transferenciaOrigem}/reenviar', [TransferenciaMovimentacaoController::class, 'reenviar'])
+                ->middleware('permission:movimentacoes.transferencias.reenviar')
+                ->name('reenviar');
+
+            Route::post('/{transferenciaOrigem}/cancelar', [TransferenciaMovimentacaoController::class, 'cancelar'])
+                ->middleware('permission:movimentacoes.transferencias.cancelar')
+                ->name('cancelar');
+
+            Route::post('/{transferenciaOrigem}/cancelar-admin', CancelarTransferenciaMovimentacaoAdminController::class)
+                ->middleware('role_or_permission:Administrador|movimentacoes.transferencias.cancelar-admin')
+                ->name('cancelar-admin');
+        });
+
+        Route::prefix('movimentacoes/doacoes')->name('movimentacoes.doacoes.')->group(function () {
+            Route::get('/', [DoacaoMovimentacaoController::class, 'index'])
+                ->middleware('permission:movimentacoes.doacoes.visualizar')
+                ->name('index');
+
+            Route::get('/criar', [DoacaoMovimentacaoController::class, 'create'])
+                ->middleware('permission:movimentacoes.doacoes.criar')
+                ->name('create');
+
+            Route::post('/', [DoacaoMovimentacaoController::class, 'store'])
+                ->middleware('permission:movimentacoes.doacoes.criar')
+                ->name('store');
+
+            Route::get('/{movimentacaoDoacao}', [DoacaoMovimentacaoController::class, 'show'])
+                ->middleware('permission:movimentacoes.doacoes.visualizar')
+                ->name('show');
+
+            Route::get('/{movimentacaoDoacao}/editar', [DoacaoMovimentacaoController::class, 'edit'])
+                ->middleware('permission:movimentacoes.doacoes.editar')
+                ->name('edit');
+
+            Route::put('/{movimentacaoDoacao}', [DoacaoMovimentacaoController::class, 'update'])
+                ->middleware('permission:movimentacoes.doacoes.editar')
+                ->name('update');
+
+            Route::post('/{movimentacaoDoacao}/cancelar-admin', CancelarDoacaoMovimentacaoAdminController::class)
+                ->middleware('role_or_permission:Administrador|movimentacoes.doacoes.cancelar-admin')
+                ->name('cancelar-admin');
         });
 
         Route::prefix('grupos-permissoes')->name('grupos-permissoes.')->group(function () {

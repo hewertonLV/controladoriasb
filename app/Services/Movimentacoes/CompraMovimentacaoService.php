@@ -505,7 +505,8 @@ final class CompraMovimentacaoService
                 $valorNfUm = round($valorNfTotal / $qtdUm, 2);
 
                 $valorCo = (float) $m->valor_custo_operacional;
-                $icmsKg = (float) $this->calcularIcmsPorKg($fruta, $unidade, $fornecedor);
+                // Preserva o ICMS histórico da linha; mudança posterior em frutas.icms_* só vale para novos lançamentos.
+                $icmsKg = (float) $m->icms_convertido_kg;
                 $kgPorUm = (float) $fruta->kg_por_unidade_medicao;
                 $precoMedioKg = round($valorNfKg + $valorCo + $valorFreteKg + $icmsKg, 2);
                 $precoMedioUm = round($precoMedioKg * $kgPorUm, 2);

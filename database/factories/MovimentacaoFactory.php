@@ -23,6 +23,7 @@ class MovimentacaoFactory extends Factory
             'valor_nf_total' => '0.00',
             'valor_nf_um' => '0.00',
             'valor_nf_kg' => '0.00',
+            'valor_total_movimentacao' => '0.00',
             'qtd_fruta_kg' => '10.00',
             'qtd_fruta_um' => '0.00',
             'valor_frete_rateio' => '0.00',

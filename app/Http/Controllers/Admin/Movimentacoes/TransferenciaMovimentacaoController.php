@@ -2,20 +2,112 @@
 
 namespace App\Http\Controllers\Admin\Movimentacoes;
 
-use App\Actions\Movimentacoes\Transferencia\RegistrarTransferenciaMovimentacaoAction;
+use App\Actions\Movimentacoes\Transferencia\CancelarTransferenciaAction;
+use App\Actions\Movimentacoes\Transferencia\CriarTransferenciaMovimentacaoAction;
+use App\Actions\Movimentacoes\Transferencia\ReenviarTransferenciaAction;
+use App\Enums\CategoriaMovimentacaoTipo;
+use App\Enums\MovimentacaoStatusRegistro;
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Admin\Movimentacoes\CancelarTransferenciaRequest;
+use App\Http\Requests\Admin\Movimentacoes\ReenviarTransferenciaRequest;
 use App\Http\Requests\Admin\Movimentacoes\StoreTransferenciaMovimentacaoRequest;
+use App\Models\Movimentacao;
+use App\Models\StatusMovimentacao;
+use App\Services\Movimentacoes\TransferenciaMovimentacaoService;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\RedirectResponse;
+use Illuminate\View\View;
 
 class TransferenciaMovimentacaoController extends Controller
 {
-    public function store(StoreTransferenciaMovimentacaoRequest $request, RegistrarTransferenciaMovimentacaoAction $registrar): JsonResponse
+    public function index(): View
     {
-        $preview = $registrar($request);
+        $movimentacoes = Movimentacao::query()
+            ->with(['empresaOrigem', 'empresaDestino', 'fruta', 'frete'])
+            ->where('categoria_movimentacao_id', CategoriaMovimentacaoTipo::Transferencia->value)
+            ->where('status_movimentacao_id', StatusMovimentacao::ID_SAIDA)
+            ->where('status_registro', MovimentacaoStatusRegistro::ATIVO->value)
+            ->orderByDesc('data_movimentacao')
+            ->orderByDesc('id')
+            ->paginate(15)
+            ->withQueryString();
 
-        return response()->json([
-            'message' => 'Pré-visualização em memória; persistência na próxima fase.',
-            'data' => $preview->only($preview->getFillable()),
+        return view('admin.movimentacoes.transferencias.index', [
+            'movimentacoes' => $movimentacoes,
         ]);
+    }
+
+    public function create(TransferenciaMovimentacaoService $transferencias): View
+    {
+        return view('admin.movimentacoes.transferencias.create', $transferencias->opcoesFormularioTransferencia());
+    }
+
+    public function store(
+        StoreTransferenciaMovimentacaoRequest $request,
+        CriarTransferenciaMovimentacaoAction $criar,
+    ): JsonResponse|RedirectResponse {
+        $par = $criar($request);
+        $anchor = (int) $par['saida']->transferencia_origem_id;
+
+        if ($request->expectsJson()) {
+            return response()->json(['data' => $par], JsonResponse::HTTP_CREATED);
+        }
+
+        return redirect()
+            ->route('admin.movimentacoes.transferencias.show', ['transferenciaOrigem' => $anchor])
+            ->with('success', 'Transferência registrada (saída na origem e entrada pendente no destino).');
+    }
+
+    public function show(Movimentacao $transferenciaOrigem): View
+    {
+        $saida = $transferenciaOrigem->load([
+            'empresaOrigem',
+            'empresaDestino',
+            'fruta',
+            'frete',
+            'movimentacaoPareada.custoOperacionalHistorico',
+        ]);
+
+        $entrada = $saida->movimentacaoPareada;
+        abort_if($entrada === null, 404);
+
+        return view('admin.movimentacoes.transferencias.show', [
+            'saida' => $saida,
+            'entrada' => $entrada,
+        ]);
+    }
+
+    public function reenviar(
+        ReenviarTransferenciaRequest $request,
+        Movimentacao $transferenciaOrigem,
+        ReenviarTransferenciaAction $reenviar,
+    ): JsonResponse|RedirectResponse {
+        $anchor = (int) $transferenciaOrigem->transferencia_origem_id;
+        $par = $reenviar($request, $anchor);
+
+        if ($request->expectsJson()) {
+            return response()->json(['data' => $par]);
+        }
+
+        return redirect()
+            ->route('admin.movimentacoes.transferencias.show', ['transferenciaOrigem' => $anchor])
+            ->with('success', 'Transferência reenviada (nova versão ativa).');
+    }
+
+    public function cancelar(
+        CancelarTransferenciaRequest $request,
+        Movimentacao $transferenciaOrigem,
+        CancelarTransferenciaAction $cancelar,
+    ): JsonResponse|RedirectResponse {
+        $anchor = (int) $transferenciaOrigem->transferencia_origem_id;
+        $cancelar($request, $anchor);
+
+        if ($request->expectsJson()) {
+            return response()->json(['message' => 'Transferência cancelada.']);
+        }
+
+        return redirect()
+            ->route('admin.movimentacoes.transferencias.index')
+            ->with('success', 'Transferência cancelada e estoque de origem estornado.');
     }
 }

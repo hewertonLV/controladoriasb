@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Enums\CategoriaMovimentacaoTipo;
 use App\Enums\MovimentacaoStatusRegistro;
 use App\Models\Concerns\NormalizaAtributosMonetariosMovimentacao;
+use App\Support\Movimentacoes\DoacaoValorEconomico;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -25,6 +26,7 @@ use Illuminate\Support\Carbon;
  * @property string $valor_nf_total
  * @property string $valor_nf_um
  * @property string $valor_nf_kg
+ * @property string $valor_total_movimentacao
  * @property string $qtd_fruta_um
  * @property string $qtd_fruta_kg
  * @property int|null $id_frete
@@ -39,6 +41,18 @@ use Illuminate\Support\Carbon;
  * @property string $preco_medio_fruta_um
  * @property string $icms_convertido_kg
  * @property int $categoria_movimentacao_id
+ * @property int|null $status_movimentacao_id
+ * @property string|null $status_transferencia
+ * @property int|null $transferencia_origem_id
+ * @property int|null $pareada_movimentacao_id
+ * @property string|null $numero_nf_origem
+ * @property string|null $numero_nf_destino
+ * @property string|null $qtd_recebida_um
+ * @property string|null $qtd_recebida_kg
+ * @property string|null $status_recebimento
+ * @property string|null $observacao
+ * @property string|null $motivo_doacao
+ * @property string|null $observacao_recebimento
  * @property int|null $movimentacao_origem_id
  * @property int|null $substituida_por_id
  * @property int $versao
@@ -46,8 +60,12 @@ use Illuminate\Support\Carbon;
  * @property string|null $motivo_substituicao
  * @property Carbon|null $substituida_em
  * @property Carbon $data_movimentacao
+ * @property int|null $cancelada_por
+ * @property Carbon|null $cancelada_em
+ * @property string|null $motivo_cancelamento
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
+ * @property-read User|null $canceladaPor
  * @property-read MovimentacaoEstoque|null $movimentacaoEstoqueOld
  * @property-read MovimentacaoEstoque|null $movimentacaoEstoqueNew
  * @property-read Empresa|null $empresaOrigem
@@ -60,6 +78,7 @@ use Illuminate\Support\Carbon;
  * @property-read Movimentacao|null $origem
  * @property-read Movimentacao|null $substituidaPor
  * @property-read Movimentacao|null $versaoAnterior
+ * @property-read Movimentacao|null $movimentacaoPareada
  */
 class Movimentacao extends Model
 {
@@ -80,6 +99,7 @@ class Movimentacao extends Model
         'valor_nf_total',
         'valor_nf_um',
         'valor_nf_kg',
+        'valor_total_movimentacao',
         'qtd_fruta_um',
         'qtd_fruta_kg',
         'id_frete',
@@ -94,6 +114,18 @@ class Movimentacao extends Model
         'preco_medio_fruta_um',
         'icms_convertido_kg',
         'categoria_movimentacao_id',
+        'status_movimentacao_id',
+        'status_transferencia',
+        'transferencia_origem_id',
+        'pareada_movimentacao_id',
+        'numero_nf_origem',
+        'numero_nf_destino',
+        'qtd_recebida_um',
+        'qtd_recebida_kg',
+        'status_recebimento',
+        'observacao',
+        'motivo_doacao',
+        'observacao_recebimento',
         'movimentacao_origem_id',
         'substituida_por_id',
         'versao',
@@ -101,6 +133,9 @@ class Movimentacao extends Model
         'motivo_substituicao',
         'substituida_em',
         'data_movimentacao',
+        'cancelada_por',
+        'cancelada_em',
+        'motivo_cancelamento',
     ];
 
     /**
@@ -117,14 +152,20 @@ class Movimentacao extends Model
             'id_frete' => 'integer',
             'id_custo_operacional' => 'integer',
             'categoria_movimentacao_id' => 'integer',
+            'status_movimentacao_id' => 'integer',
+            'transferencia_origem_id' => 'integer',
+            'pareada_movimentacao_id' => 'integer',
             'movimentacao_origem_id' => 'integer',
             'substituida_por_id' => 'integer',
             'versao' => 'integer',
             'valor_nf_total' => 'decimal:2',
             'valor_nf_um' => 'decimal:2',
             'valor_nf_kg' => 'decimal:2',
+            'valor_total_movimentacao' => 'decimal:2',
             'qtd_fruta_um' => 'decimal:2',
             'qtd_fruta_kg' => 'decimal:2',
+            'qtd_recebida_um' => 'decimal:2',
+            'qtd_recebida_kg' => 'decimal:2',
             'valor_frete_rateio' => 'decimal:2',
             'valor_frete_um' => 'decimal:2',
             'valor_frete_kg' => 'decimal:2',
@@ -136,6 +177,8 @@ class Movimentacao extends Model
             'icms_convertido_kg' => 'decimal:2',
             'data_movimentacao' => 'datetime',
             'substituida_em' => 'datetime',
+            'cancelada_por' => 'integer',
+            'cancelada_em' => 'datetime',
         ];
     }
 
@@ -214,6 +257,24 @@ class Movimentacao extends Model
     }
 
     /**
+     * @return BelongsTo<User, $this>
+     */
+    public function canceladaPor(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'cancelada_por');
+    }
+
+    /**
+     * Outra perna da mesma transferência (saída ↔ entrada pendente).
+     *
+     * @return BelongsTo<Movimentacao, $this>
+     */
+    public function movimentacaoPareada(): BelongsTo
+    {
+        return $this->belongsTo(Movimentacao::class, 'pareada_movimentacao_id');
+    }
+
+    /**
      * Primeira versão da cadeia (quando {@see $movimentacao_origem_id} é null, o próprio registro é a raiz).
      *
      * @return BelongsTo<Movimentacao, $this>
@@ -261,6 +322,18 @@ class Movimentacao extends Model
     public function idCadeiaRaiz(): int
     {
         return (int) ($this->movimentacao_origem_id ?? $this->id);
+    }
+
+    /**
+     * Valor exibido em relatórios: em doação, custo econômico da baixa; nas demais categorias, NF total.
+     */
+    public function valorEconomicoParaRelatorio(): float
+    {
+        if ($this->categoriaTipo() === CategoriaMovimentacaoTipo::Doacao) {
+            return DoacaoValorEconomico::valorTotalMovimentacao($this);
+        }
+
+        return (float) $this->valor_nf_total;
     }
 
     public function versaoAtual(): ?Movimentacao

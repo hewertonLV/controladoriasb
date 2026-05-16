@@ -172,6 +172,28 @@ final class Permissions
 
     public const MOVIMENTACOES_COMPRAS_EDITAR = 'movimentacoes.compras.editar';
 
+    public const MOVIMENTACOES_COMPRAS_CANCELAR_ADMIN = 'movimentacoes.compras.cancelar-admin';
+
+    public const MOVIMENTACOES_TRANSFERENCIAS_VISUALIZAR = 'movimentacoes.transferencias.visualizar';
+
+    public const MOVIMENTACOES_TRANSFERENCIAS_CRIAR = 'movimentacoes.transferencias.criar';
+
+    public const MOVIMENTACOES_TRANSFERENCIAS_RECEBER = 'movimentacoes.transferencias.receber';
+
+    public const MOVIMENTACOES_TRANSFERENCIAS_REENVIAR = 'movimentacoes.transferencias.reenviar';
+
+    public const MOVIMENTACOES_TRANSFERENCIAS_CANCELAR = 'movimentacoes.transferencias.cancelar';
+
+    public const MOVIMENTACOES_TRANSFERENCIAS_CANCELAR_ADMIN = 'movimentacoes.transferencias.cancelar-admin';
+
+    public const MOVIMENTACOES_DOACOES_VISUALIZAR = 'movimentacoes.doacoes.visualizar';
+
+    public const MOVIMENTACOES_DOACOES_CRIAR = 'movimentacoes.doacoes.criar';
+
+    public const MOVIMENTACOES_DOACOES_EDITAR = 'movimentacoes.doacoes.editar';
+
+    public const MOVIMENTACOES_DOACOES_CANCELAR_ADMIN = 'movimentacoes.doacoes.cancelar-admin';
+
     public const GRUPOS_VISUALIZAR = 'grupos.visualizar';
 
     public const GRUPOS_CRIAR = 'grupos.criar';
@@ -306,6 +328,21 @@ final class Permissions
                 self::MOVIMENTACOES_COMPRAS_VISUALIZAR,
                 self::MOVIMENTACOES_COMPRAS_CRIAR,
                 self::MOVIMENTACOES_COMPRAS_EDITAR,
+                self::MOVIMENTACOES_COMPRAS_CANCELAR_ADMIN,
+            ],
+            'Movimentações — Transferência' => [
+                self::MOVIMENTACOES_TRANSFERENCIAS_VISUALIZAR,
+                self::MOVIMENTACOES_TRANSFERENCIAS_CRIAR,
+                self::MOVIMENTACOES_TRANSFERENCIAS_RECEBER,
+                self::MOVIMENTACOES_TRANSFERENCIAS_REENVIAR,
+                self::MOVIMENTACOES_TRANSFERENCIAS_CANCELAR,
+                self::MOVIMENTACOES_TRANSFERENCIAS_CANCELAR_ADMIN,
+            ],
+            'Movimentações — Doação' => [
+                self::MOVIMENTACOES_DOACOES_VISUALIZAR,
+                self::MOVIMENTACOES_DOACOES_CRIAR,
+                self::MOVIMENTACOES_DOACOES_EDITAR,
+                self::MOVIMENTACOES_DOACOES_CANCELAR_ADMIN,
             ],
         ];
     }
