@@ -10,6 +10,7 @@ use App\Enums\Permissions;
 use App\Enums\StatusRecebimentoTransferencia;
 use App\Enums\StatusTransferenciaOperacional;
 use App\Models\Cliente;
+use App\Models\CategoriaDescarte;
 use App\Models\Empresa;
 use App\Models\Estado;
 use App\Models\Estoque;
@@ -23,6 +24,7 @@ use App\Models\MovimentacaoHistorico;
 use App\Models\StatusMovimentacao;
 use App\Models\UnidadeNegocio;
 use App\Services\UnidadesNegocio\HistoricoCustoOperacionalUnidadeNegocioService;
+use Database\Seeders\CategoriaDescarteSeeder;
 use Database\Seeders\CategoriaMovimentacaoSeeder;
 use Database\Seeders\EstadoSeeder;
 use Database\Seeders\StatusMovimentacaoSeeder;
@@ -44,6 +46,7 @@ class FluxoIntegradoMovimentacoesComCustosEImpostosTest extends TestCase
             EstadoSeeder::class,
             StatusMovimentacaoSeeder::class,
             CategoriaMovimentacaoSeeder::class,
+            CategoriaDescarteSeeder::class,
         ]);
     }
 
@@ -260,8 +263,8 @@ class FluxoIntegradoMovimentacoesComCustosEImpostosTest extends TestCase
             valorNfTotal: '420,00',
         ));
 
-        // 32. Doação Unidade C.
-        $doacaoC2 = $this->evento(fn () => $this->registrarDoacao(
+        // 32. Descarte Unidade C.
+        $descarteC1 = $this->evento(fn () => $this->registrarDescarte(
             origem: $c['empresa_c'],
             fruta: $c['fruta'],
             qtdUm: '0.5',
@@ -296,7 +299,7 @@ class FluxoIntegradoMovimentacoesComCustosEImpostosTest extends TestCase
         $this->assertDoacaoPreservaPrecoMedioEValorEconomico($doacaoA1);
         $this->assertDoacaoPreservaPrecoMedioEValorEconomico($doacaoB1);
         $this->assertDoacaoPreservaPrecoMedioEValorEconomico($doacaoC1);
-        $this->assertDoacaoPreservaPrecoMedioEValorEconomico($doacaoC2);
+        $this->assertDescartePreservaPrecoMedioEValorEconomico($descarteC1);
         $this->assertTransferenciaDivergenteOuPendenteNaoEntraNoDestino();
         $this->assertTransferenciasConformesEntraramNoDestino();
         $this->assertCancelamentoAdministrativoReprocessouLinhaDoTempo();
@@ -459,6 +462,24 @@ class FluxoIntegradoMovimentacoesComCustosEImpostosTest extends TestCase
 
         return Movimentacao::query()
             ->where('categoria_movimentacao_id', CategoriaMovimentacaoTipo::Doacao->value)
+            ->where('id_empresa_origem', $origem->id)
+            ->where('id_fruta', $fruta->id)
+            ->orderByDesc('id')
+            ->firstOrFail();
+    }
+
+    private function registrarDescarte(Empresa $origem, Fruta $fruta, string $qtdUm): Movimentacao
+    {
+        $this->actingAs($this->movimentacoesDescartesUsuario())->postJson(route('admin.movimentacoes.descartes.store'), [
+            'id_empresa_origem' => $origem->id,
+            'id_fruta' => $fruta->id,
+            'qtd_fruta_um' => $qtdUm,
+            'categoria_descarte_id' => CategoriaDescarte::ID_PERDA_OPERACIONAL,
+            'motivo_descarte' => 'Descarte stress integrado',
+        ])->assertCreated();
+
+        return Movimentacao::query()
+            ->where('categoria_movimentacao_id', CategoriaMovimentacaoTipo::Descarte->value)
             ->where('id_empresa_origem', $origem->id)
             ->where('id_fruta', $fruta->id)
             ->orderByDesc('id')
@@ -730,6 +751,22 @@ class FluxoIntegradoMovimentacoesComCustosEImpostosTest extends TestCase
             $this->assertSame((string) $doacao->preco_medio_fruta_kg, (string) $me->preco_medio_kg);
             $this->assertSame((string) $doacao->preco_medio_fruta_um, (string) $me->preco_medio_um);
         }
+    }
+
+    private function assertDescartePreservaPrecoMedioEValorEconomico(Movimentacao $descarte): void
+    {
+        $descarte->refresh();
+        $this->assertSame('0.00', (string) $descarte->valor_nf_total);
+        $this->assertSame('0.00', (string) $descarte->icms_convertido_kg);
+        $this->assertSame('0.00', (string) $descarte->valor_custo_operacional);
+        $this->assertSame(
+            number_format(round((float) $descarte->preco_medio_fruta_kg * (float) $descarte->qtd_fruta_kg, 2), 2, '.', ''),
+            (string) $descarte->valor_total_movimentacao,
+        );
+
+        $me = MovimentacaoEstoque::query()->findOrFail((int) $descarte->id_movimentacao_estoque_new);
+        $this->assertSame((string) $descarte->preco_medio_fruta_kg, (string) $me->preco_medio_kg);
+        $this->assertSame((string) $descarte->preco_medio_fruta_um, (string) $me->preco_medio_um);
     }
 
     private function assertTransferenciaDivergenteOuPendenteNaoEntraNoDestino(): void

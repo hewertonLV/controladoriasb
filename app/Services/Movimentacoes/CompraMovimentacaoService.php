@@ -182,6 +182,7 @@ final class CompraMovimentacaoService
             $valorFreteUm = round($valorFreteRateio / $qtdUm, 2);
 
             $icmsKg = (float) $this->calcularIcmsPorKg($fruta, $unidade, $fornecedor);
+            $icmsHistorico = $this->camposIcmsHistorico($icmsKg, $qtdKg, $qtdUm);
             $precoMedioKgLote = round($valorNfKg + $valorCo + $valorFreteKg + $icmsKg, 2);
             $precoMedioUmLote = round($precoMedioKgLote * $kgPorUm, 2);
 
@@ -217,6 +218,9 @@ final class CompraMovimentacaoService
                 'preco_medio_fruta_kg' => number_format($precoMedioKgLote, 2, '.', ''),
                 'preco_medio_fruta_um' => number_format($precoMedioUmLote, 2, '.', ''),
                 'icms_convertido_kg' => number_format($icmsKg, 2, '.', ''),
+                'valor_icms_total' => $icmsHistorico['valor_icms_total'],
+                'valor_icms_kg' => $icmsHistorico['valor_icms_kg'],
+                'valor_icms_um' => $icmsHistorico['valor_icms_um'],
                 'categoria_movimentacao_id' => $categoriaId,
                 'data_movimentacao' => now(),
                 'versao' => 1,
@@ -364,6 +368,7 @@ final class CompraMovimentacaoService
 
             $valorCo = (float) $ativa->valor_custo_operacional;
             $icmsKg = (float) $this->calcularIcmsPorKg($fruta, $unidade, $fornecedor);
+            $icmsHistorico = $this->camposIcmsHistorico($icmsKg, $qtdKg, $qtdUm);
             $precoMedioKgLoteProvisional = round($valorNfKg + $valorCo + $valorFreteKg + $icmsKg, 2);
             $precoMedioUmLoteProvisional = round($precoMedioKgLoteProvisional * $kgPorUm, 2);
 
@@ -398,6 +403,9 @@ final class CompraMovimentacaoService
                 'preco_medio_fruta_kg' => number_format($precoMedioKgLoteProvisional, 2, '.', ''),
                 'preco_medio_fruta_um' => number_format($precoMedioUmLoteProvisional, 2, '.', ''),
                 'icms_convertido_kg' => number_format($icmsKg, 2, '.', ''),
+                'valor_icms_total' => $icmsHistorico['valor_icms_total'],
+                'valor_icms_kg' => $icmsHistorico['valor_icms_kg'],
+                'valor_icms_um' => $icmsHistorico['valor_icms_um'],
                 'categoria_movimentacao_id' => $ativa->categoria_movimentacao_id,
             ];
 
@@ -575,6 +583,20 @@ final class CompraMovimentacaoService
         $icmsKg = $umIcms === 'KG' ? $icmsUm : ($kgPorUm > 0 ? $icmsUm / $kgPorUm : 0.0);
 
         return number_format(round(max(0, $icmsKg), 2), 2, '.', '');
+    }
+
+    /**
+     * @return array{valor_icms_total: string, valor_icms_kg: string, valor_icms_um: string}
+     */
+    private function camposIcmsHistorico(float $icmsKg, float $qtdKg, float $qtdUm): array
+    {
+        $total = round($icmsKg * $qtdKg, 2);
+
+        return [
+            'valor_icms_total' => number_format($total, 2, '.', ''),
+            'valor_icms_kg' => number_format($icmsKg, 2, '.', ''),
+            'valor_icms_um' => number_format($qtdUm > 0 ? $total / $qtdUm : 0, 2, '.', ''),
+        ];
     }
 
     private function obterOuCriarEstoqueComLock(int $idUnidade, int $idFruta): Estoque

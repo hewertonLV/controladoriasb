@@ -167,6 +167,15 @@ final class ReplayLinhaTempoEstoqueService
             ->get()
             ->map(static fn (Movimentacao $m): array => ['tipo' => 'saida', 'movimentacao' => $m]);
 
+        $saidasDescarte = Movimentacao::query()
+            ->vigentesParaCalculo()
+            ->where('categoria_movimentacao_id', CategoriaMovimentacaoTipo::Descarte->value)
+            ->where('status_movimentacao_id', StatusMovimentacao::ID_SAIDA)
+            ->where('id_empresa_origem', $empresaId)
+            ->where('id_fruta', $idFruta)
+            ->get()
+            ->map(static fn (Movimentacao $m): array => ['tipo' => 'saida', 'movimentacao' => $m]);
+
         $saidasTransferencia = Movimentacao::query()
             ->vigentesParaCalculo()
             ->where('categoria_movimentacao_id', CategoriaMovimentacaoTipo::Transferencia->value)
@@ -179,6 +188,7 @@ final class ReplayLinhaTempoEstoqueService
         return $entradasCompra
             ->concat($entradasTransferencia)
             ->concat($saidasDoacao)
+            ->concat($saidasDescarte)
             ->concat($saidasTransferencia)
             ->sortBy(static function (array $evento): array {
                 /** @var Movimentacao $m */
@@ -243,6 +253,7 @@ final class ReplayLinhaTempoEstoqueService
             'id_movimentacao_estoque_new' => $me->id,
             'saldo_estoque_fruta_kg' => number_format($runKg, 2, '.', ''),
             'saldo_estoque_fruta_um' => number_format($runUm, 2, '.', ''),
+            'versao_replay' => (int) ($m->versao_replay ?? 1) + 1,
         ])->saveQuietly();
 
         return [$runUm, $runKg, $valorAcumulado, (int) $me->id, (int) $me->id];
@@ -296,13 +307,18 @@ final class ReplayLinhaTempoEstoqueService
             'saldo_estoque_fruta_um' => number_format($runUm, 2, '.', ''),
             'preco_medio_fruta_kg' => number_format($precoMedioKg, 2, '.', ''),
             'preco_medio_fruta_um' => number_format($precoMedioUm, 2, '.', ''),
+            'versao_replay' => (int) ($m->versao_replay ?? 1) + 1,
         ];
 
-        if ((int) $m->categoria_movimentacao_id === CategoriaMovimentacaoTipo::Doacao->value) {
+        if (in_array((int) $m->categoria_movimentacao_id, [CategoriaMovimentacaoTipo::Doacao->value, CategoriaMovimentacaoTipo::Descarte->value], true)) {
             $attrs['valor_total_movimentacao'] = number_format($valorMovimentacao, 2, '.', '');
             $attrs['valor_nf_total'] = '0.00';
             $attrs['valor_nf_um'] = '0.00';
             $attrs['valor_nf_kg'] = '0.00';
+            $attrs['valor_icms_total'] = '0.00';
+            $attrs['valor_icms_kg'] = '0.00';
+            $attrs['valor_icms_um'] = '0.00';
+            $attrs['icms_convertido_kg'] = '0.00';
         }
 
         $m->forceFill($attrs)->saveQuietly();

@@ -12,6 +12,7 @@ use App\Enums\StatusTransferenciaOperacional;
 use App\Models\Empresa;
 use App\Models\Estado;
 use App\Models\Estoque;
+use App\Models\CategoriaDescarte;
 use App\Models\Fornecedor;
 use App\Models\Frete;
 use App\Models\Fruta;
@@ -21,6 +22,7 @@ use App\Models\MovimentacaoEstoque;
 use App\Models\MovimentacaoHistorico;
 use App\Models\StatusMovimentacao;
 use App\Models\UnidadeNegocio;
+use Database\Seeders\CategoriaDescarteSeeder;
 use Database\Seeders\CategoriaMovimentacaoSeeder;
 use Database\Seeders\EstadoSeeder;
 use Database\Seeders\StatusMovimentacaoSeeder;
@@ -39,6 +41,7 @@ class FluxoIntegradoMovimentacoesTest extends TestCase
             EstadoSeeder::class,
             StatusMovimentacaoSeeder::class,
             CategoriaMovimentacaoSeeder::class,
+            CategoriaDescarteSeeder::class,
         ]);
     }
 
@@ -238,6 +241,42 @@ class FluxoIntegradoMovimentacoesTest extends TestCase
         $this->assertEstoque($c['unidade_b'], $c['fruta'], '40.00', '4.00', '8.00', '80.00', '320.00');
     }
 
+    public function test_cenario_10_compra_doacao_e_descarte_preservam_preco_medio_e_valor_acumulado(): void
+    {
+        $this->seedBase();
+        $c = $this->cenarioBase();
+
+        $this->registrarCompra($c, $c['frete_compra'], '10', '500,00');
+        $doacao = $this->registrarDoacao($c['empresa_a'], $c['fruta'], '2');
+        $descarte = $this->registrarDescarte($c['empresa_a'], $c['fruta'], '1');
+
+        $this->assertSame('100.00', (string) $doacao->valor_total_movimentacao);
+        $this->assertSame('50.00', (string) $descarte->valor_total_movimentacao);
+        $this->assertSame('5.00', (string) $descarte->preco_medio_fruta_kg);
+        $this->assertEstoque($c['unidade_a'], $c['fruta'], '70.00', '7.00', '5.00', '50.00', '350.00');
+        $this->assertUltimaPosicaoBateComEstoque($c['unidade_a'], $c['fruta']);
+    }
+
+    public function test_cenario_11_cancelamento_admin_de_descarte_reprocessa_movimentacoes_futuras(): void
+    {
+        $this->seedBase();
+        $c = $this->cenarioBase();
+
+        $this->registrarCompra($c, $c['frete_compra'], '10', '500,00');
+        $descarte1 = $this->registrarDescarte($c['empresa_a'], $c['fruta'], '2');
+        $descarte2 = $this->registrarDescarte($c['empresa_a'], $c['fruta'], '1');
+
+        $this->cancelarDescarteAdmin($descarte1);
+
+        $descarte1->refresh();
+        $descarte2->refresh();
+        $this->assertSame(MovimentacaoStatusRegistro::CANCELADO->value, $descarte1->status_registro);
+        $this->assertSame('50.00', (string) $descarte2->valor_total_movimentacao);
+        $this->assertGreaterThan(1, (int) $descarte2->versao_replay);
+        $this->assertEstoque($c['unidade_a'], $c['fruta'], '90.00', '9.00', '5.00', '50.00', '450.00');
+        $this->assertUltimaPosicaoBateComEstoque($c['unidade_a'], $c['fruta']);
+    }
+
     public function test_permissoes_bloqueiam_acoes_criticas_integradas(): void
     {
         $this->seedBase();
@@ -396,6 +435,25 @@ class FluxoIntegradoMovimentacoesTest extends TestCase
             ->firstOrFail();
     }
 
+    private function registrarDescarte(Empresa $empresaOrigem, Fruta $fruta, string $qtdUm): Movimentacao
+    {
+        $user = $this->movimentacoesDescartesUsuario();
+
+        $this->actingAs($user)->postJson(route('admin.movimentacoes.descartes.store'), [
+            'id_empresa_origem' => $empresaOrigem->id,
+            'id_fruta' => $fruta->id,
+            'qtd_fruta_um' => $qtdUm,
+            'categoria_descarte_id' => CategoriaDescarte::ID_AVARIA,
+            'motivo_descarte' => 'Descarte integrado de teste',
+        ])->assertCreated();
+
+        return Movimentacao::query()
+            ->where('categoria_movimentacao_id', CategoriaMovimentacaoTipo::Descarte->value)
+            ->where('status_movimentacao_id', StatusMovimentacao::ID_SAIDA)
+            ->orderByDesc('id')
+            ->firstOrFail();
+    }
+
     /**
      * @param  array<string, mixed>  $cenario
      */
@@ -484,6 +542,15 @@ class FluxoIntegradoMovimentacoesTest extends TestCase
             'acao' => MovimentacaoHistorico::ACAO_CANCELAMENTO_ADMIN,
             'origem' => MovimentacaoHistorico::ORIGEM_CANCELAMENTO_ADMIN,
         ]);
+    }
+
+    private function cancelarDescarteAdmin(Movimentacao $descarte): void
+    {
+        $admin = $this->userWithPermissions([Permissions::MOVIMENTACOES_DESCARTES_CANCELAR_ADMIN]);
+
+        $this->actingAs($admin)->postJson(route('admin.movimentacoes.descartes.cancelar-admin', $descarte), [
+            'motivo' => 'Cancelamento administrativo integrado de descarte.',
+        ])->assertOk();
     }
 
     private function assertEstoque(

@@ -194,6 +194,14 @@ final class Permissions
 
     public const MOVIMENTACOES_DOACOES_CANCELAR_ADMIN = 'movimentacoes.doacoes.cancelar-admin';
 
+    public const MOVIMENTACOES_DESCARTES_VISUALIZAR = 'movimentacoes.descartes.visualizar';
+
+    public const MOVIMENTACOES_DESCARTES_CRIAR = 'movimentacoes.descartes.criar';
+
+    public const MOVIMENTACOES_DESCARTES_EDITAR = 'movimentacoes.descartes.editar';
+
+    public const MOVIMENTACOES_DESCARTES_CANCELAR_ADMIN = 'movimentacoes.descartes.cancelar-admin';
+
     public const GRUPOS_VISUALIZAR = 'grupos.visualizar';
 
     public const GRUPOS_CRIAR = 'grupos.criar';
@@ -343,6 +351,12 @@ final class Permissions
                 self::MOVIMENTACOES_DOACOES_CRIAR,
                 self::MOVIMENTACOES_DOACOES_EDITAR,
                 self::MOVIMENTACOES_DOACOES_CANCELAR_ADMIN,
+            ],
+            'Movimentações — Descarte' => [
+                self::MOVIMENTACOES_DESCARTES_VISUALIZAR,
+                self::MOVIMENTACOES_DESCARTES_CRIAR,
+                self::MOVIMENTACOES_DESCARTES_EDITAR,
+                self::MOVIMENTACOES_DESCARTES_CANCELAR_ADMIN,
             ],
         ];
     }

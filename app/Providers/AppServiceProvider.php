@@ -4,6 +4,7 @@ namespace App\Providers;
 
 use App\Contracts\Movimentacoes\ReprocessaEstoqueDestinoCompra;
 use App\Contracts\Movimentacoes\ReprocessaSaidasDoacaoOrigem;
+use App\Contracts\Movimentacoes\ReprocessaSaidasDescarteOrigem;
 use App\Contracts\Movimentacoes\ReprocessaSaidasTransferenciaOrigem;
 use App\Enums\CategoriaMovimentacaoTipo;
 use App\Enums\MovimentacaoStatusRegistro;
@@ -19,6 +20,7 @@ use App\Observers\FornecedorObserver;
 use App\Observers\MovimentacaoObserver;
 use App\Observers\UnidadeNegocioObserver;
 use App\Services\Movimentacoes\ReplayEstoqueCompraService;
+use App\Services\Movimentacoes\ReplayEstoqueDescarteService;
 use App\Services\Movimentacoes\ReplayEstoqueDoacaoService;
 use App\Services\Movimentacoes\ReplayEstoqueTransferenciaService;
 use Illuminate\Pagination\Paginator;
@@ -33,6 +35,7 @@ class AppServiceProvider extends ServiceProvider
         $this->app->bind(ReprocessaEstoqueDestinoCompra::class, ReplayEstoqueCompraService::class);
         $this->app->bind(ReprocessaSaidasTransferenciaOrigem::class, ReplayEstoqueTransferenciaService::class);
         $this->app->bind(ReprocessaSaidasDoacaoOrigem::class, ReplayEstoqueDoacaoService::class);
+        $this->app->bind(ReprocessaSaidasDescarteOrigem::class, ReplayEstoqueDescarteService::class);
     }
 
     public function boot(): void
@@ -69,6 +72,14 @@ class AppServiceProvider extends ServiceProvider
             return Movimentacao::query()
                 ->whereKey($value)
                 ->where('categoria_movimentacao_id', CategoriaMovimentacaoTipo::Doacao->value)
+                ->where('status_movimentacao_id', StatusMovimentacao::ID_SAIDA)
+                ->firstOrFail();
+        });
+
+        Route::bind('movimentacaoDescarte', function (string $value): Movimentacao {
+            return Movimentacao::query()
+                ->whereKey($value)
+                ->where('categoria_movimentacao_id', CategoriaMovimentacaoTipo::Descarte->value)
                 ->where('status_movimentacao_id', StatusMovimentacao::ID_SAIDA)
                 ->firstOrFail();
         });

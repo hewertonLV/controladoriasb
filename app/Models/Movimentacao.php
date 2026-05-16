@@ -27,6 +27,9 @@ use Illuminate\Support\Carbon;
  * @property string $valor_nf_um
  * @property string $valor_nf_kg
  * @property string $valor_total_movimentacao
+ * @property string $valor_icms_total
+ * @property string $valor_icms_kg
+ * @property string $valor_icms_um
  * @property string $qtd_fruta_um
  * @property string $qtd_fruta_kg
  * @property int|null $id_frete
@@ -41,6 +44,7 @@ use Illuminate\Support\Carbon;
  * @property string $preco_medio_fruta_um
  * @property string $icms_convertido_kg
  * @property int $categoria_movimentacao_id
+ * @property int|null $categoria_descarte_id
  * @property int|null $status_movimentacao_id
  * @property string|null $status_transferencia
  * @property int|null $transferencia_origem_id
@@ -52,10 +56,12 @@ use Illuminate\Support\Carbon;
  * @property string|null $status_recebimento
  * @property string|null $observacao
  * @property string|null $motivo_doacao
+ * @property string|null $motivo_descarte
  * @property string|null $observacao_recebimento
  * @property int|null $movimentacao_origem_id
  * @property int|null $substituida_por_id
  * @property int $versao
+ * @property int $versao_replay
  * @property string $status_registro
  * @property string|null $motivo_substituicao
  * @property Carbon|null $substituida_em
@@ -75,6 +81,7 @@ use Illuminate\Support\Carbon;
  * @property-read HistoricoCOUnNg|null $custoOperacionalHistorico
  * @property-read MovimentacaoEstoque|null $movimentacaoEstoqueVinculada
  * @property-read CategoriaMovimentacao $categoriaMovimentacao
+ * @property-read CategoriaDescarte|null $categoriaDescarte
  * @property-read Movimentacao|null $origem
  * @property-read Movimentacao|null $substituidaPor
  * @property-read Movimentacao|null $versaoAnterior
@@ -100,6 +107,9 @@ class Movimentacao extends Model
         'valor_nf_um',
         'valor_nf_kg',
         'valor_total_movimentacao',
+        'valor_icms_total',
+        'valor_icms_kg',
+        'valor_icms_um',
         'qtd_fruta_um',
         'qtd_fruta_kg',
         'id_frete',
@@ -114,6 +124,7 @@ class Movimentacao extends Model
         'preco_medio_fruta_um',
         'icms_convertido_kg',
         'categoria_movimentacao_id',
+        'categoria_descarte_id',
         'status_movimentacao_id',
         'status_transferencia',
         'transferencia_origem_id',
@@ -125,10 +136,12 @@ class Movimentacao extends Model
         'status_recebimento',
         'observacao',
         'motivo_doacao',
+        'motivo_descarte',
         'observacao_recebimento',
         'movimentacao_origem_id',
         'substituida_por_id',
         'versao',
+        'versao_replay',
         'status_registro',
         'motivo_substituicao',
         'substituida_em',
@@ -152,16 +165,21 @@ class Movimentacao extends Model
             'id_frete' => 'integer',
             'id_custo_operacional' => 'integer',
             'categoria_movimentacao_id' => 'integer',
+            'categoria_descarte_id' => 'integer',
             'status_movimentacao_id' => 'integer',
             'transferencia_origem_id' => 'integer',
             'pareada_movimentacao_id' => 'integer',
             'movimentacao_origem_id' => 'integer',
             'substituida_por_id' => 'integer',
             'versao' => 'integer',
+            'versao_replay' => 'integer',
             'valor_nf_total' => 'decimal:2',
             'valor_nf_um' => 'decimal:2',
             'valor_nf_kg' => 'decimal:2',
             'valor_total_movimentacao' => 'decimal:2',
+            'valor_icms_total' => 'decimal:2',
+            'valor_icms_kg' => 'decimal:2',
+            'valor_icms_um' => 'decimal:2',
             'qtd_fruta_um' => 'decimal:2',
             'qtd_fruta_kg' => 'decimal:2',
             'qtd_recebida_um' => 'decimal:2',
@@ -257,6 +275,14 @@ class Movimentacao extends Model
     }
 
     /**
+     * @return BelongsTo<CategoriaDescarte, $this>
+     */
+    public function categoriaDescarte(): BelongsTo
+    {
+        return $this->belongsTo(CategoriaDescarte::class, 'categoria_descarte_id');
+    }
+
+    /**
      * @return BelongsTo<User, $this>
      */
     public function canceladaPor(): BelongsTo
@@ -325,11 +351,11 @@ class Movimentacao extends Model
     }
 
     /**
-     * Valor exibido em relatórios: em doação, custo econômico da baixa; nas demais categorias, NF total.
+     * Valor exibido em relatórios: em saídas sem receita, custo econômico da baixa; nas demais categorias, NF total.
      */
     public function valorEconomicoParaRelatorio(): float
     {
-        if ($this->categoriaTipo() === CategoriaMovimentacaoTipo::Doacao) {
+        if (in_array($this->categoriaTipo(), [CategoriaMovimentacaoTipo::Doacao, CategoriaMovimentacaoTipo::Descarte], true)) {
             return DoacaoValorEconomico::valorTotalMovimentacao($this);
         }
 

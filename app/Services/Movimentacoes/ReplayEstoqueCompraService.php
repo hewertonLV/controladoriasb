@@ -177,6 +177,7 @@ final class ReplayEstoqueCompraService implements ReprocessaEstoqueDestinoCompra
                 'id_movimentacao_estoque_new' => $me->id,
                 'saldo_estoque_fruta_kg' => number_format($runKg, 2, '.', ''),
                 'saldo_estoque_fruta_um' => number_format($runUm, 2, '.', ''),
+                'versao_replay' => (int) ($m->versao_replay ?? 1) + 1,
             ])->saveQuietly();
 
             $prevMeId = (int) $me->id;

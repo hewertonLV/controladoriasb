@@ -30,6 +30,21 @@ trait NormalizaAtributosMonetariosMovimentacao
         $this->attributes['valor_total_movimentacao'] = TextoCadastro::normalizarValorMonetarioBrasileiro($value);
     }
 
+    protected function setValorIcmsTotalAttribute(mixed $value): void
+    {
+        $this->attributes['valor_icms_total'] = TextoCadastro::normalizarValorMonetarioBrasileiro($value);
+    }
+
+    protected function setValorIcmsKgAttribute(mixed $value): void
+    {
+        $this->attributes['valor_icms_kg'] = TextoCadastro::normalizarValorMonetarioBrasileiro($value);
+    }
+
+    protected function setValorIcmsUmAttribute(mixed $value): void
+    {
+        $this->attributes['valor_icms_um'] = TextoCadastro::normalizarValorMonetarioBrasileiro($value);
+    }
+
     protected function setValorFreteRateioAttribute(mixed $value): void
     {
         $this->attributes['valor_frete_rateio'] = TextoCadastro::normalizarValorMonetarioBrasileiro($value);

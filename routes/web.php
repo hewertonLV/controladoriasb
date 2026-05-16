@@ -23,9 +23,11 @@ use App\Http\Controllers\Admin\GrupoExportacaoController;
 use App\Http\Controllers\Admin\GrupoImportacaoController;
 use App\Http\Controllers\Admin\GrupoPermissaoController;
 use App\Http\Controllers\Admin\Movimentacoes\CancelarCompraMovimentacaoController;
+use App\Http\Controllers\Admin\Movimentacoes\CancelarDescarteMovimentacaoAdminController;
 use App\Http\Controllers\Admin\Movimentacoes\CancelarDoacaoMovimentacaoAdminController;
 use App\Http\Controllers\Admin\Movimentacoes\CancelarTransferenciaMovimentacaoAdminController;
 use App\Http\Controllers\Admin\Movimentacoes\CompraMovimentacaoController;
+use App\Http\Controllers\Admin\Movimentacoes\DescarteMovimentacaoController;
 use App\Http\Controllers\Admin\Movimentacoes\DoacaoMovimentacaoController;
 use App\Http\Controllers\Admin\Movimentacoes\RecebimentoTransferenciaController;
 use App\Http\Controllers\Admin\Movimentacoes\TransferenciaMovimentacaoController;
@@ -778,6 +780,36 @@ Route::middleware(['auth', 'verified', 'user.active', 'password.changed'])->grou
 
             Route::post('/{movimentacaoDoacao}/cancelar-admin', CancelarDoacaoMovimentacaoAdminController::class)
                 ->middleware('role_or_permission:Administrador|movimentacoes.doacoes.cancelar-admin')
+                ->name('cancelar-admin');
+        });
+
+        Route::prefix('movimentacoes/descartes')->name('movimentacoes.descartes.')->group(function () {
+            Route::get('/', [DescarteMovimentacaoController::class, 'index'])
+                ->middleware('permission:movimentacoes.descartes.visualizar')
+                ->name('index');
+
+            Route::get('/criar', [DescarteMovimentacaoController::class, 'create'])
+                ->middleware('permission:movimentacoes.descartes.criar')
+                ->name('create');
+
+            Route::post('/', [DescarteMovimentacaoController::class, 'store'])
+                ->middleware('permission:movimentacoes.descartes.criar')
+                ->name('store');
+
+            Route::get('/{movimentacaoDescarte}', [DescarteMovimentacaoController::class, 'show'])
+                ->middleware('permission:movimentacoes.descartes.visualizar')
+                ->name('show');
+
+            Route::get('/{movimentacaoDescarte}/editar', [DescarteMovimentacaoController::class, 'edit'])
+                ->middleware('permission:movimentacoes.descartes.editar')
+                ->name('edit');
+
+            Route::put('/{movimentacaoDescarte}', [DescarteMovimentacaoController::class, 'update'])
+                ->middleware('permission:movimentacoes.descartes.editar')
+                ->name('update');
+
+            Route::post('/{movimentacaoDescarte}/cancelar-admin', CancelarDescarteMovimentacaoAdminController::class)
+                ->middleware('role_or_permission:Administrador|movimentacoes.descartes.cancelar-admin')
                 ->name('cancelar-admin');
         });
 

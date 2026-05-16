@@ -6,7 +6,7 @@ use App\Http\Requests\Admin\Movimentacoes\StoreDescarteMovimentacaoRequest;
 use App\Models\Movimentacao;
 use App\Services\Movimentacoes\DescarteMovimentacaoService;
 
-final class RegistrarDescarteMovimentacaoAction
+final class CriarDescarteMovimentacaoAction
 {
     public function __construct(
         private readonly DescarteMovimentacaoService $descarte,
@@ -14,9 +14,9 @@ final class RegistrarDescarteMovimentacaoAction
 
     public function __invoke(StoreDescarteMovimentacaoRequest $request): Movimentacao
     {
-        /** @var array<string, mixed> $dados */
-        $dados = $request->validated();
+        /** @var array<string, mixed> $payload */
+        $payload = $request->validated();
 
-        return $this->descarte->registrarDescarte($dados, $request->user());
+        return $this->descarte->registrarDescarte($payload, $request->user());
     }
 }

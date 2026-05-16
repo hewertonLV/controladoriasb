@@ -316,6 +316,7 @@ final class TransferenciaMovimentacaoService
         }
 
         $icmsKg = (float) $this->calcularIcmsTransferenciaKg($fruta, $unidadeOrigem, $unidadeDestino);
+        $icmsHistoricoEntrada = $this->camposIcmsHistorico($icmsKg, $qtdKg, $qtdUm);
         $valorCoDest = (float) $coDestino->custo_operacional;
         $precoEntradaKg = round($precoMedioOrigemKg + $valorFreteKg + $valorCoDest + $icmsKg, 2);
         $precoEntradaUm = round($precoEntradaKg * $kgPorUm, 2);
@@ -364,6 +365,9 @@ final class TransferenciaMovimentacaoService
             'preco_medio_fruta_kg' => number_format($precoMedioOrigemKg, 2, '.', ''),
             'preco_medio_fruta_um' => number_format($precoMedioOrigemUm, 2, '.', ''),
             'icms_convertido_kg' => number_format(0, 2, '.', ''),
+            'valor_icms_total' => number_format(0, 2, '.', ''),
+            'valor_icms_kg' => number_format(0, 2, '.', ''),
+            'valor_icms_um' => number_format(0, 2, '.', ''),
             'categoria_movimentacao_id' => $categoriaId,
             'status_movimentacao_id' => StatusMovimentacao::ID_SAIDA,
             'status_transferencia' => StatusTransferenciaOperacional::PENDENTE_RECEBIMENTO->value,
@@ -437,6 +441,9 @@ final class TransferenciaMovimentacaoService
             'preco_medio_fruta_kg' => number_format($precoEntradaKg, 2, '.', ''),
             'preco_medio_fruta_um' => number_format($precoEntradaUm, 2, '.', ''),
             'icms_convertido_kg' => number_format($icmsKg, 2, '.', ''),
+            'valor_icms_total' => $icmsHistoricoEntrada['valor_icms_total'],
+            'valor_icms_kg' => $icmsHistoricoEntrada['valor_icms_kg'],
+            'valor_icms_um' => $icmsHistoricoEntrada['valor_icms_um'],
             'categoria_movimentacao_id' => $categoriaId,
             'status_movimentacao_id' => StatusMovimentacao::ID_ENTRADA,
             'status_transferencia' => StatusTransferenciaOperacional::PENDENTE_RECEBIMENTO->value,
@@ -591,6 +598,20 @@ final class TransferenciaMovimentacaoService
         $icmsKg = $umIcms === 'KG' ? $icmsUm : ($kgPorUm > 0 ? $icmsUm / $kgPorUm : 0.0);
 
         return number_format(round(max(0, $icmsKg), 2), 2, '.', '');
+    }
+
+    /**
+     * @return array{valor_icms_total: string, valor_icms_kg: string, valor_icms_um: string}
+     */
+    private function camposIcmsHistorico(float $icmsKg, float $qtdKg, float $qtdUm): array
+    {
+        $total = round($icmsKg * $qtdKg, 2);
+
+        return [
+            'valor_icms_total' => number_format($total, 2, '.', ''),
+            'valor_icms_kg' => number_format($icmsKg, 2, '.', ''),
+            'valor_icms_um' => number_format($qtdUm > 0 ? $total / $qtdUm : 0, 2, '.', ''),
+        ];
     }
 
     private function obterOuCriarEstoqueComLock(int $idUnidade, int $idFruta): Estoque

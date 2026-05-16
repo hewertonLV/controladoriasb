@@ -160,7 +160,12 @@ final class ReplayEstoqueDoacaoService implements ReprocessaSaidasDoacaoOrigem
                 'valor_nf_total' => '0.00',
                 'valor_nf_um' => '0.00',
                 'valor_nf_kg' => '0.00',
+                'valor_icms_total' => '0.00',
+                'valor_icms_kg' => '0.00',
+                'valor_icms_um' => '0.00',
+                'icms_convertido_kg' => '0.00',
                 'valor_total_movimentacao' => number_format($valorMov, 2, '.', ''),
+                'versao_replay' => (int) ($saida->versao_replay ?? 1) + 1,
             ])->saveQuietly();
 
             $prevMeId = (int) $me->id;

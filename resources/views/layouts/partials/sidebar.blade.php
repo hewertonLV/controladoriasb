@@ -184,20 +184,22 @@
                 'movimentacoes.transferencias.criar',
                 'movimentacoes.doacoes.visualizar',
                 'movimentacoes.doacoes.criar',
+                'movimentacoes.descartes.visualizar',
+                'movimentacoes.descartes.criar',
             ])
                 <li class="side-nav-title mt-2">Movimentações</li>
 
                 <li class="side-nav-item">
                     <a data-bs-toggle="collapse"
                        href="#sidebarMovimentacoes"
-                       aria-expanded="{{ request()->routeIs('admin.movimentacoes.compras.*') || request()->routeIs('admin.movimentacoes.transferencias.*') || request()->routeIs('admin.movimentacoes.doacoes.*') ? 'true' : 'false' }}"
+                       aria-expanded="{{ request()->routeIs('admin.movimentacoes.compras.*') || request()->routeIs('admin.movimentacoes.transferencias.*') || request()->routeIs('admin.movimentacoes.doacoes.*') || request()->routeIs('admin.movimentacoes.descartes.*') ? 'true' : 'false' }}"
                        aria-controls="sidebarMovimentacoes"
-                       class="side-nav-link {{ request()->routeIs('admin.movimentacoes.compras.*') || request()->routeIs('admin.movimentacoes.transferencias.*') || request()->routeIs('admin.movimentacoes.doacoes.*') ? '' : 'collapsed' }}">
+                       class="side-nav-link {{ request()->routeIs('admin.movimentacoes.compras.*') || request()->routeIs('admin.movimentacoes.transferencias.*') || request()->routeIs('admin.movimentacoes.doacoes.*') || request()->routeIs('admin.movimentacoes.descartes.*') ? '' : 'collapsed' }}">
                         <span class="menu-icon"><i class="ri-exchange-funds-line"></i></span>
                         <span class="menu-text"> Movimentações </span>
                         <span class="menu-arrow"></span>
                     </a>
-                    <div class="collapse {{ request()->routeIs('admin.movimentacoes.compras.*') || request()->routeIs('admin.movimentacoes.transferencias.*') || request()->routeIs('admin.movimentacoes.doacoes.*') ? 'show' : '' }}" id="sidebarMovimentacoes">
+                    <div class="collapse {{ request()->routeIs('admin.movimentacoes.compras.*') || request()->routeIs('admin.movimentacoes.transferencias.*') || request()->routeIs('admin.movimentacoes.doacoes.*') || request()->routeIs('admin.movimentacoes.descartes.*') ? 'show' : '' }}" id="sidebarMovimentacoes">
                         <ul class="sub-menu">
                             @can('movimentacoes.compras.visualizar')
                                 <li class="side-nav-item">
@@ -248,6 +250,24 @@
                                         <a href="{{ route('admin.movimentacoes.doacoes.create') }}"
                                            class="side-nav-link {{ request()->routeIs('admin.movimentacoes.doacoes.*') ? 'active' : '' }}">
                                             <span class="menu-text">Doação</span>
+                                        </a>
+                                    </li>
+                                @endcan
+                            @endcan
+
+                            @can('movimentacoes.descartes.visualizar')
+                                <li class="side-nav-item">
+                                    <a href="{{ route('admin.movimentacoes.descartes.index') }}"
+                                       class="side-nav-link {{ request()->routeIs('admin.movimentacoes.descartes.*') ? 'active' : '' }}">
+                                        <span class="menu-text">Descarte</span>
+                                    </a>
+                                </li>
+                            @else
+                                @can('movimentacoes.descartes.criar')
+                                    <li class="side-nav-item">
+                                        <a href="{{ route('admin.movimentacoes.descartes.create') }}"
+                                           class="side-nav-link {{ request()->routeIs('admin.movimentacoes.descartes.*') ? 'active' : '' }}">
+                                            <span class="menu-text">Descarte</span>
                                         </a>
                                     </li>
                                 @endcan

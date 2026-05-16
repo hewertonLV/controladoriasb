@@ -266,4 +266,18 @@ trait CreatesUsersWithRoles
             Permissions::MOVIMENTACOES_DOACOES_EDITAR,
         ], $extra))));
     }
+
+    /**
+     * Permissões típicas do fluxo web de descarte (testes).
+     *
+     * @param  list<string>  $extra
+     */
+    protected function movimentacoesDescartesUsuario(array $extra = []): User
+    {
+        return $this->userWithPermissions(array_values(array_unique(array_merge([
+            Permissions::MOVIMENTACOES_DESCARTES_VISUALIZAR,
+            Permissions::MOVIMENTACOES_DESCARTES_CRIAR,
+            Permissions::MOVIMENTACOES_DESCARTES_EDITAR,
+        ], $extra))));
+    }
 }
