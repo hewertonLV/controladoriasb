@@ -30,6 +30,30 @@
         </div>
 
         <div class="p-3 border-bottom border-dashed">
+            <h5 class="mb-3 fs-16 fw-bold">Modo de Layout</h5>
+            <div class="row">
+                <div class="col-6">
+                    <div class="form-check card-radio">
+                        <input class="form-check-input" type="radio" name="data-layout-mode" id="layout-mode-fluid" value="fluid">
+                        <label class="form-check-label p-3 w-100 d-flex justify-content-center align-items-center" for="layout-mode-fluid">
+                            <iconify-icon icon="solar:window-frame-bold-duotone" class="fs-32 text-muted"></iconify-icon>
+                        </label>
+                    </div>
+                    <h5 class="fs-14 text-center text-muted mt-2">Fluido</h5>
+                </div>
+                <div class="col-6">
+                    <div class="form-check card-radio">
+                        <input class="form-check-input" type="radio" name="data-layout-mode" id="layout-mode-detached" value="detached">
+                        <label class="form-check-label p-3 w-100 d-flex justify-content-center align-items-center" for="layout-mode-detached">
+                            <iconify-icon icon="solar:widget-5-bold-duotone" class="fs-32 text-muted"></iconify-icon>
+                        </label>
+                    </div>
+                    <h5 class="fs-14 text-center text-muted mt-2">Destacado</h5>
+                </div>
+            </div>
+        </div>
+
+        <div class="p-3 border-bottom border-dashed">
             <h5 class="mb-3 fs-16 fw-bold">Cor do Topbar</h5>
             <div class="row">
                 <div class="col-3">

@@ -14,6 +14,20 @@ class User extends Authenticatable
     use HasFactory, HasRoles, Notifiable;
 
     /**
+     * @return array<string, string>
+     */
+    public static function defaultThemeSettings(): array
+    {
+        return [
+            'data-bs-theme' => 'light',
+            'data-layout-mode' => 'fluid',
+            'data-topbar-color' => 'light',
+            'data-menu-color' => 'light',
+            'data-sidenav-size' => 'sm-hover-active',
+        ];
+    }
+
+    /**
      * @var list<string>
      */
     protected $fillable = [
@@ -23,6 +37,7 @@ class User extends Authenticatable
         'password',
         'must_change_password',
         'ativo',
+        'theme_settings',
     ];
 
     /**
@@ -43,6 +58,18 @@ class User extends Authenticatable
             'password' => 'hashed',
             'must_change_password' => 'boolean',
             'ativo' => 'boolean',
+            'theme_settings' => 'array',
         ];
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    public function themeSettings(): array
+    {
+        return array_merge(
+            self::defaultThemeSettings(),
+            is_array($this->theme_settings) ? $this->theme_settings : [],
+        );
     }
 }

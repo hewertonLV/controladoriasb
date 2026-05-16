@@ -46,6 +46,7 @@ use App\Http\Controllers\Admin\VeiculoExportacaoController;
 use App\Http\Controllers\Admin\VeiculoImportacaoController;
 use App\Http\Controllers\Auth\ForcePasswordChangeController;
 use App\Http\Controllers\ProfileController;
+use App\Http\Controllers\ThemeSettingsController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
@@ -69,6 +70,9 @@ Route::middleware(['auth', 'user.active'])->group(function () {
  * Rotas autenticadas, sessão ativa e senha já trocada.
  */
 Route::middleware(['auth', 'verified', 'user.active', 'password.changed'])->group(function () {
+    Route::post('/theme-settings', [ThemeSettingsController::class, 'update'])
+        ->name('theme-settings.update');
+
     Route::get('/dashboard', function () {
         return view('dashboard');
     })->name('dashboard');
