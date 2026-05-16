@@ -5,7 +5,7 @@ namespace App\Actions\Movimentacoes\Venda;
 use App\Http\Requests\Admin\Movimentacoes\StoreVendaMovimentacaoRequest;
 use App\Services\Movimentacoes\VendaMovimentacaoService;
 
-final class RegistrarVendaMovimentacaoAction
+final class CriarVendaMovimentacaoAction
 {
     public function __construct(
         private readonly VendaMovimentacaoService $venda,

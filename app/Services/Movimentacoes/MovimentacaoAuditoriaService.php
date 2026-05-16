@@ -25,6 +25,8 @@ final class MovimentacaoAuditoriaService
             'valor_nf_um' => (string) $movimentacao->valor_nf_um,
             'valor_nf_kg' => (string) $movimentacao->valor_nf_kg,
             'valor_total_movimentacao' => (string) ($movimentacao->valor_total_movimentacao ?? '0.00'),
+            'valor_custo_saida' => (string) ($movimentacao->valor_custo_saida ?? '0.00'),
+            'resultado_movimentacao' => (string) ($movimentacao->resultado_movimentacao ?? '0.00'),
             'valor_icms_total' => (string) ($movimentacao->valor_icms_total ?? '0.00'),
             'valor_icms_kg' => (string) ($movimentacao->valor_icms_kg ?? '0.00'),
             'valor_icms_um' => (string) ($movimentacao->valor_icms_um ?? '0.00'),
@@ -43,6 +45,9 @@ final class MovimentacaoAuditoriaService
             'preco_medio_fruta_um' => (string) $movimentacao->preco_medio_fruta_um,
             'versao_replay' => (int) ($movimentacao->versao_replay ?? 1),
             'categoria_descarte_id' => $movimentacao->categoria_descarte_id,
+            'venda_nota_id' => $movimentacao->venda_nota_id,
+            'numero_nf' => $movimentacao->vendaNota?->numero_nf,
+            'id_unidade_negocio_faturamento' => $movimentacao->id_unidade_negocio_faturamento,
             'id_frete' => $movimentacao->id_frete,
             'id_movimentacao_estoque_new' => $movimentacao->id_movimentacao_estoque_new,
             'cancelada_por' => $movimentacao->cancelada_por,
@@ -134,6 +139,40 @@ final class MovimentacaoAuditoriaService
             'user_id' => $user?->id,
             'origem' => MovimentacaoHistorico::ORIGEM_DESCARTE,
             'acao' => MovimentacaoHistorico::ACAO_REGISTRO_DESCARTE,
+            'motivo' => null,
+            'dados_antes' => [
+                'estoque' => $estoqueAntes,
+                'movimentacao_estoque' => $meAntes,
+            ],
+            'dados_depois' => [
+                'movimentacao' => $this->snapshotVersao($movimentacao),
+                'estoque' => $estoqueDepois,
+                'movimentacao_estoque' => $meDepois,
+            ],
+        ]);
+    }
+
+    /**
+     * @param  array<string, mixed>|null  $meAntes
+     * @param  array<string, mixed>|null  $meDepois
+     */
+    public function registrarRegistroVenda(
+        Movimentacao $movimentacao,
+        ?User $user,
+        array $estoqueAntes,
+        array $estoqueDepois,
+        ?array $meAntes,
+        ?array $meDepois,
+    ): MovimentacaoHistorico {
+        $raizId = $movimentacao->idCadeiaRaiz();
+
+        return MovimentacaoHistorico::query()->create([
+            'movimentacao_cadeia_raiz_id' => $raizId,
+            'movimentacao_antes_id' => $movimentacao->id,
+            'movimentacao_depois_id' => $movimentacao->id,
+            'user_id' => $user?->id,
+            'origem' => MovimentacaoHistorico::ORIGEM_VENDA,
+            'acao' => MovimentacaoHistorico::ACAO_REGISTRO_VENDA,
             'motivo' => null,
             'dados_antes' => [
                 'estoque' => $estoqueAntes,

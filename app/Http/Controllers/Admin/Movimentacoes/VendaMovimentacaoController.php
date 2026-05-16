@@ -2,20 +2,86 @@
 
 namespace App\Http\Controllers\Admin\Movimentacoes;
 
-use App\Actions\Movimentacoes\Venda\RegistrarVendaMovimentacaoAction;
+use App\Actions\Movimentacoes\Venda\AtualizarVendaMovimentacaoAction;
+use App\Actions\Movimentacoes\Venda\CriarVendaMovimentacaoAction;
+use App\Enums\CategoriaMovimentacaoTipo;
+use App\Enums\MovimentacaoStatusRegistro;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Admin\Movimentacoes\StoreVendaMovimentacaoRequest;
+use App\Http\Requests\Admin\Movimentacoes\UpdateVendaMovimentacaoRequest;
+use App\Models\Movimentacao;
+use App\Models\StatusMovimentacao;
+use App\Services\Movimentacoes\VendaMovimentacaoService;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\RedirectResponse;
+use Illuminate\View\View;
 
 class VendaMovimentacaoController extends Controller
 {
-    public function store(StoreVendaMovimentacaoRequest $request, RegistrarVendaMovimentacaoAction $registrar): JsonResponse
+    public function index(): View
     {
-        $preview = $registrar($request);
+        $movimentacoes = Movimentacao::query()
+            ->with(['vendaNota', 'empresaOrigem', 'empresaDestino', 'unidadeFaturamento', 'fruta'])
+            ->where('categoria_movimentacao_id', CategoriaMovimentacaoTipo::Venda->value)
+            ->where('status_movimentacao_id', StatusMovimentacao::ID_SAIDA)
+            ->where('status_registro', MovimentacaoStatusRegistro::ATIVO->value)
+            ->orderByDesc('data_movimentacao')
+            ->orderByDesc('id')
+            ->paginate(15)
+            ->withQueryString();
 
-        return response()->json([
-            'message' => 'Pré-visualização em memória; persistência na próxima fase.',
-            'data' => $preview->only($preview->getFillable()),
+        return view('admin.movimentacoes.vendas.index', ['movimentacoes' => $movimentacoes]);
+    }
+
+    public function create(VendaMovimentacaoService $vendas): View
+    {
+        return view('admin.movimentacoes.vendas.create', $vendas->opcoesFormularioVenda());
+    }
+
+    public function store(StoreVendaMovimentacaoRequest $request, CriarVendaMovimentacaoAction $criar): JsonResponse|RedirectResponse
+    {
+        $resultado = $criar($request);
+        $primeira = $resultado['movimentacoes']->first();
+
+        if ($request->expectsJson()) {
+            return response()->json(['data' => $resultado], JsonResponse::HTTP_CREATED);
+        }
+
+        return redirect()
+            ->route('admin.movimentacoes.vendas.show', $primeira)
+            ->with('success', 'Venda registrada com sucesso.');
+    }
+
+    public function show(Movimentacao $movimentacaoVenda): View
+    {
+        $movimentacaoVenda->load(['vendaNota', 'empresaOrigem', 'empresaDestino', 'unidadeFaturamento', 'fruta', 'canceladaPor']);
+
+        return view('admin.movimentacoes.vendas.show', ['movimentacao' => $movimentacaoVenda]);
+    }
+
+    public function edit(Movimentacao $movimentacaoVenda): View
+    {
+        $movimentacaoVenda->load(['vendaNota', 'empresaOrigem', 'empresaDestino', 'unidadeFaturamento', 'fruta']);
+
+        return view('admin.movimentacoes.vendas.edit', [
+            'movimentacao' => $movimentacaoVenda,
+            'opcoes' => app(VendaMovimentacaoService::class)->opcoesFormularioVenda(),
         ]);
+    }
+
+    public function update(
+        UpdateVendaMovimentacaoRequest $request,
+        Movimentacao $movimentacaoVenda,
+        AtualizarVendaMovimentacaoAction $atualizar,
+    ): JsonResponse|RedirectResponse {
+        $nova = $atualizar($request, $movimentacaoVenda);
+
+        if ($request->expectsJson()) {
+            return response()->json(['data' => $nova]);
+        }
+
+        return redirect()
+            ->route('admin.movimentacoes.vendas.show', $nova)
+            ->with('success', 'Venda atualizada (nova versão registrada).');
     }
 }

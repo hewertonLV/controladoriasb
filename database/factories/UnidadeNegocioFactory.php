@@ -26,6 +26,7 @@ class UnidadeNegocioFactory extends Factory
             'custo_operacional' => $this->faker->randomFloat(2, 0, 5000),
             'status' => true,
             'possui_estoque' => false,
+            'is_hub' => false,
         ];
     }
 

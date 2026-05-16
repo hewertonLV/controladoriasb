@@ -23,6 +23,7 @@ use Illuminate\Support\Carbon;
  * @property string $custo_operacional
  * @property bool $status
  * @property bool $possui_estoque
+ * @property bool $is_hub
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
  * @property-read string $cpf_cnpj_formatado
@@ -50,6 +51,7 @@ class UnidadeNegocio extends Model
         'custo_operacional',
         'status',
         'possui_estoque',
+        'is_hub',
     ];
 
     /**
@@ -61,6 +63,7 @@ class UnidadeNegocio extends Model
             'id_estado' => 'integer',
             'status' => 'boolean',
             'possui_estoque' => 'boolean',
+            'is_hub' => 'boolean',
             'custo_operacional' => 'decimal:2',
         ];
     }

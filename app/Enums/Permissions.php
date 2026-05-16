@@ -202,6 +202,14 @@ final class Permissions
 
     public const MOVIMENTACOES_DESCARTES_CANCELAR_ADMIN = 'movimentacoes.descartes.cancelar-admin';
 
+    public const MOVIMENTACOES_VENDAS_VISUALIZAR = 'movimentacoes.vendas.visualizar';
+
+    public const MOVIMENTACOES_VENDAS_CRIAR = 'movimentacoes.vendas.criar';
+
+    public const MOVIMENTACOES_VENDAS_EDITAR = 'movimentacoes.vendas.editar';
+
+    public const MOVIMENTACOES_VENDAS_CANCELAR_ADMIN = 'movimentacoes.vendas.cancelar-admin';
+
     public const GRUPOS_VISUALIZAR = 'grupos.visualizar';
 
     public const GRUPOS_CRIAR = 'grupos.criar';
@@ -357,6 +365,12 @@ final class Permissions
                 self::MOVIMENTACOES_DESCARTES_CRIAR,
                 self::MOVIMENTACOES_DESCARTES_EDITAR,
                 self::MOVIMENTACOES_DESCARTES_CANCELAR_ADMIN,
+            ],
+            'Movimentações — Venda' => [
+                self::MOVIMENTACOES_VENDAS_VISUALIZAR,
+                self::MOVIMENTACOES_VENDAS_CRIAR,
+                self::MOVIMENTACOES_VENDAS_EDITAR,
+                self::MOVIMENTACOES_VENDAS_CANCELAR_ADMIN,
             ],
         ];
     }

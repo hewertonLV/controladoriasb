@@ -30,6 +30,16 @@ trait NormalizaAtributosMonetariosMovimentacao
         $this->attributes['valor_total_movimentacao'] = TextoCadastro::normalizarValorMonetarioBrasileiro($value);
     }
 
+    protected function setValorCustoSaidaAttribute(mixed $value): void
+    {
+        $this->attributes['valor_custo_saida'] = TextoCadastro::normalizarValorMonetarioBrasileiro($value);
+    }
+
+    protected function setResultadoMovimentacaoAttribute(mixed $value): void
+    {
+        $this->attributes['resultado_movimentacao'] = TextoCadastro::normalizarValorMonetarioBrasileiro($value);
+    }
+
     protected function setValorIcmsTotalAttribute(mixed $value): void
     {
         $this->attributes['valor_icms_total'] = TextoCadastro::normalizarValorMonetarioBrasileiro($value);
@@ -67,12 +77,12 @@ trait NormalizaAtributosMonetariosMovimentacao
 
     protected function setSaldoEstoqueFrutaKgAttribute(mixed $value): void
     {
-        $this->attributes['saldo_estoque_fruta_kg'] = TextoCadastro::normalizarValorMonetarioBrasileiro($value);
+        $this->attributes['saldo_estoque_fruta_kg'] = $this->normalizarDecimalComSinal($value);
     }
 
     protected function setSaldoEstoqueFrutaUmAttribute(mixed $value): void
     {
-        $this->attributes['saldo_estoque_fruta_um'] = TextoCadastro::normalizarValorMonetarioBrasileiro($value);
+        $this->attributes['saldo_estoque_fruta_um'] = $this->normalizarDecimalComSinal($value);
     }
 
     protected function setPrecoMedioFrutaKgAttribute(mixed $value): void
@@ -93,5 +103,20 @@ trait NormalizaAtributosMonetariosMovimentacao
     protected function setQtdFrutaKgAttribute(mixed $value): void
     {
         $this->attributes['qtd_fruta_kg'] = TextoCadastro::normalizarDecimalNaoNegativo($value);
+    }
+
+    private function normalizarDecimalComSinal(mixed $value): string
+    {
+        if (is_numeric($value)) {
+            return number_format((float) $value, 2, '.', '');
+        }
+
+        $raw = trim((string) ($value ?? '0'));
+        $negative = str_starts_with($raw, '-');
+        $normalized = TextoCadastro::normalizarValorMonetarioBrasileiro(ltrim($raw, '-'));
+
+        return $negative && (float) $normalized > 0
+            ? '-'.$normalized
+            : $normalized;
     }
 }

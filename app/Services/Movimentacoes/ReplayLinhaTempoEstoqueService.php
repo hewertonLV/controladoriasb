@@ -123,8 +123,9 @@ final class ReplayLinhaTempoEstoqueService
 
         MovimentacaoEstoque::query()->whereKey($ultimaMeId)->update(['status_ultima_posicao' => true]);
 
-        $precoMedioKg = $runKg > 0 ? round($valorAcumulado / $runKg, 2) : 0.0;
-        $precoMedioUm = round($precoMedioKg * $kgPorUm, 2);
+        $ultimaPosicao = MovimentacaoEstoque::query()->find($ultimaMeId);
+        $precoMedioKg = $ultimaPosicao !== null ? (float) $ultimaPosicao->preco_medio_kg : ($runKg > 0 ? round($valorAcumulado / $runKg, 2) : 0.0);
+        $precoMedioUm = $ultimaPosicao !== null ? (float) $ultimaPosicao->preco_medio_um : round($precoMedioKg * $kgPorUm, 2);
 
         $estoque->forceFill([
             'qtd_fruta_kg' => number_format($runKg, 2, '.', ''),
@@ -176,6 +177,15 @@ final class ReplayLinhaTempoEstoqueService
             ->get()
             ->map(static fn (Movimentacao $m): array => ['tipo' => 'saida', 'movimentacao' => $m]);
 
+        $saidasVenda = Movimentacao::query()
+            ->vigentesParaCalculo()
+            ->where('categoria_movimentacao_id', CategoriaMovimentacaoTipo::Venda->value)
+            ->where('status_movimentacao_id', StatusMovimentacao::ID_SAIDA)
+            ->where('id_empresa_origem', $empresaId)
+            ->where('id_fruta', $idFruta)
+            ->get()
+            ->map(static fn (Movimentacao $m): array => ['tipo' => 'saida', 'movimentacao' => $m]);
+
         $saidasTransferencia = Movimentacao::query()
             ->vigentesParaCalculo()
             ->where('categoria_movimentacao_id', CategoriaMovimentacaoTipo::Transferencia->value)
@@ -189,6 +199,7 @@ final class ReplayLinhaTempoEstoqueService
             ->concat($entradasTransferencia)
             ->concat($saidasDoacao)
             ->concat($saidasDescarte)
+            ->concat($saidasVenda)
             ->concat($saidasTransferencia)
             ->sortBy(static function (array $evento): array {
                 /** @var Movimentacao $m */
@@ -276,13 +287,15 @@ final class ReplayLinhaTempoEstoqueService
         $qUm = (float) $m->qtd_fruta_um;
         $qKg = (float) $m->qtd_fruta_kg;
 
-        if ($runUm + 1e-6 < $qUm || $runKg + 1e-6 < $qKg) {
+        $isVenda = (int) $m->categoria_movimentacao_id === CategoriaMovimentacaoTipo::Venda->value;
+
+        if (! $isVenda && ($runUm + 1e-6 < $qUm || $runKg + 1e-6 < $qKg)) {
             throw new InvalidArgumentException('Saldo insuficiente durante replay integrado de saída.');
         }
 
-        $precoMedioKg = $runKg > 0 ? round($valorAcumulado / $runKg, 2) : 0.0;
+        $precoMedioKg = $isVenda ? (float) $m->preco_medio_fruta_kg : ($runKg > 0 ? round($valorAcumulado / $runKg, 2) : 0.0);
         $precoMedioUm = round($precoMedioKg * $kgPorUm, 2);
-        $valorMovimentacao = round($precoMedioKg * $qKg, 2);
+        $valorMovimentacao = $isVenda ? (float) $m->valor_custo_saida : round($precoMedioKg * $qKg, 2);
 
         $runUm = round($runUm - $qUm, 2);
         $runKg = round($runKg - $qKg, 2);
@@ -319,6 +332,16 @@ final class ReplayLinhaTempoEstoqueService
             $attrs['valor_icms_kg'] = '0.00';
             $attrs['valor_icms_um'] = '0.00';
             $attrs['icms_convertido_kg'] = '0.00';
+        }
+
+        if ($isVenda) {
+            $attrs['valor_total_movimentacao'] = number_format($valorMovimentacao, 2, '.', '');
+            $attrs['resultado_movimentacao'] = number_format(
+                round((float) $m->valor_nf_total - $valorMovimentacao - (float) $m->valor_frete_rateio, 2),
+                2,
+                '.',
+                '',
+            );
         }
 
         $m->forceFill($attrs)->saveQuietly();

@@ -280,4 +280,18 @@ trait CreatesUsersWithRoles
             Permissions::MOVIMENTACOES_DESCARTES_EDITAR,
         ], $extra))));
     }
+
+    /**
+     * Permissões típicas do fluxo web de venda (testes).
+     *
+     * @param  list<string>  $extra
+     */
+    protected function movimentacoesVendasUsuario(array $extra = []): User
+    {
+        return $this->userWithPermissions(array_values(array_unique(array_merge([
+            Permissions::MOVIMENTACOES_VENDAS_VISUALIZAR,
+            Permissions::MOVIMENTACOES_VENDAS_CRIAR,
+            Permissions::MOVIMENTACOES_VENDAS_EDITAR,
+        ], $extra))));
+    }
 }

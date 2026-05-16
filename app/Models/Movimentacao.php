@@ -27,6 +27,8 @@ use Illuminate\Support\Carbon;
  * @property string $valor_nf_um
  * @property string $valor_nf_kg
  * @property string $valor_total_movimentacao
+ * @property string $valor_custo_saida
+ * @property string $resultado_movimentacao
  * @property string $valor_icms_total
  * @property string $valor_icms_kg
  * @property string $valor_icms_um
@@ -45,6 +47,8 @@ use Illuminate\Support\Carbon;
  * @property string $icms_convertido_kg
  * @property int $categoria_movimentacao_id
  * @property int|null $categoria_descarte_id
+ * @property int|null $venda_nota_id
+ * @property int|null $id_unidade_negocio_faturamento
  * @property int|null $status_movimentacao_id
  * @property string|null $status_transferencia
  * @property int|null $transferencia_origem_id
@@ -82,6 +86,8 @@ use Illuminate\Support\Carbon;
  * @property-read MovimentacaoEstoque|null $movimentacaoEstoqueVinculada
  * @property-read CategoriaMovimentacao $categoriaMovimentacao
  * @property-read CategoriaDescarte|null $categoriaDescarte
+ * @property-read VendaNota|null $vendaNota
+ * @property-read UnidadeNegocio|null $unidadeFaturamento
  * @property-read Movimentacao|null $origem
  * @property-read Movimentacao|null $substituidaPor
  * @property-read Movimentacao|null $versaoAnterior
@@ -107,6 +113,8 @@ class Movimentacao extends Model
         'valor_nf_um',
         'valor_nf_kg',
         'valor_total_movimentacao',
+        'valor_custo_saida',
+        'resultado_movimentacao',
         'valor_icms_total',
         'valor_icms_kg',
         'valor_icms_um',
@@ -125,6 +133,8 @@ class Movimentacao extends Model
         'icms_convertido_kg',
         'categoria_movimentacao_id',
         'categoria_descarte_id',
+        'venda_nota_id',
+        'id_unidade_negocio_faturamento',
         'status_movimentacao_id',
         'status_transferencia',
         'transferencia_origem_id',
@@ -166,6 +176,8 @@ class Movimentacao extends Model
             'id_custo_operacional' => 'integer',
             'categoria_movimentacao_id' => 'integer',
             'categoria_descarte_id' => 'integer',
+            'venda_nota_id' => 'integer',
+            'id_unidade_negocio_faturamento' => 'integer',
             'status_movimentacao_id' => 'integer',
             'transferencia_origem_id' => 'integer',
             'pareada_movimentacao_id' => 'integer',
@@ -177,6 +189,8 @@ class Movimentacao extends Model
             'valor_nf_um' => 'decimal:2',
             'valor_nf_kg' => 'decimal:2',
             'valor_total_movimentacao' => 'decimal:2',
+            'valor_custo_saida' => 'decimal:2',
+            'resultado_movimentacao' => 'decimal:2',
             'valor_icms_total' => 'decimal:2',
             'valor_icms_kg' => 'decimal:2',
             'valor_icms_um' => 'decimal:2',
@@ -280,6 +294,22 @@ class Movimentacao extends Model
     public function categoriaDescarte(): BelongsTo
     {
         return $this->belongsTo(CategoriaDescarte::class, 'categoria_descarte_id');
+    }
+
+    /**
+     * @return BelongsTo<VendaNota, $this>
+     */
+    public function vendaNota(): BelongsTo
+    {
+        return $this->belongsTo(VendaNota::class, 'venda_nota_id');
+    }
+
+    /**
+     * @return BelongsTo<UnidadeNegocio, $this>
+     */
+    public function unidadeFaturamento(): BelongsTo
+    {
+        return $this->belongsTo(UnidadeNegocio::class, 'id_unidade_negocio_faturamento');
     }
 
     /**
