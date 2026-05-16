@@ -33,6 +33,8 @@ class MovimentacaoHistorico extends Model
 
     public const ACAO_RECALCULO_FRETE_VENDA = 'RECALCULO_FRETE_VENDA';
 
+    public const ACAO_REGISTRO_DEVOLUCAO = 'REGISTRO_DEVOLUCAO';
+
     public const ORIGEM_VERSIONAMENTO = 'versionamento';
 
     public const ORIGEM_CANCELAMENTO_ADMIN = 'cancelamento_admin';
@@ -42,6 +44,8 @@ class MovimentacaoHistorico extends Model
     public const ORIGEM_DESCARTE = 'descarte';
 
     public const ORIGEM_VENDA = 'venda';
+
+    public const ORIGEM_DEVOLUCAO = 'devolucao';
 
     public $timestamps = false;
 

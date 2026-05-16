@@ -4,6 +4,7 @@ namespace App\Services\Movimentacoes;
 
 use App\Enums\CategoriaMovimentacaoTipo;
 use App\Enums\StatusTransferenciaOperacional;
+use App\Enums\TipoDevolucao;
 use App\Models\Empresa;
 use App\Models\Estoque;
 use App\Models\Fruta;
@@ -159,6 +160,16 @@ final class ReplayLinhaTempoEstoqueService
             ->get()
             ->map(static fn (Movimentacao $m): array => ['tipo' => 'entrada', 'movimentacao' => $m]);
 
+        $entradasDevolucao = Movimentacao::query()
+            ->vigentesParaCalculo()
+            ->where('categoria_movimentacao_id', CategoriaMovimentacaoTipo::Devolucao->value)
+            ->where('tipo_devolucao', TipoDevolucao::COM_RETORNO_ESTOQUE->value)
+            ->where('status_movimentacao_id', StatusMovimentacao::ID_ENTRADA)
+            ->where('id_empresa_destino', $empresaId)
+            ->where('id_fruta', $idFruta)
+            ->get()
+            ->map(static fn (Movimentacao $m): array => ['tipo' => 'entrada', 'movimentacao' => $m]);
+
         $saidasDoacao = Movimentacao::query()
             ->vigentesParaCalculo()
             ->where('categoria_movimentacao_id', CategoriaMovimentacaoTipo::Doacao->value)
@@ -197,6 +208,7 @@ final class ReplayLinhaTempoEstoqueService
 
         return $entradasCompra
             ->concat($entradasTransferencia)
+            ->concat($entradasDevolucao)
             ->concat($saidasDoacao)
             ->concat($saidasDescarte)
             ->concat($saidasVenda)
@@ -242,7 +254,10 @@ final class ReplayLinhaTempoEstoqueService
 
         $runUm = round($runUm + $qUm, 2);
         $runKg = round($runKg + $qKg, 2);
-        $valorAcumulado = round($valorAcumulado + ((float) $m->preco_medio_fruta_kg * $qKg), 2);
+        $valorEntrada = (int) $m->categoria_movimentacao_id === CategoriaMovimentacaoTipo::Devolucao->value
+            ? (float) $m->valor_total_movimentacao
+            : (float) $m->preco_medio_fruta_kg * $qKg;
+        $valorAcumulado = round($valorAcumulado + $valorEntrada, 2);
 
         $precoMedioKg = $runKg > 0 ? round($valorAcumulado / $runKg, 2) : 0.0;
         $precoMedioUm = round($precoMedioKg * $kgPorUm, 2);
@@ -259,13 +274,21 @@ final class ReplayLinhaTempoEstoqueService
             $valorAcumulado,
         );
 
-        $m->forceFill([
+        $attrs = [
             'id_movimentacao_estoque_old' => $prevMeId,
             'id_movimentacao_estoque_new' => $me->id,
             'saldo_estoque_fruta_kg' => number_format($runKg, 2, '.', ''),
             'saldo_estoque_fruta_um' => number_format($runUm, 2, '.', ''),
             'versao_replay' => (int) ($m->versao_replay ?? 1) + 1,
-        ])->saveQuietly();
+        ];
+
+        if ((int) $m->categoria_movimentacao_id === CategoriaMovimentacaoTipo::Devolucao->value) {
+            $attrs['preco_medio_fruta_kg'] = number_format($precoMedioKg, 2, '.', '');
+            $attrs['preco_medio_fruta_um'] = number_format($precoMedioUm, 2, '.', '');
+            $attrs['valor_total_movimentacao'] = number_format((float) $m->valor_custo_devolucao, 2, '.', '');
+        }
+
+        $m->forceFill($attrs)->saveQuietly();
 
         return [$runUm, $runKg, $valorAcumulado, (int) $me->id, (int) $me->id];
     }

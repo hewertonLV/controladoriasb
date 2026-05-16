@@ -9,10 +9,12 @@ use App\Enums\MovimentacaoStatusRegistro;
 use App\Enums\Permissions;
 use App\Enums\StatusRecebimentoTransferencia;
 use App\Enums\StatusTransferenciaOperacional;
+use App\Enums\TipoDevolucao;
+use App\Models\CategoriaDescarte;
+use App\Models\Cliente;
 use App\Models\Empresa;
 use App\Models\Estado;
 use App\Models\Estoque;
-use App\Models\CategoriaDescarte;
 use App\Models\Fornecedor;
 use App\Models\Frete;
 use App\Models\Fruta;
@@ -277,6 +279,36 @@ class FluxoIntegradoMovimentacoesTest extends TestCase
         $this->assertUltimaPosicaoBateComEstoque($c['unidade_a'], $c['fruta']);
     }
 
+    public function test_cenario_12_compra_venda_devolucao_com_retorno_recompoe_estoque_por_custo_historico(): void
+    {
+        $this->seedBase();
+        $c = $this->cenarioBase();
+
+        $this->registrarCompra($c, $c['frete_compra'], '10', '500,00');
+        $venda = $this->registrarVenda($c, '4', '800,00');
+        $devolucao = $this->registrarDevolucao($venda, TipoDevolucao::COM_RETORNO_ESTOQUE, '2');
+
+        $this->assertSame('400.00', (string) $devolucao->valor_devolucao_total);
+        $this->assertSame('100.00', (string) $devolucao->valor_custo_devolucao);
+        $this->assertEstoque($c['unidade_a'], $c['fruta'], '80.00', '8.00', '5.00', '50.00', '400.00');
+        $this->assertUltimaPosicaoBateComEstoque($c['unidade_a'], $c['fruta']);
+    }
+
+    public function test_cenario_13_compra_venda_devolucao_sem_retorno_nao_altera_estoque(): void
+    {
+        $this->seedBase();
+        $c = $this->cenarioBase();
+
+        $this->registrarCompra($c, $c['frete_compra'], '10', '500,00');
+        $venda = $this->registrarVenda($c, '4', '800,00');
+        $devolucao = $this->registrarDevolucao($venda, TipoDevolucao::SEM_RETORNO_ESTOQUE, '2');
+
+        $this->assertNull($devolucao->id_movimentacao_estoque_new);
+        $this->assertSame('-300.00', (string) $devolucao->resultado_devolucao);
+        $this->assertEstoque($c['unidade_a'], $c['fruta'], '60.00', '6.00', '5.00', '50.00', '300.00');
+        $this->assertUltimaPosicaoBateComEstoque($c['unidade_a'], $c['fruta']);
+    }
+
     public function test_permissoes_bloqueiam_acoes_criticas_integradas(): void
     {
         $this->seedBase();
@@ -319,6 +351,7 @@ class FluxoIntegradoMovimentacoesTest extends TestCase
      *     empresa_fornecedor: Empresa,
      *     empresa_a: Empresa,
      *     empresa_b: Empresa,
+     *     empresa_cliente: Empresa,
      *     unidade_a: UnidadeNegocio,
      *     unidade_b: UnidadeNegocio,
      *     fruta: Fruta,
@@ -333,6 +366,7 @@ class FluxoIntegradoMovimentacoesTest extends TestCase
 
         $unidadeA = $this->criarUnidadeComCustoZero(Estado::ID_PERNAMBUCO);
         $unidadeB = $this->criarUnidadeComCustoZero(Estado::ID_PERNAMBUCO);
+        $cliente = Cliente::factory()->create();
 
         $fruta = Fruta::factory()->create([
             'kg_por_unidade_medicao' => 10,
@@ -345,6 +379,7 @@ class FluxoIntegradoMovimentacoesTest extends TestCase
             'empresa_fornecedor' => $empresaFornecedor,
             'empresa_a' => $unidadeA->registroCorporativo()->firstOrFail(),
             'empresa_b' => $unidadeB->registroCorporativo()->firstOrFail(),
+            'empresa_cliente' => $cliente->registroCorporativo()->firstOrFail(),
             'unidade_a' => $unidadeA,
             'unidade_b' => $unidadeB,
             'fruta' => $fruta,
@@ -450,6 +485,46 @@ class FluxoIntegradoMovimentacoesTest extends TestCase
         return Movimentacao::query()
             ->where('categoria_movimentacao_id', CategoriaMovimentacaoTipo::Descarte->value)
             ->where('status_movimentacao_id', StatusMovimentacao::ID_SAIDA)
+            ->orderByDesc('id')
+            ->firstOrFail();
+    }
+
+    /**
+     * @param  array<string, mixed>  $cenario
+     */
+    private function registrarVenda(array $cenario, string $qtdUm, string $valorNfTotal): Movimentacao
+    {
+        $this->actingAs($this->movimentacoesVendasUsuario())->postJson(route('admin.movimentacoes.vendas.store'), [
+            'numero_nf' => 'NF-VENDA-INT',
+            'id_empresa_origem' => $cenario['empresa_a']->id,
+            'id_empresa_destino' => $cenario['empresa_cliente']->id,
+            'id_unidade_negocio_faturamento' => $cenario['unidade_a']->id,
+            'itens' => [
+                ['id_fruta' => $cenario['fruta']->id, 'qtd_fruta_um' => $qtdUm, 'valor_nf_total' => $valorNfTotal],
+            ],
+        ])->assertCreated();
+
+        return Movimentacao::query()
+            ->where('categoria_movimentacao_id', CategoriaMovimentacaoTipo::Venda->value)
+            ->where('status_movimentacao_id', StatusMovimentacao::ID_SAIDA)
+            ->orderByDesc('id')
+            ->firstOrFail();
+    }
+
+    private function registrarDevolucao(Movimentacao $venda, TipoDevolucao $tipo, string $qtdUm): Movimentacao
+    {
+        $this->actingAs($this->movimentacoesDevolucoesUsuario())->postJson(route('admin.movimentacoes.devolucoes.store'), [
+            'movimentacao_venda_origem_id' => $venda->id,
+            'tipo_devolucao' => $tipo->value,
+            'qtd_fruta_um' => $qtdUm,
+            'numero_nf_devolucao' => 'DEV-INT',
+            'id_unidade_negocio_retorno' => $tipo === TipoDevolucao::COM_RETORNO_ESTOQUE
+                ? $venda->empresaOrigem->entidade->id
+                : null,
+        ])->assertCreated();
+
+        return Movimentacao::query()
+            ->where('categoria_movimentacao_id', CategoriaMovimentacaoTipo::Devolucao->value)
             ->orderByDesc('id')
             ->firstOrFail();
     }

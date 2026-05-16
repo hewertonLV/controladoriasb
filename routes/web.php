@@ -29,6 +29,7 @@ use App\Http\Controllers\Admin\Movimentacoes\CancelarTransferenciaMovimentacaoAd
 use App\Http\Controllers\Admin\Movimentacoes\CancelarVendaMovimentacaoAdminController;
 use App\Http\Controllers\Admin\Movimentacoes\CompraMovimentacaoController;
 use App\Http\Controllers\Admin\Movimentacoes\DescarteMovimentacaoController;
+use App\Http\Controllers\Admin\Movimentacoes\DevolucaoMovimentacaoController;
 use App\Http\Controllers\Admin\Movimentacoes\DoacaoMovimentacaoController;
 use App\Http\Controllers\Admin\Movimentacoes\RecebimentoTransferenciaController;
 use App\Http\Controllers\Admin\Movimentacoes\TransferenciaMovimentacaoController;
@@ -842,6 +843,36 @@ Route::middleware(['auth', 'verified', 'user.active', 'password.changed'])->grou
 
             Route::post('/{movimentacaoVenda}/cancelar-admin', CancelarVendaMovimentacaoAdminController::class)
                 ->middleware('role_or_permission:Administrador|movimentacoes.vendas.cancelar-admin')
+                ->name('cancelar-admin');
+        });
+
+        Route::prefix('movimentacoes/devolucoes')->name('movimentacoes.devolucoes.')->group(function () {
+            Route::get('/', [DevolucaoMovimentacaoController::class, 'index'])
+                ->middleware('permission:movimentacoes.devolucoes.visualizar')
+                ->name('index');
+
+            Route::get('/criar', [DevolucaoMovimentacaoController::class, 'create'])
+                ->middleware('permission:movimentacoes.devolucoes.criar')
+                ->name('create');
+
+            Route::post('/', [DevolucaoMovimentacaoController::class, 'store'])
+                ->middleware('permission:movimentacoes.devolucoes.criar')
+                ->name('store');
+
+            Route::get('/{movimentacaoDevolucao}', [DevolucaoMovimentacaoController::class, 'show'])
+                ->middleware('permission:movimentacoes.devolucoes.visualizar')
+                ->name('show');
+
+            Route::get('/{movimentacaoDevolucao}/editar', [DevolucaoMovimentacaoController::class, 'edit'])
+                ->middleware('permission:movimentacoes.devolucoes.editar')
+                ->name('edit');
+
+            Route::put('/{movimentacaoDevolucao}', [DevolucaoMovimentacaoController::class, 'update'])
+                ->middleware('permission:movimentacoes.devolucoes.editar')
+                ->name('update');
+
+            Route::post('/{movimentacaoDevolucao}/cancelar-admin', [DevolucaoMovimentacaoController::class, 'cancelarAdmin'])
+                ->middleware('role_or_permission:Administrador|movimentacoes.devolucoes.cancelar-admin')
                 ->name('cancelar-admin');
         });
 

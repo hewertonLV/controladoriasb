@@ -294,4 +294,18 @@ trait CreatesUsersWithRoles
             Permissions::MOVIMENTACOES_VENDAS_EDITAR,
         ], $extra))));
     }
+
+    /**
+     * Permissões típicas do fluxo web de devolução (testes).
+     *
+     * @param  list<string>  $extra
+     */
+    protected function movimentacoesDevolucoesUsuario(array $extra = []): User
+    {
+        return $this->userWithPermissions(array_values(array_unique(array_merge([
+            Permissions::MOVIMENTACOES_DEVOLUCOES_VISUALIZAR,
+            Permissions::MOVIMENTACOES_DEVOLUCOES_CRIAR,
+            Permissions::MOVIMENTACOES_DEVOLUCOES_EDITAR,
+        ], $extra))));
+    }
 }

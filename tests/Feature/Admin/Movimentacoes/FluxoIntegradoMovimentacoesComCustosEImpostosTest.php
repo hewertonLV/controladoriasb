@@ -9,8 +9,9 @@ use App\Enums\MovimentacaoStatusRegistro;
 use App\Enums\Permissions;
 use App\Enums\StatusRecebimentoTransferencia;
 use App\Enums\StatusTransferenciaOperacional;
-use App\Models\Cliente;
+use App\Enums\TipoDevolucao;
 use App\Models\CategoriaDescarte;
+use App\Models\Cliente;
 use App\Models\Empresa;
 use App\Models\Estado;
 use App\Models\Estoque;
@@ -281,7 +282,24 @@ class FluxoIntegradoMovimentacoesComCustosEImpostosTest extends TestCase
         // 34. Recebimento conforme em B.
         $this->evento(fn () => $this->receberConforme((int) $saidaAB2->transferencia_origem_id, '1'));
 
-        $this->assertSame(34, $this->eventosExecutados);
+        // 35. Venda em C.
+        $vendaC1 = $this->evento(fn () => $this->registrarVenda(
+            origem: $c['empresa_c'],
+            cliente: $c['cliente_doacao'],
+            unidadeFaturamento: $c['unidade_c'],
+            fruta: $c['fruta'],
+            qtdUm: '0.5',
+            valorNfTotal: '300,00',
+        ));
+
+        // 36. Devolução parcial com retorno vinculada à venda em C.
+        $devolucaoC1 = $this->evento(fn () => $this->registrarDevolucao(
+            venda: $vendaC1,
+            tipo: TipoDevolucao::COM_RETORNO_ESTOQUE,
+            qtdUm: '0.25',
+        ));
+
+        $this->assertSame(36, $this->eventosExecutados);
 
         $this->assertSemEstoqueNegativo();
         foreach ([$c['unidade_a'], $c['unidade_b'], $c['unidade_c']] as $unidade) {
@@ -300,6 +318,7 @@ class FluxoIntegradoMovimentacoesComCustosEImpostosTest extends TestCase
         $this->assertDoacaoPreservaPrecoMedioEValorEconomico($doacaoB1);
         $this->assertDoacaoPreservaPrecoMedioEValorEconomico($doacaoC1);
         $this->assertDescartePreservaPrecoMedioEValorEconomico($descarteC1);
+        $this->assertDevolucaoPreservaCustoHistorico($vendaC1, $devolucaoC1);
         $this->assertTransferenciaDivergenteOuPendenteNaoEntraNoDestino();
         $this->assertTransferenciasConformesEntraramNoDestino();
         $this->assertCancelamentoAdministrativoReprocessouLinhaDoTempo();
@@ -400,6 +419,7 @@ class FluxoIntegradoMovimentacoesComCustosEImpostosTest extends TestCase
 
     /**
      * @template T
+     *
      * @param  callable():T  $callback
      * @return T
      */
@@ -482,6 +502,51 @@ class FluxoIntegradoMovimentacoesComCustosEImpostosTest extends TestCase
             ->where('categoria_movimentacao_id', CategoriaMovimentacaoTipo::Descarte->value)
             ->where('id_empresa_origem', $origem->id)
             ->where('id_fruta', $fruta->id)
+            ->orderByDesc('id')
+            ->firstOrFail();
+    }
+
+    private function registrarVenda(
+        Empresa $origem,
+        Empresa $cliente,
+        UnidadeNegocio $unidadeFaturamento,
+        Fruta $fruta,
+        string $qtdUm,
+        string $valorNfTotal,
+    ): Movimentacao {
+        $this->actingAs($this->movimentacoesVendasUsuario())->postJson(route('admin.movimentacoes.vendas.store'), [
+            'numero_nf' => 'NF-VENDA-STRESS',
+            'id_empresa_origem' => $origem->id,
+            'id_empresa_destino' => $cliente->id,
+            'id_unidade_negocio_faturamento' => $unidadeFaturamento->id,
+            'itens' => [
+                ['id_fruta' => $fruta->id, 'qtd_fruta_um' => $qtdUm, 'valor_nf_total' => $valorNfTotal],
+            ],
+        ])->assertCreated();
+
+        return Movimentacao::query()
+            ->where('categoria_movimentacao_id', CategoriaMovimentacaoTipo::Venda->value)
+            ->where('id_empresa_origem', $origem->id)
+            ->where('id_fruta', $fruta->id)
+            ->orderByDesc('id')
+            ->firstOrFail();
+    }
+
+    private function registrarDevolucao(Movimentacao $venda, TipoDevolucao $tipo, string $qtdUm): Movimentacao
+    {
+        $this->actingAs($this->movimentacoesDevolucoesUsuario())->postJson(route('admin.movimentacoes.devolucoes.store'), [
+            'movimentacao_venda_origem_id' => $venda->id,
+            'tipo_devolucao' => $tipo->value,
+            'qtd_fruta_um' => $qtdUm,
+            'numero_nf_devolucao' => 'DEV-STRESS',
+            'id_unidade_negocio_retorno' => $tipo === TipoDevolucao::COM_RETORNO_ESTOQUE
+                ? $venda->empresaOrigem->entidade->id
+                : null,
+        ])->assertCreated();
+
+        return Movimentacao::query()
+            ->where('categoria_movimentacao_id', CategoriaMovimentacaoTipo::Devolucao->value)
+            ->where('movimentacao_venda_origem_id', $venda->id)
             ->orderByDesc('id')
             ->firstOrFail();
     }
@@ -767,6 +832,22 @@ class FluxoIntegradoMovimentacoesComCustosEImpostosTest extends TestCase
         $me = MovimentacaoEstoque::query()->findOrFail((int) $descarte->id_movimentacao_estoque_new);
         $this->assertSame((string) $descarte->preco_medio_fruta_kg, (string) $me->preco_medio_kg);
         $this->assertSame((string) $descarte->preco_medio_fruta_um, (string) $me->preco_medio_um);
+    }
+
+    private function assertDevolucaoPreservaCustoHistorico(Movimentacao $venda, Movimentacao $devolucao): void
+    {
+        $venda->refresh();
+        $devolucao->refresh();
+        $proporcao = (float) $devolucao->qtd_fruta_um / (float) $venda->qtd_fruta_um;
+
+        $this->assertSame(CategoriaMovimentacaoTipo::Devolucao->value, (int) $devolucao->categoria_movimentacao_id);
+        $this->assertSame($venda->id, (int) $devolucao->movimentacao_venda_origem_id);
+        $this->assertSame('0.00', (string) $devolucao->valor_nf_total);
+        $this->assertSame(
+            number_format(round((float) $venda->valor_custo_saida * $proporcao, 2), 2, '.', ''),
+            (string) $devolucao->valor_custo_devolucao,
+        );
+        $this->assertSame((string) $devolucao->valor_custo_devolucao, (string) $devolucao->valor_total_movimentacao);
     }
 
     private function assertTransferenciaDivergenteOuPendenteNaoEntraNoDestino(): void

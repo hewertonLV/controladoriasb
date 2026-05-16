@@ -48,6 +48,17 @@ final class MovimentacaoAuditoriaService
             'venda_nota_id' => $movimentacao->venda_nota_id,
             'numero_nf' => $movimentacao->vendaNota?->numero_nf,
             'id_unidade_negocio_faturamento' => $movimentacao->id_unidade_negocio_faturamento,
+            'id_unidade_negocio_retorno' => $movimentacao->id_unidade_negocio_retorno,
+            'movimentacao_venda_origem_id' => $movimentacao->movimentacao_venda_origem_id,
+            'devolucao_origem_id' => $movimentacao->devolucao_origem_id,
+            'tipo_devolucao' => $movimentacao->tipo_devolucao,
+            'numero_nf_devolucao' => $movimentacao->numero_nf_devolucao,
+            'motivo_devolucao' => $movimentacao->motivo_devolucao,
+            'valor_devolucao_total' => (string) ($movimentacao->valor_devolucao_total ?? '0.00'),
+            'valor_devolucao_um' => (string) ($movimentacao->valor_devolucao_um ?? '0.00'),
+            'valor_devolucao_kg' => (string) ($movimentacao->valor_devolucao_kg ?? '0.00'),
+            'valor_custo_devolucao' => (string) ($movimentacao->valor_custo_devolucao ?? '0.00'),
+            'resultado_devolucao' => (string) ($movimentacao->resultado_devolucao ?? '0.00'),
             'id_frete' => $movimentacao->id_frete,
             'id_movimentacao_estoque_new' => $movimentacao->id_movimentacao_estoque_new,
             'cancelada_por' => $movimentacao->cancelada_por,
@@ -182,6 +193,43 @@ final class MovimentacaoAuditoriaService
                 'movimentacao' => $this->snapshotVersao($movimentacao),
                 'estoque' => $estoqueDepois,
                 'movimentacao_estoque' => $meDepois,
+            ],
+        ]);
+    }
+
+    /**
+     * @param  array<string, mixed>|null  $meAntes
+     * @param  array<string, mixed>|null  $meDepois
+     */
+    public function registrarRegistroDevolucao(
+        Movimentacao $movimentacao,
+        ?User $user,
+        array $estoqueAntes,
+        array $estoqueDepois,
+        ?array $meAntes,
+        ?array $meDepois,
+    ): MovimentacaoHistorico {
+        $raizId = $movimentacao->idCadeiaRaiz();
+
+        return MovimentacaoHistorico::query()->create([
+            'movimentacao_cadeia_raiz_id' => $raizId,
+            'movimentacao_antes_id' => $movimentacao->id,
+            'movimentacao_depois_id' => $movimentacao->id,
+            'user_id' => $user?->id,
+            'origem' => MovimentacaoHistorico::ORIGEM_DEVOLUCAO,
+            'acao' => MovimentacaoHistorico::ACAO_REGISTRO_DEVOLUCAO,
+            'motivo' => null,
+            'dados_antes' => [
+                'estoque' => $estoqueAntes,
+                'movimentacao_estoque' => $meAntes,
+            ],
+            'dados_depois' => [
+                'movimentacao' => $this->snapshotVersao($movimentacao),
+                'estoque' => $estoqueDepois,
+                'movimentacao_estoque' => $meDepois,
+                'venda_origem' => $movimentacao->vendaOrigem !== null
+                    ? $this->snapshotVersao($movimentacao->vendaOrigem)
+                    : null,
             ],
         ]);
     }

@@ -49,6 +49,17 @@ use Illuminate\Support\Carbon;
  * @property int|null $categoria_descarte_id
  * @property int|null $venda_nota_id
  * @property int|null $id_unidade_negocio_faturamento
+ * @property int|null $id_unidade_negocio_retorno
+ * @property int|null $movimentacao_venda_origem_id
+ * @property int|null $devolucao_origem_id
+ * @property string|null $tipo_devolucao
+ * @property string|null $numero_nf_devolucao
+ * @property string|null $motivo_devolucao
+ * @property string $valor_devolucao_total
+ * @property string $valor_devolucao_um
+ * @property string $valor_devolucao_kg
+ * @property string $valor_custo_devolucao
+ * @property string $resultado_devolucao
  * @property int|null $status_movimentacao_id
  * @property string|null $status_transferencia
  * @property int|null $transferencia_origem_id
@@ -88,6 +99,9 @@ use Illuminate\Support\Carbon;
  * @property-read CategoriaDescarte|null $categoriaDescarte
  * @property-read VendaNota|null $vendaNota
  * @property-read UnidadeNegocio|null $unidadeFaturamento
+ * @property-read UnidadeNegocio|null $unidadeRetorno
+ * @property-read Movimentacao|null $vendaOrigem
+ * @property-read Movimentacao|null $devolucaoOrigem
  * @property-read Movimentacao|null $origem
  * @property-read Movimentacao|null $substituidaPor
  * @property-read Movimentacao|null $versaoAnterior
@@ -135,6 +149,17 @@ class Movimentacao extends Model
         'categoria_descarte_id',
         'venda_nota_id',
         'id_unidade_negocio_faturamento',
+        'id_unidade_negocio_retorno',
+        'movimentacao_venda_origem_id',
+        'devolucao_origem_id',
+        'tipo_devolucao',
+        'numero_nf_devolucao',
+        'motivo_devolucao',
+        'valor_devolucao_total',
+        'valor_devolucao_um',
+        'valor_devolucao_kg',
+        'valor_custo_devolucao',
+        'resultado_devolucao',
         'status_movimentacao_id',
         'status_transferencia',
         'transferencia_origem_id',
@@ -178,6 +203,9 @@ class Movimentacao extends Model
             'categoria_descarte_id' => 'integer',
             'venda_nota_id' => 'integer',
             'id_unidade_negocio_faturamento' => 'integer',
+            'id_unidade_negocio_retorno' => 'integer',
+            'movimentacao_venda_origem_id' => 'integer',
+            'devolucao_origem_id' => 'integer',
             'status_movimentacao_id' => 'integer',
             'transferencia_origem_id' => 'integer',
             'pareada_movimentacao_id' => 'integer',
@@ -191,6 +219,11 @@ class Movimentacao extends Model
             'valor_total_movimentacao' => 'decimal:2',
             'valor_custo_saida' => 'decimal:2',
             'resultado_movimentacao' => 'decimal:2',
+            'valor_devolucao_total' => 'decimal:2',
+            'valor_devolucao_um' => 'decimal:2',
+            'valor_devolucao_kg' => 'decimal:2',
+            'valor_custo_devolucao' => 'decimal:2',
+            'resultado_devolucao' => 'decimal:2',
             'valor_icms_total' => 'decimal:2',
             'valor_icms_kg' => 'decimal:2',
             'valor_icms_um' => 'decimal:2',
@@ -313,6 +346,30 @@ class Movimentacao extends Model
     }
 
     /**
+     * @return BelongsTo<UnidadeNegocio, $this>
+     */
+    public function unidadeRetorno(): BelongsTo
+    {
+        return $this->belongsTo(UnidadeNegocio::class, 'id_unidade_negocio_retorno');
+    }
+
+    /**
+     * @return BelongsTo<Movimentacao, $this>
+     */
+    public function vendaOrigem(): BelongsTo
+    {
+        return $this->belongsTo(self::class, 'movimentacao_venda_origem_id');
+    }
+
+    /**
+     * @return BelongsTo<Movimentacao, $this>
+     */
+    public function devolucaoOrigem(): BelongsTo
+    {
+        return $this->belongsTo(self::class, 'devolucao_origem_id');
+    }
+
+    /**
      * @return BelongsTo<User, $this>
      */
     public function canceladaPor(): BelongsTo
@@ -378,6 +435,40 @@ class Movimentacao extends Model
     public function idCadeiaRaiz(): int
     {
         return (int) ($this->movimentacao_origem_id ?? $this->id);
+    }
+
+    public function saldoDevolvivelUm(?Movimentacao $ignorar = null): float
+    {
+        $query = self::query()
+            ->vigentesParaCalculo()
+            ->where('categoria_movimentacao_id', CategoriaMovimentacaoTipo::Devolucao->value)
+            ->where('movimentacao_venda_origem_id', $this->id);
+
+        if ($ignorar !== null) {
+            $raiz = $ignorar->idCadeiaRaiz();
+            $query->where(function ($q) use ($raiz): void {
+                $q->where('id', '!=', $raiz)->where('movimentacao_origem_id', '!=', $raiz);
+            });
+        }
+
+        return round((float) $this->qtd_fruta_um - (float) $query->sum('qtd_fruta_um'), 2);
+    }
+
+    public function saldoDevolvivelKg(?Movimentacao $ignorar = null): float
+    {
+        $query = self::query()
+            ->vigentesParaCalculo()
+            ->where('categoria_movimentacao_id', CategoriaMovimentacaoTipo::Devolucao->value)
+            ->where('movimentacao_venda_origem_id', $this->id);
+
+        if ($ignorar !== null) {
+            $raiz = $ignorar->idCadeiaRaiz();
+            $query->where(function ($q) use ($raiz): void {
+                $q->where('id', '!=', $raiz)->where('movimentacao_origem_id', '!=', $raiz);
+            });
+        }
+
+        return round((float) $this->qtd_fruta_kg - (float) $query->sum('qtd_fruta_kg'), 2);
     }
 
     /**

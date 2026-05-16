@@ -2,21 +2,21 @@
 
 namespace App\Actions\Movimentacoes\Devolucao;
 
-use App\Http\Requests\Admin\Movimentacoes\StoreDevolucaoMovimentacaoRequest;
+use App\Http\Requests\Admin\Movimentacoes\UpdateDevolucaoMovimentacaoRequest;
 use App\Models\Movimentacao;
 use App\Services\Movimentacoes\DevolucaoMovimentacaoService;
 
-final class RegistrarDevolucaoMovimentacaoAction
+final class AtualizarDevolucaoMovimentacaoAction
 {
     public function __construct(
         private readonly DevolucaoMovimentacaoService $devolucao,
     ) {}
 
-    public function __invoke(StoreDevolucaoMovimentacaoRequest $request): Movimentacao
+    public function __invoke(UpdateDevolucaoMovimentacaoRequest $request, Movimentacao $movimentacaoDevolucao): Movimentacao
     {
         /** @var array<string, mixed> $payload */
         $payload = $request->validated();
 
-        return $this->devolucao->registrarDevolucao($payload, $request->user());
+        return $this->devolucao->atualizarDevolucao($movimentacaoDevolucao, $payload, $request->user());
     }
 }

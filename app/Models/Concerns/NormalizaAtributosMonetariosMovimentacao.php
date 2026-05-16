@@ -37,7 +37,32 @@ trait NormalizaAtributosMonetariosMovimentacao
 
     protected function setResultadoMovimentacaoAttribute(mixed $value): void
     {
-        $this->attributes['resultado_movimentacao'] = TextoCadastro::normalizarValorMonetarioBrasileiro($value);
+        $this->attributes['resultado_movimentacao'] = $this->normalizarDecimalComSinal($value);
+    }
+
+    protected function setValorDevolucaoTotalAttribute(mixed $value): void
+    {
+        $this->attributes['valor_devolucao_total'] = TextoCadastro::normalizarValorMonetarioBrasileiro($value);
+    }
+
+    protected function setValorDevolucaoUmAttribute(mixed $value): void
+    {
+        $this->attributes['valor_devolucao_um'] = TextoCadastro::normalizarValorMonetarioBrasileiro($value);
+    }
+
+    protected function setValorDevolucaoKgAttribute(mixed $value): void
+    {
+        $this->attributes['valor_devolucao_kg'] = TextoCadastro::normalizarValorMonetarioBrasileiro($value);
+    }
+
+    protected function setValorCustoDevolucaoAttribute(mixed $value): void
+    {
+        $this->attributes['valor_custo_devolucao'] = TextoCadastro::normalizarValorMonetarioBrasileiro($value);
+    }
+
+    protected function setResultadoDevolucaoAttribute(mixed $value): void
+    {
+        $this->attributes['resultado_devolucao'] = $this->normalizarDecimalComSinal($value);
     }
 
     protected function setValorIcmsTotalAttribute(mixed $value): void

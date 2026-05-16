@@ -2,6 +2,7 @@
 
 namespace App\Providers;
 
+use App\Contracts\Movimentacoes\ReprocessaEntradasDevolucaoDestino;
 use App\Contracts\Movimentacoes\ReprocessaEstoqueDestinoCompra;
 use App\Contracts\Movimentacoes\ReprocessaSaidasDescarteOrigem;
 use App\Contracts\Movimentacoes\ReprocessaSaidasDoacaoOrigem;
@@ -22,6 +23,7 @@ use App\Observers\MovimentacaoObserver;
 use App\Observers\UnidadeNegocioObserver;
 use App\Services\Movimentacoes\ReplayEstoqueCompraService;
 use App\Services\Movimentacoes\ReplayEstoqueDescarteService;
+use App\Services\Movimentacoes\ReplayEstoqueDevolucaoService;
 use App\Services\Movimentacoes\ReplayEstoqueDoacaoService;
 use App\Services\Movimentacoes\ReplayEstoqueTransferenciaService;
 use App\Services\Movimentacoes\ReplayEstoqueVendaService;
@@ -39,6 +41,7 @@ class AppServiceProvider extends ServiceProvider
         $this->app->bind(ReprocessaSaidasDoacaoOrigem::class, ReplayEstoqueDoacaoService::class);
         $this->app->bind(ReprocessaSaidasDescarteOrigem::class, ReplayEstoqueDescarteService::class);
         $this->app->bind(ReprocessaSaidasVendaOrigem::class, ReplayEstoqueVendaService::class);
+        $this->app->bind(ReprocessaEntradasDevolucaoDestino::class, ReplayEstoqueDevolucaoService::class);
     }
 
     public function boot(): void
@@ -92,6 +95,13 @@ class AppServiceProvider extends ServiceProvider
                 ->whereKey($value)
                 ->where('categoria_movimentacao_id', CategoriaMovimentacaoTipo::Venda->value)
                 ->where('status_movimentacao_id', StatusMovimentacao::ID_SAIDA)
+                ->firstOrFail();
+        });
+
+        Route::bind('movimentacaoDevolucao', function (string $value): Movimentacao {
+            return Movimentacao::query()
+                ->whereKey($value)
+                ->where('categoria_movimentacao_id', CategoriaMovimentacaoTipo::Devolucao->value)
                 ->firstOrFail();
         });
 
