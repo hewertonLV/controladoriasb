@@ -1,6 +1,6 @@
 @extends('layouts.app')
 
-@section('title', 'Editar compra #' . $movimentacao->id)
+@section('title', 'Editar compra #' . ($movimentacao->numero_compra ?? $movimentacao->id))
 @section('page-title', 'Movimentação — Ajustar valor da NF')
 
 @section('content')
@@ -13,6 +13,13 @@
         </div>
         <div class="card-body">
             <div class="row g-2 small">
+                @if ($movimentacao->movimentacao_origem_id)
+                    <div class="col-md-4"><span class="text-muted">Compra:</span> #{{ $movimentacao->numero_compra ?? $movimentacao->movimentacao_origem_id }}</div>
+                    <div class="col-md-4"><span class="text-muted">Versão ativa:</span> #{{ $movimentacao->id }} (v{{ $movimentacao->versao }})</div>
+                    <div class="col-md-4"><span class="text-muted">Versão anterior:</span> {{ $movimentacao->versaoAnterior ? '#'.$movimentacao->versaoAnterior->id : '—' }}</div>
+                @endif
+                <div class="col-md-4"><span class="text-muted">Data da movimentação:</span> {{ $movimentacao->data_movimentacao?->format('d/m/Y H:i') ?? '—' }}</div>
+                <div class="col-md-4"><span class="text-muted">Data da atualização:</span> {{ $movimentacao->versao > 1 ? $movimentacao->created_at?->format('d/m/Y H:i') : '—' }}</div>
                 <div class="col-md-4"><span class="text-muted">Fornecedor:</span> {{ $movimentacao->empresaOrigem?->nomeExibicao() }}</div>
                 <div class="col-md-4"><span class="text-muted">Unidade:</span> {{ $movimentacao->empresaDestino?->nomeExibicao() }}</div>
                 <div class="col-md-4"><span class="text-muted">Fruta:</span> {{ $movimentacao->fruta?->nome }}</div>

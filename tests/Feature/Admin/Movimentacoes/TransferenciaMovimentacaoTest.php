@@ -27,7 +27,6 @@ use Database\Seeders\EstadoSeeder;
 use Database\Seeders\StatusMovimentacaoSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
-use InvalidArgumentException;
 use Tests\Support\CreatesUsersWithRoles;
 use Tests\TestCase;
 
@@ -215,6 +214,54 @@ class TransferenciaMovimentacaoTest extends TestCase
         $this->assertSame('0.00', (string) $estoqueDestino->qtd_fruta_kg);
     }
 
+    public function test_criar_transferencia_multi_item_gera_um_par_por_fruta(): void
+    {
+        $this->seedCategoriasEEstados();
+        [$empresaOrigem, $empresaDestino, $unidadeOrigem, , $fruta] = $this->criarCenarioTransferencia();
+        $fruta2 = Fruta::factory()->create([
+            'kg_por_unidade_medicao' => '5.00',
+            'icms_na_compra' => '0.00',
+            'icms_ex_compra' => '0.00',
+            'um_icms' => FrutaUmIcms::KG->value,
+        ]);
+        $estoque2 = Estoque::factory()->create([
+            'id_unidade_negocio' => $unidadeOrigem->id,
+            'id_fruta' => $fruta2->id,
+            'qtd_fruta_kg' => '50.00',
+            'qtd_fruta_um' => '10.00',
+            'preco_medio_kg' => '6.00',
+            'preco_medio_um' => '30.00',
+            'valor_total_acumulado' => '300.00',
+        ]);
+        MovimentacaoEstoque::query()->create([
+            'id_estoque' => $estoque2->id,
+            'id_unidade_negocio' => $unidadeOrigem->id,
+            'id_fruta' => $fruta2->id,
+            'movimentacao_id' => null,
+            'qtd_fruta_kg' => '50.00',
+            'qtd_fruta_um' => '10.00',
+            'preco_medio_kg' => '6.00',
+            'preco_medio_um' => '30.00',
+            'valor_total_fruta' => '300.00',
+            'status_ultima_posicao' => true,
+        ]);
+
+        $this->actingAs($this->movimentacoesTransferenciasUsuario())
+            ->postJson(route('admin.movimentacoes.transferencias.store'), [
+                'id_empresa_origem' => $empresaOrigem->id,
+                'id_empresa_destino' => $empresaDestino->id,
+                'itens' => [
+                    ['id_fruta' => $fruta->id, 'qtd_fruta_um' => '2'],
+                    ['id_fruta' => $fruta2->id, 'qtd_fruta_um' => '3'],
+                ],
+            ])
+            ->assertCreated()
+            ->assertJsonCount(2, 'data');
+
+        $this->assertSame(2, Movimentacao::query()->where('status_movimentacao_id', StatusMovimentacao::ID_SAIDA)->count());
+        $this->assertSame(2, Movimentacao::query()->where('status_movimentacao_id', StatusMovimentacao::ID_ENTRADA)->count());
+    }
+
     public function test_sem_frete_valores_zerados(): void
     {
         $this->seedCategoriasEEstados();
@@ -285,6 +332,75 @@ class TransferenciaMovimentacaoTest extends TestCase
 
         $this->assertSame('20.00', (string) $estoqueDestino->qtd_fruta_kg);
         $this->assertSame('2.00', (string) $estoqueDestino->qtd_fruta_um);
+    }
+
+    public function test_recebimento_conforme_com_quantidade_diferente_retorna_validacao(): void
+    {
+        $this->seedCategoriasEEstados();
+
+        [$empresaOrigem, $empresaDestino, , , $fruta] = $this->criarCenarioTransferencia();
+        $user = $this->movimentacoesTransferenciasUsuario();
+
+        $this->actingAs($user)->post(route('admin.movimentacoes.transferencias.store'), [
+            'id_empresa_origem' => $empresaOrigem->id,
+            'id_empresa_destino' => $empresaDestino->id,
+            'id_fruta' => $fruta->id,
+            'qtd_fruta_um' => '2',
+        ])->assertRedirect();
+
+        $saida = Movimentacao::query()
+            ->where('status_movimentacao_id', StatusMovimentacao::ID_SAIDA)
+            ->where('categoria_movimentacao_id', CategoriaMovimentacaoTipo::Transferencia->value)
+            ->firstOrFail();
+
+        $anchor = (int) $saida->transferencia_origem_id;
+
+        $this->actingAs($user)->post(
+            route('admin.movimentacoes.transferencias.recebimento.store', ['transferenciaOrigem' => $anchor]),
+            [
+                'status_recebimento' => StatusRecebimentoTransferencia::CONFORME->value,
+                'qtd_recebida_um' => '1',
+            ],
+        )
+            ->assertSessionHasErrors('qtd_recebida_um');
+
+        $entrada = Movimentacao::query()
+            ->where('status_movimentacao_id', StatusMovimentacao::ID_ENTRADA)
+            ->where('transferencia_origem_id', $anchor)
+            ->where('status_registro', MovimentacaoStatusRegistro::ATIVO->value)
+            ->firstOrFail();
+
+        $this->assertSame(StatusTransferenciaOperacional::PENDENTE_RECEBIMENTO->value, $entrada->status_transferencia);
+        $this->assertNull($entrada->qtd_recebida_um);
+    }
+
+    public function test_formulario_recebimento_trava_quantidade_quando_conforme(): void
+    {
+        $this->seedCategoriasEEstados();
+
+        [$empresaOrigem, $empresaDestino, , , $fruta] = $this->criarCenarioTransferencia();
+        $user = $this->movimentacoesTransferenciasUsuario();
+
+        $this->actingAs($user)->post(route('admin.movimentacoes.transferencias.store'), [
+            'id_empresa_origem' => $empresaOrigem->id,
+            'id_empresa_destino' => $empresaDestino->id,
+            'id_fruta' => $fruta->id,
+            'qtd_fruta_um' => '2',
+        ])->assertRedirect();
+
+        $saida = Movimentacao::query()
+            ->where('status_movimentacao_id', StatusMovimentacao::ID_SAIDA)
+            ->where('categoria_movimentacao_id', CategoriaMovimentacaoTipo::Transferencia->value)
+            ->firstOrFail();
+
+        $this->actingAs($user)
+            ->get(route('admin.movimentacoes.transferencias.show', ['transferenciaOrigem' => (int) $saida->transferencia_origem_id]))
+            ->assertOk()
+            ->assertSee('data-recebimento-transferencia-form', false)
+            ->assertSee('data-status-recebimento', false)
+            ->assertSee('data-qtd-recebida-um', false)
+            ->assertSee('data-qtd-enviada="2.00"', false)
+            ->assertSee('qtd.readOnly = conforme', false);
     }
 
     public function test_recebimento_divergente_nao_altera_estoque_destino(): void
@@ -474,6 +590,58 @@ class TransferenciaMovimentacaoTest extends TestCase
         foreach ($saidas as $s) {
             $this->assertSame(number_format($valorKgEsperado, 2, '.', ''), (string) $s->valor_frete_kg);
         }
+    }
+
+    /** Recalcular rateio não cria novas linhas em movimentacoes_estoque na origem. */
+    public function test_rateio_frete_distribui_centavos_para_fechar_valor_total(): void
+    {
+        $this->seedCategoriasEEstados();
+
+        [$empresaOrigem, $empresaDestino, $unidadeOrigem, , $fruta] = $this->criarCenarioTransferencia();
+        [$empresaDestino2] = $this->criarUnidadeDestinoComHistoricoCo();
+        [$empresaDestino3] = $this->criarUnidadeDestinoComHistoricoCo();
+        $frete = Frete::factory()->create(['valor' => '100.00']);
+
+        Estoque::query()
+            ->where('id_unidade_negocio', $unidadeOrigem->id)
+            ->where('id_fruta', $fruta->id)
+            ->update([
+                'qtd_fruta_kg' => '500.00',
+                'qtd_fruta_um' => '50.00',
+                'valor_total_acumulado' => '2500.00',
+            ]);
+        MovimentacaoEstoque::query()
+            ->where('id_unidade_negocio', $unidadeOrigem->id)
+            ->where('id_fruta', $fruta->id)
+            ->where('status_ultima_posicao', true)
+            ->update([
+                'qtd_fruta_kg' => '500.00',
+                'qtd_fruta_um' => '50.00',
+                'valor_total_fruta' => '2500.00',
+            ]);
+
+        $user = $this->movimentacoesTransferenciasUsuario();
+
+        foreach ([$empresaDestino, $empresaDestino2, $empresaDestino3] as $destino) {
+            $this->actingAs($user)->post(route('admin.movimentacoes.transferencias.store'), [
+                'id_empresa_origem' => $empresaOrigem->id,
+                'id_empresa_destino' => $destino->id,
+                'id_fruta' => $fruta->id,
+                'qtd_fruta_um' => '1',
+                'id_frete' => $frete->id,
+            ])->assertRedirect();
+        }
+
+        $saidas = Movimentacao::query()
+            ->where('id_frete', $frete->id)
+            ->where('status_movimentacao_id', StatusMovimentacao::ID_SAIDA)
+            ->where('status_registro', MovimentacaoStatusRegistro::ATIVO->value)
+            ->orderBy('id')
+            ->get();
+
+        $this->assertCount(3, $saidas);
+        $this->assertSame('100.00', number_format((float) $saidas->sum('valor_frete_rateio'), 2, '.', ''));
+        $this->assertSame(['33.34', '33.33', '33.33'], $saidas->pluck('valor_frete_rateio')->map(fn ($valor): string => (string) $valor)->all());
     }
 
     /** Recalcular rateio não cria novas linhas em movimentacoes_estoque na origem. */
@@ -806,7 +974,7 @@ class TransferenciaMovimentacaoTest extends TestCase
         app(ReconciliacaoTransferenciaService::class)->recalcularRateioFreteParaTransferencias($frete->id);
 
         $frete->refresh();
-        $this->assertSame('10.00', (string) $frete->valor_fruta_kg);
+        $this->assertSame('0.00', (string) $frete->valor_fruta_kg);
     }
 
     public function test_somente_uma_movimentacao_estoque_com_ultima_posicao_na_origem(): void
@@ -1031,21 +1199,82 @@ class TransferenciaMovimentacaoTest extends TestCase
             ->assertSessionHasErrors('id_empresa_destino');
     }
 
-    public function test_nao_permite_transferencia_com_estoque_insuficiente(): void
+    public function test_permite_transferencia_com_saldo_negativo_quando_origem_tem_registro_de_estoque(): void
     {
         $this->seedCategoriasEEstados();
 
         [$empresaOrigem, $empresaDestino, , , $fruta] = $this->criarCenarioTransferencia();
 
-        $this->expectException(InvalidArgumentException::class);
-        $this->expectExceptionMessage('Saldo insuficiente');
-
-        app(TransferenciaMovimentacaoService::class)->criarTransferencia([
+        $par = app(TransferenciaMovimentacaoService::class)->criarTransferencia([
             'id_empresa_origem' => $empresaOrigem->id,
             'id_empresa_destino' => $empresaDestino->id,
             'id_fruta' => $fruta->id,
             'qtd_fruta_um' => '999',
         ]);
+
+        $this->assertSame('-989.00', (string) $par['saida']->fresh()->saldo_estoque_fruta_um);
+    }
+
+    public function test_nao_permite_transferencia_quando_origem_nunca_recebeu_produto(): void
+    {
+        $this->seedCategoriasEEstados();
+
+        [$empresaOrigem, $empresaDestino, $unidadeOrigem, , $frutaComEstoque] = $this->criarCenarioTransferencia();
+        $frutaSemEstoque = Fruta::factory()->create([
+            'kg_por_unidade_medicao' => '10.00',
+        ]);
+        $user = $this->movimentacoesTransferenciasUsuario();
+
+        $this->assertDatabaseMissing('estoques', [
+            'id_unidade_negocio' => $unidadeOrigem->id,
+            'id_fruta' => $frutaSemEstoque->id,
+        ]);
+
+        $response = $this
+            ->actingAs($user)
+            ->from(route('admin.movimentacoes.transferencias.create'))
+            ->post(route('admin.movimentacoes.transferencias.store'), [
+                'id_empresa_origem' => $empresaOrigem->id,
+                'id_empresa_destino' => $empresaDestino->id,
+                'id_fruta' => $frutaSemEstoque->id,
+                'qtd_fruta_um' => '1',
+            ]);
+
+        $response
+            ->assertRedirect(route('admin.movimentacoes.transferencias.create'))
+            ->assertSessionHasErrors('id_fruta');
+
+        $this->assertDatabaseMissing('estoques', [
+            'id_unidade_negocio' => $unidadeOrigem->id,
+            'id_fruta' => $frutaSemEstoque->id,
+        ]);
+
+        $this->assertDatabaseHas('estoques', [
+            'id_unidade_negocio' => $unidadeOrigem->id,
+            'id_fruta' => $frutaComEstoque->id,
+        ]);
+    }
+
+    public function test_retorna_422_json_quando_origem_nunca_recebeu_produto(): void
+    {
+        $this->seedCategoriasEEstados();
+
+        [$empresaOrigem, $empresaDestino] = $this->criarCenarioTransferencia();
+        $frutaSemEstoque = Fruta::factory()->create([
+            'kg_por_unidade_medicao' => '10.00',
+        ]);
+        $user = $this->movimentacoesTransferenciasUsuario();
+
+        $this
+            ->actingAs($user)
+            ->postJson(route('admin.movimentacoes.transferencias.store'), [
+                'id_empresa_origem' => $empresaOrigem->id,
+                'id_empresa_destino' => $empresaDestino->id,
+                'id_fruta' => $frutaSemEstoque->id,
+                'qtd_fruta_um' => '1',
+            ])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('id_fruta');
     }
 
     private function selectHtml(string $html, string $id): string

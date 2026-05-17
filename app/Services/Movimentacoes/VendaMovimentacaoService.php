@@ -30,6 +30,7 @@ final class VendaMovimentacaoService
         private readonly MovimentacaoVersionamentoService $versionamento,
         private readonly ReprocessaSaidasVendaOrigem $replayVenda,
         private readonly MovimentacaoAuditoriaService $auditoria,
+        private readonly FreteRateioMovimentacaoService $freteRateio,
     ) {}
 
     /**
@@ -117,7 +118,7 @@ final class VendaMovimentacaoService
                 'id_unidade_negocio_faturamento' => $ativa->id_unidade_negocio_faturamento,
                 'id_frete' => $ativa->id_frete,
                 'data_emissao' => $ativa->data_movimentacao,
-            ], $input));
+            ], $input), true);
 
             $item = $this->normalizarItem([
                 'id_fruta' => $input['id_fruta'] ?? $ativa->id_fruta,
@@ -220,49 +221,7 @@ final class VendaMovimentacaoService
 
     public function recalcularRateioFreteParaVendas(int $idFrete): void
     {
-        DB::transaction(function () use ($idFrete): void {
-            $frete = Frete::query()->whereKey($idFrete)->lockForUpdate()->first();
-            if ($frete === null) {
-                return;
-            }
-
-            $movs = Movimentacao::query()
-                ->vigentesParaCalculo()
-                ->where('categoria_movimentacao_id', CategoriaMovimentacaoTipo::Venda->value)
-                ->where('id_frete', $idFrete)
-                ->orderBy('data_movimentacao')
-                ->orderBy('id')
-                ->lockForUpdate()
-                ->get();
-
-            if ($movs->isEmpty()) {
-                $frete->forceFill(['valor_fruta_kg' => '0.00'])->save();
-
-                return;
-            }
-
-            $totalKg = round((float) $movs->sum(static fn (Movimentacao $m): float => (float) $m->qtd_fruta_kg), 2);
-            if ($totalKg <= 0) {
-                return;
-            }
-
-            $valorFreteKg = round((float) $frete->valor / $totalKg, 2);
-            foreach ($movs as $m) {
-                $qtdKg = (float) $m->qtd_fruta_kg;
-                $qtdUm = (float) $m->qtd_fruta_um;
-                $rateio = round($valorFreteKg * $qtdKg, 2);
-                $freteUm = $qtdUm > 0 ? round($rateio / $qtdUm, 2) : 0.0;
-
-                $m->forceFill([
-                    'valor_frete_kg' => number_format($valorFreteKg, 2, '.', ''),
-                    'valor_frete_rateio' => number_format($rateio, 2, '.', ''),
-                    'valor_frete_um' => number_format($freteUm, 2, '.', ''),
-                    'resultado_movimentacao' => number_format(round((float) $m->valor_nf_total - (float) $m->valor_custo_saida - $rateio, 2), 2, '.', ''),
-                ])->saveQuietly();
-            }
-
-            $frete->forceFill(['valor_fruta_kg' => number_format($valorFreteKg, 2, '.', '')])->save();
-        });
+        $this->freteRateio->recalcular($idFrete);
     }
 
     /**
@@ -356,7 +315,7 @@ final class VendaMovimentacaoService
     /**
      * @return array{Empresa, UnidadeNegocio, Empresa, UnidadeNegocio, Frete|null, Carbon}
      */
-    private function resolverCabecalho(array $input): array
+    private function resolverCabecalho(array $input, bool $usarDataInformada = false): array
     {
         $empresaOrigem = Empresa::query()->with('entidade')->findOrFail((int) $input['id_empresa_origem']);
         $this->assertEmpresaTipo($empresaOrigem, TipoEmpresaRegistro::UNIDADE_NEGOCIO);
@@ -365,9 +324,17 @@ final class VendaMovimentacaoService
         $empresaDestino = Empresa::query()->with('entidade')->findOrFail((int) $input['id_empresa_destino']);
         $this->assertEmpresaTipo($empresaDestino, TipoEmpresaRegistro::CLIENTE);
 
-        $unidadeFaturamento = UnidadeNegocio::query()->findOrFail((int) $input['id_unidade_negocio_faturamento']);
-        if ($unidadeFaturamento->is_hub) {
-            throw new InvalidArgumentException('A unidade de faturamento não pode ser HUB.');
+        if ($unidadeOrigem->is_hub) {
+            if (($input['id_unidade_negocio_faturamento'] ?? null) === null || $input['id_unidade_negocio_faturamento'] === '') {
+                throw new InvalidArgumentException('Informe a unidade de faturamento quando a origem física for HUB.');
+            }
+
+            $unidadeFaturamento = UnidadeNegocio::query()->findOrFail((int) $input['id_unidade_negocio_faturamento']);
+            if ($unidadeFaturamento->is_hub) {
+                throw new InvalidArgumentException('A unidade de faturamento não pode ser HUB.');
+            }
+        } else {
+            $unidadeFaturamento = $unidadeOrigem;
         }
 
         $frete = null;
@@ -378,7 +345,11 @@ final class VendaMovimentacaoService
             }
         }
 
-        return [$empresaOrigem, $unidadeOrigem, $empresaDestino, $unidadeFaturamento, $frete, $this->resolverData($input['data_emissao'] ?? null)];
+        $dataEmissao = $usarDataInformada
+            ? $this->resolverData($input['data_emissao'] ?? null)
+            : now();
+
+        return [$empresaOrigem, $unidadeOrigem, $empresaDestino, $unidadeFaturamento, $frete, $dataEmissao];
     }
 
     /**

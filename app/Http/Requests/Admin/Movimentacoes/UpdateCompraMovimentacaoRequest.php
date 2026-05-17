@@ -20,6 +20,7 @@ class UpdateCompraMovimentacaoRequest extends FormRequest
         $proibidos = [
             'id_movimentacao_estoque_old' => ['prohibited'],
             'id_movimentacao_estoque_new' => ['prohibited'],
+            'numero_compra' => ['prohibited'],
             'id_empresa_origem' => ['prohibited'],
             'id_empresa_destino' => ['prohibited'],
             'id_fruta' => ['prohibited'],

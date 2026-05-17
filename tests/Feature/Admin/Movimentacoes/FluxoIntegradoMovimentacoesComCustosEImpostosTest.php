@@ -514,15 +514,20 @@ class FluxoIntegradoMovimentacoesComCustosEImpostosTest extends TestCase
         string $qtdUm,
         string $valorNfTotal,
     ): Movimentacao {
-        $this->actingAs($this->movimentacoesVendasUsuario())->postJson(route('admin.movimentacoes.vendas.store'), [
+        $payload = [
             'numero_nf' => 'NF-VENDA-STRESS',
             'id_empresa_origem' => $origem->id,
             'id_empresa_destino' => $cliente->id,
-            'id_unidade_negocio_faturamento' => $unidadeFaturamento->id,
             'itens' => [
                 ['id_fruta' => $fruta->id, 'qtd_fruta_um' => $qtdUm, 'valor_nf_total' => $valorNfTotal],
             ],
-        ])->assertCreated();
+        ];
+
+        if ($origem->loadMissing('entidade')->entidade?->is_hub) {
+            $payload['id_unidade_negocio_faturamento'] = $unidadeFaturamento->id;
+        }
+
+        $this->actingAs($this->movimentacoesVendasUsuario())->postJson(route('admin.movimentacoes.vendas.store'), $payload)->assertCreated();
 
         return Movimentacao::query()
             ->where('categoria_movimentacao_id', CategoriaMovimentacaoTipo::Venda->value)
@@ -764,11 +769,11 @@ class FluxoIntegradoMovimentacoesComCustosEImpostosTest extends TestCase
             return;
         }
 
-        $kgAtivos = (float) $ativas->sum(fn (Movimentacao $m): float => (float) $m->qtd_fruta_kg);
+        $kgAtivos = (float) $this->movimentacoesAtivasDoFrete($frete)->sum(fn (Movimentacao $m): float => (float) $m->qtd_fruta_kg);
         $esperadoKg = round((float) $frete->valor / $kgAtivos, 2);
 
         foreach ($ativas as $m) {
-            $this->assertSame(number_format($esperadoKg, 2, '.', ''), (string) $m->valor_frete_kg);
+            $this->assertSame(number_format($esperadoKg, 2, '.', ''), (string) $m->valor_frete_kg, "frete={$frete->id} compra movimentacao={$m->id}");
         }
     }
 
@@ -781,11 +786,11 @@ class FluxoIntegradoMovimentacoesComCustosEImpostosTest extends TestCase
             return;
         }
 
-        $kgAtivos = (float) $ativas->sum(fn (Movimentacao $m): float => (float) $m->qtd_fruta_kg);
+        $kgAtivos = (float) $this->movimentacoesAtivasDoFrete($frete)->sum(fn (Movimentacao $m): float => (float) $m->qtd_fruta_kg);
         $esperadoKg = round((float) $frete->valor / $kgAtivos, 2);
 
         foreach ($ativas as $m) {
-            $this->assertSame(number_format($esperadoKg, 2, '.', ''), (string) $m->valor_frete_kg);
+            $this->assertSame(number_format($esperadoKg, 2, '.', ''), (string) $m->valor_frete_kg, "frete={$frete->id} transferencia movimentacao={$m->id}");
         }
     }
 
@@ -799,6 +804,23 @@ class FluxoIntegradoMovimentacoesComCustosEImpostosTest extends TestCase
             ->where('categoria_movimentacao_id', $categoriaId)
             ->when($statusMovimentacaoId !== null, fn ($q) => $q->where('status_movimentacao_id', $statusMovimentacaoId))
             ->where('status_registro', MovimentacaoStatusRegistro::ATIVO->value)
+            ->get();
+    }
+
+    /**
+     * @return Collection<int, Movimentacao>
+     */
+    private function movimentacoesAtivasDoFrete(Frete $frete): Collection
+    {
+        return Movimentacao::query()
+            ->where('id_frete', $frete->id)
+            ->where('status_registro', MovimentacaoStatusRegistro::ATIVO->value)
+            ->where('qtd_fruta_kg', '>', 0)
+            ->where(function ($query): void {
+                $query
+                    ->where('categoria_movimentacao_id', '!=', CategoriaMovimentacaoTipo::Transferencia->value)
+                    ->orWhere('status_movimentacao_id', '!=', StatusMovimentacao::ID_ENTRADA);
+            })
             ->get();
     }
 

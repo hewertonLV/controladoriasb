@@ -4,6 +4,7 @@ namespace App\Http\Requests\Admin\Movimentacoes;
 
 use App\Enums\FreteStatusSituacao;
 use App\Models\Cliente;
+use App\Models\Empresa;
 use App\Models\Fruta;
 use App\Models\UnidadeNegocio;
 use App\Support\TextoCadastro;
@@ -27,8 +28,7 @@ class StoreVendaMovimentacaoRequest extends FormRequest
             'numero_nf' => ['required', 'string', 'max:255'],
             'id_empresa_origem' => ['required', 'integer', Rule::exists('empresas', 'id')->where('entidade_type', UnidadeNegocio::class)],
             'id_empresa_destino' => ['required', 'integer', Rule::exists('empresas', 'id')->where('entidade_type', Cliente::class)],
-            'id_unidade_negocio_faturamento' => ['required', 'integer', Rule::exists('unidades_negocio', 'id')],
-            'data_emissao' => ['nullable', 'date'],
+            'id_unidade_negocio_faturamento' => ['nullable', 'integer', Rule::exists('unidades_negocio', 'id')],
             'observacao' => ['nullable', 'string', 'max:5000'],
             'id_frete' => ['nullable', 'integer', Rule::exists('fretes', 'id')->where('status_situacao', FreteStatusSituacao::ABERTA->value)],
             'itens' => ['required', 'array', 'min:1'],
@@ -51,9 +51,23 @@ class StoreVendaMovimentacaoRequest extends FormRequest
                 }
             }
 
-            $unidade = UnidadeNegocio::query()->find((int) $this->input('id_unidade_negocio_faturamento'));
-            if ($unidade !== null && $unidade->is_hub) {
-                $v->errors()->add('id_unidade_negocio_faturamento', 'A unidade de faturamento não pode ser HUB.');
+            $empresaOrigem = Empresa::query()->with('entidade')->find((int) $this->input('id_empresa_origem'));
+            $origem = $empresaOrigem?->entidade instanceof UnidadeNegocio ? $empresaOrigem->entidade : null;
+            $faturamentoInformado = ! blank($this->input('id_unidade_negocio_faturamento'));
+
+            if ($origem !== null && $origem->is_hub && ! $faturamentoInformado) {
+                $v->errors()->add('id_unidade_negocio_faturamento', 'Informe a unidade de faturamento quando a origem física for HUB.');
+            }
+
+            if ($origem !== null && ! $origem->is_hub && $faturamentoInformado) {
+                $v->errors()->add('id_unidade_negocio_faturamento', 'A unidade de faturamento só deve ser informada quando a origem física for HUB.');
+            }
+
+            if ($faturamentoInformado) {
+                $unidade = UnidadeNegocio::query()->find((int) $this->input('id_unidade_negocio_faturamento'));
+                if ($unidade !== null && $unidade->is_hub) {
+                    $v->errors()->add('id_unidade_negocio_faturamento', 'A unidade de faturamento não pode ser HUB.');
+                }
             }
         });
     }
@@ -105,6 +119,7 @@ class StoreVendaMovimentacaoRequest extends FormRequest
             'valor_custo_saida' => ['prohibited'],
             'resultado_movimentacao' => ['prohibited'],
             'valor_total_movimentacao' => ['prohibited'],
+            'data_emissao' => ['prohibited'],
             'saldo_estoque_fruta_kg' => ['prohibited'],
             'saldo_estoque_fruta_um' => ['prohibited'],
             'preco_medio_fruta_kg' => ['prohibited'],

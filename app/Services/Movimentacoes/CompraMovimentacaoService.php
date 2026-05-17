@@ -34,6 +34,8 @@ final class CompraMovimentacaoService
 
     public function __construct(
         private readonly MovimentacaoVersionamentoService $versionamento,
+        private readonly ReplayLinhaTempoEstoqueService $replayLinhaTempoEstoque,
+        private readonly FreteRateioMovimentacaoService $freteRateio,
     ) {}
 
     /**
@@ -194,6 +196,7 @@ final class CompraMovimentacaoService
 
             /** @var Movimentacao $movimentacao */
             $movimentacao = Movimentacao::query()->create([
+                'numero_compra' => $this->proximoNumeroCompra(),
                 'id_movimentacao_estoque_old' => $posicaoAnterior?->id,
                 'id_movimentacao_estoque_new' => null,
                 'id_empresa_origem' => $empresaOrigem->id,
@@ -300,21 +303,6 @@ final class CompraMovimentacaoService
             $this->assertMovimentacaoECategoriaCompra($ativa);
             $this->versionamento->validarPodeSubstituir($ativa);
 
-            $ultima = MovimentacaoEstoque::query()
-                ->where('id_unidade_negocio', (int) $this->unidadeIdDestino($ativa))
-                ->where('id_fruta', $ativa->id_fruta)
-                ->where('status_ultima_posicao', true)
-                ->lockForUpdate()
-                ->first();
-
-            if ($ultima === null || (int) $ultima->id !== (int) $ativa->id_movimentacao_estoque_new) {
-                throw new InvalidArgumentException('Somente a compra que gerou a posição atual de estoque pode ser alterada.');
-            }
-
-            if ((int) $ultima->movimentacao_id !== (int) $ativa->id) {
-                throw new InvalidArgumentException('A posição de estoque vigente não corresponde à movimentação informada.');
-            }
-
             $fruta = Fruta::query()->findOrFail($ativa->id_fruta);
             $kgPorUm = (float) $fruta->kg_por_unidade_medicao;
 
@@ -345,7 +333,6 @@ final class CompraMovimentacaoService
             $valorNfUm = round($valorNfTotal / $qtdUm, 2);
             $valorNfKg = round($valorNfTotal / $qtdKg, 2);
 
-            $precoMedioKgLoteAntigo = (float) $ativa->preco_medio_fruta_kg;
             $categoriaCompraId = CategoriaMovimentacao::idPorNome(self::CATEGORIA_NOME);
 
             $kgOutros = (float) Movimentacao::query()
@@ -364,21 +351,20 @@ final class CompraMovimentacaoService
             $valorFreteUm = round($valorFreteRateio / $qtdUm, 2);
 
             $valorCo = (float) $ativa->valor_custo_operacional;
-            $icmsKg = (float) $this->calcularIcmsPorKg($fruta, $unidade, $fornecedor);
+            // Ajustes retroativos preservam o ICMS snapshotado na compra original.
+            $icmsKg = (float) $ativa->icms_convertido_kg;
             $icmsHistorico = $this->camposIcmsHistorico($icmsKg, $qtdKg, $qtdUm);
             $precoMedioKgLoteProvisional = round($valorNfKg + $valorCo + $valorFreteKg + $icmsKg, 2);
             $precoMedioUmLoteProvisional = round($precoMedioKgLoteProvisional * $kgPorUm, 2);
 
-            $estoque = Estoque::query()
+            Estoque::query()
                 ->where('id_unidade_negocio', $unidade->id)
                 ->where('id_fruta', $fruta->id)
                 ->lockForUpdate()
                 ->firstOrFail();
 
-            $V = (float) $estoque->valor_total_acumulado;
-            $Q = (float) $estoque->qtd_fruta_kg;
-
             $novaLinha = [
+                'numero_compra' => $ativa->numero_compra,
                 'id_movimentacao_estoque_old' => $ativa->id_movimentacao_estoque_old,
                 'id_movimentacao_estoque_new' => null,
                 'id_empresa_origem' => $ativa->id_empresa_origem,
@@ -408,43 +394,8 @@ final class CompraMovimentacaoService
 
             $nova = $this->versionamento->criarNovaVersao($ativa, $novaLinha, $motivo, $user);
 
-            $ultima->forceFill(['status_ultima_posicao' => false])->save();
-
             $this->recalcularRateioFreteParaTodasMovimentacoes((int) $frete->id);
-
-            $nova = $nova->fresh();
-            $precoMedioKgLoteNovo = (float) $nova->preco_medio_fruta_kg;
-
-            $Vajustado = round($V - ($precoMedioKgLoteAntigo * $qtdKg) + ($precoMedioKgLoteNovo * $qtdKg), 2);
-            $precoConsolidadoKg = $Q > 0 ? round($Vajustado / $Q, 2) : 0.0;
-            $precoConsolidadoUm = round($precoConsolidadoKg * $kgPorUm, 2);
-            $valorTotalSnapshot = round($Q * $precoConsolidadoKg, 2);
-
-            $saldoKgNovo = (float) $nova->saldo_estoque_fruta_kg;
-            $saldoUmNovo = (float) $nova->saldo_estoque_fruta_um;
-
-            $novaMe = MovimentacaoEstoque::query()->create([
-                'id_estoque' => $estoque->id,
-                'id_unidade_negocio' => $unidade->id,
-                'id_fruta' => $fruta->id,
-                'movimentacao_id' => $nova->id,
-                'qtd_fruta_kg' => number_format($saldoKgNovo, 2, '.', ''),
-                'qtd_fruta_um' => number_format($saldoUmNovo, 2, '.', ''),
-                'preco_medio_kg' => number_format($precoConsolidadoKg, 2, '.', ''),
-                'preco_medio_um' => number_format($precoConsolidadoUm, 2, '.', ''),
-                'valor_total_fruta' => number_format($valorTotalSnapshot, 2, '.', ''),
-                'status_ultima_posicao' => true,
-            ]);
-
-            $nova->forceFill(['id_movimentacao_estoque_new' => $novaMe->id])->saveQuietly();
-
-            $estoque->forceFill([
-                'qtd_fruta_kg' => number_format($saldoKgNovo, 2, '.', ''),
-                'qtd_fruta_um' => number_format($saldoUmNovo, 2, '.', ''),
-                'preco_medio_kg' => number_format($precoConsolidadoKg, 2, '.', ''),
-                'preco_medio_um' => number_format($precoConsolidadoUm, 2, '.', ''),
-                'valor_total_acumulado' => number_format($Vajustado, 2, '.', ''),
-            ])->save();
+            $this->replayLinhaTempoEstoque->reprocessarUnidadeFruta($unidade->id, (int) $fruta->id);
 
             return $nova->fresh(['fruta', 'frete', 'empresaOrigem', 'empresaDestino']);
         });
@@ -458,78 +409,7 @@ final class CompraMovimentacaoService
      */
     public function recalcularRateioFreteParaTodasMovimentacoes(int $idFrete): void
     {
-        DB::transaction(function () use ($idFrete): void {
-            $frete = Frete::query()->find($idFrete);
-            if ($frete === null) {
-                return;
-            }
-
-            $movs = Movimentacao::query()
-                ->vigentesParaCalculo()
-                ->where('categoria_movimentacao_id', CategoriaMovimentacao::idPorNome(self::CATEGORIA_NOME))
-                ->where('id_frete', $idFrete)
-                ->ordenarLinhaDoTempo()
-                ->get();
-
-            if ($movs->isEmpty()) {
-                return;
-            }
-
-            $totalKg = round((float) $movs->sum(static fn (Movimentacao $m) => (float) $m->qtd_fruta_kg), 2);
-            if ($totalKg <= 0) {
-                return;
-            }
-
-            $valorFreteTotal = (float) $frete->valor;
-
-            foreach ($movs as $m) {
-                $fruta = Fruta::query()->find((int) $m->id_fruta);
-                $empresaOrigem = Empresa::query()->with(['entidade.estado'])->find((int) $m->id_empresa_origem);
-                $empresaDestino = Empresa::query()->with(['entidade.estado'])->find((int) $m->id_empresa_destino);
-                if ($fruta === null || $empresaOrigem === null || $empresaDestino === null) {
-                    continue;
-                }
-                $fornecedor = $empresaOrigem->entidade;
-                $unidade = $empresaDestino->entidade;
-                if (! $fornecedor instanceof Fornecedor || ! $unidade instanceof UnidadeNegocio) {
-                    continue;
-                }
-
-                $qtdKg = (float) $m->qtd_fruta_kg;
-                $qtdUm = (float) $m->qtd_fruta_um;
-                if ($qtdKg <= 0 || $qtdUm <= 0) {
-                    continue;
-                }
-
-                $valorFreteKg = round($valorFreteTotal / $totalKg, 2);
-                $rateio = round($valorFreteKg * $qtdKg, 2);
-                $freteUm = round($rateio / $qtdUm, 2);
-
-                $valorNfTotal = (float) $m->valor_nf_total;
-                $valorNfKg = round($valorNfTotal / $qtdKg, 2);
-                $valorNfUm = round($valorNfTotal / $qtdUm, 2);
-
-                $valorCo = (float) $m->valor_custo_operacional;
-                // Preserva o ICMS histórico da linha; mudança posterior em frutas.icms_* só vale para novos lançamentos.
-                $icmsKg = (float) $m->icms_convertido_kg;
-                $kgPorUm = (float) $fruta->kg_por_unidade_medicao;
-                $precoMedioKg = round($valorNfKg + $valorCo + $valorFreteKg + $icmsKg, 2);
-                $precoMedioUm = round($precoMedioKg * $kgPorUm, 2);
-
-                $m->forceFill([
-                    'valor_nf_kg' => number_format($valorNfKg, 2, '.', ''),
-                    'valor_nf_um' => number_format($valorNfUm, 2, '.', ''),
-                    'valor_frete_kg' => number_format($valorFreteKg, 2, '.', ''),
-                    'valor_frete_rateio' => number_format($rateio, 2, '.', ''),
-                    'valor_frete_um' => number_format($freteUm, 2, '.', ''),
-                    'icms_convertido_kg' => number_format($icmsKg, 2, '.', ''),
-                    'preco_medio_fruta_kg' => number_format($precoMedioKg, 2, '.', ''),
-                    'preco_medio_fruta_um' => number_format($precoMedioUm, 2, '.', ''),
-                ])->saveQuietly();
-            }
-
-            $frete->forceFill(['valor_fruta_kg' => number_format($valorFreteTotal / $totalKg, 2, '.', '')])->save();
-        });
+        $this->freteRateio->recalcular($idFrete);
     }
 
     private function assertMovimentacaoECategoriaCompra(Movimentacao $movimentacao): void
@@ -538,6 +418,20 @@ final class CompraMovimentacaoService
         if ((int) $movimentacao->categoria_movimentacao_id !== $idEsperado) {
             throw new InvalidArgumentException('A movimentação não é uma COMPRA.');
         }
+    }
+
+    private function proximoNumeroCompra(): int
+    {
+        Movimentacao::query()
+            ->where('categoria_movimentacao_id', CategoriaMovimentacao::idPorNome(self::CATEGORIA_NOME))
+            ->whereNotNull('numero_compra')
+            ->orderBy('numero_compra')
+            ->lockForUpdate()
+            ->get(['id']);
+
+        return ((int) Movimentacao::query()
+            ->where('categoria_movimentacao_id', CategoriaMovimentacao::idPorNome(self::CATEGORIA_NOME))
+            ->max('numero_compra')) + 1;
     }
 
     private function unidadeIdDestino(Movimentacao $movimentacao): int

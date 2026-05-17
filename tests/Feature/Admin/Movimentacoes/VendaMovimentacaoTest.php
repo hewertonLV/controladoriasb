@@ -24,6 +24,7 @@ use Database\Seeders\CategoriaMovimentacaoSeeder;
 use Database\Seeders\EstadoSeeder;
 use Database\Seeders\StatusMovimentacaoSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Carbon;
 use RuntimeException;
 use Tests\Support\CreatesUsersWithRoles;
 use Tests\TestCase;
@@ -46,10 +47,13 @@ class VendaMovimentacaoTest extends TestCase
         $this->assertStringContainsString($c['unidade']->nome, (string) $html);
         $this->assertStringContainsString($c['empresa_cliente']->nomeExibicao(), (string) $html);
         $this->assertStringContainsString($c['unidade_faturamento']->nome, (string) $html);
+        $this->assertStringNotContainsString('name="data_emissao"', (string) $html);
     }
 
     public function test_usuario_com_permissao_cria_venda_multi_item_e_calcula_estoque_valores_e_resultado(): void
     {
+        Carbon::setTestNow(Carbon::parse('2026-05-17 18:55:00'));
+
         $this->seedBase();
         $c = $this->cenarioBase();
         $fruta2 = Fruta::factory()->create([
@@ -66,8 +70,6 @@ class VendaMovimentacaoTest extends TestCase
             'numero_nf' => ' NF-100 ',
             'id_empresa_origem' => $c['empresa_unidade']->id,
             'id_empresa_destino' => $c['empresa_cliente']->id,
-            'id_unidade_negocio_faturamento' => $c['unidade_faturamento']->id,
-            'data_emissao' => '2026-05-16 10:00:00',
             'observacao' => 'Venda com dois itens.',
             'itens' => [
                 ['id_fruta' => $c['fruta']->id, 'qtd_fruta_um' => '2', 'valor_nf_total' => '300,00'],
@@ -79,6 +81,8 @@ class VendaMovimentacaoTest extends TestCase
             'numero_nf' => 'NF-100',
             'valor_total_nf' => '380.00',
             'status_registro' => MovimentacaoStatusRegistro::ATIVO->value,
+            'id_unidade_negocio_faturamento' => $c['unidade']->id,
+            'data_emissao' => '2026-05-17 18:55:00',
         ]);
 
         $vendas = Movimentacao::query()
@@ -97,7 +101,8 @@ class VendaMovimentacaoTest extends TestCase
         $this->assertSame('100.00', (string) $venda->valor_total_movimentacao);
         $this->assertSame('200.00', (string) $venda->resultado_movimentacao);
         $this->assertSame('5.00', (string) $venda->preco_medio_fruta_kg);
-        $this->assertSame($c['unidade_faturamento']->id, (int) $venda->id_unidade_negocio_faturamento);
+        $this->assertSame($c['unidade']->id, (int) $venda->id_unidade_negocio_faturamento);
+        $this->assertSame('2026-05-17 18:55:00', $venda->data_movimentacao?->format('Y-m-d H:i:s'));
         $this->assertNull($venda->categoria_descarte_id);
         $this->assertSame('0.00', (string) $venda->valor_icms_total);
         $this->assertEstoque($c['unidade'], $c['fruta'], '80.00', '8.00', '5.00', '50.00', '400.00');
@@ -106,6 +111,45 @@ class VendaMovimentacaoTest extends TestCase
             'origem' => MovimentacaoHistorico::ORIGEM_VENDA,
             'acao' => MovimentacaoHistorico::ACAO_REGISTRO_VENDA,
         ]);
+
+        Carbon::setTestNow();
+    }
+
+    public function test_criacao_rejeita_data_emissao_informada_pelo_usuario(): void
+    {
+        $this->seedBase();
+        $c = $this->cenarioBase();
+        $this->registrarCompra($c, '10', '500,00');
+
+        $this->actingAs($this->movimentacoesVendasUsuario())->postJson(route('admin.movimentacoes.vendas.store'), array_merge($this->payloadVenda($c), [
+            'data_emissao' => '2020-01-01 10:00:00',
+        ]))->assertJsonValidationErrors(['data_emissao']);
+    }
+
+    public function test_unidade_faturamento_so_e_informada_quando_origem_fisica_for_hub(): void
+    {
+        $this->seedBase();
+
+        $origemNormal = $this->cenarioBase();
+        $this->registrarCompra($origemNormal, '10', '500,00');
+
+        $this->actingAs($this->movimentacoesVendasUsuario())->postJson(route('admin.movimentacoes.vendas.store'), array_merge($this->payloadVenda($origemNormal), [
+            'id_unidade_negocio_faturamento' => $origemNormal['unidade_faturamento']->id,
+        ]))->assertJsonValidationErrors(['id_unidade_negocio_faturamento']);
+
+        $origemHub = $this->cenarioBase(origemHub: true);
+        $this->registrarCompra($origemHub, '10', '500,00');
+
+        $this->actingAs($this->movimentacoesVendasUsuario())->postJson(route('admin.movimentacoes.vendas.store'), $this->payloadVenda($origemHub, '1', '100,00'))
+            ->assertCreated();
+
+        $venda = Movimentacao::query()
+            ->where('categoria_movimentacao_id', CategoriaMovimentacaoTipo::Venda->value)
+            ->where('id_empresa_origem', $origemHub['empresa_unidade']->id)
+            ->latest('id')
+            ->firstOrFail();
+
+        $this->assertSame($origemHub['unidade_faturamento']->id, (int) $venda->id_unidade_negocio_faturamento);
     }
 
     public function test_venda_permite_estoque_negativo_e_preserva_preco_medio(): void
@@ -152,8 +196,8 @@ class VendaMovimentacaoTest extends TestCase
 
         $this->assertSame(MovimentacaoStatusRegistro::CANCELADO->value, $v1->fresh()->status_registro);
         $this->assertSame('3.33', (string) $v2->fresh()->valor_frete_kg);
-        $this->assertSame('99.90', (string) $v2->fresh()->valor_frete_rateio);
-        $this->assertSame('200.10', (string) $v2->fresh()->resultado_movimentacao);
+        $this->assertSame('100.00', (string) $v2->fresh()->valor_frete_rateio);
+        $this->assertSame('200.00', (string) $v2->fresh()->resultado_movimentacao);
     }
 
     public function test_correcao_de_venda_cria_nova_versao_e_substituida_nao_entra_no_calculo(): void
@@ -167,7 +211,6 @@ class VendaMovimentacaoTest extends TestCase
             'numero_nf' => 'NF-200',
             'id_empresa_origem' => $c['empresa_unidade']->id,
             'id_empresa_destino' => $c['empresa_cliente']->id,
-            'id_unidade_negocio_faturamento' => $c['unidade_faturamento']->id,
             'id_fruta' => $c['fruta']->id,
             'qtd_fruta_um' => '3',
             'valor_nf_total' => '480,00',
@@ -196,7 +239,8 @@ class VendaMovimentacaoTest extends TestCase
             ->assertForbidden();
 
         $hub = UnidadeNegocio::factory()->create(['is_hub' => true, 'id_estado' => Estado::ID_PERNAMBUCO]);
-        $this->actingAs($this->movimentacoesVendasUsuario())->postJson(route('admin.movimentacoes.vendas.store'), array_merge($this->payloadVenda($c), [
+        $cenarioHub = $this->cenarioBase(origemHub: true);
+        $this->actingAs($this->movimentacoesVendasUsuario())->postJson(route('admin.movimentacoes.vendas.store'), array_merge($this->payloadVenda($cenarioHub), [
             'id_unidade_negocio_faturamento' => $hub->id,
         ]))->assertJsonValidationErrors(['id_unidade_negocio_faturamento']);
 
@@ -339,7 +383,7 @@ class VendaMovimentacaoTest extends TestCase
             'numero_nf' => 'NF-TESTE',
             'id_empresa_origem' => $cenario['empresa_unidade']->id,
             'id_empresa_destino' => $cenario['empresa_cliente']->id,
-            'id_unidade_negocio_faturamento' => $cenario['unidade_faturamento']->id,
+            'id_unidade_negocio_faturamento' => $cenario['unidade']->is_hub ? $cenario['unidade_faturamento']->id : null,
             'id_frete' => $frete?->id,
             'itens' => [
                 ['id_fruta' => $cenario['fruta']->id, 'qtd_fruta_um' => $qtdUm, 'valor_nf_total' => $valorNfTotal],

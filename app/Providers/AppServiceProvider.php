@@ -55,10 +55,12 @@ class AppServiceProvider extends ServiceProvider
         Paginator::useBootstrapFive();
 
         Route::bind('movimentacao', function (string $value): Movimentacao {
-            return Movimentacao::query()
+            $movimentacao = Movimentacao::query()
                 ->whereKey($value)
                 ->where('categoria_movimentacao_id', CategoriaMovimentacaoTipo::Compra->value)
                 ->firstOrFail();
+
+            return $movimentacao->versaoAtual() ?? $movimentacao;
         });
 
         Route::bind('transferenciaOrigem', function (string $value): Movimentacao {

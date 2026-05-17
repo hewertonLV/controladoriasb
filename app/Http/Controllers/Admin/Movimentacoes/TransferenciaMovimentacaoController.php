@@ -16,7 +16,9 @@ use App\Models\StatusMovimentacao;
 use App\Services\Movimentacoes\TransferenciaMovimentacaoService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
+use InvalidArgumentException;
 
 class TransferenciaMovimentacaoController extends Controller
 {
@@ -46,16 +48,34 @@ class TransferenciaMovimentacaoController extends Controller
         StoreTransferenciaMovimentacaoRequest $request,
         CriarTransferenciaMovimentacaoAction $criar,
     ): JsonResponse|RedirectResponse {
-        $par = $criar($request);
+        try {
+            $pares = $criar($request);
+        } catch (InvalidArgumentException $e) {
+            $campo = str_contains($e->getMessage(), 'nunca recebeu') ? 'id_fruta' : 'id_empresa_origem';
+
+            if ($request->expectsJson()) {
+                throw ValidationException::withMessages([
+                    $campo => $e->getMessage(),
+                ]);
+            }
+
+            return back()
+                ->withInput()
+                ->withErrors([$campo => $e->getMessage()]);
+        }
+
+        $par = $pares->firstOrFail();
         $anchor = (int) $par['saida']->transferencia_origem_id;
 
         if ($request->expectsJson()) {
-            return response()->json(['data' => $par], JsonResponse::HTTP_CREATED);
+            return response()->json(['data' => $pares->count() === 1 ? $par : $pares], JsonResponse::HTTP_CREATED);
         }
 
         return redirect()
             ->route('admin.movimentacoes.transferencias.show', ['transferenciaOrigem' => $anchor])
-            ->with('success', 'Transferência registrada (saída na origem e entrada pendente no destino).');
+            ->with('success', $pares->count() > 1
+                ? 'Transferências registradas (saídas na origem e entradas pendentes no destino).'
+                : 'Transferência registrada (saída na origem e entrada pendente no destino).');
     }
 
     public function show(Movimentacao $transferenciaOrigem): View

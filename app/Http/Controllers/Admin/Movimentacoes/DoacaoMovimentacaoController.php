@@ -46,15 +46,16 @@ class DoacaoMovimentacaoController extends Controller
         StoreDoacaoMovimentacaoRequest $request,
         CriarDoacaoMovimentacaoAction $criar,
     ): JsonResponse|RedirectResponse {
-        $movimentacao = $criar($request);
+        $movimentacoes = $criar($request);
+        $movimentacao = $movimentacoes->firstOrFail();
 
         if ($request->expectsJson()) {
-            return response()->json(['data' => $movimentacao], JsonResponse::HTTP_CREATED);
+            return response()->json(['data' => $movimentacoes->count() === 1 ? $movimentacao : $movimentacoes], JsonResponse::HTTP_CREATED);
         }
 
         return redirect()
             ->route('admin.movimentacoes.doacoes.show', $movimentacao)
-            ->with('success', 'Doação registrada com sucesso.');
+            ->with('success', $movimentacoes->count() > 1 ? 'Doações registradas com sucesso.' : 'Doação registrada com sucesso.');
     }
 
     public function show(Movimentacao $movimentacaoDoacao): View

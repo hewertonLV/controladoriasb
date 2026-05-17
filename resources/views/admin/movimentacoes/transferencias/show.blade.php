@@ -70,11 +70,11 @@
                     <h5 class="mb-0">Conferência no destino</h5>
                 </div>
                 <div class="card-body">
-                    <form method="POST" action="{{ route('admin.movimentacoes.transferencias.recebimento.store', ['transferenciaOrigem' => $anchor]) }}" class="row g-3">
+                    <form method="POST" action="{{ route('admin.movimentacoes.transferencias.recebimento.store', ['transferenciaOrigem' => $anchor]) }}" class="row g-3" data-recebimento-transferencia-form>
                         @csrf
                         <div class="col-md-4">
                             <label class="form-label">Status <span class="text-danger">*</span></label>
-                            <select name="status_recebimento" class="form-select @error('status_recebimento') is-invalid @enderror" required>
+                            <select name="status_recebimento" class="form-select @error('status_recebimento') is-invalid @enderror" data-status-recebimento required>
                                 <option value="">Selecione…</option>
                                 <option value="{{ StatusRecebimentoTransferencia::CONFORME->value }}" @selected(old('status_recebimento') === StatusRecebimentoTransferencia::CONFORME->value)>Conforme</option>
                                 <option value="{{ StatusRecebimentoTransferencia::DIVERGENTE->value }}" @selected(old('status_recebimento') === StatusRecebimentoTransferencia::DIVERGENTE->value)>Divergente</option>
@@ -83,8 +83,18 @@
                         </div>
                         <div class="col-md-4">
                             <label class="form-label">Qtd recebida (UM) <span class="text-danger">*</span></label>
-                            <input type="text" name="qtd_recebida_um" value="{{ old('qtd_recebida_um', $entrada->qtd_fruta_um) }}" class="form-control @error('qtd_recebida_um') is-invalid @enderror" data-mask-decimal-br required>
+                            <input
+                                type="text"
+                                name="qtd_recebida_um"
+                                value="{{ old('qtd_recebida_um', $entrada->qtd_fruta_um) }}"
+                                class="form-control @error('qtd_recebida_um') is-invalid @enderror"
+                                data-mask-decimal-br
+                                data-qtd-recebida-um
+                                data-qtd-enviada="{{ number_format((float) $entrada->qtd_fruta_um, 2, '.', '') }}"
+                                required
+                            >
                             @error('qtd_recebida_um')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                            <small class="text-muted" data-qtd-recebida-ajuda>Em Conforme, a quantidade recebida é igual à enviada.</small>
                         </div>
                         <div class="col-md-4">
                             <label class="form-label">NF destino</label>
@@ -103,6 +113,43 @@
                     </form>
                 </div>
             </div>
+            <script>
+                document.addEventListener('DOMContentLoaded', () => {
+                    document.querySelectorAll('[data-recebimento-transferencia-form]').forEach((form) => {
+                        const status = form.querySelector('[data-status-recebimento]');
+                        const qtd = form.querySelector('[data-qtd-recebida-um]');
+                        const ajuda = form.querySelector('[data-qtd-recebida-ajuda]');
+
+                        if (!status || !qtd) {
+                            return;
+                        }
+
+                        const qtdEnviada = qtd.dataset.qtdEnviada || qtd.value;
+                        const sincronizarQuantidade = () => {
+                            const conforme = status.value === @json(StatusRecebimentoTransferencia::CONFORME->value);
+
+                            qtd.readOnly = conforme;
+                            qtd.classList.toggle('bg-light', conforme);
+
+                            if (conforme) {
+                                qtd.value = qtdEnviada;
+                                qtd.setAttribute('title', 'Para informar quantidade diferente, selecione Divergente.');
+                            } else {
+                                qtd.removeAttribute('title');
+                            }
+
+                            if (ajuda) {
+                                ajuda.textContent = conforme
+                                    ? 'Em Conforme, a quantidade recebida é igual à enviada.'
+                                    : 'Informe a quantidade realmente recebida e descreva a divergência.';
+                            }
+                        };
+
+                        status.addEventListener('change', sincronizarQuantidade);
+                        sincronizarQuantidade();
+                    });
+                });
+            </script>
         @endcan
     @endif
 

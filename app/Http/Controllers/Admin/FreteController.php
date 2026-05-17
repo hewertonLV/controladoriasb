@@ -11,6 +11,7 @@ use App\Models\FreteHistorico;
 use App\Models\Veiculo;
 use App\Queries\FreteQuery;
 use App\Services\Fretes\FreteAuditoriaService;
+use App\Services\Movimentacoes\FreteRateioMovimentacaoService;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -22,6 +23,7 @@ class FreteController extends Controller
     public function __construct(
         private readonly FreteAuditoriaService $auditoria,
         private readonly FreteQuery $freteQuery,
+        private readonly FreteRateioMovimentacaoService $freteRateio,
     ) {}
 
     public function index(Request $request): View
@@ -107,6 +109,10 @@ class FreteController extends Controller
             $antes = $this->auditoria->snapshot($frete);
 
             $frete->update($dados);
+
+            if ((float) $antes['valor'] !== (float) $dados['valor']) {
+                $this->freteRateio->recalcular((int) $frete->id);
+            }
 
             $depois = $this->auditoria->snapshot($frete->fresh());
 

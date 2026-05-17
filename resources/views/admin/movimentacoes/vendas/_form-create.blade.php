@@ -16,10 +16,10 @@
         </div>
         <div class="col-md-3">
             <label class="form-label">Origem física</label>
-            <select name="id_empresa_origem" class="form-select" required>
+            <select name="id_empresa_origem" class="form-select" required data-venda-origem>
                 <option value="">Selecione</option>
                 @foreach ($opcoes['empresas_origem'] as $empresa)
-                    <option value="{{ $empresa->id }}" @selected((int) old('id_empresa_origem', $movimentacao->id_empresa_origem ?? 0) === $empresa->id)>
+                    <option value="{{ $empresa->id }}" data-is-hub="{{ $empresa->entidade?->is_hub ? '1' : '0' }}" @selected((int) old('id_empresa_origem', $movimentacao->id_empresa_origem ?? 0) === $empresa->id)>
                         {{ $empresa->nomeExibicao() }}
                     </option>
                 @endforeach
@@ -36,9 +36,9 @@
                 @endforeach
             </select>
         </div>
-        <div class="col-md-3">
+        <div class="col-md-3" data-venda-faturamento-wrapper>
             <label class="form-label">Unidade faturamento</label>
-            <select name="id_unidade_negocio_faturamento" class="form-select" required>
+            <select name="id_unidade_negocio_faturamento" class="form-select" data-venda-faturamento>
                 <option value="">Selecione</option>
                 @foreach ($opcoes['unidades_faturamento'] as $unidade)
                     <option value="{{ $unidade->id }}" @selected((int) old('id_unidade_negocio_faturamento', $movimentacao->id_unidade_negocio_faturamento ?? 0) === $unidade->id)>
@@ -46,10 +46,7 @@
                     </option>
                 @endforeach
             </select>
-        </div>
-        <div class="col-md-3">
-            <label class="form-label">Data emissão</label>
-            <input type="datetime-local" name="data_emissao" class="form-control" value="{{ old('data_emissao', isset($movimentacao) ? optional($movimentacao->data_movimentacao)->format('Y-m-d\TH:i') : now()->format('Y-m-d\TH:i')) }}">
+            <small class="text-muted">Informe apenas quando a origem física for HUB. Caso contrário, a própria origem será usada automaticamente.</small>
         </div>
         <div class="col-md-3">
             <label class="form-label">Frete</label>
@@ -94,25 +91,38 @@
             </div>
         </div>
     @else
-        <h5 class="mb-3">Itens</h5>
-        @for ($i = 0; $i < max(3, count(old('itens', []))); $i++)
-            <div class="row g-3 mb-2">
-                <div class="col-md-5">
-                    <select name="itens[{{ $i }}][id_fruta]" class="form-select" @required($i === 0)>
-                        <option value="">Fruta</option>
-                        @foreach ($opcoes['frutas'] as $fruta)
-                            <option value="{{ $fruta->id }}" @selected((int) old("itens.$i.id_fruta") === $fruta->id)>{{ $fruta->nome }}</option>
-                        @endforeach
-                    </select>
+        @php
+            $itens = old('itens', [['id_fruta' => null, 'qtd_fruta_um' => null, 'valor_nf_total' => null]]);
+        @endphp
+        <div class="d-flex align-items-center justify-content-between mb-2">
+            <h5 class="mb-0">Itens</h5>
+            <button type="button" class="btn btn-outline-primary btn-sm" data-add-item="venda">
+                <i class="ri-add-line me-1"></i> Adicionar fruta
+            </button>
+        </div>
+        <div data-items-container="venda">
+            @foreach ($itens as $i => $item)
+                <div class="row g-3 mb-2" data-item-row>
+                    <div class="col-md-5">
+                        <select name="itens[{{ $i }}][id_fruta]" class="form-select" required>
+                            <option value="">Fruta</option>
+                            @foreach ($opcoes['frutas'] as $fruta)
+                                <option value="{{ $fruta->id }}" @selected((int) ($item['id_fruta'] ?? 0) === $fruta->id)>{{ $fruta->nome }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                    <div class="col-md-3">
+                        <input name="itens[{{ $i }}][qtd_fruta_um]" class="form-control" placeholder="Qtd UM" value="{{ $item['qtd_fruta_um'] ?? '' }}" required>
+                    </div>
+                    <div class="col-md-3">
+                        <input name="itens[{{ $i }}][valor_nf_total]" class="form-control money-mask" placeholder="Valor vendido" value="{{ $item['valor_nf_total'] ?? '' }}" required>
+                    </div>
+                    <div class="col-md-1">
+                        <button type="button" class="btn btn-outline-danger w-100" data-remove-item aria-label="Remover item">&times;</button>
+                    </div>
                 </div>
-                <div class="col-md-3">
-                    <input name="itens[{{ $i }}][qtd_fruta_um]" class="form-control" placeholder="Qtd UM" value="{{ old("itens.$i.qtd_fruta_um") }}" @required($i === 0)>
-                </div>
-                <div class="col-md-4">
-                    <input name="itens[{{ $i }}][valor_nf_total]" class="form-control money-mask" placeholder="Valor vendido" value="{{ old("itens.$i.valor_nf_total") }}" @required($i === 0)>
-                </div>
-            </div>
-        @endfor
+            @endforeach
+        </div>
     @endif
 
     <div class="mt-4 d-flex gap-2">
@@ -120,3 +130,84 @@
         <a href="{{ route('admin.movimentacoes.vendas.index') }}" class="btn btn-light">Cancelar</a>
     </div>
 </form>
+
+@unless ($isEdit)
+    <template id="venda-item-template">
+        <div class="row g-3 mb-2" data-item-row>
+            <div class="col-md-5">
+                <select name="itens[__INDEX__][id_fruta]" class="form-select" required>
+                    <option value="">Fruta</option>
+                    @foreach ($opcoes['frutas'] as $fruta)
+                        <option value="{{ $fruta->id }}">{{ $fruta->nome }}</option>
+                    @endforeach
+                </select>
+            </div>
+            <div class="col-md-3">
+                <input name="itens[__INDEX__][qtd_fruta_um]" class="form-control" placeholder="Qtd UM" required>
+            </div>
+            <div class="col-md-3">
+                <input name="itens[__INDEX__][valor_nf_total]" class="form-control money-mask" placeholder="Valor vendido" required>
+            </div>
+            <div class="col-md-1">
+                <button type="button" class="btn btn-outline-danger w-100" data-remove-item aria-label="Remover item">&times;</button>
+            </div>
+        </div>
+    </template>
+@endunless
+
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        const origem = document.querySelector('[data-venda-origem]');
+        const wrapper = document.querySelector('[data-venda-faturamento-wrapper]');
+        const faturamento = document.querySelector('[data-venda-faturamento]');
+
+        if (!origem || !wrapper || !faturamento) {
+            return;
+        }
+
+        const atualizarFaturamento = () => {
+            const selecionada = origem.options[origem.selectedIndex];
+            const origemEhHub = selecionada?.dataset?.isHub === '1';
+
+            wrapper.classList.toggle('d-none', !origemEhHub);
+            faturamento.required = origemEhHub;
+            faturamento.disabled = !origemEhHub;
+
+            if (!origemEhHub) {
+                faturamento.value = '';
+            }
+        };
+
+        origem.addEventListener('change', atualizarFaturamento);
+        atualizarFaturamento();
+
+        const container = document.querySelector('[data-items-container="venda"]');
+        const addButton = document.querySelector('[data-add-item="venda"]');
+        const template = document.getElementById('venda-item-template');
+        if (!container || !addButton || !template) {
+            return;
+        }
+
+        const refreshRemoveButtons = () => {
+            container.querySelectorAll('[data-remove-item]').forEach((button) => {
+                button.disabled = container.querySelectorAll('[data-item-row]').length <= 1;
+            });
+        };
+
+        addButton.addEventListener('click', () => {
+            const index = container.querySelectorAll('[data-item-row]').length;
+            container.insertAdjacentHTML('beforeend', template.innerHTML.replaceAll('__INDEX__', String(index)));
+            refreshRemoveButtons();
+        });
+
+        container.addEventListener('click', (event) => {
+            if (!event.target.matches('[data-remove-item]')) {
+                return;
+            }
+            event.target.closest('[data-item-row]')?.remove();
+            refreshRemoveButtons();
+        });
+
+        refreshRemoveButtons();
+    });
+</script>

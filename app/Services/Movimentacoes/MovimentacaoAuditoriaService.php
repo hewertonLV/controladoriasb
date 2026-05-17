@@ -17,6 +17,7 @@ final class MovimentacaoAuditoriaService
     {
         return [
             'id' => $movimentacao->id,
+            'numero_compra' => $movimentacao->numero_compra,
             'versao' => $movimentacao->versao,
             'status_registro' => $movimentacao->status_registro,
             'movimentacao_origem_id' => $movimentacao->movimentacao_origem_id,

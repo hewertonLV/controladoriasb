@@ -243,6 +243,34 @@ class FluxoIntegradoMovimentacoesTest extends TestCase
         $this->assertEstoque($c['unidade_b'], $c['fruta'], '40.00', '4.00', '8.00', '80.00', '320.00');
     }
 
+    public function test_frete_compartilhado_rateia_entre_compra_e_transferencia_e_reprocessa_posteriores(): void
+    {
+        $this->seedBase();
+        $c = $this->cenarioBase(valorFreteCompra: '100,00');
+
+        $compra = $this->registrarCompra($c, $c['frete_compra'], '10', '500,00');
+        $saida = $this->registrarTransferencia($c, '4', $c['frete_compra']);
+        $this->confirmarTransferenciaConforme((int) $saida->transferencia_origem_id, '4');
+
+        $compra->refresh();
+        $saida->refresh();
+        $entrada = Movimentacao::query()
+            ->where('transferencia_origem_id', $saida->transferencia_origem_id)
+            ->where('status_movimentacao_id', StatusMovimentacao::ID_ENTRADA)
+            ->firstOrFail();
+
+        $this->assertSame('0.71', (string) $c['frete_compra']->fresh()->valor_fruta_kg);
+        $this->assertSame('0.71', (string) $compra->valor_frete_kg);
+        $this->assertSame('5.71', (string) $compra->preco_medio_fruta_kg);
+        $this->assertSame('0.71', (string) $saida->valor_frete_kg);
+        $this->assertSame('5.71', (string) $saida->preco_medio_fruta_kg);
+        $this->assertSame('0.71', (string) $entrada->valor_frete_kg);
+        $this->assertSame('6.42', (string) $entrada->preco_medio_fruta_kg);
+
+        $this->assertEstoque($c['unidade_a'], $c['fruta'], '60.00', '6.00', '5.71', '57.10', '342.60');
+        $this->assertEstoque($c['unidade_b'], $c['fruta'], '40.00', '4.00', '6.42', '64.20', '256.80');
+    }
+
     public function test_cenario_10_compra_doacao_e_descarte_preservam_preco_medio_e_valor_acumulado(): void
     {
         $this->seedBase();
@@ -494,15 +522,16 @@ class FluxoIntegradoMovimentacoesTest extends TestCase
      */
     private function registrarVenda(array $cenario, string $qtdUm, string $valorNfTotal): Movimentacao
     {
-        $this->actingAs($this->movimentacoesVendasUsuario())->postJson(route('admin.movimentacoes.vendas.store'), [
+        $payload = [
             'numero_nf' => 'NF-VENDA-INT',
             'id_empresa_origem' => $cenario['empresa_a']->id,
             'id_empresa_destino' => $cenario['empresa_cliente']->id,
-            'id_unidade_negocio_faturamento' => $cenario['unidade_a']->id,
             'itens' => [
                 ['id_fruta' => $cenario['fruta']->id, 'qtd_fruta_um' => $qtdUm, 'valor_nf_total' => $valorNfTotal],
             ],
-        ])->assertCreated();
+        ];
+
+        $this->actingAs($this->movimentacoesVendasUsuario())->postJson(route('admin.movimentacoes.vendas.store'), $payload)->assertCreated();
 
         return Movimentacao::query()
             ->where('categoria_movimentacao_id', CategoriaMovimentacaoTipo::Venda->value)

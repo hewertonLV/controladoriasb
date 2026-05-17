@@ -10,6 +10,7 @@ return new class extends Migration
     {
         Schema::create('movimentacoes', function (Blueprint $table) {
             $table->id();
+            $table->unsignedBigInteger('numero_compra')->nullable()->index();
 
             $table->foreignId('id_movimentacao_estoque_old')
                 ->nullable()
@@ -80,6 +81,7 @@ return new class extends Migration
 
             $table->index(['categoria_movimentacao_id', 'id_fruta']);
             $table->index(['id_fruta', 'created_at']);
+            $table->index(['categoria_movimentacao_id', 'numero_compra'], 'movimentacoes_categoria_numero_compra_index');
         });
     }
 

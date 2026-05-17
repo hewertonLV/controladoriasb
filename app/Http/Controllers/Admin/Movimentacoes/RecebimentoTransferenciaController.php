@@ -8,6 +8,8 @@ use App\Http\Requests\Admin\Movimentacoes\ConfirmarRecebimentoTransferenciaReque
 use App\Models\Movimentacao;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Validation\ValidationException;
+use InvalidArgumentException;
 
 class RecebimentoTransferenciaController extends Controller
 {
@@ -19,7 +21,13 @@ class RecebimentoTransferenciaController extends Controller
         $entrada = $transferenciaOrigem->movimentacaoPareada;
         abort_if($entrada === null, 404);
 
-        $confirmar($request, $entrada);
+        try {
+            $confirmar($request, $entrada);
+        } catch (InvalidArgumentException $e) {
+            throw ValidationException::withMessages([
+                'qtd_recebida_um' => [$e->getMessage()],
+            ]);
+        }
 
         $anchor = (int) $transferenciaOrigem->transferencia_origem_id;
 

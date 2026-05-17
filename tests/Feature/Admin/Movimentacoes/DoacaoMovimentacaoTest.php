@@ -2,7 +2,6 @@
 
 namespace Tests\Feature\Admin\Movimentacoes;
 
-use App\Contracts\Movimentacoes\ReprocessaSaidasDoacaoOrigem;
 use App\Enums\CategoriaMovimentacaoTipo;
 use App\Enums\MovimentacaoStatusRegistro;
 use App\Enums\Permissions;
@@ -17,10 +16,12 @@ use App\Models\MovimentacaoHistorico;
 use App\Models\StatusMovimentacao;
 use App\Models\UnidadeNegocio;
 use App\Services\Movimentacoes\CancelarDoacaoMovimentacaoAdminService;
+use App\Services\Movimentacoes\ReplayLinhaTempoEstoqueService;
 use Database\Seeders\CategoriaMovimentacaoSeeder;
 use Database\Seeders\EstadoSeeder;
 use Database\Seeders\StatusMovimentacaoSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Carbon;
 use RuntimeException;
 use Tests\Support\CreatesUsersWithRoles;
 use Tests\TestCase;
@@ -146,6 +147,109 @@ class DoacaoMovimentacaoTest extends TestCase
         $this->assertDatabaseHas('movimentacao_historicos', [
             'acao' => MovimentacaoHistorico::ACAO_REGISTRO_DOACAO,
             'origem' => MovimentacaoHistorico::ORIGEM_DOACAO,
+        ]);
+    }
+
+    public function test_criacao_multi_item_cria_uma_doacao_por_fruta(): void
+    {
+        $this->seedBase();
+        [$empresaOrigem, $unidade, $fruta] = $this->criarCenarioDoacao();
+        $fruta2 = Fruta::factory()->create(['kg_por_unidade_medicao' => '5.00']);
+        $estoque2 = Estoque::factory()->create([
+            'id_unidade_negocio' => $unidade->id,
+            'id_fruta' => $fruta2->id,
+            'qtd_fruta_kg' => '50.00',
+            'qtd_fruta_um' => '10.00',
+            'preco_medio_kg' => '6.00',
+            'preco_medio_um' => '30.00',
+            'valor_total_acumulado' => '300.00',
+        ]);
+        MovimentacaoEstoque::query()->create([
+            'id_estoque' => $estoque2->id,
+            'id_unidade_negocio' => $unidade->id,
+            'id_fruta' => $fruta2->id,
+            'movimentacao_id' => null,
+            'qtd_fruta_kg' => '50.00',
+            'qtd_fruta_um' => '10.00',
+            'preco_medio_kg' => '6.00',
+            'preco_medio_um' => '30.00',
+            'valor_total_fruta' => '300.00',
+            'status_ultima_posicao' => true,
+        ]);
+
+        $this->actingAs($this->movimentacoesDoacoesUsuario())
+            ->postJson(route('admin.movimentacoes.doacoes.store'), [
+                'id_empresa_origem' => $empresaOrigem->id,
+                'motivo_doacao' => 'Campanha social',
+                'itens' => [
+                    ['id_fruta' => $fruta->id, 'qtd_fruta_um' => '1'],
+                    ['id_fruta' => $fruta2->id, 'qtd_fruta_um' => '2'],
+                ],
+            ])
+            ->assertCreated()
+            ->assertJsonCount(2, 'data');
+
+        $this->assertSame(2, Movimentacao::query()
+            ->where('categoria_movimentacao_id', CategoriaMovimentacaoTipo::Doacao->value)
+            ->where('status_registro', MovimentacaoStatusRegistro::ATIVO->value)
+            ->count());
+    }
+
+    public function test_formulario_criacao_nao_exibe_data_movimentacao(): void
+    {
+        $this->seedBase();
+        $this->criarCenarioDoacao();
+
+        $this->actingAs($this->movimentacoesDoacoesUsuario())
+            ->get(route('admin.movimentacoes.doacoes.create'))
+            ->assertOk()
+            ->assertDontSee('name="data_movimentacao"', false)
+            ->assertDontSee('Data da movimentação', false);
+    }
+
+    public function test_criacao_usa_hora_atual_como_data_movimentacao(): void
+    {
+        Carbon::setTestNow(Carbon::parse('2026-05-17 18:30:00'));
+
+        $this->seedBase();
+        [$empresaOrigem, , $fruta] = $this->criarCenarioDoacao();
+        $user = $this->movimentacoesDoacoesUsuario();
+
+        $this->actingAs($user)->post(route('admin.movimentacoes.doacoes.store'), [
+            'id_empresa_origem' => $empresaOrigem->id,
+            'id_fruta' => $fruta->id,
+            'qtd_fruta_um' => '1',
+            'motivo_doacao' => 'Campanha social',
+        ])->assertRedirect();
+
+        $mov = Movimentacao::query()
+            ->where('categoria_movimentacao_id', CategoriaMovimentacaoTipo::Doacao->value)
+            ->where('status_movimentacao_id', StatusMovimentacao::ID_SAIDA)
+            ->where('status_registro', MovimentacaoStatusRegistro::ATIVO->value)
+            ->firstOrFail();
+
+        $this->assertSame('2026-05-17 18:30:00', $mov->data_movimentacao?->format('Y-m-d H:i:s'));
+
+        Carbon::setTestNow();
+    }
+
+    public function test_criacao_rejeita_data_movimentacao_enviada_pelo_usuario(): void
+    {
+        $this->seedBase();
+        [$empresaOrigem, , $fruta] = $this->criarCenarioDoacao();
+        $user = $this->movimentacoesDoacoesUsuario();
+
+        $this->actingAs($user)->post(route('admin.movimentacoes.doacoes.store'), [
+            'id_empresa_origem' => $empresaOrigem->id,
+            'id_fruta' => $fruta->id,
+            'qtd_fruta_um' => '1',
+            'motivo_doacao' => 'Campanha social',
+            'data_movimentacao' => '2020-01-01 10:00:00',
+        ])->assertSessionHasErrors('data_movimentacao');
+
+        $this->assertDatabaseMissing('movimentacoes', [
+            'categoria_movimentacao_id' => CategoriaMovimentacaoTipo::Doacao->value,
+            'id_fruta' => $fruta->id,
         ]);
     }
 
@@ -504,8 +608,8 @@ class DoacaoMovimentacaoTest extends TestCase
             ->where('acao', MovimentacaoHistorico::ACAO_CANCELAMENTO_ADMIN)
             ->count();
 
-        $this->mock(ReprocessaSaidasDoacaoOrigem::class, function ($mock): void {
-            $mock->shouldReceive('reprocessarSaidasDoacaoNaUnidadeOrigem')
+        $this->mock(ReplayLinhaTempoEstoqueService::class, function ($mock): void {
+            $mock->shouldReceive('reprocessarUnidadeFruta')
                 ->once()
                 ->andThrow(new RuntimeException('falha simulada no replay de doações'));
         });

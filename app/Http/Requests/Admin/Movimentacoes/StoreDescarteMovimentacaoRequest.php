@@ -30,18 +30,27 @@ class StoreDescarteMovimentacaoRequest extends FormRequest
                 Rule::exists('empresas', 'id')->where('entidade_type', UnidadeNegocio::class),
             ],
             'id_fruta' => [
-                'required',
+                'required_without:itens',
                 'integer',
                 'min:1',
                 Rule::exists('frutas', 'id')->where(
                     fn ($query) => $query->where('kg_por_unidade_medicao', '>', 0),
                 ),
             ],
-            'qtd_fruta_um' => ['required', 'numeric', 'min:0.01'],
+            'qtd_fruta_um' => ['required_without:itens', 'numeric', 'min:0.01'],
+            'itens' => ['sometimes', 'array', 'min:1'],
+            'itens.*.id_fruta' => [
+                'required_with:itens',
+                'integer',
+                'min:1',
+                Rule::exists('frutas', 'id')->where(
+                    fn ($query) => $query->where('kg_por_unidade_medicao', '>', 0),
+                ),
+            ],
+            'itens.*.qtd_fruta_um' => ['required_with:itens', 'numeric', 'min:0.01'],
             'categoria_descarte_id' => ['required', 'integer', Rule::exists('categorias_descarte', 'id')],
             'motivo_descarte' => ['nullable', 'string', 'max:5000'],
             'observacao' => ['nullable', 'string', 'max:4000'],
-            'data_movimentacao' => ['nullable', 'date'],
         ]);
     }
 
@@ -49,8 +58,7 @@ class StoreDescarteMovimentacaoRequest extends FormRequest
     {
         $validator->after(function (Validator $v): void {
             $idEmpOrigem = $this->input('id_empresa_origem');
-            $idFruta = $this->input('id_fruta');
-            if ($idEmpOrigem === null || $idEmpOrigem === '' || $idFruta === null || $idFruta === '') {
+            if ($idEmpOrigem === null || $idEmpOrigem === '') {
                 return;
             }
 
@@ -66,16 +74,23 @@ class StoreDescarteMovimentacaoRequest extends FormRequest
                 return;
             }
 
-            $existeEstoque = Estoque::query()
-                ->where('id_unidade_negocio', $unidade->id)
-                ->where('id_fruta', (int) $idFruta)
-                ->exists();
+            $itens = $this->input('itens');
+            $frutas = is_array($itens)
+                ? collect($itens)->pluck('id_fruta')->filter()->values()
+                : collect([$this->input('id_fruta')])->filter()->values();
 
-            if (! $existeEstoque) {
-                $v->errors()->add(
-                    'id_empresa_origem',
-                    'A unidade selecionada não possui estoque registrado para a fruta informada.',
-                );
+            foreach ($frutas as $index => $idFruta) {
+                $existeEstoque = Estoque::query()
+                    ->where('id_unidade_negocio', $unidade->id)
+                    ->where('id_fruta', (int) $idFruta)
+                    ->exists();
+
+                if (! $existeEstoque) {
+                    $v->errors()->add(
+                        is_array($itens) ? "itens.{$index}.id_fruta" : 'id_empresa_origem',
+                        'A unidade selecionada não possui estoque registrado para a fruta informada.',
+                    );
+                }
             }
         });
     }
@@ -89,20 +104,39 @@ class StoreDescarteMovimentacaoRequest extends FormRequest
             'id_empresa_origem' => 'unidade de origem',
             'id_fruta' => 'fruta',
             'qtd_fruta_um' => 'quantidade na unidade de medida',
+            'itens.*.id_fruta' => 'fruta',
+            'itens.*.qtd_fruta_um' => 'quantidade na unidade de medida',
             'categoria_descarte_id' => 'categoria de descarte',
             'motivo_descarte' => 'motivo do descarte',
             'observacao' => 'observação',
-            'data_movimentacao' => 'data da movimentação',
         ];
     }
 
     protected function prepareForValidation(): void
     {
+        $merge = [];
+
         if ($this->has('qtd_fruta_um')) {
-            $this->merge([
-                'qtd_fruta_um' => TextoCadastro::normalizarDecimalNaoNegativo($this->input('qtd_fruta_um')),
-            ]);
+            $merge['qtd_fruta_um'] = TextoCadastro::normalizarDecimalNaoNegativo($this->input('qtd_fruta_um'));
         }
+
+        if ($this->has('itens')) {
+            $itens = [];
+            foreach ((array) $this->input('itens', []) as $key => $item) {
+                if (blank($item['id_fruta'] ?? null) && blank($item['qtd_fruta_um'] ?? null)) {
+                    continue;
+                }
+
+                $itens[$key] = $item;
+                if (array_key_exists('qtd_fruta_um', $item)) {
+                    $itens[$key]['qtd_fruta_um'] = TextoCadastro::normalizarDecimalNaoNegativo($item['qtd_fruta_um']);
+                }
+            }
+
+            $merge['itens'] = $itens;
+        }
+
+        $this->merge($merge);
     }
 
     /**
@@ -134,6 +168,7 @@ class StoreDescarteMovimentacaoRequest extends FormRequest
             'valor_icms_total' => ['prohibited'],
             'valor_icms_kg' => ['prohibited'],
             'valor_icms_um' => ['prohibited'],
+            'data_movimentacao' => ['prohibited'],
             'versao' => ['prohibited'],
             'versao_replay' => ['prohibited'],
             'movimentacao_origem_id' => ['prohibited'],

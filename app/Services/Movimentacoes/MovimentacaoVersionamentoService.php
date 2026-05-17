@@ -114,6 +114,7 @@ final class MovimentacaoVersionamentoService
             ])->saveQuietly();
 
             $novaLinhaAtributos['versao'] = (int) $atual->versao + 1;
+            $novaLinhaAtributos['numero_compra'] ??= $atual->numero_compra;
             $novaLinhaAtributos['movimentacao_origem_id'] = $raizId;
             $novaLinhaAtributos['status_registro'] = MovimentacaoStatusRegistro::ATIVO->value;
             $novaLinhaAtributos['substituida_por_id'] = null;

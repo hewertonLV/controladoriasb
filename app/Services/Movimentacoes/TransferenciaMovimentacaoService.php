@@ -265,7 +265,18 @@ final class TransferenciaMovimentacaoService
 
         $frete = $this->resolverFreteOpcional($payload['id_frete'] ?? null);
 
-        $estoqueOrigem = $this->obterOuCriarEstoqueComLock($unidadeOrigem->id, $fruta->id);
+        $estoqueOrigem = Estoque::query()
+            ->where('id_unidade_negocio', $unidadeOrigem->id)
+            ->where('id_fruta', $fruta->id)
+            ->lockForUpdate()
+            ->first();
+
+        if ($estoqueOrigem === null) {
+            throw new InvalidArgumentException(
+                'A unidade de origem nunca recebeu este produto; por isso não é possível executar esta transferência.',
+            );
+        }
+
         $this->garantirPosicaoInicialSeNecessario($estoqueOrigem, $unidadeOrigem->id, $fruta->id);
 
         $posicaoOrigem = MovimentacaoEstoque::query()
@@ -277,10 +288,6 @@ final class TransferenciaMovimentacaoService
 
         $saldoUmAnt = $posicaoOrigem ? (float) $posicaoOrigem->qtd_fruta_um : 0.0;
         $saldoKgAnt = $posicaoOrigem ? (float) $posicaoOrigem->qtd_fruta_kg : 0.0;
-
-        if ($saldoUmAnt + 1e-6 < $qtdUm) {
-            throw new InvalidArgumentException('Saldo insuficiente na unidade de origem.');
-        }
 
         $Vprev = (float) $estoqueOrigem->valor_total_acumulado;
         $Qprev = (float) $estoqueOrigem->qtd_fruta_kg;

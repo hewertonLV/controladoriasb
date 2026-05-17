@@ -19,7 +19,6 @@ use App\Support\EmpresaEntidadeQuery;
 use App\Support\Movimentacoes\DoacaoValorEconomico;
 use App\Support\TextoCadastro;
 use Illuminate\Database\Eloquent\Collection;
-use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
 
@@ -64,7 +63,6 @@ final class DescarteMovimentacaoService
      *     categoria_descarte_id:int,
      *     motivo_descarte?:string|null,
      *     observacao?:string|null,
-     *     data_movimentacao?:string|null,
      * }  $input
      */
     public function registrarDescarte(array $input, ?User $user = null): Movimentacao
@@ -77,7 +75,6 @@ final class DescarteMovimentacaoService
 
             $motivoDescarte = $this->nullableTrim($input['motivo_descarte'] ?? null);
             $observacao = $this->nullableTrim($input['observacao'] ?? null);
-            $dataMovimentacao = $this->resolverDataMovimentacao($input['data_movimentacao'] ?? null);
 
             $estoque = Estoque::query()
                 ->where('id_unidade_negocio', $unidadeOrigem->id)
@@ -132,7 +129,7 @@ final class DescarteMovimentacaoService
                 'categoria_descarte_id' => $categoriaDescarteId,
                 'motivo_descarte' => $motivoDescarte,
                 'observacao' => $observacao,
-                'data_movimentacao' => $dataMovimentacao,
+                'data_movimentacao' => now(),
                 'versao' => 1,
                 'status_registro' => MovimentacaoStatusRegistro::ATIVO->value,
             ]));
@@ -429,15 +426,6 @@ final class DescarteMovimentacaoService
                 sprintf('Empresa «%d» deve ser do tipo %s.', $empresa->id, $tipo->rotulo()),
             );
         }
-    }
-
-    private function resolverDataMovimentacao(mixed $raw): Carbon
-    {
-        if ($raw === null || $raw === '') {
-            return now();
-        }
-
-        return Carbon::parse((string) $raw);
     }
 
     private function nullableTrim(mixed $raw): ?string

@@ -349,15 +349,20 @@ class DevolucaoMovimentacaoTest extends TestCase
      */
     private function registrarVenda(array $cenario, string $qtdUm, string $valorNfTotal): Movimentacao
     {
-        $this->actingAs($this->movimentacoesVendasUsuario())->postJson(route('admin.movimentacoes.vendas.store'), [
+        $payload = [
             'numero_nf' => 'NF-VENDA',
             'id_empresa_origem' => $cenario['empresa_unidade']->id,
             'id_empresa_destino' => $cenario['empresa_cliente']->id,
-            'id_unidade_negocio_faturamento' => $cenario['unidade_faturamento']->id,
             'itens' => [
                 ['id_fruta' => $cenario['fruta']->id, 'qtd_fruta_um' => $qtdUm, 'valor_nf_total' => $valorNfTotal],
             ],
-        ])->assertCreated();
+        ];
+
+        if ($cenario['unidade']->is_hub) {
+            $payload['id_unidade_negocio_faturamento'] = $cenario['unidade_faturamento']->id;
+        }
+
+        $this->actingAs($this->movimentacoesVendasUsuario())->postJson(route('admin.movimentacoes.vendas.store'), $payload)->assertCreated();
 
         return Movimentacao::query()->where('categoria_movimentacao_id', CategoriaMovimentacaoTipo::Venda->value)->orderByDesc('id')->firstOrFail();
     }

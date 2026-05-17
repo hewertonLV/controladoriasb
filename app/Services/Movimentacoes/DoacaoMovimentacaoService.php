@@ -19,7 +19,6 @@ use App\Support\EmpresaEntidadeQuery;
 use App\Support\Movimentacoes\DoacaoValorEconomico;
 use App\Support\TextoCadastro;
 use Illuminate\Database\Eloquent\Collection;
-use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
 
@@ -77,7 +76,6 @@ final class DoacaoMovimentacaoService
      *     motivo_doacao:string,
      *     observacao?:string|null,
      *     numero_nf_origem?:string|null,
-     *     data_movimentacao?:string|null,
      * }  $input
      */
     public function registrarDoacao(array $input, ?User $user = null): Movimentacao
@@ -129,8 +127,6 @@ final class DoacaoMovimentacaoService
             if ($numeroNfOrigem === '') {
                 $numeroNfOrigem = null;
             }
-
-            $dataMovimentacao = $this->resolverDataMovimentacao($input['data_movimentacao'] ?? null);
 
             $estoque = Estoque::query()
                 ->where('id_unidade_negocio', $unidadeOrigem->id)
@@ -219,7 +215,7 @@ final class DoacaoMovimentacaoService
                 'movimentacao_origem_id' => null,
                 'versao' => 1,
                 'status_registro' => MovimentacaoStatusRegistro::ATIVO->value,
-                'data_movimentacao' => $dataMovimentacao,
+                'data_movimentacao' => now(),
             ]);
 
             $novaPosicaoOrigem = MovimentacaoEstoque::query()->create([
@@ -528,15 +524,6 @@ final class DoacaoMovimentacaoService
                 sprintf('Empresa «%d» deve ser do tipo %s.', $empresa->id, $tipo->rotulo()),
             );
         }
-    }
-
-    private function resolverDataMovimentacao(mixed $raw): Carbon
-    {
-        if ($raw === null || $raw === '') {
-            return now();
-        }
-
-        return Carbon::parse((string) $raw);
     }
 
     private function garantirPosicaoInicialSeNecessario(Estoque $estoque, int $idUnidade, int $idFruta): void

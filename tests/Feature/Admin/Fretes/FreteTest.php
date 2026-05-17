@@ -2,10 +2,15 @@
 
 namespace Tests\Feature\Admin\Fretes;
 
+use App\Enums\CategoriaMovimentacaoTipo;
 use App\Enums\FreteStatusSituacao;
 use App\Enums\Permissions;
 use App\Models\Frete;
+use App\Models\Movimentacao;
+use App\Models\StatusMovimentacao;
 use App\Models\Veiculo;
+use Database\Seeders\CategoriaMovimentacaoSeeder;
+use Database\Seeders\StatusMovimentacaoSeeder;
 
 class FreteTest extends FreteTestCase
 {
@@ -141,5 +146,71 @@ class FreteTest extends FreteTestCase
         $frete->refresh();
         $this->assertSame('DEPOIS', $frete->nome);
         $this->assertSame(FreteStatusSituacao::ENCERRADA->value, $frete->status_situacao);
+    }
+
+    public function test_edicao_de_valor_recalcula_movimentacoes_vinculadas(): void
+    {
+        $this->seed([
+            StatusMovimentacaoSeeder::class,
+            CategoriaMovimentacaoSeeder::class,
+        ]);
+
+        $veiculo = Veiculo::factory()->create();
+        $frete = Frete::factory()->create([
+            'nome' => 'FRETE COM MOVIMENTOS',
+            'valor' => '100.00',
+            'valor_fruta_kg' => '2.00',
+            'id_veiculo' => $veiculo->id,
+            'status_situacao' => FreteStatusSituacao::ABERTA->value,
+        ]);
+
+        $venda1 = Movimentacao::factory()->create([
+            'categoria_movimentacao_id' => CategoriaMovimentacaoTipo::Venda->value,
+            'status_movimentacao_id' => StatusMovimentacao::ID_SAIDA,
+            'id_frete' => $frete->id,
+            'qtd_fruta_kg' => '20.00',
+            'qtd_fruta_um' => '2.00',
+            'valor_nf_total' => '300.00',
+            'valor_custo_saida' => '100.00',
+            'valor_frete_rateio' => '40.00',
+            'valor_frete_kg' => '2.00',
+            'resultado_movimentacao' => '160.00',
+        ]);
+        $venda2 = Movimentacao::factory()->create([
+            'categoria_movimentacao_id' => CategoriaMovimentacaoTipo::Venda->value,
+            'status_movimentacao_id' => StatusMovimentacao::ID_SAIDA,
+            'id_frete' => $frete->id,
+            'qtd_fruta_kg' => '30.00',
+            'qtd_fruta_um' => '3.00',
+            'valor_nf_total' => '450.00',
+            'valor_custo_saida' => '150.00',
+            'valor_frete_rateio' => '60.00',
+            'valor_frete_kg' => '2.00',
+            'resultado_movimentacao' => '240.00',
+        ]);
+
+        $this->actingAs($this->userWithPermissions([Permissions::FRETES_EDITAR]))
+            ->put(route('admin.fretes.update', $frete), [
+                'nome' => 'Frete com movimentos',
+                'valor' => '200',
+                'id_veiculo' => $veiculo->id,
+                'descricao' => null,
+                'status_situacao' => FreteStatusSituacao::ABERTA->value,
+                'valor_fruta_kg' => '999',
+            ])
+            ->assertRedirect(route('admin.fretes.index'))
+            ->assertSessionHas('success');
+
+        $frete->refresh();
+        $venda1->refresh();
+        $venda2->refresh();
+
+        $this->assertSame('4.00', (string) $frete->valor_fruta_kg);
+        $this->assertSame('4.00', (string) $venda1->valor_frete_kg);
+        $this->assertSame('80.00', (string) $venda1->valor_frete_rateio);
+        $this->assertSame('120.00', (string) $venda1->resultado_movimentacao);
+        $this->assertSame('4.00', (string) $venda2->valor_frete_kg);
+        $this->assertSame('120.00', (string) $venda2->valor_frete_rateio);
+        $this->assertSame('180.00', (string) $venda2->resultado_movimentacao);
     }
 }

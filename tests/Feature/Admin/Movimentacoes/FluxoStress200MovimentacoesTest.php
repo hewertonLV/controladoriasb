@@ -520,11 +520,14 @@ class FluxoStress200MovimentacoesTest extends TestCase
             'numero_nf' => 'NF-VENDA-STRESS-200',
             'id_empresa_origem' => $origem->id,
             'id_empresa_destino' => $cliente->id,
-            'id_unidade_negocio_faturamento' => $unidadeFaturamento->id,
             'itens' => [
                 ['id_fruta' => $fruta->id, 'qtd_fruta_um' => $qtdUm, 'valor_nf_total' => $valorNfTotal],
             ],
         ];
+
+        if ($origem->loadMissing('entidade')->entidade?->is_hub) {
+            $payload['id_unidade_negocio_faturamento'] = $unidadeFaturamento->id;
+        }
 
         if ($frete !== null) {
             $payload['id_frete'] = $frete->id;
@@ -547,7 +550,6 @@ class FluxoStress200MovimentacoesTest extends TestCase
             'numero_nf' => $venda->vendaNota?->numero_nf ?? 'NF-VENDA-STRESS-200',
             'id_empresa_origem' => $venda->id_empresa_origem,
             'id_empresa_destino' => $venda->id_empresa_destino,
-            'id_unidade_negocio_faturamento' => $venda->id_unidade_negocio_faturamento,
             'id_fruta' => $venda->id_fruta,
             'qtd_fruta_um' => $qtdUm,
             'valor_nf_total' => $valorNfTotal,

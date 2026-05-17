@@ -25,6 +25,7 @@ use Database\Seeders\CategoriaMovimentacaoSeeder;
 use Database\Seeders\EstadoSeeder;
 use Database\Seeders\StatusMovimentacaoSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Carbon;
 use InvalidArgumentException;
 use RuntimeException;
 use Tests\Support\CreatesUsersWithRoles;
@@ -64,6 +65,80 @@ class DescarteMovimentacaoTest extends TestCase
             'origem' => MovimentacaoHistorico::ORIGEM_DESCARTE,
             'acao' => MovimentacaoHistorico::ACAO_REGISTRO_DESCARTE,
         ]);
+    }
+
+    public function test_criacao_multi_item_cria_um_descarte_por_fruta(): void
+    {
+        $this->seedBase();
+        $c = $this->cenarioBase();
+        $this->registrarCompra($c, '10', '500,00');
+        $fruta2 = Fruta::factory()->create([
+            'kg_por_unidade_medicao' => 5,
+            'icms_na_compra' => 0,
+            'icms_ex_compra' => 0,
+            'um_icms' => FrutaUmIcms::KG->value,
+        ]);
+        $c2 = array_merge($c, ['fruta' => $fruta2]);
+        $this->registrarCompra($c2, '4', '200,00');
+
+        $this->actingAs($this->movimentacoesDescartesUsuario())
+            ->postJson(route('admin.movimentacoes.descartes.store'), [
+                'id_empresa_origem' => $c['empresa_unidade']->id,
+                'categoria_descarte_id' => CategoriaDescarte::ID_AVARIA,
+                'itens' => [
+                    ['id_fruta' => $c['fruta']->id, 'qtd_fruta_um' => '2'],
+                    ['id_fruta' => $fruta2->id, 'qtd_fruta_um' => '1'],
+                ],
+            ])
+            ->assertCreated()
+            ->assertJsonCount(2, 'data');
+
+        $this->assertSame(2, Movimentacao::query()
+            ->where('categoria_movimentacao_id', CategoriaMovimentacaoTipo::Descarte->value)
+            ->where('status_registro', MovimentacaoStatusRegistro::ATIVO->value)
+            ->count());
+    }
+
+    public function test_formulario_criacao_nao_exibe_data_movimentacao(): void
+    {
+        $this->seedBase();
+        $this->cenarioBase();
+
+        $this->actingAs($this->movimentacoesDescartesUsuario())
+            ->get(route('admin.movimentacoes.descartes.create'))
+            ->assertOk()
+            ->assertDontSee('name="data_movimentacao"', false)
+            ->assertDontSee('Data da movimentação', false);
+    }
+
+    public function test_criacao_usa_hora_atual_como_data_movimentacao(): void
+    {
+        Carbon::setTestNow(Carbon::parse('2026-05-17 18:40:00'));
+
+        $this->seedBase();
+        $c = $this->cenarioBase();
+        $this->registrarCompra($c, '10', '500,00');
+
+        $descarte = $this->registrarDescarte($c, '2', CategoriaDescarte::ID_AVARIA);
+
+        $this->assertSame('2026-05-17 18:40:00', $descarte->data_movimentacao?->format('Y-m-d H:i:s'));
+
+        Carbon::setTestNow();
+    }
+
+    public function test_criacao_rejeita_data_movimentacao_enviada_pelo_usuario(): void
+    {
+        $this->seedBase();
+        $c = $this->cenarioBase();
+        $this->registrarCompra($c, '10', '500,00');
+
+        $this->actingAs($this->movimentacoesDescartesUsuario())->postJson(route('admin.movimentacoes.descartes.store'), [
+            'id_empresa_origem' => $c['empresa_unidade']->id,
+            'id_fruta' => $c['fruta']->id,
+            'qtd_fruta_um' => '1',
+            'categoria_descarte_id' => CategoriaDescarte::ID_AVARIA,
+            'data_movimentacao' => '2020-01-01 10:00:00',
+        ])->assertJsonValidationErrors('data_movimentacao');
     }
 
     public function test_usuario_sem_permissao_nao_cria_descarte(): void
@@ -184,6 +259,63 @@ class DescarteMovimentacaoTest extends TestCase
             'origem' => MovimentacaoHistorico::ORIGEM_CANCELAMENTO_ADMIN,
             'acao' => MovimentacaoHistorico::ACAO_CANCELAMENTO_ADMIN,
         ]);
+    }
+
+    public function test_cancelamento_administrativo_de_descarte_unico_retorna_saldo_ao_estoque(): void
+    {
+        $this->seedBase();
+        $c = $this->cenarioBase();
+        $this->registrarCompra($c, '10', '500,00');
+        $descarte = $this->registrarDescarte($c, '2', CategoriaDescarte::ID_AVARIA);
+
+        $this->assertEstoque($c['unidade'], $c['fruta'], '80.00', '8.00', '5.00', '50.00', '400.00');
+
+        $this->cancelarDescarteAdmin($descarte);
+
+        $descarte->refresh();
+        $this->assertSame(MovimentacaoStatusRegistro::CANCELADO->value, $descarte->status_registro);
+        $this->assertEstoque($c['unidade'], $c['fruta'], '100.00', '10.00', '5.00', '50.00', '500.00');
+    }
+
+    public function test_cancelamento_reprocessa_descartes_restantes_quando_estoque_veio_de_saldo_inicial(): void
+    {
+        $this->seedBase();
+        $c = $this->cenarioBase();
+
+        $estoque = Estoque::factory()->create([
+            'id_unidade_negocio' => $c['unidade']->id,
+            'id_fruta' => $c['fruta']->id,
+            'qtd_fruta_kg' => '100.00',
+            'qtd_fruta_um' => '10.00',
+            'preco_medio_kg' => '5.00',
+            'preco_medio_um' => '50.00',
+            'valor_total_acumulado' => '500.00',
+        ]);
+        MovimentacaoEstoque::query()->create([
+            'id_estoque' => $estoque->id,
+            'id_unidade_negocio' => $c['unidade']->id,
+            'id_fruta' => $c['fruta']->id,
+            'movimentacao_id' => null,
+            'qtd_fruta_kg' => '100.00',
+            'qtd_fruta_um' => '10.00',
+            'preco_medio_kg' => '5.00',
+            'preco_medio_um' => '50.00',
+            'valor_total_fruta' => '500.00',
+            'status_ultima_posicao' => true,
+        ]);
+
+        $d1 = $this->registrarDescarte($c, '2', CategoriaDescarte::ID_AVARIA);
+        $d2 = $this->registrarDescarte($c, '1', CategoriaDescarte::ID_QUEBRA);
+
+        $this->assertEstoque($c['unidade'], $c['fruta'], '70.00', '7.00', '5.00', '50.00', '350.00');
+
+        $this->cancelarDescarteAdmin($d1);
+
+        $d1->refresh();
+        $d2->refresh();
+        $this->assertSame(MovimentacaoStatusRegistro::CANCELADO->value, $d1->status_registro);
+        $this->assertGreaterThan(1, (int) $d2->versao_replay);
+        $this->assertEstoque($c['unidade'], $c['fruta'], '90.00', '9.00', '5.00', '50.00', '450.00');
     }
 
     public function test_usuario_sem_permissao_nao_cancela_e_motivo_e_obrigatorio(): void

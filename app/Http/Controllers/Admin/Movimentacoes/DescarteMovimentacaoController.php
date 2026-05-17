@@ -44,15 +44,16 @@ class DescarteMovimentacaoController extends Controller
         StoreDescarteMovimentacaoRequest $request,
         CriarDescarteMovimentacaoAction $criar,
     ): JsonResponse|RedirectResponse {
-        $movimentacao = $criar($request);
+        $movimentacoes = $criar($request);
+        $movimentacao = $movimentacoes->firstOrFail();
 
         if ($request->expectsJson()) {
-            return response()->json(['data' => $movimentacao], JsonResponse::HTTP_CREATED);
+            return response()->json(['data' => $movimentacoes->count() === 1 ? $movimentacao : $movimentacoes], JsonResponse::HTTP_CREATED);
         }
 
         return redirect()
             ->route('admin.movimentacoes.descartes.show', $movimentacao)
-            ->with('success', 'Descarte registrado com sucesso.');
+            ->with('success', $movimentacoes->count() > 1 ? 'Descartes registrados com sucesso.' : 'Descarte registrado com sucesso.');
     }
 
     public function show(Movimentacao $movimentacaoDescarte): View

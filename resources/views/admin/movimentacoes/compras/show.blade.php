@@ -1,6 +1,6 @@
 @extends('layouts.app')
 
-@section('title', 'Compra #' . $movimentacao->id)
+@section('title', 'Compra #' . ($movimentacao->numero_compra ?? $movimentacao->id))
 @section('page-title', 'Movimentação — Compra')
 
 @section('content')
@@ -8,8 +8,13 @@
 
     <div class="card mb-3">
         <div class="card-header d-flex align-items-center flex-wrap gap-2">
-            <h4 class="header-title mb-0">Compra #{{ $movimentacao->id }}</h4>
+            <h4 class="header-title mb-0">Compra #{{ $movimentacao->numero_compra ?? $movimentacao->id }}</h4>
             <span class="badge bg-secondary">v{{ $movimentacao->versao }}</span>
+            @if ($movimentacao->movimentacao_origem_id)
+                <span class="badge bg-info-subtle text-info">
+                    Linha do tempo da compra #{{ $movimentacao->numero_compra ?? $movimentacao->movimentacao_origem_id }}
+                </span>
+            @endif
             <div class="ms-auto d-flex gap-2">
                 @can('movimentacoes.compras.editar')
                     <a href="{{ route('admin.movimentacoes.compras.edit', $movimentacao) }}" class="btn btn-primary btn-sm">Editar valor da NF</a>
@@ -26,9 +31,27 @@
                     <div class="fw-semibold">{{ $movimentacao->data_movimentacao?->format('d/m/Y H:i') ?? '—' }}</div>
                 </div>
                 <div class="col-md-6">
+                    <div class="text-muted small">Data da atualização desta versão</div>
+                    <div class="fw-semibold">{{ $movimentacao->versao > 1 ? $movimentacao->created_at?->format('d/m/Y H:i') : '—' }}</div>
+                </div>
+                <div class="col-md-6">
                     <div class="text-muted small">Status do registro</div>
                     <div class="fw-semibold">{{ $movimentacao->status_registro }}</div>
                 </div>
+                @if ($movimentacao->movimentacao_origem_id || $movimentacao->versaoAnterior)
+                    <div class="col-md-6">
+                        <div class="text-muted small">Número da compra na linha do tempo</div>
+                        <div class="fw-semibold">
+                            #{{ $movimentacao->numero_compra ?? $movimentacao->movimentacao_origem_id ?? $movimentacao->id }}
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="text-muted small">Versão anterior</div>
+                        <div class="fw-semibold">
+                            {{ $movimentacao->versaoAnterior ? '#'.$movimentacao->versaoAnterior->id : '—' }}
+                        </div>
+                    </div>
+                @endif
                 <div class="col-md-6">
                     <div class="text-muted small">Fornecedor (origem)</div>
                     <div class="fw-semibold">{{ $movimentacao->empresaOrigem?->nomeExibicao() ?? '—' }}</div>

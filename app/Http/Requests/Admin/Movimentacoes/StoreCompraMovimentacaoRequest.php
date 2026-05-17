@@ -26,6 +26,7 @@ class StoreCompraMovimentacaoRequest extends FormRequest
         $proibidosSomenteBackend = [
             'id_movimentacao_estoque_old' => ['prohibited'],
             'id_movimentacao_estoque_new' => ['prohibited'],
+            'numero_compra' => ['prohibited'],
             'qtd_fruta_kg' => ['prohibited'],
             'valor_nf_um' => ['prohibited'],
             'valor_nf_kg' => ['prohibited'],
@@ -67,15 +68,26 @@ class StoreCompraMovimentacaoRequest extends FormRequest
                 Rule::exists('empresas', 'id')->where('entidade_type', UnidadeNegocio::class),
             ],
             'id_fruta' => [
-                'required',
+                'required_without:itens',
                 'integer',
                 'min:1',
                 Rule::exists('frutas', 'id')->where(
                     fn ($query) => $query->where('kg_por_unidade_medicao', '>', 0),
                 ),
             ],
-            'qtd_fruta_um' => ['required', 'numeric', 'min:0.01'],
-            'valor_nf_total' => ['required', 'numeric', 'min:0.01'],
+            'qtd_fruta_um' => ['required_without:itens', 'numeric', 'min:0.01'],
+            'valor_nf_total' => ['required_without:itens', 'numeric', 'min:0.01'],
+            'itens' => ['sometimes', 'array', 'min:1'],
+            'itens.*.id_fruta' => [
+                'required_with:itens',
+                'integer',
+                'min:1',
+                Rule::exists('frutas', 'id')->where(
+                    fn ($query) => $query->where('kg_por_unidade_medicao', '>', 0),
+                ),
+            ],
+            'itens.*.qtd_fruta_um' => ['required_with:itens', 'numeric', 'min:0.01'],
+            'itens.*.valor_nf_total' => ['required_with:itens', 'numeric', 'min:0.01'],
             'id_frete' => [
                 'required',
                 'integer',
@@ -115,6 +127,9 @@ class StoreCompraMovimentacaoRequest extends FormRequest
             'id_fruta' => 'fruta',
             'qtd_fruta_um' => 'quantidade na unidade de medida',
             'valor_nf_total' => 'valor total da NF',
+            'itens.*.id_fruta' => 'fruta',
+            'itens.*.qtd_fruta_um' => 'quantidade na unidade de medida',
+            'itens.*.valor_nf_total' => 'valor total da NF',
             'id_frete' => 'frete',
         ];
     }
@@ -133,6 +148,29 @@ class StoreCompraMovimentacaoRequest extends FormRequest
             $merge['qtd_fruta_um'] = TextoCadastro::normalizarDecimalNaoNegativo(
                 $this->input('qtd_fruta_um'),
             );
+        }
+
+        if ($this->has('itens')) {
+            $itens = [];
+            foreach ((array) $this->input('itens', []) as $key => $item) {
+                if (
+                    blank($item['id_fruta'] ?? null)
+                    && blank($item['qtd_fruta_um'] ?? null)
+                    && blank($item['valor_nf_total'] ?? null)
+                ) {
+                    continue;
+                }
+
+                $itens[$key] = $item;
+                if (array_key_exists('qtd_fruta_um', $item)) {
+                    $itens[$key]['qtd_fruta_um'] = TextoCadastro::normalizarDecimalNaoNegativo($item['qtd_fruta_um']);
+                }
+                if (array_key_exists('valor_nf_total', $item)) {
+                    $itens[$key]['valor_nf_total'] = TextoCadastro::normalizarValorMonetarioBrasileiro($item['valor_nf_total']);
+                }
+            }
+
+            $merge['itens'] = $itens;
         }
 
         $this->merge($merge);

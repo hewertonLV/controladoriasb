@@ -3,9 +3,11 @@
 namespace App\Http\Requests\Admin\Movimentacoes;
 
 use App\Enums\StatusRecebimentoTransferencia;
+use App\Models\Movimentacao;
 use App\Support\TextoCadastro;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\Validator;
 
 class ConfirmarRecebimentoTransferenciaRequest extends FormRequest
 {
@@ -95,5 +97,35 @@ class ConfirmarRecebimentoTransferenciaRequest extends FormRequest
         }
 
         $this->merge($merge);
+    }
+
+    public function withValidator(Validator $validator): void
+    {
+        $validator->after(function (Validator $validator): void {
+            $status = mb_strtoupper(trim((string) $this->input('status_recebimento', '')), 'UTF-8');
+            if ($status !== StatusRecebimentoTransferencia::CONFORME->value) {
+                return;
+            }
+
+            $transferenciaOrigem = $this->route('transferenciaOrigem');
+            if (! $transferenciaOrigem instanceof Movimentacao) {
+                return;
+            }
+
+            $entrada = $transferenciaOrigem->movimentacaoPareada;
+            if (! $entrada instanceof Movimentacao) {
+                return;
+            }
+
+            $qtdRecebida = round((float) $this->input('qtd_recebida_um'), 2);
+            $qtdEnviada = round((float) $entrada->qtd_fruta_um, 2);
+
+            if (abs($qtdRecebida - $qtdEnviada) > 0.001) {
+                $validator->errors()->add(
+                    'qtd_recebida_um',
+                    'Recebimento conforme exige quantidade recebida igual à enviada. Marque Divergente para informar outra quantidade.',
+                );
+            }
+        });
     }
 }

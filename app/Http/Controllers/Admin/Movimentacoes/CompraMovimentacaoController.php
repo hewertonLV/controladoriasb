@@ -42,20 +42,29 @@ class CompraMovimentacaoController extends Controller
         StoreCompraMovimentacaoRequest $request,
         CriarCompraMovimentacaoAction $criar,
     ): JsonResponse|RedirectResponse {
-        $movimentacao = $criar($request);
+        $movimentacoes = $criar($request);
+        $movimentacao = $movimentacoes->firstOrFail();
 
         if ($request->expectsJson()) {
-            return response()->json(['data' => $movimentacao], JsonResponse::HTTP_CREATED);
+            return response()->json(['data' => $movimentacoes->count() === 1 ? $movimentacao : $movimentacoes], JsonResponse::HTTP_CREATED);
         }
 
         return redirect()
             ->route('admin.movimentacoes.compras.show', $movimentacao)
-            ->with('success', 'Compra registrada com sucesso.');
+            ->with('success', $movimentacoes->count() > 1 ? 'Compras registradas com sucesso.' : 'Compra registrada com sucesso.');
     }
 
     public function show(Movimentacao $movimentacao): View
     {
-        $movimentacao->load(['empresaOrigem', 'empresaDestino', 'fruta', 'frete', 'custoOperacionalHistorico']);
+        $movimentacao->load([
+            'empresaOrigem',
+            'empresaDestino',
+            'fruta',
+            'frete',
+            'custoOperacionalHistorico',
+            'origem',
+            'versaoAnterior',
+        ]);
 
         return view('admin.movimentacoes.compras.show', [
             'movimentacao' => $movimentacao,
@@ -64,7 +73,7 @@ class CompraMovimentacaoController extends Controller
 
     public function edit(Movimentacao $movimentacao): View
     {
-        $movimentacao->load(['empresaOrigem', 'empresaDestino', 'fruta', 'frete']);
+        $movimentacao->load(['empresaOrigem', 'empresaDestino', 'fruta', 'frete', 'origem', 'versaoAnterior']);
 
         return view('admin.movimentacoes.compras.edit', [
             'movimentacao' => $movimentacao,

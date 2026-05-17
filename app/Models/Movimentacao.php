@@ -18,6 +18,7 @@ use Illuminate\Support\Carbon;
  * Trilha financeira, operacional e de estoque das movimentações de fruta.
  *
  * @property int $id
+ * @property int|null $numero_compra
  * @property int|null $id_movimentacao_estoque_old
  * @property int|null $id_movimentacao_estoque_new
  * @property int|null $id_empresa_origem
@@ -118,6 +119,7 @@ class Movimentacao extends Model
      * @var list<string>
      */
     protected $fillable = [
+        'numero_compra',
         'id_movimentacao_estoque_old',
         'id_movimentacao_estoque_new',
         'id_empresa_origem',
@@ -193,6 +195,7 @@ class Movimentacao extends Model
     {
         return [
             'id_movimentacao_estoque_old' => 'integer',
+            'numero_compra' => 'integer',
             'id_movimentacao_estoque_new' => 'integer',
             'id_empresa_origem' => 'integer',
             'id_empresa_destino' => 'integer',

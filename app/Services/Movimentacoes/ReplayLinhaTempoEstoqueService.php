@@ -3,6 +3,7 @@
 namespace App\Services\Movimentacoes;
 
 use App\Enums\CategoriaMovimentacaoTipo;
+use App\Enums\MovimentacaoStatusRegistro;
 use App\Enums\StatusTransferenciaOperacional;
 use App\Enums\TipoDevolucao;
 use App\Models\Empresa;
@@ -18,7 +19,7 @@ use InvalidArgumentException;
 /**
  * Reconstroi a posição de estoque por unidade/fruta considerando entradas e saídas ativas em ordem operacional.
  */
-final class ReplayLinhaTempoEstoqueService
+class ReplayLinhaTempoEstoqueService
 {
     public function reprocessarUnidadeFruta(int $idUnidadeNegocio, int $idFruta): void
     {
@@ -36,10 +37,6 @@ final class ReplayLinhaTempoEstoqueService
             ->firstOrFail();
 
         $eventos = $this->eventos($empresaId, $idFruta);
-        if (! $eventos->contains(static fn (array $evento): bool => $evento['tipo'] === 'entrada')) {
-            return;
-        }
-
         $ids = $eventos->map(static fn (array $e): int => (int) $e['movimentacao']->id)->sort()->values()->all();
         if ($ids !== []) {
             Movimentacao::query()->whereIn('id', $ids)->orderBy('id')->lockForUpdate()->get();
@@ -50,13 +47,22 @@ final class ReplayLinhaTempoEstoqueService
             ->where('id_fruta', $idFruta)
             ->update(['status_ultima_posicao' => false]);
 
-        $baseline = MovimentacaoEstoque::query()
-            ->where('id_unidade_negocio', $idUnidadeNegocio)
-            ->where('id_fruta', $idFruta)
-            ->whereNull('movimentacao_id')
-            ->orderBy('id')
-            ->lockForUpdate()
-            ->first();
+        $primeiroEvento = $eventos->first();
+        $baselineId = $primeiroEvento !== null
+            ? (int) ($primeiroEvento['movimentacao']->id_movimentacao_estoque_old ?? 0)
+            : 0;
+
+        $baseline = $this->resolverBaselinePorId($baselineId, $idUnidadeNegocio, $idFruta);
+
+        if ($baseline === null) {
+            $baseline = MovimentacaoEstoque::query()
+                ->where('id_unidade_negocio', $idUnidadeNegocio)
+                ->where('id_fruta', $idFruta)
+                ->whereNull('movimentacao_id')
+                ->orderBy('id')
+                ->lockForUpdate()
+                ->first();
+        }
 
         if ($baseline === null) {
             $baseline = MovimentacaoEstoque::query()->create([
@@ -73,20 +79,13 @@ final class ReplayLinhaTempoEstoqueService
             ]);
         }
 
-        $baseline->forceFill([
-            'qtd_fruta_kg' => '0.00',
-            'qtd_fruta_um' => '0.00',
-            'preco_medio_kg' => '0.00',
-            'preco_medio_um' => '0.00',
-            'valor_total_fruta' => '0.00',
-            'status_ultima_posicao' => false,
-        ])->save();
-
         $prevMeId = (int) $baseline->id;
         $ultimaMeId = $prevMeId;
-        $runUm = 0.0;
-        $runKg = 0.0;
-        $valorAcumulado = 0.0;
+        $runUm = (float) $baseline->qtd_fruta_um;
+        $runKg = (float) $baseline->qtd_fruta_kg;
+        $valorAcumulado = (float) $baseline->valor_total_fruta;
+
+        $baseline->forceFill(['status_ultima_posicao' => false])->save();
 
         foreach ($eventos as $evento) {
             /** @var Movimentacao $movimentacao */
@@ -311,14 +310,9 @@ final class ReplayLinhaTempoEstoqueService
         $qKg = (float) $m->qtd_fruta_kg;
 
         $isVenda = (int) $m->categoria_movimentacao_id === CategoriaMovimentacaoTipo::Venda->value;
-
-        if (! $isVenda && ($runUm + 1e-6 < $qUm || $runKg + 1e-6 < $qKg)) {
-            throw new InvalidArgumentException('Saldo insuficiente durante replay integrado de saída.');
-        }
-
-        $precoMedioKg = $isVenda ? (float) $m->preco_medio_fruta_kg : ($runKg > 0 ? round($valorAcumulado / $runKg, 2) : 0.0);
+        $precoMedioKg = $runKg > 0 ? round($valorAcumulado / $runKg, 2) : 0.0;
         $precoMedioUm = round($precoMedioKg * $kgPorUm, 2);
-        $valorMovimentacao = $isVenda ? (float) $m->valor_custo_saida : round($precoMedioKg * $qKg, 2);
+        $valorMovimentacao = round($precoMedioKg * $qKg, 2);
 
         $runUm = round($runUm - $qUm, 2);
         $runKg = round($runKg - $qKg, 2);
@@ -358,6 +352,7 @@ final class ReplayLinhaTempoEstoqueService
         }
 
         if ($isVenda) {
+            $attrs['valor_custo_saida'] = number_format($valorMovimentacao, 2, '.', '');
             $attrs['valor_total_movimentacao'] = number_format($valorMovimentacao, 2, '.', '');
             $attrs['resultado_movimentacao'] = number_format(
                 round((float) $m->valor_nf_total - $valorMovimentacao - (float) $m->valor_frete_rateio, 2),
@@ -370,6 +365,35 @@ final class ReplayLinhaTempoEstoqueService
         $m->forceFill($attrs)->saveQuietly();
 
         return [$runUm, $runKg, $valorAcumulado, (int) $me->id, (int) $me->id];
+    }
+
+    private function resolverBaselinePorId(int $baselineId, int $idUnidadeNegocio, int $idFruta): ?MovimentacaoEstoque
+    {
+        while ($baselineId > 0) {
+            $baseline = MovimentacaoEstoque::query()
+                ->whereKey($baselineId)
+                ->where('id_unidade_negocio', $idUnidadeNegocio)
+                ->where('id_fruta', $idFruta)
+                ->lockForUpdate()
+                ->first();
+
+            if ($baseline === null || $baseline->movimentacao_id === null) {
+                return $baseline;
+            }
+
+            $movimentacao = Movimentacao::query()
+                ->whereKey((int) $baseline->movimentacao_id)
+                ->lockForUpdate()
+                ->first();
+
+            if ($movimentacao === null || $movimentacao->status_registro === MovimentacaoStatusRegistro::ATIVO->value) {
+                return $baseline;
+            }
+
+            $baselineId = (int) ($movimentacao->id_movimentacao_estoque_old ?? 0);
+        }
+
+        return null;
     }
 
     private function salvarMovimentacaoEstoque(

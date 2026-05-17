@@ -3,8 +3,9 @@
 namespace App\Actions\Movimentacoes\Doacao;
 
 use App\Http\Requests\Admin\Movimentacoes\StoreDoacaoMovimentacaoRequest;
-use App\Models\Movimentacao;
 use App\Services\Movimentacoes\DoacaoMovimentacaoService;
+use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 
 final class CriarDoacaoMovimentacaoAction
 {
@@ -12,11 +13,24 @@ final class CriarDoacaoMovimentacaoAction
         private readonly DoacaoMovimentacaoService $doacao,
     ) {}
 
-    public function __invoke(StoreDoacaoMovimentacaoRequest $request): Movimentacao
+    /**
+     * @return Collection<int, \App\Models\Movimentacao>
+     */
+    public function __invoke(StoreDoacaoMovimentacaoRequest $request): Collection
     {
         /** @var array<string, mixed> $payload */
         $payload = $request->validated();
+        $itens = $payload['itens'] ?? [[
+            'id_fruta' => $payload['id_fruta'],
+            'qtd_fruta_um' => $payload['qtd_fruta_um'],
+        ]];
 
-        return $this->doacao->registrarDoacao($payload, $request->user());
+        unset($payload['itens'], $payload['id_fruta'], $payload['qtd_fruta_um']);
+
+        return DB::transaction(function () use ($payload, $itens, $request): Collection {
+            return collect($itens)
+                ->map(fn (array $item) => $this->doacao->registrarDoacao(array_merge($payload, $item), $request->user()))
+                ->values();
+        });
     }
 }

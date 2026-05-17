@@ -2,7 +2,6 @@
 
 namespace App\Services\Movimentacoes;
 
-use App\Contracts\Movimentacoes\ReprocessaSaidasDoacaoOrigem;
 use App\Enums\CategoriaMovimentacaoTipo;
 use App\Enums\MovimentacaoStatusRegistro;
 use App\Models\Empresa;
@@ -18,7 +17,6 @@ final class CancelarDoacaoMovimentacaoAdminService
 {
     public function __construct(
         private readonly DoacaoMovimentacaoService $doacaoMovimentacao,
-        private readonly ReprocessaSaidasDoacaoOrigem $reprocessaSaidasDoacaoOrigem,
         private readonly ReplayLinhaTempoEstoqueService $replayLinhaTempoEstoque,
         private readonly MovimentacaoAuditoriaService $auditoria,
     ) {}
@@ -68,7 +66,6 @@ final class CancelarDoacaoMovimentacaoAdminService
                 'motivo_cancelamento' => $motivo,
             ])->saveQuietly();
 
-            $this->reprocessaSaidasDoacaoOrigem->reprocessarSaidasDoacaoNaUnidadeOrigem((int) $unidadeOrigem->id, $frutaId);
             $this->replayLinhaTempoEstoque->reprocessarUnidadeFruta((int) $unidadeOrigem->id, $frutaId);
 
             $mov = $mov->fresh();

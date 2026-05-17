@@ -5,7 +5,6 @@ namespace App\Http\Requests\Admin\Movimentacoes;
 use App\Models\Cliente;
 use App\Models\Empresa;
 use App\Models\Estoque;
-use App\Models\Fruta;
 use App\Models\UnidadeNegocio;
 use App\Support\TextoCadastro;
 use Illuminate\Foundation\Http\FormRequest;
@@ -47,6 +46,7 @@ class StoreDoacaoMovimentacaoRequest extends FormRequest
             'valor_icms_total' => ['prohibited'],
             'valor_icms_kg' => ['prohibited'],
             'valor_icms_um' => ['prohibited'],
+            'data_movimentacao' => ['prohibited'],
             'versao' => ['prohibited'],
             'versao_replay' => ['prohibited'],
             'movimentacao_origem_id' => ['prohibited'],
@@ -79,18 +79,27 @@ class StoreDoacaoMovimentacaoRequest extends FormRequest
                 Rule::exists('empresas', 'id')->where('entidade_type', Cliente::class),
             ],
             'id_fruta' => [
-                'required',
+                'required_without:itens',
                 'integer',
                 'min:1',
                 Rule::exists('frutas', 'id')->where(
                     fn ($query) => $query->where('kg_por_unidade_medicao', '>', 0),
                 ),
             ],
-            'qtd_fruta_um' => ['required', 'numeric', 'min:0.01'],
+            'qtd_fruta_um' => ['required_without:itens', 'numeric', 'min:0.01'],
+            'itens' => ['sometimes', 'array', 'min:1'],
+            'itens.*.id_fruta' => [
+                'required_with:itens',
+                'integer',
+                'min:1',
+                Rule::exists('frutas', 'id')->where(
+                    fn ($query) => $query->where('kg_por_unidade_medicao', '>', 0),
+                ),
+            ],
+            'itens.*.qtd_fruta_um' => ['required_with:itens', 'numeric', 'min:0.01'],
             'motivo_doacao' => ['required', 'string', 'max:255'],
             'observacao' => ['nullable', 'string', 'max:4000'],
             'numero_nf_origem' => ['nullable', 'string', 'max:120'],
-            'data_movimentacao' => ['nullable', 'date'],
         ]);
     }
 
@@ -98,8 +107,7 @@ class StoreDoacaoMovimentacaoRequest extends FormRequest
     {
         $validator->after(function (Validator $v): void {
             $idEmpOrigem = $this->input('id_empresa_origem');
-            $idFruta = $this->input('id_fruta');
-            if ($idEmpOrigem === null || $idEmpOrigem === '' || $idFruta === null || $idFruta === '') {
+            if ($idEmpOrigem === null || $idEmpOrigem === '') {
                 return;
             }
 
@@ -115,16 +123,23 @@ class StoreDoacaoMovimentacaoRequest extends FormRequest
                 return;
             }
 
-            $existeEstoque = Estoque::query()
-                ->where('id_unidade_negocio', $unidade->id)
-                ->where('id_fruta', (int) $idFruta)
-                ->exists();
+            $itens = $this->input('itens');
+            $frutas = is_array($itens)
+                ? collect($itens)->pluck('id_fruta')->filter()->values()
+                : collect([$this->input('id_fruta')])->filter()->values();
 
-            if (! $existeEstoque) {
-                $v->errors()->add(
-                    'id_empresa_origem',
-                    'A unidade selecionada não possui estoque registrado para a fruta informada.',
-                );
+            foreach ($frutas as $index => $idFruta) {
+                $existeEstoque = Estoque::query()
+                    ->where('id_unidade_negocio', $unidade->id)
+                    ->where('id_fruta', (int) $idFruta)
+                    ->exists();
+
+                if (! $existeEstoque) {
+                    $v->errors()->add(
+                        is_array($itens) ? "itens.{$index}.id_fruta" : 'id_empresa_origem',
+                        'A unidade selecionada não possui estoque registrado para a fruta informada.',
+                    );
+                }
             }
         });
     }
@@ -139,10 +154,11 @@ class StoreDoacaoMovimentacaoRequest extends FormRequest
             'id_empresa_destino' => 'cliente de destino',
             'id_fruta' => 'fruta',
             'qtd_fruta_um' => 'quantidade na unidade de medida',
+            'itens.*.id_fruta' => 'fruta',
+            'itens.*.qtd_fruta_um' => 'quantidade na unidade de medida',
             'motivo_doacao' => 'motivo da doação',
             'observacao' => 'observação',
             'numero_nf_origem' => 'número da NF na origem',
-            'data_movimentacao' => 'data da movimentação',
         ];
     }
 
@@ -154,6 +170,22 @@ class StoreDoacaoMovimentacaoRequest extends FormRequest
             $merge['qtd_fruta_um'] = TextoCadastro::normalizarDecimalNaoNegativo(
                 $this->input('qtd_fruta_um'),
             );
+        }
+
+        if ($this->has('itens')) {
+            $itens = [];
+            foreach ((array) $this->input('itens', []) as $key => $item) {
+                if (blank($item['id_fruta'] ?? null) && blank($item['qtd_fruta_um'] ?? null)) {
+                    continue;
+                }
+
+                $itens[$key] = $item;
+                if (array_key_exists('qtd_fruta_um', $item)) {
+                    $itens[$key]['qtd_fruta_um'] = TextoCadastro::normalizarDecimalNaoNegativo($item['qtd_fruta_um']);
+                }
+            }
+
+            $merge['itens'] = $itens;
         }
 
         $this->merge($merge);
