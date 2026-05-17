@@ -27,6 +27,8 @@ class AuthenticatedSessionController extends Controller
         $request->authenticate();
 
         $request->session()->regenerate();
+        $request->session()->put('theme_settings', $request->user()->themeSettings());
+        $request->session()->put('theme_settings_user_id', $request->user()->getKey());
 
         return redirect()->intended(route('dashboard', absolute: false));
     }
@@ -36,6 +38,9 @@ class AuthenticatedSessionController extends Controller
      */
     public function destroy(Request $request): RedirectResponse
     {
+        $request->session()->forget('theme_settings');
+        $request->session()->forget('theme_settings_user_id');
+
         Auth::guard('web')->logout();
 
         $request->session()->invalidate();

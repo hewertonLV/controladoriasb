@@ -9,6 +9,17 @@
         sidenav: { size: 'sm-hover-active' },
     };
     const clone = (value) => JSON.parse(JSON.stringify(value));
+    const fromThemeSettings = (settings) => {
+        const config = clone(defaults);
+
+        config.theme = settings['data-bs-theme'] || defaults.theme;
+        config.layout.mode = settings['data-layout-mode'] || defaults.layout.mode;
+        config.topbar.color = settings['data-topbar-color'] || defaults.topbar.color;
+        config.sidenav.size = settings['data-sidenav-size'] || defaults.sidenav.size;
+        config.menu.color = settings['data-menu-color'] || defaults.menu.color;
+
+        return config;
+    };
     const fromHtmlAttributes = () => {
         const config = clone(defaults);
 
@@ -21,7 +32,9 @@
         return config;
     };
 
-    let config = fromHtmlAttributes();
+    let config = window.themeSettingsFromServer
+        ? fromThemeSettings(window.themeSettingsFromServer)
+        : fromHtmlAttributes();
     const hasServerSettings = html.dataset.themeSettingsSource === 'server';
 
     window.defaultConfig = clone(config);
@@ -40,18 +53,6 @@
 
     window.config = config;
     sessionStorage.setItem(storageKey, JSON.stringify(config));
-
-    if (window.innerWidth <= 1140) {
-        html.setAttribute('data-sidenav-size', 'full');
-        html.setAttribute('data-layout-mode', 'default');
-    } else {
-        html.setAttribute('data-layout-mode', config.layout.mode);
-        html.setAttribute('data-sidenav-size', config.sidenav.size);
-    }
-
-    html.setAttribute('data-bs-theme', config.theme);
-    html.setAttribute('data-menu-color', config.menu.color);
-    html.setAttribute('data-topbar-color', config.topbar.color);
 
     if (document.getElementById('app-style').href.includes('rtl.min.css')) {
         html.dir = 'rtl';

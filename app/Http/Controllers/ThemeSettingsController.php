@@ -36,8 +36,12 @@ class ThemeSettingsController extends Controller
             'theme_settings' => array_merge($user->themeSettings(), $settings),
         ])->save();
 
+        $themeSettings = $user->fresh()->themeSettings();
+        $request->session()->put('theme_settings', $themeSettings);
+        $request->session()->put('theme_settings_user_id', $user->getKey());
+
         return response()->json([
-            'theme_settings' => $user->themeSettings(),
+            'theme_settings' => $themeSettings,
         ]);
     }
 }

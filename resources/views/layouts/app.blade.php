@@ -1,5 +1,12 @@
 @php
-    $themeSettings = auth()->user()?->themeSettings() ?? \App\Models\User::defaultThemeSettings();
+    $sessionThemeSettings = session('theme_settings');
+    $sessionThemeSettingsBelongsToUser = auth()->check()
+        && session('theme_settings_user_id') === auth()->id()
+        && is_array($sessionThemeSettings);
+
+    $themeSettings = ($sessionThemeSettingsBelongsToUser ? $sessionThemeSettings : null)
+        ?? auth()->user()?->themeSettings()
+        ?? \App\Models\User::defaultThemeSettings();
 @endphp
 
 <!DOCTYPE html>
@@ -15,6 +22,10 @@
 >
 
 <head>
+    <script>
+        window.themeSettingsFromServer = @json($themeSettings);
+        window.currentThemeSettings = window.themeSettingsFromServer;
+    </script>
     @include('layouts.partials.head')
 </head>
 
