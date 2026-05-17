@@ -114,6 +114,8 @@ class ThemeSettingsTest extends TestCase
         $configScript = file_get_contents(public_path('assets/js/config.js'));
         $appScript = file_get_contents(public_path('assets/js/app.js'));
         $persistenceScript = file_get_contents(public_path('assets/js/theme-settings-persistence.js'));
+        $dynamicThemeCss = file_get_contents(public_path('assets/css/theme-dynamic.css'));
+        $head = view('layouts.partials.head')->render();
 
         $this->assertStringNotContainsString("setAttribute('data-layout-mode'", $configScript);
         $this->assertStringNotContainsString('setAttribute("data-layout-mode"', $configScript);
@@ -131,5 +133,10 @@ class ThemeSettingsTest extends TestCase
         $this->assertStringContainsString('new MutationObserver', $persistenceScript);
         $this->assertStringContainsString('event.isTrusted', $persistenceScript);
         $this->assertStringContainsString('requestAnimationFrame', $persistenceScript);
+        $this->assertStringContainsString('html[data-sidenav-size=condensed]:not([data-layout=topnav]) .page-content', $dynamicThemeCss);
+        $this->assertStringContainsString('min-height: calc(100vh - var(--highdmin-topbar-height) - 5px);', $dynamicThemeCss);
+        $this->assertStringContainsString('assets/css/theme-dynamic.css', $head);
+        $this->assertLessThan(strpos($head, 'assets/css/theme-dynamic.css'), strpos($head, 'assets/css/icons.min.css'));
+        $this->assertLessThan(strpos($head, 'assets/js/config.js'), strpos($head, 'assets/css/theme-dynamic.css'));
     }
 }

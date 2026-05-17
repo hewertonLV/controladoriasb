@@ -1,0 +1,247 @@
+/*
+ * Dynamic FACIGAM palette.
+ * Loaded after Highdmin compiled CSS so we can keep vendor/template files intact.
+ */
+:root {
+  --facigam-primary: #02c0ce;
+  --facigam-primary-rgb: 2, 192, 206;
+  --facigam-primary-hover: #02aeba;
+  --facigam-primary-active: #02b2bf;
+  --facigam-primary-soft: #d9f6f8;
+  --facigam-primary-border: #9ae6eb;
+  --facigam-primary-text-emphasis: #02a3af;
+  --facigam-primary-contrast: #ffffff;
+  --facigam-primary-focus-ring: rgba(2, 192, 206, 0.25);
+
+  --bs-primary: var(--facigam-primary);
+  --bs-primary-rgb: var(--facigam-primary-rgb);
+  --bs-link-color: var(--facigam-primary);
+  --bs-link-hover-color: var(--facigam-primary-hover);
+  --bs-primary-bg-subtle: var(--facigam-primary-soft);
+  --bs-primary-border-subtle: var(--facigam-primary-border);
+
+  --highdmin-blue: var(--facigam-primary);
+  --highdmin-primary: var(--facigam-primary);
+  --highdmin-primary-rgb: var(--facigam-primary-rgb);
+  --highdmin-primary-text-emphasis: var(--facigam-primary-text-emphasis);
+  --highdmin-primary-bg-subtle: var(--facigam-primary-soft);
+  --highdmin-primary-border-subtle: var(--facigam-primary-border);
+  --highdmin-link-color: var(--facigam-primary);
+  --highdmin-link-hover-color: var(--facigam-primary-hover);
+  --highdmin-focus-ring-color: var(--facigam-primary-focus-ring);
+}
+
+:root[data-bs-theme=dark] {
+  --highdmin-primary-text-emphasis: var(--facigam-primary-dark-text-emphasis, var(--facigam-primary-soft));
+  --highdmin-primary-bg-subtle: var(--facigam-primary-dark-soft, rgba(var(--facigam-primary-rgb), 0.2));
+  --highdmin-primary-border-subtle: var(--facigam-primary-dark-border, var(--facigam-primary-active));
+  --highdmin-link-color: var(--facigam-primary-dark-text-emphasis, var(--facigam-primary-soft));
+  --highdmin-link-hover-color: var(--facigam-primary-soft);
+}
+
+:root[data-menu-color=light] {
+  --highdmin-menu-item-hover-color: var(--facigam-primary);
+  --highdmin-menu-item-hover-bg: rgba(var(--facigam-primary-rgb), 0.1);
+  --highdmin-menu-item-active-color: var(--facigam-primary);
+}
+
+:root[data-menu-color=brand] {
+  --highdmin-menu-bg: var(--facigam-primary);
+  --highdmin-menu-item-color: rgba(255, 255, 255, 0.82);
+  --highdmin-menu-item-hover-color: var(--facigam-primary-contrast);
+  --highdmin-menu-item-hover-bg: rgba(255, 255, 255, 0.12);
+  --highdmin-menu-item-active-color: var(--facigam-primary-contrast);
+}
+
+:root[data-topbar-color=light] {
+  --highdmin-topbar-item-hover-color: var(--facigam-primary);
+}
+
+:root[data-topbar-color=brand] {
+  --highdmin-topbar-bg: var(--facigam-primary);
+}
+
+html[data-sidenav-size=condensed]:not([data-layout=topnav]) .page-content {
+  min-height: calc(100vh - var(--highdmin-topbar-height) - 5px);
+}
+
+a,
+.link-primary {
+  color: var(--facigam-primary);
+}
+
+a:hover,
+.link-primary:hover,
+.link-primary:focus {
+  color: var(--facigam-primary-hover);
+}
+
+.text-primary {
+  color: rgba(var(--facigam-primary-rgb), var(--highdmin-text-opacity, 1)) !important;
+}
+
+.bg-primary {
+  background-color: rgba(var(--facigam-primary-rgb), var(--highdmin-bg-opacity, 1)) !important;
+}
+
+.bg-primary-subtle {
+  background-color: var(--facigam-primary-soft) !important;
+}
+
+.border-primary {
+  border-color: rgba(var(--facigam-primary-rgb), var(--highdmin-border-opacity, 1)) !important;
+}
+
+.btn-primary {
+  --highdmin-btn-color: var(--facigam-primary-contrast);
+  --highdmin-btn-bg: var(--facigam-primary);
+  --highdmin-btn-border-color: var(--facigam-primary);
+  --highdmin-btn-hover-color: var(--facigam-primary-contrast);
+  --highdmin-btn-hover-bg: var(--facigam-primary-hover);
+  --highdmin-btn-hover-border-color: var(--facigam-primary-hover);
+  --highdmin-btn-focus-shadow-rgb: var(--facigam-primary-rgb);
+  --highdmin-btn-active-color: var(--facigam-primary-contrast);
+  --highdmin-btn-active-bg: var(--facigam-primary-active);
+  --highdmin-btn-active-border-color: var(--facigam-primary-active);
+  --highdmin-btn-disabled-color: var(--facigam-primary-contrast);
+  --highdmin-btn-disabled-bg: var(--facigam-primary);
+  --highdmin-btn-disabled-border-color: var(--facigam-primary);
+}
+
+.btn-outline-primary {
+  --highdmin-btn-color: var(--facigam-primary);
+  --highdmin-btn-border-color: var(--facigam-primary);
+  --highdmin-btn-hover-color: var(--facigam-primary-contrast);
+  --highdmin-btn-hover-bg: var(--facigam-primary);
+  --highdmin-btn-hover-border-color: var(--facigam-primary);
+  --highdmin-btn-focus-shadow-rgb: var(--facigam-primary-rgb);
+  --highdmin-btn-active-color: var(--facigam-primary-contrast);
+  --highdmin-btn-active-bg: var(--facigam-primary-active);
+  --highdmin-btn-active-border-color: var(--facigam-primary-active);
+  --highdmin-btn-disabled-color: var(--facigam-primary);
+  --highdmin-btn-disabled-border-color: var(--facigam-primary);
+}
+
+.btn-soft-primary {
+  --highdmin-btn-color: var(--facigam-primary);
+  --highdmin-btn-bg: var(--facigam-primary-soft);
+  --highdmin-btn-border-color: var(--facigam-primary-soft);
+  --highdmin-btn-hover-color: var(--facigam-primary-contrast);
+  --highdmin-btn-hover-bg: var(--facigam-primary);
+  --highdmin-btn-hover-border-color: var(--facigam-primary);
+  --highdmin-btn-active-color: var(--facigam-primary-contrast);
+  --highdmin-btn-active-bg: var(--facigam-primary-active);
+  --highdmin-btn-active-border-color: var(--facigam-primary-active);
+}
+
+.form-control:focus,
+.form-select:focus,
+.form-check-input:focus {
+  border-color: var(--facigam-primary-border);
+  box-shadow: 0 0 0 0.2rem var(--facigam-primary-focus-ring);
+}
+
+.form-check-input:checked,
+.form-check-input[type=checkbox]:indeterminate {
+  background-color: var(--facigam-primary);
+  border-color: var(--facigam-primary);
+}
+
+.form-switch .form-check-input:checked {
+  background-color: var(--facigam-primary);
+  border-color: var(--facigam-primary);
+}
+
+.nav-pills {
+  --highdmin-nav-pills-link-active-bg: var(--facigam-primary);
+}
+
+.nav-tabs .nav-link.active,
+.nav-tabs .nav-item.show .nav-link,
+.nav-bordered .nav-link.active,
+.nav-bordered .nav-item.show .nav-link {
+  color: var(--facigam-primary);
+  border-color: var(--facigam-primary);
+}
+
+.pagination {
+  --highdmin-pagination-active-bg: var(--facigam-primary);
+  --highdmin-pagination-active-border-color: var(--facigam-primary);
+  --highdmin-pagination-focus-box-shadow: 0 0 0 0.2rem var(--facigam-primary-focus-ring);
+}
+
+.page-link {
+  color: var(--facigam-primary);
+}
+
+.page-link:hover,
+.page-link:focus {
+  color: var(--facigam-primary-hover);
+}
+
+.dropdown-item.active,
+.dropdown-item:active,
+.list-group-item.active {
+  color: var(--facigam-primary-contrast);
+  background-color: var(--facigam-primary);
+  border-color: var(--facigam-primary);
+}
+
+.progress-bar {
+  background-color: var(--facigam-primary);
+}
+
+.badge-soft-primary {
+  color: var(--facigam-primary);
+  background-color: rgba(var(--facigam-primary-rgb), 0.15);
+}
+
+.badge-outline-primary {
+  color: var(--facigam-primary);
+  border-color: var(--facigam-primary);
+}
+
+.side-nav .side-nav-link:hover,
+.side-nav .side-nav-link:focus,
+.side-nav .side-nav-link.active,
+.side-nav .side-nav-item.active > .side-nav-link,
+.side-nav .menuitem-active > .side-nav-link {
+  color: var(--highdmin-menu-item-active-color);
+}
+
+.side-nav .side-nav-link:hover,
+.side-nav .side-nav-link:focus {
+  background-color: var(--highdmin-menu-item-hover-bg);
+}
+
+#preloader .spinner-border,
+#status .spinner-border,
+.spinner-border.text-primary,
+.spinner-grow.text-primary,
+.card-portlets-loader,
+.preloader .spinner-border {
+  color: var(--facigam-primary) !important;
+  border-color: currentColor;
+  border-right-color: transparent;
+}
+
+.loader,
+.page-loader,
+.sweet-alert .sa-icon.sa-custom,
+.swal2-loader {
+  border-color: var(--facigam-primary) transparent var(--facigam-primary) transparent;
+}
+
+.card-radio .form-check-input:checked + .form-check-label,
+.card-radio .form-check-input:focus + .form-check-label,
+.theme-palette-option.active,
+.theme-palette-option:focus {
+  border-color: var(--facigam-primary) !important;
+  box-shadow: 0 0 0 0.15rem var(--facigam-primary-focus-ring);
+}
+
+.theme-primary-preview {
+  background:
+    linear-gradient(135deg, var(--facigam-primary), var(--facigam-primary-active));
+  color: var(--facigam-primary-contrast);
+}
