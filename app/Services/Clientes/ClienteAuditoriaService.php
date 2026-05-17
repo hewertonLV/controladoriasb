@@ -11,6 +11,7 @@ class ClienteAuditoriaService
     private const COMPARABLE_FIELDS = [
         'id_cigam',
         'razao_social',
+        'fantasia',
         'cnpj_cpf',
         'id_unidade_negocio',
         'id_praca',
@@ -77,6 +78,7 @@ class ClienteAuditoriaService
         return [
             'id_cigam' => $cliente->id_cigam,
             'razao_social' => $cliente->razao_social,
+            'fantasia' => $cliente->fantasia,
             'cnpj_cpf' => $cliente->cnpj_cpf,
             'id_unidade_negocio' => (int) $cliente->id_unidade_negocio,
             'id_praca' => (int) $cliente->id_praca,

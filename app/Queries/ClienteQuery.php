@@ -20,6 +20,7 @@ class ClienteQuery
     private const ALLOWED_SORTS = [
         'id_cigam' => 'id_cigam',
         'razao_social' => 'razao_social',
+        'fantasia' => 'fantasia',
         'cnpj_cpf' => 'cnpj_cpf',
         'desconto_nf' => 'desconto_nf',
         'desconto_contrato' => 'desconto_contrato',
@@ -83,6 +84,7 @@ class ClienteQuery
             $query->where(function (Builder $q) use ($search, $searchUpper, $digits) {
                 $q->where('id_cigam', 'like', "%{$search}%")
                     ->orWhere('razao_social', 'like', "%{$searchUpper}%")
+                    ->orWhere('fantasia', 'like', "%{$searchUpper}%")
                     ->orWhere('cnpj_cpf', 'like', "%{$digits}%")
                     ->orWhereHas('praca', fn (Builder $pq) => $pq->where('nome', 'like', "%{$searchUpper}%"))
                     ->orWhereHas('grupo', fn (Builder $gq) => $gq->where('nome', 'like', "%{$searchUpper}%"));

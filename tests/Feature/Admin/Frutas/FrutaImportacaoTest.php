@@ -39,7 +39,7 @@ class FrutaImportacaoTest extends FrutaTestCase
         $importacao = FrutaImportacao::query()->firstOrFail();
 
         $this->assertSame($user->id, $importacao->user_id);
-        Storage::disk('local')->assertExists($importacao->arquivo_path);
+        $this->assertTrue(Storage::disk('local')->exists($importacao->arquivo_path));
         Queue::assertPushed(ProcessarPreviewImportacaoFrutasJob::class);
     }
 
@@ -188,6 +188,67 @@ class FrutaImportacaoTest extends FrutaTestCase
         ]);
     }
 
+    public function test_job_detecta_aba_base_por_cabecalho_e_converte_abreviacoes(): void
+    {
+        Storage::fake('local');
+
+        $path = $this->storeSpreadsheetComAbaBase([
+            ['01.857.4', 'BANANA PRATA', 'CX', '14'],
+            ['04.000.1', 'LARANJA SACO', 'SC', '3'],
+            ['04.000.2', 'MELANCIA', 'UN', '1'],
+            ['04.000.3', 'UVA PACOTE', 'PCT', '1'],
+        ]);
+
+        $importacao = FrutaImportacao::create([
+            'uuid' => (string) Str::uuid(),
+            'user_id' => $this->frutasManager()->id,
+            'arquivo_original' => 'materiais.xlsx',
+            'arquivo_path' => $path,
+            'status' => FrutaImportacao::STATUS_AGUARDANDO,
+        ]);
+
+        (new ProcessarPreviewImportacaoFrutasJob($importacao->id))
+            ->handle(app(FrutaImportacaoProcessor::class));
+
+        $importacao->refresh();
+        $primeiraLinha = $importacao->resultado['novas'][0]['dados'];
+
+        $this->assertSame(FrutaImportacao::STATUS_CONCLUIDO, $importacao->status);
+        $this->assertSame(4, $importacao->novas_count);
+        $this->assertSame(0, $importacao->erros_count);
+        $this->assertSame('018574', $primeiraLinha['id_cigam']);
+        $this->assertSame(FrutaUnidadeMedicao::CAIXA->value, $primeiraLinha['unidade_medicao']);
+        $this->assertSame('14.00', $primeiraLinha['kg_por_unidade_medicao']);
+    }
+
+    public function test_job_ignora_id_cigam_repetido_com_dados_iguais_e_bloqueia_divergente(): void
+    {
+        Storage::fake('local');
+
+        $path = $this->storeSpreadsheet([
+            ['100', 'BANANA', FrutaUnidadeMedicao::CAIXA->value, '14'],
+            ['100', 'BANANA', FrutaUnidadeMedicao::CAIXA->value, '14'],
+            ['100', 'BANANA DIFERENTE', FrutaUnidadeMedicao::CAIXA->value, '14'],
+        ]);
+
+        $importacao = FrutaImportacao::create([
+            'uuid' => (string) Str::uuid(),
+            'user_id' => $this->frutasManager()->id,
+            'arquivo_original' => 'frutas.xlsx',
+            'arquivo_path' => $path,
+            'status' => FrutaImportacao::STATUS_AGUARDANDO,
+        ]);
+
+        (new ProcessarPreviewImportacaoFrutasJob($importacao->id))
+            ->handle(app(FrutaImportacaoProcessor::class));
+
+        $importacao->refresh();
+
+        $this->assertSame(1, $importacao->novas_count);
+        $this->assertSame(1, $importacao->erros_count);
+        $this->assertSame('ID CIGAM duplicado na planilha (já aparece na linha 2).', $importacao->resultado['erros'][0]['erros'][0]);
+    }
+
     /**
      * @param  list<list<mixed>>  $rows
      */
@@ -208,6 +269,37 @@ class FrutaImportacaoTest extends FrutaTestCase
         $spreadsheet->disconnectWorksheets();
 
         $path = 'frutas/importacoes/teste.xlsx';
+        Storage::disk('local')->put($path, file_get_contents($tmp));
+        @unlink($tmp);
+
+        return $path;
+    }
+
+    /**
+     * @param  list<list<mixed>>  $baseRows
+     */
+    private function storeSpreadsheetComAbaBase(array $baseRows): string
+    {
+        $spreadsheet = new Spreadsheet;
+
+        $sheet = $spreadsheet->getActiveSheet();
+        $sheet->setTitle('T.O');
+        $sheet->fromArray(['TP OPERACAO', 'DESC TIPO OPERACAO'], null, 'A1');
+        $sheet->fromArray(['610.1A', 'VENDA'], null, 'A2');
+
+        $base = $spreadsheet->createSheet();
+        $base->setTitle('BASE');
+        $base->fromArray(['CODIGO MATERIAL', 'DESCRICAO MAT', 'UNID MEDIDA', 'PESO MAT'], null, 'A1');
+
+        foreach ($baseRows as $index => $row) {
+            $base->fromArray($row, null, 'A'.($index + 2));
+        }
+
+        $tmp = tempnam(sys_get_temp_dir(), 'frutas-test-');
+        (new Xlsx($spreadsheet))->save($tmp);
+        $spreadsheet->disconnectWorksheets();
+
+        $path = 'frutas/importacoes/teste-base.xlsx';
         Storage::disk('local')->put($path, file_get_contents($tmp));
         @unlink($tmp);
 

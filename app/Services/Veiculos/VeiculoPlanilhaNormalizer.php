@@ -10,7 +10,7 @@ use App\Support\TextoCadastro;
  *   A → id_sbs
  *   B → nome
  *   C → tipo
- *   D → id_unidade_negocio
+ *   D → id_cigam da unidade de negócio
  *   E → status (ATIVO|INATIVO)
  */
 class VeiculoPlanilhaNormalizer
@@ -23,6 +23,7 @@ class VeiculoPlanilhaNormalizer
      *         nome: string,
      *         tipo: string,
      *         id_unidade_negocio: int,
+     *         id_cigam_unidade: string,
      *         status: string,
      *     },
      *     erros: list<string>,
@@ -35,11 +36,12 @@ class VeiculoPlanilhaNormalizer
         $idSbsRaw = TextoCadastro::somenteDigitos($this->trimString($row[0] ?? null));
         $nome = TextoCadastro::normalizarMaiusculas($this->trimString($row[1] ?? null));
         $tipo = TextoCadastro::normalizarMaiusculas($this->trimString($row[2] ?? null));
-        $unidadeRaw = TextoCadastro::somenteDigitos($this->trimString($row[3] ?? null));
+        $unidadeOriginal = $this->trimString($row[3] ?? null);
+        $idCigamUnidade = TextoCadastro::normalizarIdCigam($unidadeOriginal);
         $status = TextoCadastro::normalizarStatusAtivoInativo($this->trimString($row[4] ?? null) ?: 'ATIVO');
 
         $idSbs = $idSbsRaw !== '' ? (int) $idSbsRaw : 0;
-        $idUnidade = $unidadeRaw !== '' ? (int) $unidadeRaw : 0;
+        $idUnidade = 0;
 
         if ($idSbs <= 0) {
             $erros[] = 'ID SBS (coluna A) deve ser um inteiro positivo.';
@@ -57,10 +59,20 @@ class VeiculoPlanilhaNormalizer
             $erros[] = 'Tipo pode ter no máximo 255 caracteres.';
         }
 
-        if ($idUnidade <= 0) {
-            $erros[] = 'ID Unidade de Negócio (coluna D) deve ser um inteiro positivo.';
-        } elseif (! UnidadeNegocio::query()->whereKey($idUnidade)->exists()) {
-            $erros[] = "Unidade de negócio #{$idUnidade} não encontrada.";
+        if ($idCigamUnidade === '') {
+            $erros[] = 'ID CIGAM da unidade de negócio (coluna D) é obrigatório.';
+        } elseif (! preg_match('/^\d{6}$/', $idCigamUnidade)) {
+            $erros[] = 'ID CIGAM da unidade de negócio (coluna D) deve ter até 6 dígitos numéricos.';
+        } else {
+            $unidade = UnidadeNegocio::query()
+                ->where('id_cigam', $idCigamUnidade)
+                ->first(['id']);
+
+            if ($unidade === null) {
+                $erros[] = $this->mensagemUnidadeNaoEncontrada($idCigamUnidade, $unidadeOriginal);
+            } else {
+                $idUnidade = (int) $unidade->id;
+            }
         }
 
         $statusUpper = mb_strtoupper($status);
@@ -74,6 +86,7 @@ class VeiculoPlanilhaNormalizer
                 'nome' => $nome,
                 'tipo' => $tipo,
                 'id_unidade_negocio' => $idUnidade,
+                'id_cigam_unidade' => $idCigamUnidade,
                 'status' => $statusUpper,
             ],
             'erros' => $erros,
@@ -87,5 +100,10 @@ class VeiculoPlanilhaNormalizer
         }
 
         return trim((string) $value);
+    }
+
+    private function mensagemUnidadeNaoEncontrada(string $normalizado, string $original): string
+    {
+        return "Unidade de negócio com id_cigam {$normalizado} não encontrada. Valor original informado: {$original}.";
     }
 }

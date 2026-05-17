@@ -11,7 +11,7 @@ return new class extends Migration
     {
         Schema::table('unidades_negocio', function (Blueprint $table) {
             $table->string('razao_social', 255)->default('')->after('id_cigam');
-            $table->string('cpf_cnpj', 14)->default('00000000000')->after('nome');
+            $table->string('cpf_cnpj', 14)->nullable()->after('nome');
             $table->decimal('custo_operacional', 15, 2)->default(0)->after('cpf_cnpj');
         });
 

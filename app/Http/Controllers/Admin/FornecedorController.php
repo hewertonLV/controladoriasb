@@ -45,7 +45,7 @@ class FornecedorController extends Controller
             'perPageOptions' => FornecedorQuery::PER_PAGE_OPTIONS,
             'total' => $total,
             'exibindo' => $exibindo,
-            'estados' => Estado::query()->orderBy('nome')->get(['id', 'nome']),
+            'estados' => Estado::query()->orderBy('nome')->get(['id', 'nome', 'abreviacao']),
         ];
 
         if ($request->ajax()) {
@@ -58,7 +58,7 @@ class FornecedorController extends Controller
     public function create(): View
     {
         return view('admin.fornecedores.create', [
-            'estados' => Estado::query()->orderBy('nome')->get(['id', 'nome']),
+            'estados' => Estado::query()->orderBy('nome')->get(['id', 'nome', 'abreviacao']),
             'fornecedor' => new Fornecedor([
                 'id_estado' => Estado::ID_CEARA,
             ]),
@@ -99,7 +99,7 @@ class FornecedorController extends Controller
     public function edit(Fornecedor $fornecedor): View
     {
         return view('admin.fornecedores.edit', [
-            'estados' => Estado::query()->orderBy('nome')->get(['id', 'nome']),
+            'estados' => Estado::query()->orderBy('nome')->get(['id', 'nome', 'abreviacao']),
             'fornecedor' => $fornecedor,
         ]);
     }

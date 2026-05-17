@@ -284,6 +284,12 @@ class CompraMovimentacaoTest extends TestCase
             'id_estado' => Estado::ID_CEARA,
             'nome' => 'Unidade SB Teste Sem Estoque '.uniqid(),
         ]);
+        $cliente = Cliente::factory()->create([
+            'razao_social' => 'Cliente SB Sem Possui Estoque '.uniqid(),
+        ]);
+        $fornecedorExtra = Fornecedor::factory()->create([
+            'razao_social' => 'Fornecedor SB Sem Possui Estoque '.uniqid(),
+        ]);
 
         $nomeFreteEncerrado = 'Frete Encerrado SB Teste '.uniqid();
         $freteFechado = Frete::factory()->create([
@@ -300,9 +306,14 @@ class CompraMovimentacaoTest extends TestCase
         $user = $this->userWithPermissions([Permissions::MOVIMENTACOES_COMPRAS_CRIAR]);
 
         $html = $this->actingAs($user)->get(route('admin.movimentacoes.compras.create'))->assertOk()->getContent();
+        $destinoSelect = $this->selectHtml((string) $html, 'id_empresa_destino');
+
         $this->assertStringContainsString((string) $empresaFornecedor->id, (string) $html);
         $this->assertStringContainsString((string) $empresaUnidade->id, (string) $html);
-        $this->assertStringNotContainsString($unidadeSemEstoque->nome, (string) $html);
+        $this->assertStringContainsString((string) $empresaUnidade->id, $destinoSelect);
+        $this->assertStringNotContainsString($unidadeSemEstoque->nome, $destinoSelect);
+        $this->assertStringNotContainsString($cliente->razao_social, $destinoSelect);
+        $this->assertStringNotContainsString($fornecedorExtra->razao_social, $destinoSelect);
         $this->assertStringContainsString((string) $fruta->id, (string) $html);
         $this->assertStringContainsString((string) $frete->id, (string) $html);
         $this->assertStringNotContainsString($nomeFreteEncerrado, (string) $html);
@@ -377,5 +388,12 @@ class CompraMovimentacaoTest extends TestCase
         $html = $this->actingAs($user)->get(route('admin.movimentacoes.compras.create'))->assertOk()->getContent();
         $this->assertStringNotContainsString($cliente->razao_social, (string) $html);
         $this->assertStringContainsString((string) $empresaFornecedor->id, (string) $html);
+    }
+
+    private function selectHtml(string $html, string $id): string
+    {
+        $pattern = sprintf('/<select[^>]*id="%s"[^>]*>.*?<\/select>/s', preg_quote($id, '/'));
+
+        return preg_match($pattern, $html, $matches) === 1 ? $matches[0] : '';
     }
 }

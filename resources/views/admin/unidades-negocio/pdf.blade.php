@@ -47,7 +47,8 @@
                 $partesFiltro[] = 'estoque '.($filtros['possui_estoque'] === '1' ? 'sim' : 'não');
             }
             if (($filtros['id_estado'] ?? null) !== null) {
-                $nomeEstadoFiltro = \App\Models\Estado::query()->whereKey((int) $filtros['id_estado'])->value('nome');
+                $estadoFiltro = \App\Models\Estado::query()->whereKey((int) $filtros['id_estado'])->first(['nome', 'abreviacao']);
+                $nomeEstadoFiltro = $estadoFiltro ? "{$estadoFiltro->abreviacao} - {$estadoFiltro->nome}" : null;
                 $partesFiltro[] = 'estado '.($nomeEstadoFiltro ?? $filtros['id_estado']);
             }
         @endphp
@@ -71,7 +72,9 @@
             @forelse ($unidadesNegocio as $unidade)
                 <tr>
                     <td>{{ $unidade->id_cigam }}</td>
-                    <td>{{ $unidade->estado?->nome ?? '—' }}</td>
+                    <td>
+                        {{ $unidade->estado ? $unidade->estado->abreviacao.' - '.$unidade->estado->nome : '—' }}
+                    </td>
                     <td>{{ $unidade->razao_social }}</td>
                     <td>{{ $unidade->nome }}</td>
                     <td>{{ $fmtDoc($unidade->cpf_cnpj) }}</td>

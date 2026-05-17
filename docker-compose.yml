@@ -15,7 +15,7 @@ services:
       - mysql
 
   # ------------------------------------------------------------------
-  # Worker dedicado para importações em planilha (Empresas + Unidades de Negócio).
+  # Worker dedicado para importações em planilha.
   # Separado da exportação PDF para que processos pesados não bloqueiem
   # filas entre si.
   # ------------------------------------------------------------------
@@ -32,7 +32,7 @@ services:
       - php
       - artisan
       - queue:work
-      - --queue=empresas-importacao,unidades-negocio-importacao,fornecedores-importacao,clientes-importacao,grupos-importacao,veiculos-importacao,fretes-importacao,frutas-importacao,pracas-importacao,estoques-importacao
+      - --queue=imports,empresas-importacao,unidades-negocio-importacao,clientes-importacao,grupos-importacao,veiculos-importacao,fretes-importacao,frutas-importacao,pracas-importacao,estoques-importacao
       - --sleep=1
       - --tries=1
       - --timeout=900

@@ -59,6 +59,7 @@ class GerarPdfClientesJob implements ShouldQueue
                         'id',
                         'id_cigam',
                         'razao_social',
+                        'fantasia',
                         'cnpj_cpf',
                         'id_unidade_negocio',
                         'id_praca',

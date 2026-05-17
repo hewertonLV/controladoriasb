@@ -29,7 +29,7 @@ trait ValidatesUnidadeNegocioAttributes
             'razao_social' => ['required', 'string', 'max:255'],
             'nome' => ['required', 'string', 'max:255'],
             'cpf_cnpj' => [
-                'required',
+                'nullable',
                 'string',
                 $this->cpfCnpjTamanhoRule(),
             ],
@@ -81,7 +81,7 @@ trait ValidatesUnidadeNegocioAttributes
             'id_estado' => (int) $this->input('id_estado', 0),
             'razao_social' => trim((string) $this->input('razao_social')),
             'nome' => trim((string) $this->input('nome')),
-            'cpf_cnpj' => $documento,
+            'cpf_cnpj' => $documento === '' ? null : $documento,
             'custo_operacional' => $custoNormalizado,
             'possui_estoque' => $this->boolean('possui_estoque'),
         ]);
@@ -90,6 +90,10 @@ trait ValidatesUnidadeNegocioAttributes
     protected function cpfCnpjTamanhoRule(): Closure
     {
         return function (string $attribute, mixed $value, Closure $fail): void {
+            if ($value === null || $value === '') {
+                return;
+            }
+
             $len = strlen((string) $value);
 
             if (! in_array($len, [11, 14], true)) {

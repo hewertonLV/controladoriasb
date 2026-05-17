@@ -12,7 +12,8 @@
                     Layout fixo (linha 1 é cabeçalho e pode ter qualquer texto):
                     <code>A</code> ID CIGAM · <code>B</code> Razão social ·
                     <code>C</code> CPF/CNPJ · <code>D</code> Unidade negócio · <code>E</code> Desconto NF ·
-                    <code>F</code> Desconto contrato · <code>G</code> Praça (nome) · <code>H</code> Grupo (nome, opcional)
+                    <code>F</code> Desconto contrato · <code>G</code> Praça (nome) · <code>H</code> Grupo (nome, opcional) ·
+                    Fantasia opcional por cabeçalho: <code>fantasia</code>, <code>nome fantasia</code> ou <code>fantasia_cliente</code>
                 </p>
             </div>
             <a href="{{ route('admin.clientes.index') }}" class="btn btn-light">
@@ -124,6 +125,7 @@
                                 <th>Linha</th>
                                 <th>ID CIGAM</th>
                                 <th>Razão social</th>
+                                <th>Fantasia</th>
                                 <th>CPF/CNPJ</th>
                                 <th>UN</th>
                                 <th>Desc. NF</th>
@@ -398,6 +400,7 @@
                     <td>${item.linha}</td>
                     <td><code>${escapeHtml(d.id_cigam)}</code></td>
                     <td>${escapeHtml(d.razao_social)}</td>
+                    <td>${escapeHtml(d.fantasia || '—')}</td>
                     <td>${fmtDoc(d.cnpj_cpf)}</td>
                     <td>${escapeHtml(d.id_unidade_negocio)}</td>
                     <td>${escapeHtml(d.desconto_nf)}</td>

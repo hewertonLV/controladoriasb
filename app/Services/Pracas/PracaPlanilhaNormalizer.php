@@ -8,7 +8,7 @@ use App\Support\TextoCadastro;
 /**
  * Layout fixo da planilha (linha 1 = cabeçalho):
  *   A → nome
- *   B → id_unidade_negocio
+ *   B → id_cigam da unidade de negócio
  */
 class PracaPlanilhaNormalizer
 {
@@ -18,6 +18,7 @@ class PracaPlanilhaNormalizer
      *     dados: array{
      *         nome: string,
      *         id_unidade_negocio: int,
+     *         id_cigam_unidade: string,
      *     },
      *     erros: list<string>,
      * }
@@ -27,8 +28,9 @@ class PracaPlanilhaNormalizer
         $erros = [];
 
         $nome = TextoCadastro::normalizarMaiusculas($this->trimString($row[0] ?? null));
-        $unidadeRaw = TextoCadastro::somenteDigitos($this->trimString($row[1] ?? null));
-        $idUnidade = $unidadeRaw !== '' ? (int) $unidadeRaw : 0;
+        $unidadeOriginal = $this->trimString($row[1] ?? null);
+        $idCigamUnidade = TextoCadastro::normalizarIdCigam($unidadeOriginal);
+        $idUnidade = 0;
 
         if ($nome === '') {
             $erros[] = 'Nome (coluna A) é obrigatório.';
@@ -36,16 +38,27 @@ class PracaPlanilhaNormalizer
             $erros[] = 'Nome pode ter no máximo 255 caracteres.';
         }
 
-        if ($idUnidade <= 0) {
-            $erros[] = 'ID Unidade de Negócio (coluna B) deve ser um inteiro positivo.';
-        } elseif (! UnidadeNegocio::query()->whereKey($idUnidade)->exists()) {
-            $erros[] = "Unidade de negócio #{$idUnidade} não encontrada.";
+        if ($idCigamUnidade === '') {
+            $erros[] = 'ID CIGAM da unidade de negócio (coluna B) é obrigatório.';
+        } elseif (! preg_match('/^\d{6}$/', $idCigamUnidade)) {
+            $erros[] = 'ID CIGAM da unidade de negócio (coluna B) deve ter até 6 dígitos numéricos.';
+        } else {
+            $unidade = UnidadeNegocio::query()
+                ->where('id_cigam', $idCigamUnidade)
+                ->first(['id']);
+
+            if ($unidade === null) {
+                $erros[] = $this->mensagemUnidadeNaoEncontrada($idCigamUnidade, $unidadeOriginal);
+            } else {
+                $idUnidade = (int) $unidade->id;
+            }
         }
 
         return [
             'dados' => [
                 'nome' => $nome,
                 'id_unidade_negocio' => $idUnidade,
+                'id_cigam_unidade' => $idCigamUnidade,
             ],
             'erros' => $erros,
         ];
@@ -58,5 +71,10 @@ class PracaPlanilhaNormalizer
         }
 
         return trim((string) $value);
+    }
+
+    private function mensagemUnidadeNaoEncontrada(string $normalizado, string $original): string
+    {
+        return "Unidade de negócio com id_cigam {$normalizado} não encontrada. Valor original informado: {$original}.";
     }
 }

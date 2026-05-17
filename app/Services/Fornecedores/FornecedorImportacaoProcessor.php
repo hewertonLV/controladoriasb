@@ -5,6 +5,7 @@ namespace App\Services\Fornecedores;
 use App\Models\Estado;
 use App\Models\Fornecedor;
 use App\Models\FornecedorImportacao;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use PhpOffice\PhpSpreadsheet\IOFactory;
@@ -12,10 +13,12 @@ use PhpOffice\PhpSpreadsheet\Spreadsheet;
 
 class FornecedorImportacaoProcessor
 {
+    public const HEARTBEAT_CACHE_KEY = 'queue_worker_imports_last_seen_at';
+
     /**
      * @var array<string, int>|null
      */
-    private ?array $idsEstadoPorNome = null;
+    private ?array $idsEstadoPorBusca = null;
 
     public const MAX_LINHAS_ESCANEADAS = 5000;
 
@@ -37,6 +40,8 @@ class FornecedorImportacaoProcessor
 
     public function processar(FornecedorImportacao $importacao): void
     {
+        $this->registrarHeartbeat();
+
         $importacao->forceFill([
             'status' => FornecedorImportacao::STATUS_PROCESSANDO,
             'started_at' => $importacao->started_at ?? now(),
@@ -61,7 +66,11 @@ class FornecedorImportacaoProcessor
         $highestRow = min((int) $sheet->getHighestDataRow(), self::MAX_LINHAS_ESCANEADAS);
         $totalLinhas = max(0, $highestRow - 1);
 
-        $importacao->forceFill(['total_linhas' => $totalLinhas])->save();
+        $importacao->forceFill([
+            'total_linhas' => $totalLinhas,
+            'linhas_processadas' => 0,
+            'percentual' => $totalLinhas > 0 ? 1 : 0,
+        ])->save();
 
         $novas = [];
         $atualizacoes = [];
@@ -119,12 +128,12 @@ class FornecedorImportacaoProcessor
             $dados = $normalized['dados'];
             $errosLinha = $normalized['erros'];
 
-            $estadoNome = $dados['estado_nome'] ?? '';
-            unset($dados['estado_nome']);
-            if ($estadoNome !== '' && $errosLinha === []) {
-                $idEstado = $this->idsEstadoPorNome()[$estadoNome] ?? null;
+            $estadoBusca = $dados['estado_busca'] ?? '';
+            unset($dados['estado_busca']);
+            if ($estadoBusca !== '' && $errosLinha === []) {
+                $idEstado = $this->idsEstadoPorBusca()[$estadoBusca] ?? null;
                 if ($idEstado === null) {
-                    $errosLinha[] = "Estado \"{$estadoNome}\" não cadastrado. Utilize o nome exatamente como na tabela de estados.";
+                    $errosLinha[] = "Estado \"{$estadoBusca}\" não cadastrado. Utilize a abreviação ou o nome do estado.";
                 } else {
                     $dados['id_estado'] = (int) $idEstado;
                 }
@@ -240,9 +249,29 @@ class FornecedorImportacaoProcessor
     /**
      * @return array<string, int>
      */
-    private function idsEstadoPorNome(): array
+    private function idsEstadoPorBusca(): array
     {
-        return $this->idsEstadoPorNome ??= Estado::query()->pluck('id', 'nome')->all();
+        if ($this->idsEstadoPorBusca !== null) {
+            return $this->idsEstadoPorBusca;
+        }
+
+        $map = [];
+
+        foreach (Estado::query()->get(['id', 'nome', 'abreviacao']) as $estado) {
+            $abreviacao = Estado::normalizarChaveBusca($estado->abreviacao);
+            if ($abreviacao !== '') {
+                $map[$abreviacao] = (int) $estado->id;
+            }
+        }
+
+        foreach (Estado::query()->get(['id', 'nome', 'abreviacao']) as $estado) {
+            $nome = Estado::normalizarChaveBusca($estado->nome);
+            if ($nome !== '' && ! isset($map[$nome])) {
+                $map[$nome] = (int) $estado->id;
+            }
+        }
+
+        return $this->idsEstadoPorBusca = $map;
     }
 
     private function mensagemAmigavel(\Throwable $e): string
@@ -281,7 +310,7 @@ class FornecedorImportacaoProcessor
 
         $existentes = Fornecedor::query()
             ->whereIn('id_cigam', array_values(array_unique($idsCigam)))
-            ->with('estado:id,nome')
+            ->with('estado:id,nome,abreviacao')
             ->get()
             ->keyBy('id_cigam');
 
@@ -391,6 +420,8 @@ class FornecedorImportacaoProcessor
         array $semAlteracoes,
         array $erros,
     ): void {
+        $this->registrarHeartbeat();
+
         $percentual = $totalLinhas > 0
             ? (int) min(99, floor($linhasProcessadas * 100 / $totalLinhas))
             : 0;
@@ -403,6 +434,11 @@ class FornecedorImportacaoProcessor
             'sem_alteracoes_count' => count($semAlteracoes),
             'erros_count' => count($erros),
         ])->save();
+    }
+
+    private function registrarHeartbeat(): void
+    {
+        Cache::put(self::HEARTBEAT_CACHE_KEY, now()->toIso8601String(), 120);
     }
 
     /**

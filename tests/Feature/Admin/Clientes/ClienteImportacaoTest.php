@@ -41,7 +41,7 @@ class ClienteImportacaoTest extends ClienteTestCase
     public function test_job_processa_planilha_valida(): void
     {
         Storage::fake('local');
-        $unidade = UnidadeNegocio::factory()->create();
+        $unidade = UnidadeNegocio::factory()->create(['id_cigam' => '000110']);
         $praca = Praca::factory()->create([
             'nome' => 'PRACA CENTRO',
             'id_unidade_negocio' => $unidade->id,
@@ -49,6 +49,7 @@ class ClienteImportacaoTest extends ClienteTestCase
         Cliente::factory()->create([
             'id_cigam' => '7001',
             'razao_social' => 'Cliente Igual',
+            'fantasia' => null,
             'cnpj_cpf' => '11111111000111',
             'id_unidade_negocio' => $unidade->id,
             'id_praca' => $praca->id,
@@ -58,8 +59,8 @@ class ClienteImportacaoTest extends ClienteTestCase
         ]);
 
         $path = $this->storeSpreadsheet([
-            ['7002', 'Cliente Novo', '33333333000133', $unidade->id, '1.50', '2.00', 'PRACA CENTRO', ''],
-            ['7001', 'Cliente Igual', '11111111000111', $unidade->id, '0.00', '0.00', 'PRACA CENTRO', ''],
+            ['7002', 'Cliente Novo', '33333333000133', '110', '1.50', '2.00', 'PRACA CENTRO', ''],
+            ['7001', 'Cliente Igual', '11111111000111', '000110', '0.00', '0.00', 'PRACA CENTRO', ''],
         ]);
 
         $importacao = ClienteImportacao::create([
@@ -80,8 +81,83 @@ class ClienteImportacaoTest extends ClienteTestCase
         $this->assertSame(1, $importacao->sem_alteracoes_count);
     }
 
+    public function test_importacao_resolve_unidade_por_id_cigam_normalizado(): void
+    {
+        Storage::fake('local');
+        $unidade = UnidadeNegocio::factory()->create(['id_cigam' => '000110']);
+        Praca::factory()->create([
+            'nome' => 'PRACA CENTRO',
+            'id_unidade_negocio' => $unidade->id,
+        ]);
+
+        $path = $this->storeSpreadsheet([
+            ['7004', 'Cliente Unidade Cigam', '33333333000133', ' 1-10 ', '1.50', '2.00', 'PRACA CENTRO', ''],
+        ]);
+
+        $importacao = ClienteImportacao::create([
+            'uuid' => (string) Str::uuid(),
+            'user_id' => $this->clientesManager()->id,
+            'arquivo_original' => 'clientes.xlsx',
+            'arquivo_path' => $path,
+            'status' => ClienteImportacao::STATUS_AGUARDANDO,
+        ]);
+
+        (new ProcessarPreviewImportacaoClientesJob($importacao->id))
+            ->handle(app(ClienteImportacaoProcessor::class));
+
+        $importacao->refresh();
+
+        $this->assertSame(0, $importacao->erros_count);
+        $this->assertSame($unidade->id, $importacao->resultado['novas'][0]['dados']['id_unidade_negocio']);
+    }
+
+    public function test_importacao_salva_fantasia(): void
+    {
+        Storage::fake('local');
+        $user = $this->userWithPermissions([
+            Permissions::CLIENTES_IMPORTAR,
+            Permissions::CLIENTES_IMPORTAR_CONFIRMAR,
+        ]);
+        $unidade = UnidadeNegocio::factory()->create(['id_cigam' => '000111']);
+        Praca::factory()->create([
+            'nome' => 'PRACA CENTRO',
+            'id_unidade_negocio' => $unidade->id,
+        ]);
+
+        $path = $this->storeSpreadsheet([
+            ['7003', 'Cliente Importado', '33333333000133', '111', '1.50', '2.00', 'PRACA CENTRO', '', '  fantasia   importada  '],
+        ]);
+
+        $importacao = ClienteImportacao::create([
+            'uuid' => (string) Str::uuid(),
+            'user_id' => $user->id,
+            'arquivo_original' => 'clientes.xlsx',
+            'arquivo_path' => $path,
+            'status' => ClienteImportacao::STATUS_AGUARDANDO,
+        ]);
+
+        (new ProcessarPreviewImportacaoClientesJob($importacao->id))
+            ->handle(app(ClienteImportacaoProcessor::class));
+
+        $importacao->refresh();
+
+        $this->assertSame('FANTASIA IMPORTADA', $importacao->resultado['novas'][0]['dados']['fantasia']);
+
+        $this->actingAs($user)
+            ->postJson(route('admin.clientes.importar.confirmar', $importacao), [
+                'row_ids_novas' => [1],
+            ])
+            ->assertOk()
+            ->assertJsonPath('resumo.criadas', 1);
+
+        $this->assertDatabaseHas('clientes', [
+            'id_cigam' => '007003',
+            'fantasia' => 'FANTASIA IMPORTADA',
+        ]);
+    }
+
     /**
-     * @param  list<array{0:mixed,1:mixed,2:mixed,3:mixed,4:mixed,5:mixed,6:mixed,7:mixed}>  $rows
+     * @param  list<array{0:mixed,1:mixed,2:mixed,3:mixed,4:mixed,5:mixed,6:mixed,7:mixed,8?:mixed}>  $rows
      */
     private function storeSpreadsheet(array $rows): string
     {
@@ -97,6 +173,7 @@ class ClienteImportacaoTest extends ClienteTestCase
                 'Desconto contrato',
                 'Praça',
                 'Grupo',
+                'Fantasia',
             ],
             null,
             'A1',

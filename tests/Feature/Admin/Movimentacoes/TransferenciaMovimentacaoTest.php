@@ -8,9 +8,11 @@ use App\Enums\MovimentacaoStatusRegistro;
 use App\Enums\Permissions;
 use App\Enums\StatusRecebimentoTransferencia;
 use App\Enums\StatusTransferenciaOperacional;
+use App\Models\Cliente;
 use App\Models\Empresa;
 use App\Models\Estado;
 use App\Models\Estoque;
+use App\Models\Fornecedor;
 use App\Models\Frete;
 use App\Models\Fruta;
 use App\Models\HistoricoCOUnNg;
@@ -126,6 +128,41 @@ class TransferenciaMovimentacaoTest extends TestCase
             ->where('status_registro', MovimentacaoStatusRegistro::ATIVO->value)
             ->where('id_frete', $idFrete)
             ->sum('qtd_fruta_kg');
+    }
+
+    public function test_create_carrega_origem_e_destino_apenas_com_unidades_que_controlam_estoque(): void
+    {
+        $this->seedCategoriasEEstados();
+
+        [$empresaOrigem, $empresaDestino, $unidadeOrigem, $unidadeDestino] = $this->criarCenarioTransferencia();
+        $unidadeSemEstoque = UnidadeNegocio::factory()->create([
+            'possui_estoque' => false,
+            'nome' => 'UNIDADE TRANSFERENCIA SEM ESTOQUE '.uniqid(),
+        ]);
+        $cliente = Cliente::factory()->create([
+            'razao_social' => 'CLIENTE TRANSFERENCIA SEM ESTOQUE '.uniqid(),
+        ]);
+        $fornecedor = Fornecedor::factory()->create([
+            'razao_social' => 'FORNECEDOR TRANSFERENCIA SEM ESTOQUE '.uniqid(),
+        ]);
+
+        $html = $this->actingAs($this->userWithPermissions([Permissions::MOVIMENTACOES_TRANSFERENCIAS_CRIAR]))
+            ->get(route('admin.movimentacoes.transferencias.create'))
+            ->assertOk()
+            ->getContent();
+
+        $origemSelect = $this->selectHtml((string) $html, 'id_empresa_origem');
+        $destinoSelect = $this->selectHtml((string) $html, 'id_empresa_destino');
+
+        foreach ([$origemSelect, $destinoSelect] as $select) {
+            $this->assertStringContainsString((string) $empresaOrigem->id, $select);
+            $this->assertStringContainsString((string) $empresaDestino->id, $select);
+            $this->assertStringContainsString($unidadeOrigem->nome, $select);
+            $this->assertStringContainsString($unidadeDestino->nome, $select);
+            $this->assertStringNotContainsString($unidadeSemEstoque->nome, $select);
+            $this->assertStringNotContainsString($cliente->razao_social, $select);
+            $this->assertStringNotContainsString($fornecedor->razao_social, $select);
+        }
     }
 
     public function test_criar_transferencia_gera_par_e_baixa_origem_sem_entrar_no_destino(): void
@@ -1009,5 +1046,12 @@ class TransferenciaMovimentacaoTest extends TestCase
             'id_fruta' => $fruta->id,
             'qtd_fruta_um' => '999',
         ]);
+    }
+
+    private function selectHtml(string $html, string $id): string
+    {
+        $pattern = sprintf('/<select[^>]*id="%s"[^>]*>.*?<\/select>/s', preg_quote($id, '/'));
+
+        return preg_match($pattern, $html, $matches) === 1 ? $matches[0] : '';
     }
 }

@@ -10,7 +10,7 @@ use App\Support\TextoCadastro;
  *   B → razao_social
  *   C → fantasia
  *   D → cnpj_cpf
- *   E → estado (nome cadastrado, ex.: CEARA)
+ *   E → estado (abreviação ou nome cadastrado, ex.: CE ou CEARA)
  */
 class FornecedorPlanilhaNormalizer
 {
@@ -22,7 +22,7 @@ class FornecedorPlanilhaNormalizer
      *         razao_social: string,
      *         fantasia: string|null,
      *         cnpj_cpf: string,
-     *         estado_nome: string,
+     *         estado_busca: string,
      *     },
      *     erros: list<string>,
      * }
@@ -37,7 +37,7 @@ class FornecedorPlanilhaNormalizer
         $razaoSocial = $this->trimString($row[1] ?? null);
         $fantasia = $this->trimString($row[2] ?? null);
         $cnpjCpf = $this->onlyDigits($row[3] ?? null);
-        $estadoNome = TextoCadastro::normalizarMaiusculas($this->trimString($row[4] ?? null));
+        $estadoBusca = TextoCadastro::normalizarBuscaEstado($this->trimString($row[4] ?? null));
 
         if ($idCigam === '') {
             $erros[] = 'ID CIGAM (coluna A) é obrigatório.';
@@ -53,8 +53,8 @@ class FornecedorPlanilhaNormalizer
             $erros[] = 'CPF/CNPJ deve ter 11 dígitos (CPF) ou 14 dígitos (CNPJ).';
         }
 
-        if ($estadoNome === '') {
-            $erros[] = 'Estado (coluna E) é obrigatório: informe o nome do estado cadastrado (ex.: CEARA).';
+        if ($estadoBusca === '') {
+            $erros[] = 'Estado (coluna E) é obrigatório: informe a abreviação ou o nome do estado cadastrado (ex.: CE ou CEARA).';
         }
 
         return [
@@ -63,7 +63,7 @@ class FornecedorPlanilhaNormalizer
                 'razao_social' => mb_strtoupper($razaoSocial),
                 'fantasia' => $fantasia !== '' ? mb_strtoupper($fantasia) : null,
                 'cnpj_cpf' => $cnpjCpf,
-                'estado_nome' => $estadoNome,
+                'estado_busca' => $estadoBusca,
             ],
             'erros' => $erros,
         ];

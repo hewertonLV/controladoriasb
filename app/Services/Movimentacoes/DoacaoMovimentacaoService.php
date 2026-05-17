@@ -15,6 +15,7 @@ use App\Models\MovimentacaoEstoque;
 use App\Models\StatusMovimentacao;
 use App\Models\UnidadeNegocio;
 use App\Models\User;
+use App\Support\EmpresaEntidadeQuery;
 use App\Support\Movimentacoes\DoacaoValorEconomico;
 use App\Support\TextoCadastro;
 use Illuminate\Database\Eloquent\Collection;
@@ -42,21 +43,9 @@ final class DoacaoMovimentacaoService
      */
     public function opcoesFormularioDoacao(): array
     {
-        $empresasOrigem = Empresa::query()
-            ->where('entidade_type', UnidadeNegocio::class)
-            ->whereHas('entidade', static function ($query): void {
-                $query->where('possui_estoque', true);
-            })
+        $empresasOrigem = EmpresaEntidadeQuery::unidadesComEstoque(somenteComEstoqueCadastrado: true)
             ->with('entidade')
             ->get()
-            ->filter(function (Empresa $e): bool {
-                $u = $e->entidade;
-
-                return $u instanceof UnidadeNegocio
-                    && Estoque::query()
-                        ->where('id_unidade_negocio', $u->id)
-                        ->exists();
-            })
             ->sortBy(fn (Empresa $e): string => mb_strtolower($e->nomeExibicao()))
             ->values();
 

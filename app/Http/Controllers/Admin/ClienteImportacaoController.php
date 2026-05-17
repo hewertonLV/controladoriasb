@@ -201,6 +201,7 @@ class ClienteImportacaoController extends Controller
                     $cliente = Cliente::create([
                         'id_cigam' => $dados['id_cigam'],
                         'razao_social' => $dados['razao_social'],
+                        'fantasia' => $dados['fantasia'] ?? null,
                         'cnpj_cpf' => $dados['cnpj_cpf'],
                         'id_unidade_negocio' => (int) $dados['id_unidade_negocio'],
                         'id_praca' => (int) $dados['id_praca'],
@@ -274,6 +275,7 @@ class ClienteImportacaoController extends Controller
 
                     $cliente->update([
                         'razao_social' => $dados['razao_social'],
+                        'fantasia' => $dados['fantasia'] ?? null,
                         'cnpj_cpf' => $dados['cnpj_cpf'],
                         'id_unidade_negocio' => (int) $dados['id_unidade_negocio'],
                         'id_praca' => (int) $dados['id_praca'],
@@ -361,6 +363,10 @@ class ClienteImportacaoController extends Controller
         $doc = (string) ($dados['cnpj_cpf'] ?? '');
         if (! in_array(strlen($doc), [11, 14], true)) {
             return 'CPF/CNPJ deve ter 11 dígitos (CPF) ou 14 dígitos (CNPJ).';
+        }
+
+        if (($dados['fantasia'] ?? null) !== null && mb_strlen((string) $dados['fantasia']) > 255) {
+            return 'Fantasia pode ter no máximo 255 caracteres.';
         }
 
         $unidadeId = (int) ($dados['id_unidade_negocio'] ?? 0);

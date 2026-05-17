@@ -12,6 +12,6 @@ class ImportacaoReadFilter implements IReadFilter
     {
         return $row >= 1
             && $row <= $this->maxLinha
-            && in_array($columnAddress, ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'], true);
+            && in_array($columnAddress, ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I'], true);
     }
 }

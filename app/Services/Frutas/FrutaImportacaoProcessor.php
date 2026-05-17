@@ -2,12 +2,16 @@
 
 namespace App\Services\Frutas;
 
+use App\Enums\FrutaUnidadeMedicao;
 use App\Models\Fruta;
 use App\Models\FrutaImportacao;
+use App\Support\TextoCadastro;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
+use PhpOffice\PhpSpreadsheet\Cell\Coordinate;
 use PhpOffice\PhpSpreadsheet\IOFactory;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
+use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
 
 class FrutaImportacaoProcessor
 {
@@ -28,6 +32,17 @@ class FrutaImportacaoProcessor
         'icms_na_compra',
         'um_icms',
         'icms_venda',
+    ];
+
+    private const HEADER_ALIASES = [
+        'id_cigam' => ['IDCIGAM', 'ID', 'CODIGO', 'CODIGOMATERIAL', 'CODMATERIAL', 'MATERIAL'],
+        'nome' => ['NOME', 'DESCRICAO', 'DESCRICAOMAT', 'DESCRICAOMATERIAL'],
+        'unidade_medicao' => ['UNIDADE', 'UNIDADEMEDICAO', 'UNIDMEDIDA', 'UMMEDIDA', 'UNMEDIDA'],
+        'kg_por_unidade_medicao' => ['KG', 'KGPORUNIDADE', 'KGPORUNIDADEMEDICAO', 'PESO', 'PESOMAT'],
+        'icms_ex_compra' => ['ICMSEXCOMPRA', 'ICMSEXTERNOCOMPRA', 'ICMSEXTERNONACOMPRA'],
+        'icms_na_compra' => ['ICMSNACOMPRA', 'ICMSNACIONALCOMPRA', 'ICMSNACIONALNACOMPRA'],
+        'um_icms' => ['UMICMS', 'UNIDADEICMS'],
+        'icms_venda' => ['ICMSVENDA', 'ICMSVENDAPERCENTUAL', 'ICMSVENDA%'],
     ];
 
     public function __construct(private readonly FrutaPlanilhaNormalizer $normalizer) {}
@@ -53,7 +68,8 @@ class FrutaImportacaoProcessor
 
         /** @var Spreadsheet $spreadsheet */
         $spreadsheet = $reader->load($absoluto);
-        $sheet = $spreadsheet->getActiveSheet();
+        $sheet = $this->worksheetComLayoutDeFrutas($spreadsheet);
+        $headers = $this->headers($sheet);
 
         $highestRow = min((int) $sheet->getHighestDataRow(), self::MAX_LINHAS_ESCANEADAS);
         $totalLinhas = max(0, $highestRow - 1);
@@ -74,14 +90,14 @@ class FrutaImportacaoProcessor
 
         for ($r = 2; $r <= $highestRow; $r++) {
             $dadosBrutos = [
-                $sheet->getCell('A'.$r)->getValue(),
-                $sheet->getCell('B'.$r)->getValue(),
-                $sheet->getCell('C'.$r)->getValue(),
-                $sheet->getCell('D'.$r)->getValue(),
-                $sheet->getCell('E'.$r)->getValue(),
-                $sheet->getCell('F'.$r)->getValue(),
-                $sheet->getCell('G'.$r)->getValue(),
-                $sheet->getCell('H'.$r)->getValue(),
+                $this->valorPorHeaderOuCelula($sheet, $headers, $r, 'id_cigam', 'A'),
+                $this->valorPorHeaderOuCelula($sheet, $headers, $r, 'nome', 'B'),
+                $this->valorPorHeaderOuCelula($sheet, $headers, $r, 'unidade_medicao', 'C'),
+                $this->valorPorHeaderOuCelula($sheet, $headers, $r, 'kg_por_unidade_medicao', 'D'),
+                $this->valorPorHeaderOuCelula($sheet, $headers, $r, 'icms_ex_compra', 'E'),
+                $this->valorPorHeaderOuCelula($sheet, $headers, $r, 'icms_na_compra', 'F'),
+                $this->valorPorHeaderOuCelula($sheet, $headers, $r, 'um_icms', 'G'),
+                $this->valorPorHeaderOuCelula($sheet, $headers, $r, 'icms_venda', 'H'),
             ];
 
             $linhasProcessadas++;
@@ -119,12 +135,6 @@ class FrutaImportacaoProcessor
             $errosLinha = $normalized['erros'];
             $idCigam = $dados['id_cigam'];
 
-            if ($idCigam !== '' && isset($idsCigamVistos[$idCigam])) {
-                $errosLinha[] = "ID CIGAM duplicado na planilha (já aparece na linha {$idsCigamVistos[$idCigam]}).";
-            } elseif ($idCigam !== '') {
-                $idsCigamVistos[$idCigam] = $r;
-            }
-
             if ($errosLinha !== []) {
                 $erros[] = [
                     'row_id' => $rowId,
@@ -144,6 +154,48 @@ class FrutaImportacaoProcessor
                 );
 
                 continue;
+            }
+
+            if ($idCigam !== '' && isset($idsCigamVistos[$idCigam])) {
+                if ($this->dadosComparaveisIguais($idsCigamVistos[$idCigam]['dados'], $dados)) {
+                    $this->atualizarProgressoSeNecessario(
+                        $importacao,
+                        $linhasProcessadas,
+                        $totalLinhas,
+                        $novas,
+                        $atualizacoes,
+                        $semAlteracoes,
+                        $erros,
+                    );
+
+                    continue;
+                }
+
+                $erros[] = [
+                    'row_id' => $rowId,
+                    'linha' => $r,
+                    'id_cigam' => $idCigam,
+                    'erros' => ["ID CIGAM duplicado na planilha (já aparece na linha {$idsCigamVistos[$idCigam]['linha']})."],
+                    'dados' => $dados,
+                ];
+                $this->atualizarProgressoSeNecessario(
+                    $importacao,
+                    $linhasProcessadas,
+                    $totalLinhas,
+                    $novas,
+                    $atualizacoes,
+                    $semAlteracoes,
+                    $erros,
+                );
+
+                continue;
+            }
+
+            if ($idCigam !== '') {
+                $idsCigamVistos[$idCigam] = [
+                    'linha' => $r,
+                    'dados' => $dados,
+                ];
             }
 
             $buffer[] = [
@@ -363,6 +415,133 @@ class FrutaImportacaoProcessor
         }
 
         return true;
+    }
+
+    /**
+     * @param  array<string,mixed>  $dadosVistos
+     * @param  array<string,mixed>  $dadosAtuais
+     */
+    private function dadosComparaveisIguais(array $dadosVistos, array $dadosAtuais): bool
+    {
+        foreach (self::COMPARABLE_FIELDS as $field) {
+            if ((string) ($dadosVistos[$field] ?? '') !== (string) ($dadosAtuais[$field] ?? '')) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private function worksheetComLayoutDeFrutas(Spreadsheet $spreadsheet): Worksheet
+    {
+        $melhorSheet = $spreadsheet->getActiveSheet();
+        $melhorScore = -1;
+
+        foreach ($spreadsheet->getWorksheetIterator() as $sheet) {
+            $headers = $this->headers($sheet);
+
+            if (! $this->possuiHeadersObrigatorios($headers)) {
+                continue;
+            }
+
+            $score = $this->pontuarWorksheet($sheet, $headers);
+            if ($score > $melhorScore) {
+                $melhorScore = $score;
+                $melhorSheet = $sheet;
+            }
+        }
+
+        return $melhorSheet;
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    private function headers(Worksheet $sheet): array
+    {
+        $headers = [];
+        $highestColumnIndex = Coordinate::columnIndexFromString($sheet->getHighestDataColumn());
+
+        for ($index = 1; $index <= $highestColumnIndex; $index++) {
+            $column = Coordinate::stringFromColumnIndex($index);
+            $header = $this->normalizarHeader($sheet->getCell($column.'1')->getValue());
+
+            if ($header !== '') {
+                $headers[$header] = $column;
+            }
+        }
+
+        return $headers;
+    }
+
+    /**
+     * @param  array<string, string>  $headers
+     */
+    private function valorPorHeaderOuCelula(Worksheet $sheet, array $headers, int $row, string $field, string $fallbackColumn): mixed
+    {
+        $column = $this->colunaPorAliases($headers, $field);
+
+        return $sheet->getCell(($column ?? $fallbackColumn).$row)->getValue();
+    }
+
+    /**
+     * @param  array<string, string>  $headers
+     */
+    private function colunaPorAliases(array $headers, string $field): ?string
+    {
+        foreach (self::HEADER_ALIASES[$field] ?? [] as $alias) {
+            $alias = $this->normalizarHeader($alias);
+            if (isset($headers[$alias])) {
+                return $headers[$alias];
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * @param  array<string, string>  $headers
+     */
+    private function possuiHeadersObrigatorios(array $headers): bool
+    {
+        return $this->colunaPorAliases($headers, 'id_cigam') !== null
+            && $this->colunaPorAliases($headers, 'nome') !== null
+            && $this->colunaPorAliases($headers, 'unidade_medicao') !== null
+            && $this->colunaPorAliases($headers, 'kg_por_unidade_medicao') !== null;
+    }
+
+    /**
+     * @param  array<string, string>  $headers
+     */
+    private function pontuarWorksheet(Worksheet $sheet, array $headers): int
+    {
+        $colUnidade = $this->colunaPorAliases($headers, 'unidade_medicao');
+        $colKg = $this->colunaPorAliases($headers, 'kg_por_unidade_medicao');
+        $score = 0;
+        $lastRow = min((int) $sheet->getHighestDataRow(), 25);
+
+        for ($row = 2; $row <= $lastRow; $row++) {
+            $unidadeMedicao = $colUnidade === null
+                ? ''
+                : FrutaPlanilhaNormalizer::normalizarUnidadeMedicao($sheet->getCell($colUnidade.$row)->getValue());
+
+            if (in_array($unidadeMedicao, FrutaUnidadeMedicao::values(), true)) {
+                $score += 2;
+            }
+
+            if ($colKg !== null && trim((string) $sheet->getCell($colKg.$row)->getValue()) !== '') {
+                $score++;
+            }
+        }
+
+        return $score;
+    }
+
+    private function normalizarHeader(mixed $value): string
+    {
+        $texto = TextoCadastro::removerAcentos((string) $value);
+
+        return mb_strtoupper(preg_replace('/[^A-Za-z0-9%]/', '', $texto) ?? '', 'UTF-8');
     }
 
     /**

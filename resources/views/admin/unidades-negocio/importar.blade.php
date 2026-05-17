@@ -6,7 +6,12 @@
 @section('content')
     @php
         use App\Models\Estado;
-        $rotulosEstadoImport = Estado::query()->orderBy('id')->pluck('nome', 'id');
+        $rotulosEstadoImport = Estado::query()
+            ->orderBy('id')
+            ->get(['id', 'nome', 'abreviacao'])
+            ->mapWithKeys(fn (Estado $estado): array => [
+                $estado->id => "{$estado->abreviacao} - {$estado->nome}",
+            ]);
     @endphp
     <div class="card mb-3">
         <div class="card-header d-flex flex-wrap align-items-center gap-2">
@@ -15,9 +20,9 @@
                 <p class="text-muted mb-0">
                     Layout fixo (linha 1 é cabeçalho e pode ter qualquer texto):
                     <code>A</code> ID CIGAM · <code>B</code> Razão social ·
-                    <code>C</code> Nome · <code>D</code> CPF/CNPJ ·
+                    <code>C</code> Nome · <code>D</code> CPF/CNPJ opcional ·
                     <code>E</code> Custo operacional · <code>F</code> Possui estoque (SIM/NÃO) ·
-                    <code>G</code> Estado (nome cadastrado: CEARA, PERNAMBUCO, ALAGOAS)
+                    <code>G</code> Estado (abreviação ou nome cadastrado: CE, CEARA, PE, PERNAMBUCO)
                 </p>
             </div>
             <a href="{{ route('admin.unidades-negocio.index') }}" class="btn btn-light">

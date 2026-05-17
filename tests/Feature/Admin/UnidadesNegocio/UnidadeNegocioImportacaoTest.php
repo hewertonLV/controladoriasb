@@ -92,6 +92,61 @@ class UnidadeNegocioImportacaoTest extends UnidadeNegocioTestCase
         $this->assertSame('000102', $importacao->resultado['atualizacoes'][0]['id_cigam']);
     }
 
+    public function test_importacao_resolve_estado_por_nome(): void
+    {
+        Storage::fake('local');
+
+        $path = $this->storeSpreadsheet([
+            ['000104', 'UNIDADE CEARA', 'UNIDADE CEARA', '33333333000133', '100.00', 'NÃO', ' Ceará '],
+        ]);
+
+        $importacao = UnidadeNegocioImportacao::create([
+            'uuid' => (string) Str::uuid(),
+            'user_id' => $this->unidadesNegocioManager()->id,
+            'arquivo_original' => 'unidades.xlsx',
+            'arquivo_path' => $path,
+            'status' => UnidadeNegocioImportacao::STATUS_AGUARDANDO,
+        ]);
+
+        (new ProcessarPreviewImportacaoUnidadesNegocioJob($importacao->id))
+            ->handle(app(UnidadeNegocioImportacaoProcessor::class));
+
+        $importacao->refresh();
+
+        $this->assertSame(0, $importacao->erros_count);
+        $this->assertSame(Estado::ID_CEARA, $importacao->resultado['novas'][0]['dados']['id_estado']);
+    }
+
+    public function test_importacao_aceita_cpf_cnpj_repetido_vazio_e_sanitiza_documento(): void
+    {
+        Storage::fake('local');
+
+        $path = $this->storeSpreadsheet([
+            ['000105', 'UNIDADE DOC 1', 'UNIDADE DOC 1', '11.222.333/0001-81', '100.00', 'NÃO', 'CEARA'],
+            ['000106', 'UNIDADE DOC 2', 'UNIDADE DOC 2', '11222333000181', '100.00', 'NÃO', 'CEARA'],
+            ['000107', 'UNIDADE SEM DOC', 'UNIDADE SEM DOC', '', '100.00', 'NÃO', 'CEARA'],
+        ]);
+
+        $importacao = UnidadeNegocioImportacao::create([
+            'uuid' => (string) Str::uuid(),
+            'user_id' => $this->unidadesNegocioManager()->id,
+            'arquivo_original' => 'unidades.xlsx',
+            'arquivo_path' => $path,
+            'status' => UnidadeNegocioImportacao::STATUS_AGUARDANDO,
+        ]);
+
+        (new ProcessarPreviewImportacaoUnidadesNegocioJob($importacao->id))
+            ->handle(app(UnidadeNegocioImportacaoProcessor::class));
+
+        $importacao->refresh();
+
+        $this->assertSame(0, $importacao->erros_count);
+        $this->assertSame(3, $importacao->novas_count);
+        $this->assertSame('11222333000181', $importacao->resultado['novas'][0]['dados']['cpf_cnpj']);
+        $this->assertSame('11222333000181', $importacao->resultado['novas'][1]['dados']['cpf_cnpj']);
+        $this->assertNull($importacao->resultado['novas'][2]['dados']['cpf_cnpj']);
+    }
+
     public function test_confirmacao_cria_e_atualiza(): void
     {
         $user = $this->userWithPermissions([
@@ -166,6 +221,75 @@ class UnidadeNegocioImportacaoTest extends UnidadeNegocioTestCase
 
         $this->assertDatabaseHas('unidades_negocio', ['id_cigam' => '000202', 'nome' => 'CRIADA']);
         $this->assertSame('DEPOIS', $existente->fresh()->nome);
+    }
+
+    public function test_confirmacao_permite_cpf_cnpj_repetido_e_vazio(): void
+    {
+        $user = $this->userWithPermissions([
+            Permissions::UNIDADES_NEGOCIO_IMPORTAR_CONFIRMAR,
+        ]);
+        UnidadeNegocio::factory()->create([
+            'id_cigam' => '000301',
+            'cpf_cnpj' => '11222333000181',
+        ]);
+
+        $importacao = UnidadeNegocioImportacao::create([
+            'uuid' => (string) Str::uuid(),
+            'user_id' => $user->id,
+            'arquivo_original' => 'u.xlsx',
+            'arquivo_path' => 'unidades-negocio/importacoes/x.xlsx',
+            'status' => UnidadeNegocioImportacao::STATUS_CONCLUIDO,
+            'resultado' => [
+                'novas' => [
+                    [
+                        'row_id' => 1,
+                        'linha' => 2,
+                        'dados' => [
+                            'id_cigam' => '000302',
+                            'razao_social' => 'CRIADA DOC REPETIDO',
+                            'nome' => 'CRIADA DOC REPETIDO',
+                            'cpf_cnpj' => '11222333000181',
+                            'custo_operacional' => '25.00',
+                            'possui_estoque' => false,
+                            'id_estado' => Estado::ID_CEARA,
+                        ],
+                    ],
+                    [
+                        'row_id' => 2,
+                        'linha' => 3,
+                        'dados' => [
+                            'id_cigam' => '000303',
+                            'razao_social' => 'CRIADA SEM DOC',
+                            'nome' => 'CRIADA SEM DOC',
+                            'cpf_cnpj' => null,
+                            'custo_operacional' => '25.00',
+                            'possui_estoque' => false,
+                            'id_estado' => Estado::ID_CEARA,
+                        ],
+                    ],
+                ],
+                'atualizacoes' => [],
+                'sem_alteracoes' => [],
+                'erros' => [],
+            ],
+        ]);
+
+        $this->actingAs($user)
+            ->postJson(route('admin.unidades-negocio.importar.confirmar', $importacao), [
+                'row_ids_novas' => [1, 2],
+                'row_ids_atualizacoes' => [],
+            ])
+            ->assertOk()
+            ->assertJsonPath('resumo.criadas', 2)
+            ->assertJsonPath('resumo.erros', []);
+
+        $this->assertSame(2, UnidadeNegocio::query()
+            ->where('cpf_cnpj', '11222333000181')
+            ->count());
+        $this->assertDatabaseHas('unidades_negocio', [
+            'id_cigam' => '000303',
+            'cpf_cnpj' => null,
+        ]);
     }
 
     public function test_confirmacao_atualiza_nome_sem_reativar_unidade_inativa(): void
@@ -255,7 +379,7 @@ class UnidadeNegocioImportacaoTest extends UnidadeNegocioTestCase
     }
 
     /**
-     * @param  list<list<string>>  $rows
+     * @param  list<list<string|null>>  $rows
      */
     private function storeSpreadsheet(array $rows): string
     {

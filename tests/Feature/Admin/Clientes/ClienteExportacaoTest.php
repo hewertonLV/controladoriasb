@@ -29,7 +29,7 @@ class ClienteExportacaoTest extends ClienteTestCase
     public function test_job_gera_arquivo_pdf(): void
     {
         Storage::fake('local');
-        Cliente::factory()->create(['razao_social' => 'Cliente PDF']);
+        Cliente::factory()->create(['razao_social' => 'Cliente PDF', 'fantasia' => 'Fantasia PDF']);
 
         $exportacao = ClienteExportacao::create([
             'uuid' => (string) Str::uuid(),
@@ -46,5 +46,23 @@ class ClienteExportacaoTest extends ClienteTestCase
         $this->assertSame(ClienteExportacao::STATUS_CONCLUIDO, $exportacao->status);
         $this->assertSame(1, $exportacao->total_registros);
         $this->assertTrue(Storage::disk('local')->exists($exportacao->arquivo_path));
+    }
+
+    public function test_pdf_exibe_fantasia(): void
+    {
+        $cliente = Cliente::factory()->create([
+            'razao_social' => 'Cliente PDF Fantasia',
+            'fantasia' => 'Fantasia Visivel',
+        ]);
+
+        $html = view('admin.clientes.pdf', [
+            'clientes' => collect([$cliente->load(['praca', 'grupo'])]),
+            'filtros' => ['search' => ''],
+            'geradoEm' => now(),
+            'geradoPor' => 'Teste',
+            'limiteRegistros' => 1000,
+        ])->render();
+
+        $this->assertStringContainsString('FANTASIA VISIVEL', $html);
     }
 }

@@ -15,6 +15,7 @@ use Illuminate\Support\Carbon;
  * @property int $id
  * @property string $id_cigam
  * @property string $razao_social
+ * @property string|null $fantasia
  * @property string $cnpj_cpf
  * @property int $id_praca
  * @property int|null $grupo_id
@@ -37,6 +38,7 @@ class Cliente extends Model
     protected $fillable = [
         'id_cigam',
         'razao_social',
+        'fantasia',
         'cnpj_cpf',
         'id_praca',
         'grupo_id',
@@ -54,6 +56,7 @@ class Cliente extends Model
             'id_praca' => 'integer',
             'grupo_id' => 'integer',
             'id_unidade_negocio' => 'integer',
+            'fantasia' => 'string',
             'desconto_nf' => 'decimal:2',
             'desconto_contrato' => 'decimal:2',
         ];
@@ -70,6 +73,15 @@ class Cliente extends Model
     {
         $this->attributes['razao_social'] = TextoCadastro::normalizarMaiusculas(
             $value === null ? '' : (string) $value,
+        );
+    }
+
+    protected function setFantasiaAttribute(mixed $value): void
+    {
+        $texto = preg_replace('/\s+/u', ' ', (string) ($value ?? '')) ?? '';
+
+        $this->attributes['fantasia'] = TextoCadastro::normalizarMaiusculasOuNulo(
+            $texto,
         );
     }
 

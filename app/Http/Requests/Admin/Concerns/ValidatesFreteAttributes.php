@@ -11,7 +11,7 @@ trait ValidatesFreteAttributes
     /**
      * @return array<string, array<int, mixed>>
      */
-    protected function freteRules(?int $ignoreId = null): array
+    protected function freteRules(?int $ignoreId = null, bool $criando = false): array
     {
         $nomeUnique = Rule::unique('fretes', 'nome');
         if ($ignoreId !== null) {
@@ -23,8 +23,8 @@ trait ValidatesFreteAttributes
             'valor' => ['required', 'numeric', 'min:0'],
             'id_veiculo' => ['required', 'integer', 'min:1', 'exists:veiculos,id'],
             'descricao' => ['nullable', 'string'],
-            'status_situacao' => ['required', 'string', Rule::in(FreteStatusSituacao::values())],
-            'valor_fruta_kg' => ['required', 'numeric', 'min:0'],
+            'status_situacao' => [$criando ? 'nullable' : 'required', 'string', Rule::in(FreteStatusSituacao::values())],
+            'valor_fruta_kg' => [$criando ? 'nullable' : 'required', 'numeric', 'min:0'],
         ];
     }
 
@@ -43,18 +43,24 @@ trait ValidatesFreteAttributes
         ];
     }
 
-    protected function prepareFreteForValidation(): void
+    protected function prepareFreteForValidation(bool $criando = false): void
     {
+        $valor = TextoCadastro::normalizarDecimalNaoNegativo($this->input('valor'));
+
         /** @noinspection PhpUndefinedMethodInspection */
         $this->merge([
             'nome' => TextoCadastro::normalizarMaiusculas((string) $this->input('nome')),
-            'valor' => TextoCadastro::normalizarDecimalNaoNegativo($this->input('valor')),
+            'valor' => $valor,
             /** @noinspection PhpUndefinedMethodInspection */
             'id_veiculo' => (int) $this->input('id_veiculo'),
             /** @noinspection PhpUndefinedMethodInspection */
             'descricao' => $this->filled('descricao') ? trim((string) $this->input('descricao')) : null,
-            'status_situacao' => mb_strtoupper(trim((string) ($this->input('status_situacao') ?: 'ABERTA')), 'UTF-8'),
-            'valor_fruta_kg' => TextoCadastro::normalizarDecimalNaoNegativo($this->input('valor_fruta_kg')),
+            'status_situacao' => $criando
+                ? FreteStatusSituacao::ABERTA->value
+                : mb_strtoupper(trim((string) ($this->input('status_situacao') ?: FreteStatusSituacao::ABERTA->value)), 'UTF-8'),
+            'valor_fruta_kg' => $criando
+                ? $valor
+                : TextoCadastro::normalizarDecimalNaoNegativo($this->input('valor_fruta_kg')),
         ]);
     }
 }

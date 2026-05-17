@@ -46,6 +46,7 @@ class ClienteTest extends ClienteTestCase
         $payload = $this->clientePayload([
             'id_cigam' => '12.3',
             'razao_social' => 'raZao em MiNusCuLa',
+            'fantasia' => '  nome   fantasia  ',
             'cnpj_cpf' => '11.222.333/0001-81',
             'desconto_nf' => '10.5',
             'desconto_contrato' => '0',
@@ -56,12 +57,27 @@ class ClienteTest extends ClienteTestCase
             ->assertStatus(302)
             ->assertSessionHas('success');
 
+        $cliente = Cliente::query()->where('id_cigam', '000123')->firstOrFail();
+
+        $this->assertSame('RAZAO EM MINUSCULA', $cliente->razao_social);
+        $this->assertEquals('NOME FANTASIA', $cliente->fantasia);
+        $this->assertSame('11222333000181', $cliente->cnpj_cpf);
+        $this->assertSame('10.50', (string) $cliente->desconto_nf);
+        $this->assertSame('0.00', (string) $cliente->desconto_contrato);
+    }
+
+    public function test_cadastro_aceita_fantasia_null(): void
+    {
+        $this->actingAs($this->userWithPermissions([Permissions::CLIENTES_CRIAR]))
+            ->post(route('admin.clientes.store'), $this->clientePayload([
+                'fantasia' => '',
+            ]))
+            ->assertStatus(302)
+            ->assertSessionHas('success');
+
         $this->assertDatabaseHas('clientes', [
-            'id_cigam' => '000123',
-            'razao_social' => 'RAZAO EM MINUSCULA',
-            'cnpj_cpf' => '11222333000181',
-            'desconto_nf' => 10.5,
-            'desconto_contrato' => 0,
+            'id_cigam' => '000001',
+            'fantasia' => null,
         ]);
     }
 
@@ -99,6 +115,7 @@ class ClienteTest extends ClienteTestCase
             ->put(route('admin.clientes.update', $cliente), [
                 'id_cigam' => '50',
                 'razao_social' => 'DEPOIS',
+                'fantasia' => 'Fantasia Depois',
                 'cnpj_cpf' => $cliente->cnpj_cpf,
                 'id_unidade_negocio' => $cliente->id_unidade_negocio,
                 'id_praca' => $cliente->id_praca,
@@ -110,5 +127,19 @@ class ClienteTest extends ClienteTestCase
             ->assertSessionHas('success');
 
         $this->assertSame('DEPOIS', $cliente->fresh()->razao_social);
+        $this->assertSame('FANTASIA DEPOIS', $cliente->fresh()->fantasia);
+    }
+
+    public function test_busca_encontra_cliente_por_fantasia(): void
+    {
+        Cliente::factory()->create([
+            'razao_social' => 'RAZAO DISTANTE',
+            'fantasia' => 'APELIDO COMERCIAL',
+        ]);
+
+        $this->actingAs($this->userWithPermissions([Permissions::CLIENTES_VISUALIZAR]))
+            ->get(route('admin.clientes.index', ['search' => 'apelido comercial']))
+            ->assertOk()
+            ->assertSee('APELIDO COMERCIAL', false);
     }
 }

@@ -4,10 +4,13 @@ namespace App\Services\Clientes;
 
 use App\Models\Cliente;
 use App\Models\ClienteImportacao;
+use App\Support\TextoCadastro;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
+use PhpOffice\PhpSpreadsheet\Cell\Coordinate;
 use PhpOffice\PhpSpreadsheet\IOFactory;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
+use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
 
 class ClienteImportacaoProcessor
 {
@@ -21,6 +24,7 @@ class ClienteImportacaoProcessor
 
     private const COMPARABLE_FIELDS = [
         'razao_social',
+        'fantasia',
         'cnpj_cpf',
         'id_unidade_negocio',
         'id_praca',
@@ -56,6 +60,7 @@ class ClienteImportacaoProcessor
 
         $highestRow = min((int) $sheet->getHighestDataRow(), self::MAX_LINHAS_ESCANEADAS);
         $totalLinhas = max(0, $highestRow - 1);
+        $headers = $this->headers($sheet);
 
         $importacao->forceFill(['total_linhas' => $totalLinhas])->save();
 
@@ -74,14 +79,15 @@ class ClienteImportacaoProcessor
 
         for ($r = 2; $r <= $highestRow; $r++) {
             $dadosBrutos = [
-                $sheet->getCell('A'.$r)->getValue(),
-                $sheet->getCell('B'.$r)->getValue(),
-                $sheet->getCell('C'.$r)->getValue(),
-                $sheet->getCell('D'.$r)->getValue(),
-                $sheet->getCell('E'.$r)->getValue(),
-                $sheet->getCell('F'.$r)->getValue(),
-                $sheet->getCell('G'.$r)->getValue(),
-                $sheet->getCell('H'.$r)->getValue(),
+                $this->valorPorHeaderOuCelula($sheet, $headers, $r, ['IDCIGAM', 'ID'], 'A'),
+                $this->valorPorHeaderOuCelula($sheet, $headers, $r, ['RAZAOSOCIAL', 'RAZAO', 'CLIENTE'], 'B'),
+                $this->valorPorHeaderOuCelula($sheet, $headers, $r, ['CPFCNPJ', 'CNPJCPF', 'CNPJ', 'CPF'], 'C'),
+                $this->valorPorHeaderOuCelula($sheet, $headers, $r, ['UNIDADENEGOCIO', 'IDUNIDADENEGOCIO', 'UN'], 'D'),
+                $this->valorPorHeaderOuCelula($sheet, $headers, $r, ['DESCONTONF', 'DESCNF'], 'E'),
+                $this->valorPorHeaderOuCelula($sheet, $headers, $r, ['DESCONTOCONTRATO', 'DESCCONTRATO'], 'F'),
+                $this->valorPorHeaderOuCelula($sheet, $headers, $r, ['PRACA', 'PRAÇA'], 'G'),
+                $this->valorPorHeaderOuCelula($sheet, $headers, $r, ['GRUPO'], 'H'),
+                $this->valorPorHeaderOuCelula($sheet, $headers, $r, ['FANTASIA', 'NOMEFANTASIA', 'FANTASIACLIENTE'], null),
             ];
 
             $linhasProcessadas++;
@@ -440,6 +446,7 @@ class ClienteImportacaoProcessor
         return [
             'id_cigam' => $cliente->id_cigam,
             'razao_social' => $cliente->razao_social,
+            'fantasia' => $cliente->fantasia,
             'cnpj_cpf' => $cliente->cnpj_cpf,
             'id_unidade_negocio' => (int) $cliente->id_unidade_negocio,
             'id_praca' => (int) $cliente->id_praca,
@@ -447,5 +454,54 @@ class ClienteImportacaoProcessor
             'desconto_nf' => (string) $cliente->desconto_nf,
             'desconto_contrato' => (string) $cliente->desconto_contrato,
         ];
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    private function headers(Worksheet $sheet): array
+    {
+        $headers = [];
+        $highestColumn = $sheet->getHighestDataColumn();
+        $highestColumnIndex = Coordinate::columnIndexFromString($highestColumn);
+
+        for ($index = 1; $index <= $highestColumnIndex; $index++) {
+            $column = Coordinate::stringFromColumnIndex($index);
+            $header = $this->normalizarHeader($sheet->getCell($column.'1')->getValue());
+
+            if ($header !== '') {
+                $headers[$header] = $column;
+            }
+        }
+
+        return $headers;
+    }
+
+    /**
+     * @param  array<string, string>  $headers
+     * @param  list<string>  $aliases
+     */
+    private function valorPorHeaderOuCelula(
+        Worksheet $sheet,
+        array $headers,
+        int $row,
+        array $aliases,
+        ?string $fallbackColumn,
+    ): mixed {
+        foreach ($aliases as $alias) {
+            $normalized = $this->normalizarHeader($alias);
+            if (isset($headers[$normalized])) {
+                return $sheet->getCell($headers[$normalized].$row)->getValue();
+            }
+        }
+
+        return $fallbackColumn === null ? null : $sheet->getCell($fallbackColumn.$row)->getValue();
+    }
+
+    private function normalizarHeader(mixed $value): string
+    {
+        $texto = TextoCadastro::removerAcentos((string) $value);
+
+        return mb_strtoupper(preg_replace('/[^A-Za-z0-9]/', '', $texto) ?? '');
     }
 }

@@ -14,11 +14,11 @@ abstract class UnidadeNegocioTestCase extends TestCase
 
     /**
      * @param  array<string, mixed>  $overrides
-     * @return array{id_cigam: string, id_estado: int, razao_social: string, nome: string, cpf_cnpj: string, custo_operacional: string, possui_estoque: bool}
+     * @return array{id_cigam: string, id_estado: int, razao_social: string, nome: string, cpf_cnpj: string|null, custo_operacional: string, possui_estoque: bool}
      */
     protected function unidadePayload(array $overrides = []): array
     {
-        /** @var array{id_cigam: string, id_estado: int, razao_social: string, nome: string, cpf_cnpj: string, custo_operacional: string, possui_estoque: bool} */
+        /** @var array{id_cigam: string, id_estado: int, razao_social: string, nome: string, cpf_cnpj: string|null, custo_operacional: string, possui_estoque: bool} */
         return array_replace([
             'id_cigam' => '009001',
             'id_estado' => Estado::ID_CEARA,

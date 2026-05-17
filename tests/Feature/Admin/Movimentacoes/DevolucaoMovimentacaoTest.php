@@ -35,6 +35,23 @@ class DevolucaoMovimentacaoTest extends TestCase
     use CreatesUsersWithRoles;
     use RefreshDatabase;
 
+    public function test_create_carrega_vendas_e_unidades_retorno_sem_erro(): void
+    {
+        $this->seedBase();
+        $c = $this->cenarioBase();
+        $this->registrarCompra($c, '10', '500,00');
+        $venda = $this->registrarVenda($c, '4', '800,00');
+
+        $html = $this->actingAs($this->userWithPermissions([Permissions::MOVIMENTACOES_DEVOLUCOES_CRIAR]))
+            ->get(route('admin.movimentacoes.devolucoes.create'))
+            ->assertOk()
+            ->getContent();
+
+        $this->assertStringContainsString('#'.$venda->id, (string) $html);
+        $this->assertStringContainsString('NF-VENDA', (string) $html);
+        $this->assertStringContainsString($c['unidade']->nome, (string) $html);
+    }
+
     public function test_cria_devolucao_com_retorno_aumenta_estoque_e_usa_custo_historico_da_venda(): void
     {
         $this->seedBase();

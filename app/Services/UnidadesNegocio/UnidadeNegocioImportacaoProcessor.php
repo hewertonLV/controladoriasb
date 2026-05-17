@@ -21,7 +21,7 @@ use PhpOffice\PhpSpreadsheet\Spreadsheet;
  *  - D: cpf_cnpj
  *  - E: custo_operacional
  *  - F: possui_estoque (SIM/NÃO, S/N, 1/0, VERDADEIRO/FALSO)
- *  - G: estado (nome cadastrado, ex.: CEARA)
+ *  - G: estado (abreviação ou nome cadastrado, ex.: CE ou CEARA)
  *
  * @see UnidadeNegocioImportacaoController::confirmar para persistência.
  */
@@ -30,7 +30,7 @@ class UnidadeNegocioImportacaoProcessor
     /**
      * @var array<string, int>|null
      */
-    private ?array $idsEstadoPorNome = null;
+    private ?array $idsEstadoPorBusca = null;
 
     public const MAX_LINHAS_ESCANEADAS = 5000;
 
@@ -229,7 +229,7 @@ class UnidadeNegocioImportacaoProcessor
 
     /**
      * @param  list<mixed>  $dadosBrutos
-     * @return array{dados: array{id_cigam: string, razao_social: string, nome: string, cpf_cnpj: string, custo_operacional: string, possui_estoque: bool, id_estado: int}, erros: list<string>}
+     * @return array{dados: array{id_cigam: string, razao_social: string, nome: string, cpf_cnpj: string|null, custo_operacional: string, possui_estoque: bool, id_estado: int}, erros: list<string>}
      */
     private function normalizeRow(array $dadosBrutos): array
     {
@@ -241,8 +241,8 @@ class UnidadeNegocioImportacaoProcessor
 
         $possuiParsed = $this->parsePossuiEstoquePlanilha($dadosBrutos[5] ?? null);
 
-        $estadoNome = TextoCadastro::normalizarMaiusculas(trim((string) ($dadosBrutos[6] ?? '')));
-        $idEstado = $estadoNome === '' ? null : ($this->idsEstadoPorNome()[$estadoNome] ?? null);
+        $estadoBusca = TextoCadastro::normalizarBuscaEstado(trim((string) ($dadosBrutos[6] ?? '')));
+        $idEstado = $estadoBusca === '' ? null : ($this->idsEstadoPorBusca()[$estadoBusca] ?? null);
 
         $erros = [];
 
@@ -264,18 +264,16 @@ class UnidadeNegocioImportacaoProcessor
             $erros[] = 'Nome pode ter no máximo 255 caracteres.';
         }
 
-        if ($cpfCnpj === '') {
-            $erros[] = 'CPF/CNPJ (coluna D) é obrigatório.';
-        } elseif (! in_array(strlen($cpfCnpj), [11, 14], true)) {
+        if ($cpfCnpj !== '' && ! in_array(strlen($cpfCnpj), [11, 14], true)) {
             $erros[] = 'CPF/CNPJ deve ter 11 dígitos (CPF) ou 14 dígitos (CNPJ).';
         }
 
         $erros = array_merge($erros, $possuiParsed['erros']);
 
-        if ($estadoNome === '') {
-            $erros[] = 'Estado (coluna G) é obrigatório. Informe o nome cadastrado (ex.: CEARA).';
+        if ($estadoBusca === '') {
+            $erros[] = 'Estado (coluna G) é obrigatório. Informe a abreviação ou o nome cadastrado (ex.: CE ou CEARA).';
         } elseif ($idEstado === null) {
-            $erros[] = 'Estado inválido na coluna G. Valores aceitos: '.implode(', ', array_keys($this->idsEstadoPorNome())).'.';
+            $erros[] = 'Estado inválido na coluna G. Valores aceitos: '.implode(', ', array_keys($this->idsEstadoPorBusca())).'.';
         }
 
         return [
@@ -283,7 +281,7 @@ class UnidadeNegocioImportacaoProcessor
                 'id_cigam' => $idCigam,
                 'razao_social' => $razaoSocial,
                 'nome' => $nome,
-                'cpf_cnpj' => $cpfCnpj,
+                'cpf_cnpj' => $cpfCnpj === '' ? null : $cpfCnpj,
                 'custo_operacional' => $custoOperacional,
                 'possui_estoque' => $possuiParsed['valor'],
                 'id_estado' => (int) ($idEstado ?? 0),
@@ -295,9 +293,30 @@ class UnidadeNegocioImportacaoProcessor
     /**
      * @return array<string, int>
      */
-    private function idsEstadoPorNome(): array
+    private function idsEstadoPorBusca(): array
     {
-        return $this->idsEstadoPorNome ??= Estado::query()->pluck('id', 'nome')->all();
+        if ($this->idsEstadoPorBusca !== null) {
+            return $this->idsEstadoPorBusca;
+        }
+
+        $map = [];
+        $estados = Estado::query()->get(['id', 'nome', 'abreviacao']);
+
+        foreach ($estados as $estado) {
+            $abreviacao = Estado::normalizarChaveBusca($estado->abreviacao);
+            if ($abreviacao !== '') {
+                $map[$abreviacao] = (int) $estado->id;
+            }
+        }
+
+        foreach ($estados as $estado) {
+            $nome = Estado::normalizarChaveBusca($estado->nome);
+            if ($nome !== '' && ! isset($map[$nome])) {
+                $map[$nome] = (int) $estado->id;
+            }
+        }
+
+        return $this->idsEstadoPorBusca = $map;
     }
 
     /**

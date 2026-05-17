@@ -16,6 +16,7 @@ class EstadoFactory extends Factory
     {
         return [
             'nome' => mb_strtoupper($this->faker->unique()->lexify('EST????'), 'UTF-8'),
+            'abreviacao' => mb_strtoupper($this->faker->unique()->lexify('??'), 'UTF-8'),
             'descricao' => $this->faker->optional()->sentence(),
         ];
     }

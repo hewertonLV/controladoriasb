@@ -7,6 +7,7 @@
     $rotuloCampo = [
         'id_cigam' => 'ID CIGAM',
         'razao_social' => 'Razão social',
+        'fantasia' => 'Fantasia',
         'cnpj_cpf' => 'CPF/CNPJ',
         'id_unidade_negocio' => 'Unidade de negócio',
         'desconto_nf' => 'Desconto NF',
@@ -48,6 +49,7 @@
                 <h4 class="header-title mb-1">{{ $cliente->razao_social }}</h4>
                 <div class="text-muted small">
                     <code>{{ $cliente->id_cigam }}</code> ·
+                    Fantasia: {{ $cliente->fantasia ?? '—' }} ·
                     {{ $cliente->cnpj_cpf_formatado }} ·
                     UN {{ $cliente->id_unidade_negocio }}
                 </div>

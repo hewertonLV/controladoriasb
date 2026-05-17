@@ -19,7 +19,7 @@ class StoreFreteRequest extends FormRequest
      */
     public function rules(): array
     {
-        return $this->freteRules();
+        return $this->freteRules(criando: true);
     }
 
     /**
@@ -32,6 +32,6 @@ class StoreFreteRequest extends FormRequest
 
     protected function prepareForValidation(): void
     {
-        $this->prepareFreteForValidation();
+        $this->prepareFreteForValidation(criando: true);
     }
 }

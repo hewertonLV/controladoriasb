@@ -10,9 +10,12 @@ use App\Models\Fornecedor;
 use App\Models\FornecedorHistorico;
 use App\Models\FornecedorImportacao;
 use App\Services\Fornecedores\FornecedorAuditoriaService;
+use App\Services\Fornecedores\FornecedorImportacaoProcessor;
 use App\Support\TextoCadastro;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
@@ -35,6 +38,12 @@ class FornecedorImportacaoController extends Controller
 
     public function iniciar(Request $request): JsonResponse
     {
+        if (app()->environment('production') && config('queue.default') === 'sync') {
+            return response()->json([
+                'message' => 'Importações de fornecedores exigem QUEUE_CONNECTION=database ou redis em produção.',
+            ], 500);
+        }
+
         $validator = Validator::make($request->all(), [
             'arquivo' => ['required', 'file', 'mimes:xlsx,xls', 'max:5120'],
         ], [
@@ -327,9 +336,17 @@ class FornecedorImportacaoController extends Controller
      */
     private function statusPayload(FornecedorImportacao $importacao): array
     {
+        $resultado = $importacao->resultado ?? [];
+        $erros = $resultado['erros'] ?? [];
+        $fila = $this->resumoFila($importacao);
+        $workerStatus = $this->workerStatus();
+
         return [
+            'importacao_id' => $importacao->id,
             'uuid' => $importacao->uuid,
             'status' => $importacao->status,
+            'progresso' => $importacao->percentual,
+            'mensagem' => $this->mensagemStatus($importacao, $fila['arquivos_na_frente'], $workerStatus),
             'total_linhas' => $importacao->total_linhas,
             'linhas_processadas' => $importacao->linhas_processadas,
             'percentual' => $importacao->percentual,
@@ -337,11 +354,122 @@ class FornecedorImportacaoController extends Controller
             'atualizacoes_count' => $importacao->atualizacoes_count,
             'sem_alteracoes_count' => $importacao->sem_alteracoes_count,
             'erros_count' => $importacao->erros_count,
+            'erros' => $erros,
             'arquivo_original' => $importacao->arquivo_original,
+            'usuario_nome' => $importacao->user?->name ?? '—',
+            'posicao_fila' => $fila['posicao_fila'],
+            'arquivos_na_frente' => $fila['arquivos_na_frente'],
+            'total_aguardando' => $fila['total_aguardando'],
+            'total_processando' => $fila['total_processando'],
+            'fila_nome' => 'imports',
+            'worker_status' => $workerStatus,
+            'estimativa_inicio_texto' => $fila['estimativa_inicio_texto'],
+            'processando_agora' => $fila['processando_agora'],
             'erro_mensagem' => $importacao->erro_mensagem,
             'started_at' => optional($importacao->started_at)->toIso8601String(),
+            'created_at' => optional($importacao->created_at)->toIso8601String(),
             'finished_at' => optional($importacao->finished_at)->toIso8601String(),
         ];
+    }
+
+    private function mensagemStatus(FornecedorImportacao $importacao, int $arquivosNaFrente, string $workerStatus): string
+    {
+        return match ($importacao->status) {
+            FornecedorImportacao::STATUS_AGUARDANDO => $workerStatus === 'INATIVO'
+                ? 'Não foi detectado worker ativo para a fila de importações. Verifique o queue:work ou Supervisor.'
+                : ($arquivosNaFrente > 0
+                    ? 'Seu arquivo será iniciado após os arquivos anteriores terminarem.'
+                    : 'Seu arquivo é o próximo da fila de importações.'),
+            FornecedorImportacao::STATUS_PROCESSANDO => $importacao->total_linhas > 0
+                ? "Processados {$importacao->linhas_processadas} de {$importacao->total_linhas} registros."
+                : 'Processando planilha de fornecedores.',
+            FornecedorImportacao::STATUS_CONCLUIDO => 'Análise da importação concluída.',
+            FornecedorImportacao::STATUS_FALHOU => $importacao->erro_mensagem ?: 'O processamento falhou.',
+            default => '',
+        };
+    }
+
+    /**
+     * @return array{
+     *     posicao_fila:int|null,
+     *     arquivos_na_frente:int,
+     *     total_aguardando:int,
+     *     total_processando:int,
+     *     estimativa_inicio_texto:string|null,
+     *     processando_agora:list<array<string,mixed>>
+     * }
+     */
+    private function resumoFila(FornecedorImportacao $importacao): array
+    {
+        $statusAguardando = [FornecedorImportacao::STATUS_AGUARDANDO];
+        $statusNaoFinalizados = [
+            FornecedorImportacao::STATUS_AGUARDANDO,
+            FornecedorImportacao::STATUS_PROCESSANDO,
+        ];
+
+        $arquivosNaFrente = 0;
+        if ($importacao->isAguardando()) {
+            $arquivosNaFrente = FornecedorImportacao::query()
+                ->whereIn('status', $statusNaoFinalizados)
+                ->where(function ($query) use ($importacao): void {
+                    $query->where('created_at', '<', $importacao->created_at)
+                        ->orWhere(function ($q) use ($importacao): void {
+                            $q->where('created_at', $importacao->created_at)
+                                ->where('id', '<', $importacao->id);
+                        });
+                })
+                ->count();
+        }
+
+        $processandoAgora = FornecedorImportacao::query()
+            ->with('user:id,name')
+            ->where('status', FornecedorImportacao::STATUS_PROCESSANDO)
+            ->orderBy('started_at')
+            ->orderBy('id')
+            ->limit(10)
+            ->get(['id', 'uuid', 'user_id', 'arquivo_original', 'status', 'percentual', 'linhas_processadas', 'total_linhas', 'started_at'])
+            ->map(fn (FornecedorImportacao $item): array => [
+                'id' => $item->id,
+                'uuid' => $item->uuid,
+                'tipo' => 'fornecedores',
+                'arquivo_original' => $item->arquivo_original,
+                'usuario_nome' => $item->user?->name ?? '—',
+                'progresso' => $item->percentual,
+                'status' => $item->status,
+                'linhas_processadas' => $item->linhas_processadas,
+                'total_linhas' => $item->total_linhas,
+                'started_at' => optional($item->started_at)->toIso8601String(),
+            ])
+            ->values()
+            ->all();
+
+        return [
+            'posicao_fila' => $importacao->isAguardando() ? $arquivosNaFrente + 1 : null,
+            'arquivos_na_frente' => $arquivosNaFrente,
+            'total_aguardando' => FornecedorImportacao::query()->whereIn('status', $statusAguardando)->count(),
+            'total_processando' => FornecedorImportacao::query()->where('status', FornecedorImportacao::STATUS_PROCESSANDO)->count(),
+            'estimativa_inicio_texto' => $importacao->isAguardando()
+                ? ($arquivosNaFrente > 0 ? 'Após '.$arquivosNaFrente.' arquivo(s) anterior(es).' : 'Próximo a iniciar quando houver worker disponível.')
+                : null,
+            'processando_agora' => $processandoAgora,
+        ];
+    }
+
+    private function workerStatus(): string
+    {
+        $lastSeen = Cache::get(FornecedorImportacaoProcessor::HEARTBEAT_CACHE_KEY);
+
+        if (! is_string($lastSeen) || $lastSeen === '') {
+            return 'INATIVO';
+        }
+
+        try {
+            return now()->diffInSeconds(Carbon::parse($lastSeen), true) <= 120
+                ? 'ATIVO'
+                : 'INATIVO';
+        } catch (Throwable) {
+            return 'DESCONHECIDO';
+        }
     }
 
     /**

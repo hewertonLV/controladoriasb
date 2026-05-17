@@ -16,6 +16,7 @@ use App\Models\Movimentacao;
 use App\Models\MovimentacaoEstoque;
 use App\Models\UnidadeNegocio;
 use App\Models\User;
+use App\Support\EmpresaEntidadeQuery;
 use App\Support\TextoCadastro;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\QueryException;
@@ -54,11 +55,7 @@ final class CompraMovimentacaoService
             ->sortBy(fn (Empresa $e): string => mb_strtolower($e->nomeExibicao()))
             ->values();
 
-        $empresasDestino = Empresa::query()
-            ->where('entidade_type', UnidadeNegocio::class)
-            ->whereHas('entidade', static function ($query): void {
-                $query->where('possui_estoque', true);
-            })
+        $empresasDestino = EmpresaEntidadeQuery::unidadesComEstoque()
             ->with('entidade')
             ->get()
             ->sortBy(fn (Empresa $e): string => mb_strtolower($e->nomeExibicao()))

@@ -41,7 +41,7 @@ class VeiculoImportacaoTest extends VeiculoTestCase
     public function test_job_processa_nova_existente_sem_alteracao_e_com_alteracao(): void
     {
         Storage::fake('local');
-        $unidade = UnidadeNegocio::factory()->create();
+        $unidade = UnidadeNegocio::factory()->create(['id_cigam' => '000110']);
 
         $existenteIgual = Veiculo::factory()->create([
             'id_sbs' => 9001,
@@ -59,9 +59,9 @@ class VeiculoImportacaoTest extends VeiculoTestCase
         ]);
 
         $path = $this->storeSpreadsheet([
-            [9003, 'VEICULO NOVO', 'TRUCK', $unidade->id, 'ATIVO'],
-            [$existenteIgual->id_sbs, $existenteIgual->nome, $existenteIgual->tipo, $unidade->id, 'ATIVO'],
-            [$existenteAlterado->id_sbs, 'VEICULO ALTERADO', $existenteAlterado->tipo, $unidade->id, 'INATIVO'],
+            [9003, 'VEICULO NOVO', 'TRUCK', '110', 'ATIVO'],
+            [$existenteIgual->id_sbs, $existenteIgual->nome, $existenteIgual->tipo, '000110', 'ATIVO'],
+            [$existenteAlterado->id_sbs, 'VEICULO ALTERADO', $existenteAlterado->tipo, ' 1-10 ', 'INATIVO'],
         ]);
 
         $importacao = VeiculoImportacao::create([

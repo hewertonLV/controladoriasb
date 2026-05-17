@@ -33,6 +33,21 @@ class VendaMovimentacaoTest extends TestCase
     use CreatesUsersWithRoles;
     use RefreshDatabase;
 
+    public function test_create_carrega_origem_cliente_e_unidade_faturamento_sem_erro(): void
+    {
+        $this->seedBase();
+        $c = $this->cenarioBase();
+
+        $html = $this->actingAs($this->userWithPermissions([Permissions::MOVIMENTACOES_VENDAS_CRIAR]))
+            ->get(route('admin.movimentacoes.vendas.create'))
+            ->assertOk()
+            ->getContent();
+
+        $this->assertStringContainsString($c['unidade']->nome, (string) $html);
+        $this->assertStringContainsString($c['empresa_cliente']->nomeExibicao(), (string) $html);
+        $this->assertStringContainsString($c['unidade_faturamento']->nome, (string) $html);
+    }
+
     public function test_usuario_com_permissao_cria_venda_multi_item_e_calcula_estoque_valores_e_resultado(): void
     {
         $this->seedBase();

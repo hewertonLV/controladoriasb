@@ -52,7 +52,7 @@ class FreteTest extends FreteTestCase
             'valor' => '10,5',
             'id_veiculo' => $veiculo->id,
             'descricao' => '  texto  ',
-            'status_situacao' => 'aberta',
+            'status_situacao' => FreteStatusSituacao::ENCERRADA->value,
             'valor_fruta_kg' => '1,25',
         ]);
 
@@ -67,8 +67,44 @@ class FreteTest extends FreteTestCase
             'id_veiculo' => $veiculo->id,
             'descricao' => 'texto',
             'status_situacao' => FreteStatusSituacao::ABERTA->value,
-            'valor_fruta_kg' => '1.25',
+            'valor_fruta_kg' => '10.50',
         ]);
+    }
+
+    public function test_cadastro_nao_exige_status_nem_valor_fruta_kg(): void
+    {
+        $veiculo = Veiculo::factory()->create();
+
+        $payload = [
+            'nome' => 'frete inicial',
+            'valor' => '250,75',
+            'id_veiculo' => $veiculo->id,
+            'descricao' => null,
+        ];
+
+        $this->actingAs($this->userWithPermissions([Permissions::FRETES_CRIAR]))
+            ->post(route('admin.fretes.store'), $payload)
+            ->assertRedirect(route('admin.fretes.index'))
+            ->assertSessionHasNoErrors();
+
+        $this->assertDatabaseHas('fretes', [
+            'nome' => 'FRETE INICIAL',
+            'valor' => '250.75',
+            'status_situacao' => FreteStatusSituacao::ABERTA->value,
+            'valor_fruta_kg' => '250.75',
+        ]);
+    }
+
+    public function test_formulario_de_criacao_nao_exibe_status_nem_valor_fruta_kg(): void
+    {
+        Veiculo::factory()->create();
+
+        $this->actingAs($this->userWithPermissions([Permissions::FRETES_CRIAR]))
+            ->get(route('admin.fretes.create'))
+            ->assertOk()
+            ->assertDontSee('name="status_situacao"', false)
+            ->assertDontSee('name="valor_fruta_kg"', false)
+            ->assertSee('será criado como', false);
     }
 
     public function test_nome_duplicado_falha_na_validacao(): void

@@ -45,7 +45,7 @@ class UnidadeNegocioController extends Controller
             'perPageOptions' => UnidadeNegocioQuery::PER_PAGE_OPTIONS,
             'total' => $total,
             'exibindo' => $exibindo,
-            'estados' => Estado::query()->orderBy('nome')->get(['id', 'nome']),
+            'estados' => Estado::query()->orderBy('nome')->get(['id', 'nome', 'abreviacao']),
         ];
 
         if ($request->ajax()) {
@@ -58,7 +58,7 @@ class UnidadeNegocioController extends Controller
     public function create(): View
     {
         return view('admin.unidades-negocio.create', [
-            'estados' => Estado::query()->orderBy('nome')->get(['id', 'nome']),
+            'estados' => Estado::query()->orderBy('nome')->get(['id', 'nome', 'abreviacao']),
             'unidadeNegocio' => new UnidadeNegocio([
                 'status' => true,
                 'possui_estoque' => false,
@@ -100,7 +100,7 @@ class UnidadeNegocioController extends Controller
         ]);
 
         return view('admin.unidades-negocio.edit', [
-            'estados' => Estado::query()->orderBy('nome')->get(['id', 'nome']),
+            'estados' => Estado::query()->orderBy('nome')->get(['id', 'nome', 'abreviacao']),
             'unidadeNegocio' => $unidadeNegocio,
         ]);
     }

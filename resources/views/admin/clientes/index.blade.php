@@ -15,8 +15,8 @@
 
     <x-admin.data-table
         title="Clientes"
-        subtitle="Cadastro mestre de clientes (CIGAM + razão social + CPF/CNPJ)."
-        search-placeholder="Pesquisar por ID CIGAM, razão social ou CPF/CNPJ..."
+        subtitle="Cadastro mestre de clientes (CIGAM + razão social + fantasia + CPF/CNPJ)."
+        search-placeholder="Pesquisar por ID CIGAM, razão social, fantasia ou CPF/CNPJ..."
         :endpoint="route('admin.clientes.index')"
         :current-search="$filtros['search'] ?? ''"
         :current-per-page="$filtros['per_page'] ?? 20"

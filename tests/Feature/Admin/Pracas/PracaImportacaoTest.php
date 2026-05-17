@@ -45,7 +45,7 @@ class PracaImportacaoTest extends PracaTestCase
     public function test_job_processa_nova_existente_sem_alteracao_e_com_alteracao(): void
     {
         Storage::fake('local');
-        $unidade = UnidadeNegocio::factory()->create();
+        $unidade = UnidadeNegocio::factory()->create(['id_cigam' => '000110']);
 
         $existenteIgual = Praca::factory()->create([
             'nome' => 'PRACA IGUAL',
@@ -53,8 +53,8 @@ class PracaImportacaoTest extends PracaTestCase
         ]);
 
         $path = $this->storeSpreadsheet([
-            ['PRACA NOVA', $unidade->id],
-            [$existenteIgual->nome, $unidade->id],
+            ['PRACA NOVA', '110'],
+            [$existenteIgual->nome, '000110'],
         ]);
 
         $importacao = PracaImportacao::create([
@@ -74,6 +74,97 @@ class PracaImportacaoTest extends PracaTestCase
         $this->assertSame(1, $importacao->novas_count);
         $this->assertSame(1, $importacao->sem_alteracoes_count);
         $this->assertSame(0, $importacao->atualizacoes_count);
+    }
+
+    public function test_job_resolve_unidade_por_id_cigam_sem_zeros_com_zeros_e_com_simbolos(): void
+    {
+        Storage::fake('local');
+        $unidadeSemZeros = UnidadeNegocio::factory()->create(['id_cigam' => '000110']);
+        $unidadeComZeros = UnidadeNegocio::factory()->create(['id_cigam' => '000025']);
+        $unidadeComSimbolos = UnidadeNegocio::factory()->create(['id_cigam' => '123456']);
+
+        $path = $this->storeSpreadsheet([
+            ['PRACA 110', '110'],
+            ['PRACA 25', '000025'],
+            ['PRACA SIMBOLOS', ' 123.456 '],
+        ]);
+
+        $importacao = PracaImportacao::create([
+            'uuid' => (string) Str::uuid(),
+            'user_id' => $this->pracasManager()->id,
+            'arquivo_original' => 'pracas.xlsx',
+            'arquivo_path' => $path,
+            'status' => PracaImportacao::STATUS_AGUARDANDO,
+        ]);
+
+        (new ProcessarPreviewImportacaoPracasJob($importacao->id))
+            ->handle(app(PracaImportacaoProcessor::class));
+
+        $importacao->refresh();
+
+        $this->assertSame(0, $importacao->erros_count);
+        $this->assertSame(3, $importacao->novas_count);
+        $this->assertSame($unidadeSemZeros->id, $importacao->resultado['novas'][0]['dados']['id_unidade_negocio']);
+        $this->assertSame($unidadeComZeros->id, $importacao->resultado['novas'][1]['dados']['id_unidade_negocio']);
+        $this->assertSame($unidadeComSimbolos->id, $importacao->resultado['novas'][2]['dados']['id_unidade_negocio']);
+    }
+
+    public function test_duplicidade_na_planilha_considera_id_cigam_da_unidade_normalizado(): void
+    {
+        Storage::fake('local');
+        UnidadeNegocio::factory()->create(['id_cigam' => '000110']);
+
+        $path = $this->storeSpreadsheet([
+            ['FORTALEZA', '110'],
+            ['FORTALEZA', '000110'],
+        ]);
+
+        $importacao = PracaImportacao::create([
+            'uuid' => (string) Str::uuid(),
+            'user_id' => $this->pracasManager()->id,
+            'arquivo_original' => 'pracas.xlsx',
+            'arquivo_path' => $path,
+            'status' => PracaImportacao::STATUS_AGUARDANDO,
+        ]);
+
+        (new ProcessarPreviewImportacaoPracasJob($importacao->id))
+            ->handle(app(PracaImportacaoProcessor::class));
+
+        $importacao->refresh();
+
+        $this->assertSame(1, $importacao->erros_count);
+        $this->assertSame(
+            'Combinação nome + unidade duplicada na planilha (já aparece na linha 2).',
+            $importacao->resultado['erros'][0]['erros'][0],
+        );
+    }
+
+    public function test_mensagem_de_erro_exibe_id_cigam_normalizado_e_valor_original(): void
+    {
+        Storage::fake('local');
+
+        $path = $this->storeSpreadsheet([
+            ['FORTALEZA', '110'],
+        ]);
+
+        $importacao = PracaImportacao::create([
+            'uuid' => (string) Str::uuid(),
+            'user_id' => $this->pracasManager()->id,
+            'arquivo_original' => 'pracas.xlsx',
+            'arquivo_path' => $path,
+            'status' => PracaImportacao::STATUS_AGUARDANDO,
+        ]);
+
+        (new ProcessarPreviewImportacaoPracasJob($importacao->id))
+            ->handle(app(PracaImportacaoProcessor::class));
+
+        $importacao->refresh();
+
+        $this->assertSame(1, $importacao->erros_count);
+        $this->assertSame(
+            'Unidade de negócio com id_cigam 000110 não encontrada. Valor original informado: 110.',
+            $importacao->resultado['erros'][0]['erros'][0],
+        );
     }
 
     public function test_confirmacao_cria_atualiza_com_historico(): void

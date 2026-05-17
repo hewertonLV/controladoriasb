@@ -19,7 +19,7 @@ use Illuminate\Support\Carbon;
  * @property int $id_estado
  * @property string $razao_social
  * @property string $nome
- * @property string $cpf_cnpj
+ * @property string|null $cpf_cnpj
  * @property string $custo_operacional
  * @property bool $status
  * @property bool $possui_estoque
@@ -113,9 +113,11 @@ class UnidadeNegocio extends Model
 
     protected function setCpfCnpjAttribute(mixed $value): void
     {
-        $this->attributes['cpf_cnpj'] = TextoCadastro::somenteDigitos(
+        $documento = TextoCadastro::somenteDigitos(
             $value === null ? '' : (string) $value,
         );
+
+        $this->attributes['cpf_cnpj'] = $documento === '' ? null : $documento;
     }
 
     protected function setCustoOperacionalAttribute(mixed $value): void

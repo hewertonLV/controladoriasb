@@ -35,6 +35,7 @@ abstract class ClienteTestCase extends TestCase
         return array_replace([
             'id_cigam' => '1',
             'razao_social' => 'Cliente Teste LTDA',
+            'fantasia' => null,
             'cnpj_cpf' => '52998224725',
             'id_unidade_negocio' => $unit,
             'id_praca' => $pracaId,

@@ -18,13 +18,18 @@ class ProcessarPreviewImportacaoFornecedoresJob implements ShouldQueue
     use Queueable;
     use SerializesModels;
 
-    public int $timeout = 900;
+    public int $timeout = 300;
 
-    public int $tries = 1;
+    public int $tries = 3;
+
+    /**
+     * @var list<int>
+     */
+    public array $backoff = [30, 60, 120];
 
     public function __construct(public readonly int $importacaoId)
     {
-        $this->onQueue('fornecedores-importacao');
+        $this->onQueue('imports');
     }
 
     public function handle(FornecedorImportacaoProcessor $processor): void

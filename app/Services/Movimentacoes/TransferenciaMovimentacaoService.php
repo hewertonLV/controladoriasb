@@ -16,6 +16,7 @@ use App\Models\Movimentacao;
 use App\Models\MovimentacaoEstoque;
 use App\Models\StatusMovimentacao;
 use App\Models\UnidadeNegocio;
+use App\Support\EmpresaEntidadeQuery;
 use App\Support\TextoCadastro;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Carbon;
@@ -66,11 +67,7 @@ final class TransferenciaMovimentacaoService
      */
     public function opcoesFormularioTransferencia(): array
     {
-        $empresasUn = Empresa::query()
-            ->where('entidade_type', UnidadeNegocio::class)
-            ->whereHas('entidade', static function ($query): void {
-                $query->where('possui_estoque', true);
-            })
+        $empresasUn = EmpresaEntidadeQuery::unidadesComEstoque()
             ->with('entidade')
             ->get()
             ->sortBy(fn (Empresa $e): string => mb_strtolower($e->nomeExibicao()))

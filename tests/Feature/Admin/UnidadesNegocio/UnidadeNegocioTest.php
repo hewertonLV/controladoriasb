@@ -69,6 +69,58 @@ class UnidadeNegocioTest extends UnidadeNegocioTestCase
         ]);
     }
 
+    public function test_cadastro_sem_cpf_cnpj_grava_null(): void
+    {
+        $this->actingAs($this->userWithPermissions([Permissions::UNIDADES_NEGOCIO_CRIAR]))
+            ->post(route('admin.unidades-negocio.store'), $this->unidadePayload([
+                'id_cigam' => '77002',
+                'cpf_cnpj' => '',
+            ]))
+            ->assertRedirect(route('admin.unidades-negocio.index'))
+            ->assertSessionHasNoErrors();
+
+        $this->assertDatabaseHas('unidades_negocio', [
+            'id_cigam' => '077002',
+            'cpf_cnpj' => null,
+        ]);
+    }
+
+    public function test_cadastro_com_cpf_cnpj_null_grava_null(): void
+    {
+        $this->actingAs($this->userWithPermissions([Permissions::UNIDADES_NEGOCIO_CRIAR]))
+            ->post(route('admin.unidades-negocio.store'), $this->unidadePayload([
+                'id_cigam' => '77003',
+                'cpf_cnpj' => null,
+            ]))
+            ->assertRedirect(route('admin.unidades-negocio.index'))
+            ->assertSessionHasNoErrors();
+
+        $this->assertDatabaseHas('unidades_negocio', [
+            'id_cigam' => '077003',
+            'cpf_cnpj' => null,
+        ]);
+    }
+
+    public function test_duas_unidades_podem_ter_mesmo_cpf_cnpj(): void
+    {
+        UnidadeNegocio::factory()->create([
+            'id_cigam' => '077004',
+            'cpf_cnpj' => '11222333000181',
+        ]);
+
+        $this->actingAs($this->userWithPermissions([Permissions::UNIDADES_NEGOCIO_CRIAR]))
+            ->post(route('admin.unidades-negocio.store'), $this->unidadePayload([
+                'id_cigam' => '77005',
+                'cpf_cnpj' => '11.222.333/0001-81',
+            ]))
+            ->assertRedirect(route('admin.unidades-negocio.index'))
+            ->assertSessionHasNoErrors();
+
+        $this->assertSame(2, UnidadeNegocio::query()
+            ->where('cpf_cnpj', '11222333000181')
+            ->count());
+    }
+
     public function test_id_cigam_duplicado_falha_na_validacao(): void
     {
         UnidadeNegocio::factory()->create(['id_cigam' => '088001']);

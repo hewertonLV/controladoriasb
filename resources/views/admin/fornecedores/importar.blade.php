@@ -12,7 +12,7 @@
                     Layout fixo (linha 1 é cabeçalho e pode ter qualquer texto):
                     <code>A</code> ID CIGAM · <code>B</code> Razão social ·
                     <code>C</code> Fantasia · <code>D</code> CPF/CNPJ ·
-                    <code>E</code> Estado (nome cadastrado, ex.: CEARA)
+                    <code>E</code> Estado (abreviação ou nome cadastrado, ex.: CE ou CEARA)
                 </p>
             </div>
             <a href="{{ route('admin.fornecedores.index') }}" class="btn btn-light">
@@ -55,6 +55,39 @@
                      style="width: 0%">0%</div>
             </div>
             <div class="text-muted small mt-2" id="progresso-texto">Aguardando processamento...</div>
+
+            <div class="alert alert-warning d-none mt-3 mb-0" id="alerta-worker-inativo">
+                Fila parada: nenhum worker ativo detectado.
+            </div>
+
+            <div class="row g-2 mt-3">
+                <div class="col-md-6">
+                    <div class="border rounded p-3 h-100">
+                        <p class="text-muted text-uppercase fs-12 mb-1">Arquivo atual</p>
+                        <div class="fw-semibold" id="fila-arquivo-atual">—</div>
+                        <div class="small text-muted mt-1">Usuário: <span id="fila-usuario-atual">—</span></div>
+                        <div class="small text-muted">Linhas: <span id="fila-linhas-atual">0 / 0</span></div>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="border rounded p-3 h-100">
+                        <p class="text-muted text-uppercase fs-12 mb-1">Fila imports</p>
+                        <div class="d-flex flex-wrap gap-3">
+                            <div><span class="fw-semibold" id="fila-posicao">—</span><span class="text-muted small"> posição</span></div>
+                            <div><span class="fw-semibold" id="fila-na-frente">0</span><span class="text-muted small"> na frente</span></div>
+                            <div><span class="fw-semibold" id="fila-aguardando">0</span><span class="text-muted small"> aguardando</span></div>
+                            <div><span class="fw-semibold" id="fila-processando">0</span><span class="text-muted small"> processando</span></div>
+                        </div>
+                        <div class="small text-muted mt-2">Worker: <span id="fila-worker-status">DESCONHECIDO</span></div>
+                        <div class="small text-muted" id="fila-estimativa">—</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="border rounded p-3 mt-3 d-none" id="card-processando-agora">
+                <p class="text-muted text-uppercase fs-12 mb-2">Processando agora</p>
+                <div id="lista-processando-agora" class="d-grid gap-2"></div>
+            </div>
 
             <div class="row g-2 mt-3 text-center">
                 <div class="col-6 col-md-3">
@@ -276,6 +309,18 @@
         const progressoAtual = document.getElementById('progresso-atualizacoes');
         const progressoSem = document.getElementById('progresso-sem-alteracoes');
         const progressoErros = document.getElementById('progresso-erros');
+        const alertaWorkerInativo = document.getElementById('alerta-worker-inativo');
+        const filaArquivoAtual = document.getElementById('fila-arquivo-atual');
+        const filaUsuarioAtual = document.getElementById('fila-usuario-atual');
+        const filaLinhasAtual = document.getElementById('fila-linhas-atual');
+        const filaPosicao = document.getElementById('fila-posicao');
+        const filaNaFrente = document.getElementById('fila-na-frente');
+        const filaAguardando = document.getElementById('fila-aguardando');
+        const filaProcessando = document.getElementById('fila-processando');
+        const filaWorkerStatus = document.getElementById('fila-worker-status');
+        const filaEstimativa = document.getElementById('fila-estimativa');
+        const cardProcessandoAgora = document.getElementById('card-processando-agora');
+        const listaProcessandoAgora = document.getElementById('lista-processando-agora');
 
         const resultado = document.getElementById('resultado');
         const tbodyNovas = document.getElementById('tbody-novas');
@@ -351,6 +396,18 @@
             progressoAtual.textContent = '0';
             progressoSem.textContent = '0';
             progressoErros.textContent = '0';
+            alertaWorkerInativo.classList.add('d-none');
+            filaArquivoAtual.textContent = '—';
+            filaUsuarioAtual.textContent = '—';
+            filaLinhasAtual.textContent = '0 / 0';
+            filaPosicao.textContent = '—';
+            filaNaFrente.textContent = '0';
+            filaAguardando.textContent = '0';
+            filaProcessando.textContent = '0';
+            filaWorkerStatus.textContent = 'DESCONHECIDO';
+            filaEstimativa.textContent = '—';
+            cardProcessandoAgora.classList.add('d-none');
+            listaProcessandoAgora.innerHTML = '';
         }
         function aplicarStatusNaUI(s) {
             if (s.arquivo_original) progressoArquivo.textContent = s.arquivo_original;
@@ -363,28 +420,64 @@
             progressoAtual.textContent = s.atualizacoes_count || 0;
             progressoSem.textContent = s.sem_alteracoes_count || 0;
             progressoErros.textContent = s.erros_count || 0;
+            filaArquivoAtual.textContent = s.arquivo_original || '—';
+            filaUsuarioAtual.textContent = s.usuario_nome || '—';
+            filaLinhasAtual.textContent = (s.linhas_processadas || 0) + ' / ' + (s.total_linhas || 0);
+            filaPosicao.textContent = s.posicao_fila ? s.posicao_fila + 'º' : '—';
+            filaNaFrente.textContent = s.arquivos_na_frente || 0;
+            filaAguardando.textContent = s.total_aguardando || 0;
+            filaProcessando.textContent = s.total_processando || 0;
+            filaWorkerStatus.textContent = s.worker_status || 'DESCONHECIDO';
+            filaEstimativa.textContent = s.estimativa_inicio_texto || '—';
+            alertaWorkerInativo.classList.toggle('d-none', s.worker_status !== 'INATIVO' || s.status !== 'AGUARDANDO');
+            renderProcessandoAgora(s.processando_agora || []);
 
             if (s.status === 'AGUARDANDO') {
-                progressoStatusTitulo.textContent = 'Na fila — aguardando worker...';
-                progressoTexto.textContent = 'A planilha foi enviada e está aguardando o processamento na fila.';
+                progressoStatusTitulo.textContent = 'Esperando a fila de importações...';
+                progressoTexto.textContent = s.mensagem || 'A planilha foi enviada e está aguardando o processamento na fila.';
             } else if (s.status === 'PROCESSANDO') {
                 progressoStatusTitulo.textContent = 'Analisando planilha...';
-                if (s.total_linhas > 0) {
+                if (s.mensagem) {
+                    progressoTexto.textContent = s.mensagem;
+                } else if (s.total_linhas > 0) {
                     progressoTexto.textContent = 'Processados ' + (s.linhas_processadas || 0) + ' de ' + s.total_linhas + ' registros.';
                 } else {
                     progressoTexto.textContent = 'Processando...';
                 }
             } else if (s.status === 'CONCLUIDO') {
                 progressoStatusTitulo.textContent = 'Análise concluída.';
-                progressoTexto.textContent = 'Processados ' + (s.linhas_processadas || 0) + ' de ' + (s.total_linhas || 0) + ' registros.';
+                progressoTexto.textContent = s.mensagem || ('Processados ' + (s.linhas_processadas || 0) + ' de ' + (s.total_linhas || 0) + ' registros.');
                 progressoBarra.classList.remove('progress-bar-animated');
                 progressoBarra.classList.add('bg-success');
             } else if (s.status === 'FALHOU') {
                 progressoStatusTitulo.textContent = 'Falhou.';
-                progressoTexto.textContent = s.erro_mensagem || 'O processamento falhou.';
+                progressoTexto.textContent = s.mensagem || s.erro_mensagem || 'O processamento falhou.';
                 progressoBarra.classList.remove('progress-bar-animated');
                 progressoBarra.classList.add('bg-danger');
             }
+        }
+
+        function renderProcessandoAgora(lista) {
+            listaProcessandoAgora.innerHTML = '';
+            cardProcessandoAgora.classList.toggle('d-none', lista.length === 0);
+            lista.forEach(item => {
+                const pct = Math.max(0, Math.min(100, parseInt(item.progresso || 0, 10)));
+                const div = document.createElement('div');
+                div.className = 'border rounded p-2';
+                div.innerHTML = `
+                    <div class="d-flex flex-wrap gap-2 align-items-center">
+                        <span class="fw-semibold">${escapeHtml(item.arquivo_original || '—')}</span>
+                        <span class="text-muted small">Usuário: ${escapeHtml(item.usuario_nome || '—')}</span>
+                        <span class="text-muted small">Tipo: ${escapeHtml(item.tipo || '—')}</span>
+                        <span class="ms-auto small fw-semibold">${pct}%</span>
+                    </div>
+                    <div class="progress mt-1" style="height: 6px;">
+                        <div class="progress-bar" style="width: ${pct}%"></div>
+                    </div>
+                    <div class="small text-muted mt-1">${item.linhas_processadas || 0} / ${item.total_linhas || 0} linhas</div>
+                `;
+                listaProcessandoAgora.appendChild(div);
+            });
         }
 
         function renderNovas(lista) {

@@ -100,7 +100,8 @@ class FornecedorQuery
                 }
 
                 $q->orWhereHas('estado', function (Builder $eq) use ($searchUpper): void {
-                    $eq->where('nome', 'like', "%{$searchUpper}%");
+                    $eq->where('nome', 'like', "%{$searchUpper}%")
+                        ->orWhere('abreviacao', 'like', "%{$searchUpper}%");
                 });
             });
         }
@@ -124,7 +125,7 @@ class FornecedorQuery
 
         $query->orderBy('id');
 
-        $query->with(['estado:id,nome']);
+        $query->with(['estado:id,nome,abreviacao']);
 
         return $query;
     }

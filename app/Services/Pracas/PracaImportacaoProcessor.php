@@ -106,11 +106,11 @@ class PracaImportacaoProcessor
             $normalized = $this->normalizer->normalize($dadosBrutos);
             $dados = $normalized['dados'];
             $errosLinha = $normalized['erros'];
-            $chave = $this->chaveComposta($dados['nome'], $dados['id_unidade_negocio']);
+            $chave = $this->chaveCompostaPlanilha($dados['nome'], $dados['id_cigam_unidade'] ?? '');
 
-            if ($chave !== '|0' && isset($chavesVistas[$chave])) {
+            if ($chave !== '|' && isset($chavesVistas[$chave])) {
                 $errosLinha[] = "Combinação nome + unidade duplicada na planilha (já aparece na linha {$chavesVistas[$chave]}).";
-            } elseif ($chave !== '|0') {
+            } elseif ($chave !== '|') {
                 $chavesVistas[$chave] = $r;
             }
 
@@ -295,6 +295,11 @@ class PracaImportacaoProcessor
     private function chaveComposta(string $nome, int $idUnidade): string
     {
         return TextoCadastro::normalizarMaiusculas($nome).'|'.$idUnidade;
+    }
+
+    private function chaveCompostaPlanilha(string $nome, string $idCigamUnidade): string
+    {
+        return TextoCadastro::normalizarMaiusculas($nome).'|'.$idCigamUnidade;
     }
 
     /**

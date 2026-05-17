@@ -186,16 +186,6 @@ class UnidadeNegocioImportacaoController extends Controller
                         continue;
                     }
 
-                    if (UnidadeNegocio::query()->where('cpf_cnpj', $dados['cpf_cnpj'])->exists()) {
-                        $erros[] = [
-                            'linha' => $dados['id_cigam'],
-                            'erros' => ['CPF/CNPJ já cadastrado em outra unidade de negócio.'],
-                        ];
-                        $ignoradas++;
-
-                        continue;
-                    }
-
                     $unidade = UnidadeNegocio::create([
                         'id_cigam' => $dados['id_cigam'],
                         'id_estado' => (int) $dados['id_estado'],
@@ -246,21 +236,6 @@ class UnidadeNegocioImportacaoController extends Controller
                     $erroVal = $this->validarDadosLinha($dados);
                     if ($erroVal !== null) {
                         $erros[] = ['linha' => $unidade->id_cigam, 'erros' => [$erroVal]];
-                        $ignoradas++;
-
-                        continue;
-                    }
-
-                    $colisao = UnidadeNegocio::query()
-                        ->where('cpf_cnpj', $dados['cpf_cnpj'])
-                        ->where('id', '!=', $unidade->id)
-                        ->exists();
-
-                    if ($colisao) {
-                        $erros[] = [
-                            'linha' => $unidade->id_cigam,
-                            'erros' => ['CPF/CNPJ já cadastrado em outra unidade de negócio.'],
-                        ];
                         $ignoradas++;
 
                         continue;
@@ -370,10 +345,7 @@ class UnidadeNegocioImportacaoController extends Controller
         if ($nome === '') {
             return 'Nome é obrigatório.';
         }
-        if ($cpfCnpj === '') {
-            return 'CPF/CNPJ é obrigatório.';
-        }
-        if (! in_array(strlen($cpfCnpj), [11, 14], true)) {
+        if ($cpfCnpj !== '' && ! in_array(strlen($cpfCnpj), [11, 14], true)) {
             return 'CPF/CNPJ deve ter 11 dígitos (CPF) ou 14 dígitos (CNPJ).';
         }
         if (! array_key_exists('possui_estoque', $dados)) {

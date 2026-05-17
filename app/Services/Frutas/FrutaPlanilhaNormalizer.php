@@ -19,6 +19,19 @@ use App\Support\TextoCadastro;
  */
 class FrutaPlanilhaNormalizer
 {
+    private const UNIDADE_MEDICAO_ALIASES = [
+        'CAIXA' => FrutaUnidadeMedicao::CAIXA->value,
+        'CX' => FrutaUnidadeMedicao::CAIXA->value,
+        'PACOTE' => FrutaUnidadeMedicao::PACOTE->value,
+        'PCT' => FrutaUnidadeMedicao::PACOTE->value,
+        'PC' => FrutaUnidadeMedicao::PACOTE->value,
+        'UNIDADE' => FrutaUnidadeMedicao::UNIDADE->value,
+        'UN' => FrutaUnidadeMedicao::UNIDADE->value,
+        'UND' => FrutaUnidadeMedicao::UNIDADE->value,
+        'SACO' => FrutaUnidadeMedicao::SACO->value,
+        'SC' => FrutaUnidadeMedicao::SACO->value,
+    ];
+
     /**
      * @param  list<mixed>  $row
      * @return array{
@@ -43,7 +56,7 @@ class FrutaPlanilhaNormalizer
             $this->trimString($row[0] ?? null),
         );
         $nome = $this->trimString($row[1] ?? null);
-        $unidadeMedicao = mb_strtoupper($this->trimString($row[2] ?? null), 'UTF-8');
+        $unidadeMedicao = self::normalizarUnidadeMedicao($row[2] ?? null);
         $kg = $this->normalizeKg($row[3] ?? null);
 
         $icmsExRaw = $row[4] ?? null;
@@ -117,17 +130,32 @@ class FrutaPlanilhaNormalizer
         return trim((string) $value);
     }
 
+    public static function normalizarUnidadeMedicao(mixed $value): string
+    {
+        $texto = TextoCadastro::normalizarMaiusculas(TextoCadastro::removerAcentos((string) $value));
+        $chave = preg_replace('/[^A-Z0-9]/', '', $texto) ?? '';
+
+        return self::UNIDADE_MEDICAO_ALIASES[$chave] ?? $texto;
+    }
+
     private function normalizeKg(mixed $value): ?string
     {
         if ($value === null || trim((string) $value) === '') {
             return '0.00';
         }
 
-        if (! is_numeric((string) $value)) {
+        $limpo = preg_replace('/[^\d,.]/u', '', trim((string) $value)) ?? '';
+        if ($limpo === '') {
             return null;
         }
 
-        $kg = max(0, round((float) $value, 2));
+        $normalizado = TextoCadastro::normalizarValorMonetarioBrasileiro($value);
+
+        if (! is_numeric($normalizado)) {
+            return null;
+        }
+
+        $kg = max(0, round((float) $normalizado, 2));
 
         return number_format($kg, 2, '.', '');
     }

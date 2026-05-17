@@ -39,7 +39,8 @@
             $temFiltro = ($filtros['search'] ?? '') !== '' || ($filtros['id_estado'] ?? null) !== null;
             $estadoFiltroNome = null;
             if (($filtros['id_estado'] ?? null) !== null) {
-                $estadoFiltroNome = \App\Models\Estado::query()->whereKey((int) $filtros['id_estado'])->value('nome');
+                $estadoFiltro = \App\Models\Estado::query()->whereKey((int) $filtros['id_estado'])->first(['nome', 'abreviacao']);
+                $estadoFiltroNome = $estadoFiltro ? "{$estadoFiltro->abreviacao} - {$estadoFiltro->nome}" : null;
             }
         @endphp
         @if ($temFiltro)
@@ -71,7 +72,9 @@
             @forelse ($fornecedores as $fornecedor)
                 <tr>
                     <td>{{ $fornecedor->id_cigam }}</td>
-                    <td>{{ $fornecedor->estado?->nome ?? '—' }}</td>
+                    <td>
+                        {{ $fornecedor->estado ? $fornecedor->estado->abreviacao.' - '.$fornecedor->estado->nome : '—' }}
+                    </td>
                     <td>{{ $fornecedor->razao_social }}</td>
                     <td>{{ $fornecedor->fantasia ?? '-' }}</td>
                     <td>{{ $fmtDoc($fornecedor->cnpj_cpf) }}</td>

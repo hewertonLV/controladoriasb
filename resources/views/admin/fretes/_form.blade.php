@@ -1,6 +1,7 @@
 @php
     /** @var \App\Models\Frete $frete */
     /** @var \Illuminate\Support\Collection<int, \App\Models\Veiculo> $veiculos */
+    $criando = ! $frete->exists;
 @endphp
 
 <div class="card">
@@ -38,20 +39,22 @@
                     <div class="invalid-feedback">{{ $message }}</div>
                 @enderror
             </div>
-            <div class="col-md-3">
-                <label for="valor_fruta_kg" class="form-label">Valor fruta/kg <span class="text-danger">*</span></label>
-                <input type="number"
-                       id="valor_fruta_kg"
-                       name="valor_fruta_kg"
-                       value="{{ old('valor_fruta_kg', $frete->valor_fruta_kg) }}"
-                       class="form-control @error('valor_fruta_kg') is-invalid @enderror"
-                       min="0"
-                       step="0.01"
-                       required>
-                @error('valor_fruta_kg')
-                    <div class="invalid-feedback">{{ $message }}</div>
-                @enderror
-            </div>
+            @unless ($criando)
+                <div class="col-md-3">
+                    <label for="valor_fruta_kg" class="form-label">Valor fruta/kg <span class="text-danger">*</span></label>
+                    <input type="number"
+                           id="valor_fruta_kg"
+                           name="valor_fruta_kg"
+                           value="{{ old('valor_fruta_kg', $frete->valor_fruta_kg) }}"
+                           class="form-control @error('valor_fruta_kg') is-invalid @enderror"
+                           min="0"
+                           step="0.01"
+                           required>
+                    @error('valor_fruta_kg')
+                        <div class="invalid-feedback">{{ $message }}</div>
+                    @enderror
+                </div>
+            @endunless
             <div class="col-md-6">
                 <label for="id_veiculo" class="form-label">Veículo <span class="text-danger">*</span></label>
                 <select id="id_veiculo"
@@ -71,19 +74,27 @@
                 @enderror
                 <small class="text-muted">Somente veículos ativos.</small>
             </div>
-            <div class="col-md-3">
-                <label for="status_situacao" class="form-label">Situação <span class="text-danger">*</span></label>
-                <select id="status_situacao"
-                        name="status_situacao"
-                        class="form-select @error('status_situacao') is-invalid @enderror"
-                        required>
-                    <option value="ABERTA" @selected(old('status_situacao', $frete->status_situacao) === 'ABERTA')>Aberta</option>
-                    <option value="ENCERRADA" @selected(old('status_situacao', $frete->status_situacao) === 'ENCERRADA')>Encerrada</option>
-                </select>
-                @error('status_situacao')
-                    <div class="invalid-feedback">{{ $message }}</div>
-                @enderror
-            </div>
+            @unless ($criando)
+                <div class="col-md-3">
+                    <label for="status_situacao" class="form-label">Situação <span class="text-danger">*</span></label>
+                    <select id="status_situacao"
+                            name="status_situacao"
+                            class="form-select @error('status_situacao') is-invalid @enderror"
+                            required>
+                        <option value="ABERTA" @selected(old('status_situacao', $frete->status_situacao) === 'ABERTA')>Aberta</option>
+                        <option value="ENCERRADA" @selected(old('status_situacao', $frete->status_situacao) === 'ENCERRADA')>Encerrada</option>
+                    </select>
+                    @error('status_situacao')
+                        <div class="invalid-feedback">{{ $message }}</div>
+                    @enderror
+                </div>
+            @else
+                <div class="col-md-6">
+                    <div class="alert alert-info mb-0">
+                        O frete será criado como <strong>Aberto</strong>. Enquanto não houver movimentações vinculadas, o valor fruta/kg inicial será igual ao valor total informado.
+                    </div>
+                </div>
+            @endunless
             <div class="col-12">
                 <label for="descricao" class="form-label">Descrição</label>
                 <textarea id="descricao"

@@ -213,12 +213,13 @@ class EstoqueImportacaoProcessor
 
     /**
      * @param  list<mixed>  $dadosBrutos
-     * @return array{dados: array{id_cigam_unidade: string, id_cigam_fruta: string, qtd_fruta_kg: string, preco_medio_kg: string}, erros: list<string>}
+     * @return array{dados: array{id_cigam_unidade: string, id_cigam_unidade_original: string, id_cigam_fruta: string, qtd_fruta_kg: string, preco_medio_kg: string}, erros: list<string>}
      */
     private function normalizeRow(array $dadosBrutos): array
     {
-        $idUn = TextoCadastro::normalizarIdCigamAteSeisDigitos((string) ($dadosBrutos[0] ?? ''));
-        $idFr = TextoCadastro::normalizarIdCigamAteSeisDigitos((string) ($dadosBrutos[1] ?? ''));
+        $idUnOriginal = trim((string) ($dadosBrutos[0] ?? ''));
+        $idUn = TextoCadastro::normalizarIdCigam($idUnOriginal);
+        $idFr = TextoCadastro::normalizarIdCigam((string) ($dadosBrutos[1] ?? ''));
         $qtdRaw = trim((string) ($dadosBrutos[2] ?? '0'));
         $precoRaw = trim((string) ($dadosBrutos[3] ?? '0'));
 
@@ -242,6 +243,7 @@ class EstoqueImportacaoProcessor
         return [
             'dados' => [
                 'id_cigam_unidade' => $idUn,
+                'id_cigam_unidade_original' => $idUnOriginal,
                 'id_cigam_fruta' => $idFr,
                 'qtd_fruta_kg' => number_format($qtd, 2, '.', ''),
                 'preco_medio_kg' => number_format($preco, 2, '.', ''),
@@ -318,7 +320,7 @@ class EstoqueImportacaoProcessor
                     'row_id' => $rowId,
                     'linha' => $linha,
                     'chave' => $idUnCigam.'|'.$idFrCigam,
-                    'erros' => ['Unidade de negócio não encontrada para o ID CIGAM informado.'],
+                    'erros' => [$this->mensagemUnidadeNaoEncontrada($idUnCigam, (string) ($dados['id_cigam_unidade_original'] ?? ''))],
                     'dados' => $dados,
                 ];
 
@@ -444,6 +446,11 @@ class EstoqueImportacaoProcessor
         }
 
         $this->salvarProgresso($importacao, $linhasProcessadas, $totalLinhas, $novas, $atualizacoes, $semAlteracoes, $erros);
+    }
+
+    private function mensagemUnidadeNaoEncontrada(string $normalizado, string $original): string
+    {
+        return "Unidade de negócio com id_cigam {$normalizado} não encontrada. Valor original informado: {$original}.";
     }
 
     /**

@@ -46,7 +46,8 @@
         <thead>
             <tr>
                 <th width="10%">ID CIGAM</th>
-                <th width="30%">Razão social</th>
+                <th width="24%">Razão social</th>
+                <th width="18%">Fantasia</th>
                 <th width="18%">CPF/CNPJ</th>
                 <th width="8%">UN</th>
                 <th width="14%">Praça</th>
@@ -60,6 +61,7 @@
                 <tr>
                     <td>{{ $cliente->id_cigam }}</td>
                     <td>{{ $cliente->razao_social }}</td>
+                    <td>{{ $cliente->fantasia ?? '—' }}</td>
                     <td>{{ $fmtDoc($cliente->cnpj_cpf) }}</td>
                     <td>{{ $cliente->id_unidade_negocio }}</td>
                     <td>{{ $cliente->praca?->nome ?? '—' }}</td>
@@ -69,7 +71,7 @@
                 </tr>
             @empty
                 <tr>
-                    <td colspan="8" class="empty">Nenhum cliente corresponde aos filtros aplicados.</td>
+                    <td colspan="9" class="empty">Nenhum cliente corresponde aos filtros aplicados.</td>
                 </tr>
             @endforelse
         </tbody>

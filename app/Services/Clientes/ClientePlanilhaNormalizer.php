@@ -12,11 +12,12 @@ use App\Support\TextoCadastro;
  *   A → id_cigam
  *   B → razao_social
  *   C → cnpj_cpf
- *   D → id_unidade_negocio
+ *   D → id_cigam da unidade de negócio
  *   E → desconto_nf
  *   F → desconto_contrato
  *   G → praca (nome)
  *   H → grupo (nome, opcional)
+ *   I → fantasia/nome fantasia/fantasia_cliente (opcional quando detectado por cabeçalho)
  */
 class ClientePlanilhaNormalizer
 {
@@ -26,8 +27,10 @@ class ClientePlanilhaNormalizer
      *     dados: array{
      *         id_cigam: string,
      *         razao_social: string,
+     *         fantasia: string|null,
      *         cnpj_cpf: string,
      *         id_unidade_negocio: int|null,
+     *         id_cigam_unidade: string,
      *         desconto_nf: string,
      *         desconto_contrato: string,
      *         id_praca: int|null,
@@ -44,8 +47,11 @@ class ClientePlanilhaNormalizer
             $this->trimString($row[0] ?? null),
         );
         $razaoSocial = $this->trimString($row[1] ?? null);
+        $fantasia = $this->normalizarTextoOpcional($row[8] ?? null);
         $cnpjCpf = $this->onlyDigits($row[2] ?? null);
-        $idUnidade = $this->parseInteger($row[3] ?? null);
+        $unidadeOriginal = $this->trimString($row[3] ?? null);
+        $idCigamUnidade = TextoCadastro::normalizarIdCigam($unidadeOriginal);
+        $idUnidade = null;
         $descontoNf = $this->parseDesconto($row[4] ?? null);
         $descontoContrato = $this->parseDesconto($row[5] ?? null);
         $pracaNome = TextoCadastro::normalizarMaiusculas($this->trimString($row[6] ?? null));
@@ -59,16 +65,30 @@ class ClientePlanilhaNormalizer
             $erros[] = 'Razão social (coluna B) é obrigatória.';
         }
 
+        if ($fantasia !== null && mb_strlen($fantasia) > 255) {
+            $erros[] = 'Fantasia pode ter no máximo 255 caracteres.';
+        }
+
         if ($cnpjCpf === '') {
             $erros[] = 'CPF/CNPJ (coluna C) é obrigatório.';
         } elseif (! in_array(strlen($cnpjCpf), [11, 14], true)) {
             $erros[] = 'CPF/CNPJ deve ter 11 dígitos (CPF) ou 14 dígitos (CNPJ).';
         }
 
-        if ($idUnidade === null || $idUnidade < 1) {
-            $erros[] = 'Unidade de negócio (coluna D) deve ser um inteiro maior ou igual a 1.';
-        } elseif (! UnidadeNegocio::query()->whereKey($idUnidade)->exists()) {
-            $erros[] = "Unidade de negócio {$idUnidade} não existe no cadastro.";
+        if ($idCigamUnidade === '') {
+            $erros[] = 'ID CIGAM da unidade de negócio (coluna D) é obrigatório.';
+        } elseif (! preg_match('/^\d{6}$/', $idCigamUnidade)) {
+            $erros[] = 'ID CIGAM da unidade de negócio (coluna D) deve ter até 6 dígitos numéricos.';
+        } else {
+            $unidade = UnidadeNegocio::query()
+                ->where('id_cigam', $idCigamUnidade)
+                ->first(['id']);
+
+            if ($unidade === null) {
+                $erros[] = $this->mensagemUnidadeNaoEncontrada($idCigamUnidade, $unidadeOriginal);
+            } else {
+                $idUnidade = (int) $unidade->id;
+            }
         }
 
         if ($descontoNf === null) {
@@ -109,8 +129,10 @@ class ClientePlanilhaNormalizer
             'dados' => [
                 'id_cigam' => $idCigam,
                 'razao_social' => mb_strtoupper($razaoSocial),
+                'fantasia' => $fantasia,
                 'cnpj_cpf' => $cnpjCpf,
                 'id_unidade_negocio' => $idUnidade,
+                'id_cigam_unidade' => $idCigamUnidade,
                 'desconto_nf' => $descontoNf ?? '0.00',
                 'desconto_contrato' => $descontoContrato ?? '0.00',
                 'id_praca' => $idPraca,
@@ -129,24 +151,16 @@ class ClientePlanilhaNormalizer
         return trim((string) $value);
     }
 
+    private function normalizarTextoOpcional(mixed $value): ?string
+    {
+        $texto = preg_replace('/\s+/u', ' ', $this->trimString($value)) ?? '';
+
+        return $texto === '' ? null : mb_strtoupper($texto);
+    }
+
     private function onlyDigits(mixed $value): string
     {
         return preg_replace('/\D/', '', (string) $value) ?? '';
-    }
-
-    private function parseInteger(mixed $value): ?int
-    {
-        if ($value === null || $value === '') {
-            return null;
-        }
-
-        $digits = preg_replace('/\D/', '', (string) $value);
-
-        if ($digits === '' || $digits === null) {
-            return null;
-        }
-
-        return (int) $digits;
     }
 
     private function parseDesconto(mixed $value): ?string
@@ -169,5 +183,10 @@ class ClientePlanilhaNormalizer
         }
 
         return number_format($num, 2, '.', '');
+    }
+
+    private function mensagemUnidadeNaoEncontrada(string $normalizado, string $original): string
+    {
+        return "Unidade de negócio com id_cigam {$normalizado} não encontrada. Valor original informado: {$original}.";
     }
 }

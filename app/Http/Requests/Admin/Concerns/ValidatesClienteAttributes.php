@@ -31,6 +31,7 @@ trait ValidatesClienteAttributes
                 $uniqueIdCigam(),
             ],
             'razao_social' => ['required', 'string', 'max:255'],
+            'fantasia' => ['nullable', 'string', 'max:255'],
             'cnpj_cpf' => [
                 'required',
                 'string',
@@ -68,6 +69,7 @@ trait ValidatesClienteAttributes
         return [
             'id_cigam' => 'ID CIGAM',
             'razao_social' => 'razão social',
+            'fantasia' => 'fantasia',
             'cnpj_cpf' => 'CPF/CNPJ',
             'id_unidade_negocio' => 'unidade de negócio',
             'id_praca' => 'praça',
@@ -94,12 +96,14 @@ trait ValidatesClienteAttributes
         $documento = TextoCadastro::somenteDigitos((string) $this->input('cnpj_cpf', ''));
         $descontoNf = $this->input('desconto_nf');
         $descontoContrato = $this->input('desconto_contrato');
+        $fantasia = preg_replace('/\s+/u', ' ', (string) $this->input('fantasia', '')) ?? '';
 
         $grupoId = $this->input('grupo_id');
 
         $this->merge([
             'id_cigam' => $idCigam,
             'razao_social' => trim((string) $this->input('razao_social')),
+            'fantasia' => TextoCadastro::normalizarMaiusculasOuNulo($fantasia),
             'cnpj_cpf' => $documento,
             'id_unidade_negocio' => (int) $this->input('id_unidade_negocio'),
             'id_praca' => (int) $this->input('id_praca'),

@@ -74,19 +74,18 @@
                 @enderror
             </div>
             <div class="col-md-6">
-                <label for="cpf_cnpj" class="form-label">CPF/CNPJ <span class="text-danger">*</span></label>
+                <label for="cpf_cnpj" class="form-label">CPF/CNPJ</label>
                 <input type="text"
                        id="cpf_cnpj"
                        name="cpf_cnpj"
                        value="{{ old('cpf_cnpj', $unidadeNegocio->cpf_cnpj_formatado) }}"
                        class="form-control @error('cpf_cnpj') is-invalid @enderror"
                        maxlength="18"
-                       required
                        placeholder="Somente números ou com máscara">
                 @error('cpf_cnpj')
                     <div class="invalid-feedback">{{ $message }}</div>
                 @enderror
-                <small class="text-muted">11 dígitos (CPF) ou 14 dígitos (CNPJ).</small>
+                <small class="text-muted">Opcional. Quando informado, deve ter 11 dígitos (CPF) ou 14 dígitos (CNPJ).</small>
             </div>
             <div class="col-md-4">
                 <label for="custo_operacional" class="form-label">Custo operacional <span class="text-danger">*</span></label>

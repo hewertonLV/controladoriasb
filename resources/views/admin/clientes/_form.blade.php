@@ -42,6 +42,20 @@
                     <div class="invalid-feedback">{{ $message }}</div>
                 @enderror
             </div>
+            <div class="col-md-8">
+                <label for="fantasia" class="form-label">Fantasia</label>
+                <input type="text"
+                       id="fantasia"
+                       name="fantasia"
+                       value="{{ old('fantasia', $cliente->fantasia) }}"
+                       class="form-control @error('fantasia') is-invalid @enderror"
+                       maxlength="255"
+                       placeholder="Nome fantasia"
+                       autocomplete="off">
+                @error('fantasia')
+                    <div class="invalid-feedback">{{ $message }}</div>
+                @enderror
+            </div>
             <div class="col-md-4">
                 <label for="cnpj_cpf" class="form-label">CPF/CNPJ <span class="text-danger">*</span></label>
                 <input type="text"
