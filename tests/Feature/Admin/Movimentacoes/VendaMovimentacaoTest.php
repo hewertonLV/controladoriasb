@@ -113,7 +113,109 @@ class VendaMovimentacaoTest extends TestCase
             'acao' => MovimentacaoHistorico::ACAO_REGISTRO_VENDA,
         ]);
 
+        $usuarioRevisao = $this->userWithPermissions([
+            Permissions::MOVIMENTACOES_VENDAS_VISUALIZAR,
+            Permissions::MOVIMENTACOES_VENDAS_EDITAR,
+            Permissions::MOVIMENTACOES_VENDAS_CANCELAR_ADMIN,
+        ]);
+
+        $html = $this->actingAs($usuarioRevisao)
+            ->get(route('admin.movimentacoes.vendas.show', $venda))
+            ->assertOk()
+            ->assertSeeText('Frutas vendidas nesta venda')
+            ->getContent();
+        $htmlDecodificado = html_entity_decode((string) $html, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+        $this->assertStringContainsString($c['fruta']->nome, $htmlDecodificado);
+        $this->assertStringContainsString($fruta2->nome, $htmlDecodificado);
+        $this->assertStringContainsString('Cancelar item', $htmlDecodificado);
+        $this->assertStringContainsString('Cancelar venda completa', $htmlDecodificado);
+
+        $editHtml = $this->actingAs($usuarioRevisao)
+            ->get(route('admin.movimentacoes.vendas.edit', $venda))
+            ->assertOk()
+            ->getContent();
+        $editHtmlDecodificado = html_entity_decode((string) $editHtml, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+        $this->assertStringContainsString($c['fruta']->nome, $editHtmlDecodificado);
+        $this->assertStringContainsString($fruta2->nome, $editHtmlDecodificado);
+        $this->assertStringContainsString('Corrigir este item', $editHtmlDecodificado);
+
+        $this->cancelarVendaAdmin($venda);
+        $vendas->each->refresh();
+        $this->assertTrue($vendas->every(fn (Movimentacao $item): bool => $item->status_registro === MovimentacaoStatusRegistro::CANCELADO->value));
+        $this->assertDatabaseHas('vendas_notas', [
+            'id' => $venda->venda_nota_id,
+            'status_registro' => MovimentacaoStatusRegistro::CANCELADO->value,
+        ]);
+        $this->assertEstoque($c['unidade'], $c['fruta'], '100.00', '10.00', '5.00', '50.00', '500.00');
+        $this->assertEstoque($c['unidade'], $fruta2, '20.00', '4.00', '10.00', '50.00', '200.00');
+
         Carbon::setTestNow();
+    }
+
+    public function test_cancelamento_individual_de_item_da_venda_nao_cancela_demais_frutas(): void
+    {
+        $this->seedBase();
+        $c = $this->cenarioBase();
+        $fruta2 = Fruta::factory()->create([
+            'kg_por_unidade_medicao' => 5,
+            'icms_na_compra' => 0,
+            'icms_ex_compra' => 0,
+            'um_icms' => FrutaUmIcms::KG->value,
+        ]);
+
+        $this->registrarCompra($c, '10', '500,00');
+        $this->registrarCompra(array_merge($c, ['fruta' => $fruta2]), '4', '200,00');
+
+        $this->actingAs($this->movimentacoesVendasUsuario())->postJson(route('admin.movimentacoes.vendas.store'), [
+            'numero_nf' => 'NF-ITEM',
+            'id_empresa_origem' => $c['empresa_unidade']->id,
+            'id_empresa_destino' => $c['empresa_cliente']->id,
+            'itens' => [
+                ['id_fruta' => $c['fruta']->id, 'qtd_fruta_um' => '2', 'valor_nf_total' => '300,00'],
+                ['id_fruta' => $fruta2->id, 'qtd_fruta_um' => '1', 'valor_nf_total' => '80,00'],
+            ],
+        ])->assertCreated();
+
+        $vendaCancelada = Movimentacao::query()
+            ->where('categoria_movimentacao_id', CategoriaMovimentacaoTipo::Venda->value)
+            ->where('id_fruta', $c['fruta']->id)
+            ->firstOrFail();
+        $vendaMantida = Movimentacao::query()
+            ->where('categoria_movimentacao_id', CategoriaMovimentacaoTipo::Venda->value)
+            ->where('id_fruta', $fruta2->id)
+            ->firstOrFail();
+
+        $this->actingAs($this->userWithPermissions([Permissions::MOVIMENTACOES_VENDAS_CANCELAR_ADMIN]))
+            ->postJson(route('admin.movimentacoes.vendas.cancelar-item-admin', $vendaCancelada), [
+                'motivo' => 'Cancelamento apenas da fruta selecionada.',
+            ])
+            ->assertOk();
+
+        $vendaCancelada->refresh();
+        $vendaMantida->refresh();
+
+        $this->assertSame(MovimentacaoStatusRegistro::CANCELADO->value, $vendaCancelada->status_registro);
+        $this->assertSame(MovimentacaoStatusRegistro::ATIVO->value, $vendaMantida->status_registro);
+        $this->assertDatabaseHas('vendas_notas', [
+            'id' => $vendaCancelada->venda_nota_id,
+            'status_registro' => MovimentacaoStatusRegistro::ATIVO->value,
+        ]);
+        $this->assertEstoque($c['unidade'], $c['fruta'], '100.00', '10.00', '5.00', '50.00', '500.00');
+        $this->assertEstoque($c['unidade'], $fruta2, '15.00', '3.00', '10.00', '50.00', '150.00');
+
+        $html = $this->actingAs($this->userWithPermissions([
+            Permissions::MOVIMENTACOES_VENDAS_VISUALIZAR,
+            Permissions::MOVIMENTACOES_VENDAS_EDITAR,
+            Permissions::MOVIMENTACOES_VENDAS_CANCELAR_ADMIN,
+        ]))
+            ->get(route('admin.movimentacoes.vendas.show', $vendaMantida))
+            ->assertOk()
+            ->getContent();
+        $htmlDecodificado = html_entity_decode((string) $html, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+
+        $this->assertStringContainsString($c['fruta']->nome, $htmlDecodificado);
+        $this->assertStringContainsString($fruta2->nome, $htmlDecodificado);
+        $this->assertStringContainsString(MovimentacaoStatusRegistro::CANCELADO->value, $htmlDecodificado);
     }
 
     public function test_criacao_rejeita_data_emissao_informada_pelo_usuario(): void

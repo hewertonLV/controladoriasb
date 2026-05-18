@@ -24,70 +24,131 @@ final class CancelarVendaMovimentacaoAdminService
 
     public function executar(Movimentacao $movimentacao, User $user, string $motivo): void
     {
-        DB::transaction(function () use ($movimentacao, $user, $motivo): void {
-            $mov = Movimentacao::query()->whereKey($movimentacao->id)->lockForUpdate()->firstOrFail();
+        $this->cancelar($movimentacao, $user, $motivo, false);
+    }
 
-            if ((int) $mov->categoria_movimentacao_id !== CategoriaMovimentacaoTipo::Venda->value) {
-                throw new InvalidArgumentException('Somente vendas podem ser canceladas por este fluxo.');
-            }
+    public function executarItem(Movimentacao $movimentacao, User $user, string $motivo): void
+    {
+        $this->cancelar($movimentacao, $user, $motivo, true);
+    }
 
-            if ((int) $mov->status_movimentacao_id !== StatusMovimentacao::ID_SAIDA) {
-                throw new InvalidArgumentException('Somente saídas de venda podem ser canceladas administrativamente.');
-            }
+    private function cancelar(Movimentacao $movimentacao, User $user, string $motivo, bool $somenteItem): void
+    {
+        DB::transaction(function () use ($movimentacao, $user, $motivo, $somenteItem): void {
+            $ancora = Movimentacao::query()->whereKey($movimentacao->id)->lockForUpdate()->firstOrFail();
 
-            if ($mov->status_registro !== MovimentacaoStatusRegistro::ATIVO->value) {
-                throw new InvalidArgumentException('Somente versões ativas podem ser canceladas administrativamente.');
-            }
-
-            $empresaOrigem = Empresa::query()->with('entidade')->findOrFail((int) $mov->id_empresa_origem);
-            $unidadeOrigem = $empresaOrigem->entidade;
-            if (! $unidadeOrigem instanceof UnidadeNegocio) {
-                throw new InvalidArgumentException('Unidade de origem inválida.');
-            }
-
-            $estoque = Estoque::query()
-                ->where('id_unidade_negocio', $unidadeOrigem->id)
-                ->where('id_fruta', (int) $mov->id_fruta)
+            $movimentacoes = Movimentacao::query()
+                ->when(
+                    $ancora->venda_nota_id !== null && ! $somenteItem,
+                    fn ($query) => $query->where('venda_nota_id', $ancora->venda_nota_id),
+                    fn ($query) => $query->whereKey($ancora->id),
+                )
+                ->where('categoria_movimentacao_id', CategoriaMovimentacaoTipo::Venda->value)
+                ->where('status_movimentacao_id', StatusMovimentacao::ID_SAIDA)
+                ->where('status_registro', MovimentacaoStatusRegistro::ATIVO->value)
+                ->orderBy('id')
                 ->lockForUpdate()
-                ->firstOrFail();
+                ->get();
 
-            $dadosMovAntes = $this->auditoria->snapshotVersao($mov);
-            $estoqueAntes = $this->auditoria->snapshotEstoque($estoque);
-            $idFrete = $mov->id_frete !== null ? (int) $mov->id_frete : null;
+            if ($movimentacoes->isEmpty()) {
+                throw new InvalidArgumentException('Nenhum item ativo encontrado para esta venda.');
+            }
 
-            $this->vendaMovimentacao->estornarVendaNoEstoqueOrigem($mov);
+            $auditorias = [];
+            $reprocessos = [];
+            $fretes = [];
 
-            $mov->forceFill([
-                'status_registro' => MovimentacaoStatusRegistro::CANCELADO->value,
-                'cancelada_por' => $user->id,
-                'cancelada_em' => now(),
-                'motivo_cancelamento' => $motivo,
-            ])->saveQuietly();
+            foreach ($movimentacoes as $mov) {
+                $empresaOrigem = Empresa::query()->with('entidade')->findOrFail((int) $mov->id_empresa_origem);
+                $unidadeOrigem = $empresaOrigem->entidade;
+                if (! $unidadeOrigem instanceof UnidadeNegocio) {
+                    throw new InvalidArgumentException('Unidade de origem inválida.');
+                }
 
-            $this->reprocessaSaidasVendaOrigem->reprocessarSaidasVendaNaUnidadeOrigem((int) $unidadeOrigem->id, (int) $mov->id_fruta, $mov->id);
-            if ($idFrete !== null) {
+                $estoque = Estoque::query()
+                    ->where('id_unidade_negocio', $unidadeOrigem->id)
+                    ->where('id_fruta', (int) $mov->id_fruta)
+                    ->lockForUpdate()
+                    ->firstOrFail();
+
+                $auditorias[] = [
+                    'movimentacao_id' => $mov->id,
+                    'estoque_id' => $estoque->id,
+                    'dados_mov_antes' => $this->auditoria->snapshotVersao($mov),
+                    'estoque_antes' => $this->auditoria->snapshotEstoque($estoque),
+                    'qtd_kg' => (string) $mov->qtd_fruta_kg,
+                    'qtd_um' => (string) $mov->qtd_fruta_um,
+                ];
+
+                if ($mov->id_frete !== null) {
+                    $fretes[(int) $mov->id_frete] = (int) $mov->id_frete;
+                }
+
+                $this->vendaMovimentacao->estornarVendaNoEstoqueOrigem($mov);
+
+                $mov->forceFill([
+                    'status_registro' => MovimentacaoStatusRegistro::CANCELADO->value,
+                    'cancelada_por' => $user->id,
+                    'cancelada_em' => now(),
+                    'motivo_cancelamento' => $motivo,
+                ])->saveQuietly();
+
+                $reprocessos[$unidadeOrigem->id.':'.$mov->id_fruta] = [
+                    'id_unidade_negocio' => (int) $unidadeOrigem->id,
+                    'id_fruta' => (int) $mov->id_fruta,
+                    'movimentacao_id' => (int) $mov->id,
+                ];
+            }
+
+            if ($ancora->venda_nota_id !== null) {
+                $itensAtivosRestantes = Movimentacao::query()
+                    ->where('venda_nota_id', $ancora->venda_nota_id)
+                    ->where('categoria_movimentacao_id', CategoriaMovimentacaoTipo::Venda->value)
+                    ->where('status_movimentacao_id', StatusMovimentacao::ID_SAIDA)
+                    ->where('status_registro', MovimentacaoStatusRegistro::ATIVO->value)
+                    ->exists();
+
+                $ancora->vendaNota()->update([
+                    'status_registro' => $itensAtivosRestantes
+                        ? MovimentacaoStatusRegistro::ATIVO->value
+                        : MovimentacaoStatusRegistro::CANCELADO->value,
+                ]);
+            }
+
+            foreach ($reprocessos as $reprocesso) {
+                $this->reprocessaSaidasVendaOrigem->reprocessarSaidasVendaNaUnidadeOrigem(
+                    $reprocesso['id_unidade_negocio'],
+                    $reprocesso['id_fruta'],
+                    $reprocesso['movimentacao_id'],
+                );
+            }
+
+            foreach ($fretes as $idFrete) {
                 $this->vendaMovimentacao->recalcularRateioFreteParaVendas($idFrete);
             }
 
-            $mov = $mov->fresh();
-            if ($mov === null) {
-                throw new InvalidArgumentException('Movimentação não encontrada após cancelamento administrativo.');
-            }
+            foreach ($auditorias as $auditoria) {
+                $mov = Movimentacao::query()->findOrFail($auditoria['movimentacao_id']);
+                $estoque = Estoque::query()->whereKey($auditoria['estoque_id'])->firstOrFail();
 
-            $this->auditoria->registrarCancelamentoAdministrativo(
-                $mov,
-                $user,
-                $motivo,
-                $dadosMovAntes,
-                $this->auditoria->snapshotVersao($mov),
-                $estoqueAntes,
-                $this->auditoria->snapshotEstoque(Estoque::query()->whereKey($estoque->id)->firstOrFail()),
-                [
-                    'categoria' => 'VENDA',
-                    'quantidade_fruta_kg_afetada' => (string) $movimentacao->qtd_fruta_kg,
-                    'quantidade_fruta_um_afetada' => (string) $movimentacao->qtd_fruta_um,
-                ],
-            );
+                $this->auditoria->registrarCancelamentoAdministrativo(
+                    $mov,
+                    $user,
+                    $motivo,
+                    $auditoria['dados_mov_antes'],
+                    $this->auditoria->snapshotVersao($mov),
+                    $auditoria['estoque_antes'],
+                    $this->auditoria->snapshotEstoque($estoque),
+                    [
+                        'categoria' => 'VENDA',
+                        'quantidade_fruta_kg_afetada' => $auditoria['qtd_kg'],
+                        'quantidade_fruta_um_afetada' => $auditoria['qtd_um'],
+                        'cancelamento_em_grupo' => ! $somenteItem && $movimentacoes->count() > 1,
+                        'cancelamento_individual' => $somenteItem,
+                        'venda_nota_id' => $ancora->venda_nota_id,
+                    ],
+                );
+            }
         });
     }
 }

@@ -850,6 +850,10 @@ Route::middleware(['auth', 'verified', 'user.active', 'password.changed'])->grou
                 ->middleware('permission:movimentacoes.vendas.editar')
                 ->name('update');
 
+            Route::post('/{movimentacaoVenda}/cancelar-item-admin', [CancelarVendaMovimentacaoAdminController::class, 'item'])
+                ->middleware('role_or_permission:Administrador|movimentacoes.vendas.cancelar-admin')
+                ->name('cancelar-item-admin');
+
             Route::post('/{movimentacaoVenda}/cancelar-admin', CancelarVendaMovimentacaoAdminController::class)
                 ->middleware('role_or_permission:Administrador|movimentacoes.vendas.cancelar-admin')
                 ->name('cancelar-admin');
