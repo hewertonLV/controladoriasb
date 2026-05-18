@@ -52,12 +52,6 @@ trait ValidatesClienteAttributes
                 'min:0',
                 'regex:/^\\d+(\\.\\d{1,2})?$/',
             ],
-            'desconto_contrato' => [
-                'required',
-                'numeric',
-                'min:0',
-                'regex:/^\\d+(\\.\\d{1,2})?$/',
-            ],
         ];
     }
 
@@ -75,7 +69,6 @@ trait ValidatesClienteAttributes
             'id_praca' => 'praça',
             'grupo_id' => 'grupo',
             'desconto_nf' => 'desconto NF',
-            'desconto_contrato' => 'desconto contrato',
         ];
     }
 
@@ -86,7 +79,6 @@ trait ValidatesClienteAttributes
     {
         return [
             'desconto_nf.min' => 'O desconto não pode ser negativo.',
-            'desconto_contrato.min' => 'O desconto não pode ser negativo.',
         ];
     }
 
@@ -95,7 +87,6 @@ trait ValidatesClienteAttributes
         $idCigam = TextoCadastro::normalizarIdCigamAteSeisDigitos((string) $this->input('id_cigam', ''));
         $documento = TextoCadastro::somenteDigitos((string) $this->input('cnpj_cpf', ''));
         $descontoNf = $this->input('desconto_nf');
-        $descontoContrato = $this->input('desconto_contrato');
         $fantasia = preg_replace('/\s+/u', ' ', (string) $this->input('fantasia', '')) ?? '';
 
         $grupoId = $this->input('grupo_id');
@@ -109,7 +100,6 @@ trait ValidatesClienteAttributes
             'id_praca' => (int) $this->input('id_praca'),
             'grupo_id' => $grupoId === null || $grupoId === '' ? null : (int) $grupoId,
             'desconto_nf' => $descontoNf === null || $descontoNf === '' ? '0.00' : (string) $descontoNf,
-            'desconto_contrato' => $descontoContrato === null || $descontoContrato === '' ? '0.00' : (string) $descontoContrato,
         ]);
     }
 

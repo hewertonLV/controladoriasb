@@ -19,6 +19,7 @@ use App\Http\Controllers\Admin\FrutaController;
 use App\Http\Controllers\Admin\FrutaExportacaoController;
 use App\Http\Controllers\Admin\FrutaImportacaoController;
 use App\Http\Controllers\Admin\GrupoController;
+use App\Http\Controllers\Admin\GrupoContratoController;
 use App\Http\Controllers\Admin\GrupoExportacaoController;
 use App\Http\Controllers\Admin\GrupoImportacaoController;
 use App\Http\Controllers\Admin\GrupoPermissaoController;
@@ -46,6 +47,7 @@ use App\Http\Controllers\Admin\VeiculoController;
 use App\Http\Controllers\Admin\VeiculoExportacaoController;
 use App\Http\Controllers\Admin\VeiculoImportacaoController;
 use App\Http\Controllers\Auth\ForcePasswordChangeController;
+use App\Http\Controllers\ClientErrorController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\ThemeSettingsController;
 use Illuminate\Support\Facades\Route;
@@ -53,6 +55,9 @@ use Illuminate\Support\Facades\Route;
 Route::get('/', function () {
     return redirect()->route('dashboard');
 });
+
+Route::post('/client-errors', [ClientErrorController::class, 'store'])
+    ->name('client-errors.store');
 
 /*
  * Rotas autenticadas mas SEM o middleware password.changed,
@@ -471,6 +476,44 @@ Route::middleware(['auth', 'verified', 'user.active', 'password.changed'])->grou
             Route::put('/{grupo}', [GrupoController::class, 'update'])
                 ->middleware('permission:grupos.editar')
                 ->name('update');
+        });
+
+        Route::prefix('grupos-contrato')->name('grupos-contrato.')->group(function () {
+            Route::get('/', [GrupoContratoController::class, 'index'])
+                ->middleware('permission:grupos-contrato.visualizar')
+                ->name('index');
+
+            Route::get('/criar', [GrupoContratoController::class, 'create'])
+                ->middleware('permission:grupos-contrato.criar')
+                ->name('create');
+
+            Route::post('/', [GrupoContratoController::class, 'store'])
+                ->middleware('permission:grupos-contrato.criar')
+                ->name('store');
+
+            Route::get('/{grupoContrato}', [GrupoContratoController::class, 'show'])
+                ->middleware('permission:grupos-contrato.visualizar')
+                ->name('show');
+
+            Route::get('/{grupoContrato}/editar', [GrupoContratoController::class, 'edit'])
+                ->middleware('permission:grupos-contrato.editar')
+                ->name('edit');
+
+            Route::put('/{grupoContrato}', [GrupoContratoController::class, 'update'])
+                ->middleware('permission:grupos-contrato.editar')
+                ->name('update');
+
+            Route::post('/{grupoContrato}/membros', [GrupoContratoController::class, 'storeMembro'])
+                ->middleware('permission:grupos-contrato.membros')
+                ->name('membros.store');
+
+            Route::post('/{grupoContrato}/descontos', [GrupoContratoController::class, 'storeDesconto'])
+                ->middleware('permission:grupos-contrato.descontos')
+                ->name('descontos.store');
+
+            Route::get('/{grupoContrato}/historico', [GrupoContratoController::class, 'historico'])
+                ->middleware('permission:grupos-contrato.historico')
+                ->name('historico');
         });
 
         Route::prefix('frutas')->name('frutas.')->group(function () {

@@ -236,6 +236,18 @@ final class Permissions
 
     public const GRUPOS_EXPORTAR_PDF = 'grupos.exportar-pdf';
 
+    public const GRUPOS_CONTRATO_VISUALIZAR = 'grupos-contrato.visualizar';
+
+    public const GRUPOS_CONTRATO_CRIAR = 'grupos-contrato.criar';
+
+    public const GRUPOS_CONTRATO_EDITAR = 'grupos-contrato.editar';
+
+    public const GRUPOS_CONTRATO_MEMBROS = 'grupos-contrato.membros';
+
+    public const GRUPOS_CONTRATO_DESCONTOS = 'grupos-contrato.descontos';
+
+    public const GRUPOS_CONTRATO_HISTORICO = 'grupos-contrato.historico';
+
     /**
      * Permissões agrupadas por módulo (útil para UI/telas de gestão).
      *
@@ -317,6 +329,14 @@ final class Permissions
                 self::GRUPOS_IMPORTAR_CONFIRMAR,
                 self::GRUPOS_HISTORICO,
                 self::GRUPOS_EXPORTAR_PDF,
+            ],
+            'Grupos de Contrato' => [
+                self::GRUPOS_CONTRATO_VISUALIZAR,
+                self::GRUPOS_CONTRATO_CRIAR,
+                self::GRUPOS_CONTRATO_EDITAR,
+                self::GRUPOS_CONTRATO_MEMBROS,
+                self::GRUPOS_CONTRATO_DESCONTOS,
+                self::GRUPOS_CONTRATO_HISTORICO,
             ],
             'Frutas' => [
                 self::FRUTAS_VISUALIZAR,

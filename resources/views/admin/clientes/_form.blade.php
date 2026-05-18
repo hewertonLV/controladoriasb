@@ -136,20 +136,6 @@
                     <div class="invalid-feedback">{{ $message }}</div>
                 @enderror
             </div>
-            <div class="col-md-4">
-                <label for="desconto_contrato" class="form-label">Desconto Contrato <span class="text-danger">*</span></label>
-                <input type="number"
-                       id="desconto_contrato"
-                       name="desconto_contrato"
-                       value="{{ old('desconto_contrato', $cliente->desconto_contrato ?? '0.00') }}"
-                       class="form-control @error('desconto_contrato') is-invalid @enderror"
-                       min="0"
-                       step="0.01"
-                       required>
-                @error('desconto_contrato')
-                    <div class="invalid-feedback">{{ $message }}</div>
-                @enderror
-            </div>
         </div>
     </div>
 

@@ -41,7 +41,6 @@ abstract class ClienteTestCase extends TestCase
             'id_praca' => $pracaId,
             'grupo_id' => null,
             'desconto_nf' => '10.00',
-            'desconto_contrato' => '5.00',
         ], $overrides);
     }
 

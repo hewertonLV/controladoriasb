@@ -52,7 +52,6 @@ class ClienteTest extends ClienteTestCase
             'fantasia' => '  nome   fantasia  ',
             'cnpj_cpf' => '11.222.333/0001-81',
             'desconto_nf' => '10.5',
-            'desconto_contrato' => '0',
         ]);
 
         $this->actingAs($this->userWithPermissions([Permissions::CLIENTES_CRIAR]))
@@ -66,7 +65,6 @@ class ClienteTest extends ClienteTestCase
         $this->assertEquals('NOME FANTASIA', $cliente->fantasia);
         $this->assertSame('11222333000181', $cliente->cnpj_cpf);
         $this->assertSame('10.50', (string) $cliente->desconto_nf);
-        $this->assertSame('0.00', (string) $cliente->desconto_contrato);
     }
 
     public function test_cadastro_aceita_fantasia_null(): void
@@ -124,7 +122,6 @@ class ClienteTest extends ClienteTestCase
                 'id_praca' => $cliente->id_praca,
                 'grupo_id' => $cliente->grupo_id,
                 'desconto_nf' => '1.25',
-                'desconto_contrato' => '2.50',
             ])
             ->assertStatus(302)
             ->assertSessionHas('success');

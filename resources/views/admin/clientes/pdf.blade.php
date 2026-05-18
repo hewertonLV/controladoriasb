@@ -53,7 +53,6 @@
                 <th width="14%">Praça</th>
                 <th width="12%">Grupo</th>
                 <th width="12%">Desconto NF</th>
-                <th width="12%">Desconto contrato</th>
             </tr>
         </thead>
         <tbody>
@@ -67,11 +66,10 @@
                     <td>{{ $cliente->praca?->nome ?? '—' }}</td>
                     <td>{{ $cliente->grupo?->nome ?? '—' }}</td>
                     <td>{{ number_format((float) $cliente->desconto_nf, 2, ',', '.') }}</td>
-                    <td>{{ number_format((float) $cliente->desconto_contrato, 2, ',', '.') }}</td>
                 </tr>
             @empty
                 <tr>
-                    <td colspan="9" class="empty">Nenhum cliente corresponde aos filtros aplicados.</td>
+                    <td colspan="8" class="empty">Nenhum cliente corresponde aos filtros aplicados.</td>
                 </tr>
             @endforelse
         </tbody>

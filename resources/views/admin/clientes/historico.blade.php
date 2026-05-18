@@ -11,7 +11,6 @@
         'cnpj_cpf' => 'CPF/CNPJ',
         'id_unidade_negocio' => 'Unidade de negócio',
         'desconto_nf' => 'Desconto NF',
-        'desconto_contrato' => 'Desconto contrato',
     ];
 
     $formatValor = function (string $campo, mixed $valor) {
@@ -28,7 +27,7 @@
             }
             return $d;
         }
-        if (in_array($campo, ['desconto_nf', 'desconto_contrato'], true)) {
+        if ($campo === 'desconto_nf') {
             return number_format((float) $valor, 2, ',', '.');
         }
         return (string) $valor;

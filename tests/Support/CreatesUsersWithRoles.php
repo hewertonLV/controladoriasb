@@ -163,6 +163,18 @@ trait CreatesUsersWithRoles
         ]);
     }
 
+    protected function gruposContratoManager(): User
+    {
+        return $this->userWithPermissions([
+            Permissions::GRUPOS_CONTRATO_VISUALIZAR,
+            Permissions::GRUPOS_CONTRATO_CRIAR,
+            Permissions::GRUPOS_CONTRATO_EDITAR,
+            Permissions::GRUPOS_CONTRATO_MEMBROS,
+            Permissions::GRUPOS_CONTRATO_DESCONTOS,
+            Permissions::GRUPOS_CONTRATO_HISTORICO,
+        ]);
+    }
+
     /**
      * Usuário com permissões completas do módulo Clientes (testes).
      */

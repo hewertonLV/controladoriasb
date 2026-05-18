@@ -23,7 +23,6 @@ class ClienteQuery
         'fantasia' => 'fantasia',
         'cnpj_cpf' => 'cnpj_cpf',
         'desconto_nf' => 'desconto_nf',
-        'desconto_contrato' => 'desconto_contrato',
         'created_at' => 'created_at',
     ];
 

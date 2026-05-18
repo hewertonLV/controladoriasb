@@ -223,7 +223,6 @@ class VendaMovimentacaoTest extends TestCase
         $this->seedBase();
         $c = $this->cenarioBase(clienteOverrides: [
             'desconto_nf' => '10.00',
-            'desconto_contrato' => '5.00',
         ]);
 
         $this->registrarCompra($c, '10', '500,00');
@@ -457,7 +456,6 @@ class VendaMovimentacaoTest extends TestCase
     {
         $clienteOverrides = array_replace([
             'desconto_nf' => '0.00',
-            'desconto_contrato' => '0.00',
         ], $clienteOverrides);
 
         return $this->montarCenarioBase($origemHub, $clienteOverrides);

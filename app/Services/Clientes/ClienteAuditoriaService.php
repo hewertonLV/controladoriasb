@@ -17,7 +17,6 @@ class ClienteAuditoriaService
         'id_praca',
         'grupo_id',
         'desconto_nf',
-        'desconto_contrato',
     ];
 
     public function registrarCriacao(Cliente $cliente, ?User $user, string $origem): ClienteHistorico
@@ -84,7 +83,6 @@ class ClienteAuditoriaService
             'id_praca' => (int) $cliente->id_praca,
             'grupo_id' => $cliente->grupo_id !== null ? (int) $cliente->grupo_id : null,
             'desconto_nf' => (string) $cliente->desconto_nf,
-            'desconto_contrato' => (string) $cliente->desconto_contrato,
         ];
     }
 
@@ -107,7 +105,7 @@ class ClienteAuditoriaService
             } elseif ($campo === 'grupo_id') {
                 $a = $valorAntes === null ? null : (int) $valorAntes;
                 $b = $valorDepois === null ? null : (int) $valorDepois;
-            } elseif (in_array($campo, ['desconto_nf', 'desconto_contrato'], true)) {
+            } elseif ($campo === 'desconto_nf') {
                 $a = number_format((float) $valorAntes, 2, '.', '');
                 $b = number_format((float) $valorDepois, 2, '.', '');
             } else {

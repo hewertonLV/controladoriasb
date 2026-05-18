@@ -12,7 +12,7 @@
                     Layout fixo (linha 1 é cabeçalho e pode ter qualquer texto):
                     <code>A</code> ID CIGAM · <code>B</code> Razão social ·
                     <code>C</code> CPF/CNPJ · <code>D</code> Unidade negócio · <code>E</code> Desconto NF ·
-                    <code>F</code> Desconto contrato · <code>G</code> Praça (nome) · <code>H</code> Grupo (nome, opcional) ·
+                    <code>F</code> Praça (nome) · <code>G</code> Grupo (nome, opcional) ·
                     Fantasia opcional por cabeçalho: <code>fantasia</code>, <code>nome fantasia</code> ou <code>fantasia_cliente</code>
                 </p>
             </div>
@@ -404,7 +404,6 @@
                     <td>${fmtDoc(d.cnpj_cpf)}</td>
                     <td>${escapeHtml(d.id_unidade_negocio)}</td>
                     <td>${escapeHtml(d.desconto_nf)}</td>
-                    <td>${escapeHtml(d.desconto_contrato)}</td>
                 `;
                 tbodyNovas.appendChild(tr);
             });

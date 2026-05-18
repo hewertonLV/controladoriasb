@@ -55,12 +55,11 @@ class ClienteImportacaoTest extends ClienteTestCase
             'id_praca' => $praca->id,
             'grupo_id' => null,
             'desconto_nf' => '0.00',
-            'desconto_contrato' => '0.00',
         ]);
 
         $path = $this->storeSpreadsheet([
-            ['7002', 'Cliente Novo', '33333333000133', '110', '1.50', '2.00', 'PRACA CENTRO', ''],
-            ['7001', 'Cliente Igual', '11111111000111', '000110', '0.00', '0.00', 'PRACA CENTRO', ''],
+            ['7002', 'Cliente Novo', '33333333000133', '110', '1.50', 'PRACA CENTRO', ''],
+            ['7001', 'Cliente Igual', '11111111000111', '000110', '0.00', 'PRACA CENTRO', ''],
         ]);
 
         $importacao = ClienteImportacao::create([
@@ -91,7 +90,7 @@ class ClienteImportacaoTest extends ClienteTestCase
         ]);
 
         $path = $this->storeSpreadsheet([
-            ['7004', 'Cliente Unidade Cigam', '33333333000133', ' 1-10 ', '1.50', '2.00', 'PRACA CENTRO', ''],
+            ['7004', 'Cliente Unidade Cigam', '33333333000133', ' 1-10 ', '1.50', 'PRACA CENTRO', ''],
         ]);
 
         $importacao = ClienteImportacao::create([
@@ -125,7 +124,7 @@ class ClienteImportacaoTest extends ClienteTestCase
         ]);
 
         $path = $this->storeSpreadsheet([
-            ['7003', 'Cliente Importado', '33333333000133', '111', '1.50', '2.00', 'PRACA CENTRO', '', '  fantasia   importada  '],
+            ['7003', 'Cliente Importado', '33333333000133', '111', '1.50', 'PRACA CENTRO', '', '  fantasia   importada  '],
         ]);
 
         $importacao = ClienteImportacao::create([
@@ -157,7 +156,7 @@ class ClienteImportacaoTest extends ClienteTestCase
     }
 
     /**
-     * @param  list<array{0:mixed,1:mixed,2:mixed,3:mixed,4:mixed,5:mixed,6:mixed,7:mixed,8?:mixed}>  $rows
+     * @param  list<array{0:mixed,1:mixed,2:mixed,3:mixed,4:mixed,5:mixed,6:mixed,7?:mixed}>  $rows
      */
     private function storeSpreadsheet(array $rows): string
     {
@@ -170,7 +169,6 @@ class ClienteImportacaoTest extends ClienteTestCase
                 'CPF/CNPJ',
                 'UN',
                 'Desconto NF',
-                'Desconto contrato',
                 'Praça',
                 'Grupo',
                 'Fantasia',

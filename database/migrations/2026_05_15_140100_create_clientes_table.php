@@ -19,7 +19,6 @@ return new class extends Migration
             $table->unsignedBigInteger('id_unidade_negocio');
 
             $table->decimal('desconto_nf', 15, 2)->default(0);
-            $table->decimal('desconto_contrato', 15, 2)->default(0);
 
             $table->softDeletes();
             $table->timestamps();

@@ -65,7 +65,6 @@ class GerarPdfClientesJob implements ShouldQueue
                         'id_praca',
                         'grupo_id',
                         'desconto_nf',
-                        'desconto_contrato',
                     ])
                     ->with(['praca:id,nome', 'grupo:id,nome']),
                 $filtros,

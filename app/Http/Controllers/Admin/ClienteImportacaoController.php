@@ -207,7 +207,6 @@ class ClienteImportacaoController extends Controller
                         'id_praca' => (int) $dados['id_praca'],
                         'grupo_id' => $dados['grupo_id'] ?? null,
                         'desconto_nf' => $dados['desconto_nf'],
-                        'desconto_contrato' => $dados['desconto_contrato'],
                     ]);
 
                     $this->auditoria->registrarCriacao(
@@ -281,7 +280,6 @@ class ClienteImportacaoController extends Controller
                         'id_praca' => (int) $dados['id_praca'],
                         'grupo_id' => $dados['grupo_id'] ?? null,
                         'desconto_nf' => $dados['desconto_nf'],
-                        'desconto_contrato' => $dados['desconto_contrato'],
                     ]);
 
                     $depois = $this->auditoria->snapshot($cliente->fresh());
@@ -374,8 +372,8 @@ class ClienteImportacaoController extends Controller
             return 'Unidade de negócio inválida ou inexistente.';
         }
 
-        if ((float) ($dados['desconto_nf'] ?? -1) < 0 || (float) ($dados['desconto_contrato'] ?? -1) < 0) {
-            return 'Os descontos não podem ser negativos.';
+        if ((float) ($dados['desconto_nf'] ?? -1) < 0) {
+            return 'O desconto NF não pode ser negativo.';
         }
 
         $idPraca = (int) ($dados['id_praca'] ?? 0);

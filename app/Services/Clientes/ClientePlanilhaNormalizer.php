@@ -14,10 +14,9 @@ use App\Support\TextoCadastro;
  *   C → cnpj_cpf
  *   D → id_cigam da unidade de negócio
  *   E → desconto_nf
- *   F → desconto_contrato
- *   G → praca (nome)
- *   H → grupo (nome, opcional)
- *   I → fantasia/nome fantasia/fantasia_cliente (opcional quando detectado por cabeçalho)
+ *   F → praca (nome)
+ *   G → grupo (nome, opcional)
+ *   H → fantasia/nome fantasia/fantasia_cliente (opcional quando detectado por cabeçalho)
  */
 class ClientePlanilhaNormalizer
 {
@@ -32,7 +31,6 @@ class ClientePlanilhaNormalizer
      *         id_unidade_negocio: int|null,
      *         id_cigam_unidade: string,
      *         desconto_nf: string,
-     *         desconto_contrato: string,
      *         id_praca: int|null,
      *         grupo_id: int|null,
      *     },
@@ -47,15 +45,14 @@ class ClientePlanilhaNormalizer
             $this->trimString($row[0] ?? null),
         );
         $razaoSocial = $this->trimString($row[1] ?? null);
-        $fantasia = $this->normalizarTextoOpcional($row[8] ?? null);
+        $fantasia = $this->normalizarTextoOpcional($row[7] ?? null);
         $cnpjCpf = $this->onlyDigits($row[2] ?? null);
         $unidadeOriginal = $this->trimString($row[3] ?? null);
         $idCigamUnidade = TextoCadastro::normalizarIdCigam($unidadeOriginal);
         $idUnidade = null;
         $descontoNf = $this->parseDesconto($row[4] ?? null);
-        $descontoContrato = $this->parseDesconto($row[5] ?? null);
-        $pracaNome = TextoCadastro::normalizarMaiusculas($this->trimString($row[6] ?? null));
-        $grupoNome = TextoCadastro::normalizarMaiusculas($this->trimString($row[7] ?? null));
+        $pracaNome = TextoCadastro::normalizarMaiusculas($this->trimString($row[5] ?? null));
+        $grupoNome = TextoCadastro::normalizarMaiusculas($this->trimString($row[6] ?? null));
 
         if ($idCigam === '') {
             $erros[] = 'ID CIGAM (coluna A) é obrigatório.';
@@ -95,13 +92,9 @@ class ClientePlanilhaNormalizer
             $erros[] = 'Desconto NF (coluna E) inválido. Informe um valor numérico maior ou igual a zero.';
         }
 
-        if ($descontoContrato === null) {
-            $erros[] = 'Desconto contrato (coluna F) inválido. Informe um valor numérico maior ou igual a zero.';
-        }
-
         $idPraca = null;
         if ($pracaNome === '') {
-            $erros[] = 'Praça (coluna G) é obrigatória.';
+            $erros[] = 'Praça (coluna F) é obrigatória.';
         } elseif ($idUnidade !== null && $idUnidade >= 1) {
             $praca = Praca::query()
                 ->where('nome', $pracaNome)
@@ -134,7 +127,6 @@ class ClientePlanilhaNormalizer
                 'id_unidade_negocio' => $idUnidade,
                 'id_cigam_unidade' => $idCigamUnidade,
                 'desconto_nf' => $descontoNf ?? '0.00',
-                'desconto_contrato' => $descontoContrato ?? '0.00',
                 'id_praca' => $idPraca,
                 'grupo_id' => $grupoId,
             ],

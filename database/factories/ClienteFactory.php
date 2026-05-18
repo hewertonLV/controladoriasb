@@ -31,7 +31,6 @@ class ClienteFactory extends Factory
             'id_unidade_negocio' => UnidadeNegocio::factory(),
             'grupo_id' => null,
             'desconto_nf' => '0.00',
-            'desconto_contrato' => '0.00',
         ];
     }
 

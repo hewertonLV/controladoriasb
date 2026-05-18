@@ -30,7 +30,6 @@ class ClienteImportacaoProcessor
         'id_praca',
         'grupo_id',
         'desconto_nf',
-        'desconto_contrato',
     ];
 
     public function __construct(private readonly ClientePlanilhaNormalizer $normalizer) {}
@@ -84,9 +83,8 @@ class ClienteImportacaoProcessor
                 $this->valorPorHeaderOuCelula($sheet, $headers, $r, ['CPFCNPJ', 'CNPJCPF', 'CNPJ', 'CPF'], 'C'),
                 $this->valorPorHeaderOuCelula($sheet, $headers, $r, ['UNIDADENEGOCIO', 'IDUNIDADENEGOCIO', 'UN'], 'D'),
                 $this->valorPorHeaderOuCelula($sheet, $headers, $r, ['DESCONTONF', 'DESCNF'], 'E'),
-                $this->valorPorHeaderOuCelula($sheet, $headers, $r, ['DESCONTOCONTRATO', 'DESCCONTRATO'], 'F'),
-                $this->valorPorHeaderOuCelula($sheet, $headers, $r, ['PRACA', 'PRAÇA'], 'G'),
-                $this->valorPorHeaderOuCelula($sheet, $headers, $r, ['GRUPO'], 'H'),
+                $this->valorPorHeaderOuCelula($sheet, $headers, $r, ['PRACA', 'PRAÇA'], 'F'),
+                $this->valorPorHeaderOuCelula($sheet, $headers, $r, ['GRUPO'], 'G'),
                 $this->valorPorHeaderOuCelula($sheet, $headers, $r, ['FANTASIA', 'NOMEFANTASIA', 'FANTASIACLIENTE'], null),
             ];
 
@@ -418,7 +416,7 @@ class ClienteImportacaoProcessor
             } elseif ($campo === 'grupo_id') {
                 $atual = $cliente->grupo_id === null ? null : (int) $cliente->grupo_id;
                 $novo = ($dados[$campo] ?? null) === null ? null : (int) $dados[$campo];
-            } elseif (in_array($campo, ['desconto_nf', 'desconto_contrato'], true)) {
+            } elseif ($campo === 'desconto_nf') {
                 $atual = number_format((float) $cliente->{$campo}, 2, '.', '');
                 $novo = number_format((float) ($dados[$campo] ?? 0), 2, '.', '');
             } else {
@@ -452,7 +450,6 @@ class ClienteImportacaoProcessor
             'id_praca' => (int) $cliente->id_praca,
             'grupo_id' => $cliente->grupo_id !== null ? (int) $cliente->grupo_id : null,
             'desconto_nf' => (string) $cliente->desconto_nf,
-            'desconto_contrato' => (string) $cliente->desconto_contrato,
         ];
     }
 

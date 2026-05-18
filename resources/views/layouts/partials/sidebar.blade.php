@@ -79,20 +79,20 @@
                 </a>
             </li>
 
-            @canany(['empresas.visualizar', 'unidades-negocio.visualizar', 'fornecedores.visualizar', 'veiculos.visualizar', 'clientes.visualizar', 'grupos.visualizar', 'frutas.visualizar', 'fretes.visualizar', 'pracas.visualizar', 'estoques.visualizar'])
+            @canany(['empresas.visualizar', 'unidades-negocio.visualizar', 'fornecedores.visualizar', 'veiculos.visualizar', 'clientes.visualizar', 'grupos.visualizar', 'grupos-contrato.visualizar', 'frutas.visualizar', 'fretes.visualizar', 'pracas.visualizar', 'estoques.visualizar'])
                 <li class="side-nav-title mt-2">Cadastros</li>
 
                 <li class="side-nav-item">
                     <a data-bs-toggle="collapse"
                        href="#sidebarCadastros"
-                       aria-expanded="{{ request()->routeIs('admin.empresas.*', 'admin.unidades-negocio.*', 'admin.fornecedores.*', 'admin.veiculos.*', 'admin.clientes.*', 'admin.grupos.*', 'admin.frutas.*', 'admin.fretes.*', 'admin.pracas.*', 'admin.estoques.*') ? 'true' : 'false' }}"
+                       aria-expanded="{{ request()->routeIs('admin.empresas.*', 'admin.unidades-negocio.*', 'admin.fornecedores.*', 'admin.veiculos.*', 'admin.clientes.*', 'admin.grupos.*', 'admin.grupos-contrato.*', 'admin.frutas.*', 'admin.fretes.*', 'admin.pracas.*', 'admin.estoques.*') ? 'true' : 'false' }}"
                        aria-controls="sidebarCadastros"
-                       class="side-nav-link {{ request()->routeIs('admin.empresas.*', 'admin.unidades-negocio.*', 'admin.fornecedores.*', 'admin.veiculos.*', 'admin.clientes.*', 'admin.grupos.*', 'admin.frutas.*', 'admin.fretes.*', 'admin.pracas.*', 'admin.estoques.*') ? '' : 'collapsed' }}">
+                       class="side-nav-link {{ request()->routeIs('admin.empresas.*', 'admin.unidades-negocio.*', 'admin.fornecedores.*', 'admin.veiculos.*', 'admin.clientes.*', 'admin.grupos.*', 'admin.grupos-contrato.*', 'admin.frutas.*', 'admin.fretes.*', 'admin.pracas.*', 'admin.estoques.*') ? '' : 'collapsed' }}">
                         <span class="menu-icon"><i class="ri-building-line"></i></span>
                         <span class="menu-text"> Cadastros </span>
                         <span class="menu-arrow"></span>
                     </a>
-                    <div class="collapse {{ request()->routeIs('admin.empresas.*', 'admin.unidades-negocio.*', 'admin.fornecedores.*', 'admin.veiculos.*', 'admin.clientes.*', 'admin.grupos.*', 'admin.frutas.*', 'admin.fretes.*', 'admin.pracas.*', 'admin.estoques.*') ? 'show' : '' }}" id="sidebarCadastros">
+                    <div class="collapse {{ request()->routeIs('admin.empresas.*', 'admin.unidades-negocio.*', 'admin.fornecedores.*', 'admin.veiculos.*', 'admin.clientes.*', 'admin.grupos.*', 'admin.grupos-contrato.*', 'admin.frutas.*', 'admin.fretes.*', 'admin.pracas.*', 'admin.estoques.*') ? 'show' : '' }}" id="sidebarCadastros">
                         <ul class="sub-menu">
                             @can('empresas.visualizar')
                                 <li class="side-nav-item">
@@ -151,6 +151,15 @@
                                     <a href="{{ route('admin.grupos.index') }}"
                                        class="side-nav-link {{ request()->routeIs('admin.grupos.*') ? 'active' : '' }}">
                                         <span class="menu-text">Grupos</span>
+                                    </a>
+                                </li>
+                            @endcan
+
+                            @can('grupos-contrato.visualizar')
+                                <li class="side-nav-item">
+                                    <a href="{{ route('admin.grupos-contrato.index') }}"
+                                       class="side-nav-link {{ request()->routeIs('admin.grupos-contrato.*') ? 'active' : '' }}">
+                                        <span class="menu-text">Grupos de Contrato</span>
                                     </a>
                                 </li>
                             @endcan

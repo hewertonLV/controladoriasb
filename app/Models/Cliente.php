@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\MorphOne;
 use Illuminate\Database\Eloquent\SoftDeletes;
@@ -22,7 +23,6 @@ use Illuminate\Support\Carbon;
  * @property int|null $grupo_id
  * @property int $id_unidade_negocio
  * @property string $desconto_nf
- * @property string $desconto_contrato
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
  * @property-read string $cnpj_cpf_formatado
@@ -46,7 +46,6 @@ class Cliente extends Model
         'grupo_id',
         'id_unidade_negocio',
         'desconto_nf',
-        'desconto_contrato',
     ];
 
     /**
@@ -60,7 +59,6 @@ class Cliente extends Model
             'id_unidade_negocio' => 'integer',
             'fantasia' => 'string',
             'desconto_nf' => 'decimal:2',
-            'desconto_contrato' => 'decimal:2',
         ];
     }
 
@@ -99,11 +97,6 @@ class Cliente extends Model
         $this->attributes['desconto_nf'] = $this->normalizarDesconto($value);
     }
 
-    protected function setDescontoContratoAttribute(mixed $value): void
-    {
-        $this->attributes['desconto_contrato'] = $this->normalizarDesconto($value);
-    }
-
     private function normalizarDesconto(mixed $value): string
     {
         $num = (float) $value;
@@ -137,6 +130,14 @@ class Cliente extends Model
     public function grupo(): BelongsTo
     {
         return $this->belongsTo(Grupo::class, 'grupo_id');
+    }
+
+    public function gruposContrato(): BelongsToMany
+    {
+        return $this->belongsToMany(GrupoContrato::class, 'grupo_contrato_clientes', 'cliente_id', 'grupo_contrato_id')
+            ->withPivot(['competencia_inicio', 'competencia_fim'])
+            ->wherePivotNull('deleted_at')
+            ->withTimestamps();
     }
 
     public function unidadeNegocio(): BelongsTo

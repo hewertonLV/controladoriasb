@@ -64,7 +64,6 @@ class ClienteController extends Controller
         return view('admin.clientes.create', [
             'cliente' => new Cliente([
                 'desconto_nf' => '0.00',
-                'desconto_contrato' => '0.00',
             ]),
             'pracas' => $this->pracasParaFormulario(),
             'grupos' => $this->gruposParaFormulario(),
