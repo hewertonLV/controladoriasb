@@ -9,11 +9,11 @@
         <table class="table table-centered table-hover mb-0">
             <thead class="bg-light bg-opacity-50">
                 <tr>
-                    <x-admin.sortable-th label="ID SBS" sort="id_sbs" :filtros="$filtros" />
+                    <x-admin.sortable-th label="# SBS" sort="id_sbs" :filtros="$filtros" />
                     <x-admin.sortable-th label="Nome" sort="nome" :filtros="$filtros" />
                     <x-admin.sortable-th label="Tipo" sort="tipo" :filtros="$filtros" />
                     <x-admin.sortable-th label="Status" sort="status" :filtros="$filtros" />
-                    <x-admin.sortable-th label="Criado em" sort="created_at" :filtros="$filtros" />
+                    <x-admin.sortable-th label="Criado" sort="created_at" :filtros="$filtros" />
                     <th class="text-end">Ações</th>
                 </tr>
             </thead>

@@ -11,11 +11,11 @@
                 <tr>
                     <x-admin.sortable-th label="Unidade" sort="unidade" :filtros="$filtros" />
                     <x-admin.sortable-th label="Fruta" sort="fruta" :filtros="$filtros" />
-                    <x-admin.sortable-th label="Qtd (kg)" sort="qtd_fruta_kg" :filtros="$filtros" />
-                    <th>Qtd (UM)</th>
-                    <x-admin.sortable-th label="Pço médio kg" sort="preco_medio_kg" :filtros="$filtros" />
-                    <th>Pço médio UM</th>
-                    <x-admin.sortable-th label="Valor total" sort="valor_total" :filtros="$filtros" />
+                    <x-admin.sortable-th label="Kg" sort="qtd_fruta_kg" :filtros="$filtros" />
+                    <th>UM</th>
+                    <x-admin.sortable-th label="R$/kg" sort="preco_medio_kg" :filtros="$filtros" />
+                    <th>R$/UM</th>
+                    <x-admin.sortable-th label="Total" sort="valor_total" :filtros="$filtros" />
                     <x-admin.sortable-th label="Atualizado" sort="created_at" :filtros="$filtros" />
                     <th class="text-end">Ações</th>
                 </tr>

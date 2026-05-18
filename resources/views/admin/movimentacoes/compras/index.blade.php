@@ -25,12 +25,12 @@
                         <tr>
                             <th>Compra</th>
                             <th>Data</th>
-                            <th>Fornecedor</th>
+                            <th>Forn.</th>
                             <th>Unidade</th>
                             <th>Fruta</th>
-                            <th class="text-end">Qtd (UM)</th>
-                            <th class="text-end">Qtd (kg)</th>
-                            <th class="text-end">Valor NF</th>
+                            <th class="text-end">UM</th>
+                            <th class="text-end">Kg</th>
+                            <th class="text-end">NF</th>
                             <th>Frete</th>
                             <th class="text-end">Ações</th>
                         </tr>
@@ -49,10 +49,14 @@
                                 <td>{{ $m->frete?->nome ?? '—' }}</td>
                                 <td class="text-end">
                                     @can('movimentacoes.compras.visualizar')
-                                        <a href="{{ route('admin.movimentacoes.compras.show', $m) }}" class="btn btn-light btn-sm">Ver</a>
+                                        <a href="{{ route('admin.movimentacoes.compras.show', $m) }}" class="btn btn-light btn-sm" title="Ver">
+                                            <i class="ri-eye-line"></i> Ver
+                                        </a>
                                     @endcan
                                     @can('movimentacoes.compras.editar')
-                                        <a href="{{ route('admin.movimentacoes.compras.edit', $m) }}" class="btn btn-light btn-sm">Editar</a>
+                                        <a href="{{ route('admin.movimentacoes.compras.edit', $m) }}" class="btn btn-light btn-sm" title="Editar">
+                                            <i class="ri-pencil-line"></i> Editar
+                                        </a>
                                     @endcan
                                 </td>
                             </tr>

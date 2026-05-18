@@ -9,14 +9,13 @@
         <table class="table table-centered table-hover mb-0">
             <thead class="bg-light bg-opacity-50">
                 <tr>
-                    <x-admin.sortable-th label="ID CIGAM" sort="id_cigam" :filtros="$filtros" />
-                    <x-admin.sortable-th label="Razão social" sort="razao_social" :filtros="$filtros" />
-                    <x-admin.sortable-th label="Fantasia" sort="fantasia" :filtros="$filtros" />
-                    <x-admin.sortable-th label="CPF/CNPJ" sort="cnpj_cpf" :filtros="$filtros" />
+                    <x-admin.sortable-th label="# CI." sort="id_cigam" :filtros="$filtros" />
+                    <x-admin.sortable-th label="Cliente" sort="fantasia" :filtros="$filtros" />
+                    <x-admin.sortable-th label="Doc." sort="cnpj_cpf" :filtros="$filtros" />
                     <th>Praça</th>
                     <th>Grupo</th>
-                    <x-admin.sortable-th label="Desconto NF" sort="desconto_nf" :filtros="$filtros" />
-                    <x-admin.sortable-th label="Criado em" sort="created_at" :filtros="$filtros" />
+                    <x-admin.sortable-th label="Desc." sort="desconto_nf" :filtros="$filtros" />
+                    <x-admin.sortable-th label="Criado" sort="created_at" :filtros="$filtros" />
                     <th class="text-end">Ações</th>
                 </tr>
             </thead>
@@ -24,8 +23,7 @@
                 @forelse ($linhas as $cliente)
                     <tr>
                         <td><code>{{ $cliente->id_cigam }}</code></td>
-                        <td><span class="fw-semibold">{{ $cliente->razao_social }}</span></td>
-                        <td>{{ $cliente->fantasia ?? '—' }}</td>
+                        <td><span class="fw-semibold">{{ $cliente->fantasia ?: $cliente->razao_social }}</span></td>
                         <td><code>{{ $cliente->cnpj_cpf_formatado }}</code></td>
                         <td>{{ $cliente->praca?->nome ?? '—' }}</td>
                         <td>{{ $cliente->grupo?->nome ?? '—' }}</td>
@@ -53,7 +51,7 @@
                     </tr>
                 @empty
                     <tr>
-                        <td colspan="9" class="text-center text-muted py-4">
+                        <td colspan="8" class="text-center text-muted py-4">
                             @if (($filtros['search'] ?? '') !== '')
                                 Nenhum cliente corresponde aos filtros aplicados.
                             @else

@@ -1,4 +1,4 @@
-# Facigam — Sistema Web
+# SB - CONTROLADORIA — Sistema Web
 
 Sistema interno (Laravel 13 + MySQL + Highdmin/Bootstrap) integrado ao ERP CIGAM.
 

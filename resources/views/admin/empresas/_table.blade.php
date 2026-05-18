@@ -10,12 +10,11 @@
             <thead class="bg-light bg-opacity-50">
                 <tr>
                     <x-admin.sortable-th label="Tipo" sort="tipo_registro" :filtros="$filtros" />
-                    <x-admin.sortable-th label="ID CIGAM" sort="id_cigam" :filtros="$filtros" />
-                    <x-admin.sortable-th label="Nome / Razão social" sort="nome_exibicao" :filtros="$filtros" />
-                    <x-admin.sortable-th label="Fantasia" sort="fantasia" :filtros="$filtros" />
-                    <x-admin.sortable-th label="CPF/CNPJ" sort="documento" :filtros="$filtros" />
-                    <x-admin.sortable-th label="UN ref." sort="unidade_referencia" :filtros="$filtros" />
-                    <x-admin.sortable-th label="Tipo doc." sort="tipo_pessoa" :filtros="$filtros" />
+                    <x-admin.sortable-th label="# CI." sort="id_cigam" :filtros="$filtros" />
+                    <x-admin.sortable-th label="Nome" sort="nome_exibicao" :filtros="$filtros" />
+                    <x-admin.sortable-th label="Doc." sort="documento" :filtros="$filtros" />
+                    <x-admin.sortable-th label="UN" sort="unidade_referencia" :filtros="$filtros" />
+                    <x-admin.sortable-th label="Pessoa" sort="tipo_pessoa" :filtros="$filtros" />
                     <x-admin.sortable-th label="Status" sort="status" :filtros="$filtros" />
                     <th class="text-end">Ações</th>
                 </tr>
@@ -25,8 +24,7 @@
                     <tr class="{{ $empresa->statusExibicao() ? '' : 'text-muted bg-light bg-opacity-25' }}">
                         <td><span class="badge bg-secondary-subtle text-secondary">{{ $empresa->rotuloTipoRegistro() }}</span></td>
                         <td><code>{{ $empresa->idCigamExibicao() }}</code></td>
-                        <td><span class="fw-semibold">{{ $empresa->nomeExibicao() }}</span></td>
-                        <td>{{ $empresa->fantasiaExibicao() ?? '—' }}</td>
+                        <td><span class="fw-semibold">{{ $empresa->fantasiaExibicao() ?: $empresa->nomeExibicao() }}</span></td>
                         <td>{{ $empresa->documentoFormatado() }}</td>
                         <td>{{ $empresa->unidadeNegocioExibicao() }}</td>
                         <td>
@@ -74,7 +72,7 @@
                     </tr>
                 @empty
                     <tr>
-                        <td colspan="9" class="text-center text-muted py-4">
+                        <td colspan="8" class="text-center text-muted py-4">
                             @if (($filtros['search'] ?? '') !== '' || ($filtros['status'] ?? null) !== null || ($filtros['tipo_entidade'] ?? null) !== null)
                                 Nenhum registro corresponde aos filtros aplicados.
                             @else

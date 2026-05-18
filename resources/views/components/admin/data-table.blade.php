@@ -120,6 +120,48 @@
         .admin-data-table .sortable-th {
             white-space: nowrap;
         }
+        .admin-data-table table.table {
+            font-size: 8px;
+        }
+        .admin-data-table table.table > :not(caption) > * > * {
+            padding: 0.45rem 0.65rem;
+            vertical-align: middle;
+        }
+        .admin-data-table table.table thead th {
+            background: rgba(var(--bs-light-rgb), 0.65);
+            color: var(--bs-secondary-color);
+            font-size: 10px;
+            font-weight: 700;
+            letter-spacing: 0.025em;
+            text-transform: uppercase;
+            white-space: nowrap;
+        }
+        .admin-data-table table.table td {
+            line-height: 1.25;
+        }
+        .admin-data-table table.table code {
+            font-size: 8px;
+        }
+        .admin-data-table table.table td.text-end .d-inline-flex {
+            flex-wrap: nowrap !important;
+        }
+        .admin-data-table table.table td.text-end .btn {
+            background: transparent !important;
+            border-color: transparent !important;
+            box-shadow: none !important;
+            display: inline-flex;
+            font-size: 0;
+            line-height: 1;
+            padding: 0.1rem;
+            text-decoration: none;
+        }
+        .admin-data-table table.table td.text-end .btn i {
+            font-size: 0.95rem;
+            margin: 0 !important;
+        }
+        .admin-data-table table.table td.text-end .btn:hover {
+            opacity: 0.75;
+        }
         .admin-data-table .sortable-th a {
             align-items: center;
             color: inherit;

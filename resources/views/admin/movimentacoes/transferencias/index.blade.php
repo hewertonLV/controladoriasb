@@ -28,8 +28,8 @@
                             <th>Destino</th>
                             <th>Fruta</th>
                             <th>Status</th>
-                            <th class="text-end">Qtd (UM)</th>
-                            <th class="text-end">Qtd (kg)</th>
+                            <th class="text-end">UM</th>
+                            <th class="text-end">Kg</th>
                             <th>Frete</th>
                             <th class="text-end">Ações</th>
                         </tr>
@@ -48,7 +48,10 @@
                                 <td class="text-end">
                                     @can('movimentacoes.transferencias.visualizar')
                                         <a href="{{ route('admin.movimentacoes.transferencias.show', ['transferenciaOrigem' => $m->transferencia_origem_id]) }}"
-                                           class="btn btn-light btn-sm">Ver</a>
+                                           class="btn btn-light btn-sm"
+                                           title="Ver">
+                                            <i class="ri-eye-line"></i> Ver
+                                        </a>
                                     @endcan
                                 </td>
                             </tr>

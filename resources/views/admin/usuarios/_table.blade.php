@@ -11,11 +11,11 @@
                 <tr>
                     <x-admin.sortable-th label="Nome" sort="name" :filtros="$filtros" />
                     <x-admin.sortable-th label="Login" sort="login" :filtros="$filtros" />
-                    <x-admin.sortable-th label="E-mail" sort="email" :filtros="$filtros" />
+                    <x-admin.sortable-th label="Email" sort="email" :filtros="$filtros" />
                     <th>Grupos</th>
                     <x-admin.sortable-th label="Status" sort="ativo" :filtros="$filtros" />
                     <x-admin.sortable-th label="Senha" sort="must_change_password" :filtros="$filtros" />
-                    <x-admin.sortable-th label="Criado em" sort="created_at" :filtros="$filtros" />
+                    <x-admin.sortable-th label="Criado" sort="created_at" :filtros="$filtros" />
                     <th class="text-end">Ações</th>
                 </tr>
             </thead>

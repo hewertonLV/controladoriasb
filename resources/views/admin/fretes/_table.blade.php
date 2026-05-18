@@ -13,10 +13,10 @@
                 <tr>
                     <x-admin.sortable-th label="Nome" sort="nome" :filtros="$filtros" />
                     <x-admin.sortable-th label="Valor" sort="valor" :filtros="$filtros" />
-                    <th>Veículo (ID SBS)</th>
-                    <x-admin.sortable-th label="Situação" sort="status_situacao" :filtros="$filtros" />
-                    <x-admin.sortable-th label="Valor fruta/kg" sort="valor_fruta_kg" :filtros="$filtros" />
-                    <x-admin.sortable-th label="Criado em" sort="created_at" :filtros="$filtros" />
+                    <th>Veículo</th>
+                    <x-admin.sortable-th label="Sit." sort="status_situacao" :filtros="$filtros" />
+                    <x-admin.sortable-th label="Fruta/kg" sort="valor_fruta_kg" :filtros="$filtros" />
+                    <x-admin.sortable-th label="Criado" sort="created_at" :filtros="$filtros" />
                     <th class="text-end">Ações</th>
                 </tr>
             </thead>

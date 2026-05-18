@@ -29,7 +29,10 @@ class ClienteTest extends ClienteTestCase
 
     public function test_listagem_ajax_retorna_partial_da_tabela(): void
     {
-        Cliente::factory()->create(['razao_social' => 'CLIENTE AJAX']);
+        Cliente::factory()->create([
+            'razao_social' => 'CLIENTE AJAX',
+            'fantasia' => null,
+        ]);
 
         $this->actingAs($this->clientesManager())
             ->withHeaders([

@@ -3,6 +3,9 @@
     const body = document.body;
     const wrapper = document.querySelector('.wrapper');
     const saveUrl = html.dataset.themeSettingsUrl;
+    const userThemeStorageKey = html.dataset.themeSettingsUserId
+        ? `__HIGHDMIN_THEME_SETTINGS__:${html.dataset.themeSettingsUserId}`
+        : null;
     const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
     const persistedSettings = [
         'data-bs-theme',
@@ -21,6 +24,26 @@
     ];
     let resizeTimer = null;
     let mutationTimer = null;
+    const readLocalThemeSettings = () => {
+        if (!userThemeStorageKey) {
+            return null;
+        }
+
+        try {
+            return JSON.parse(localStorage.getItem(userThemeStorageKey) || 'null');
+        } catch (error) {
+            localStorage.removeItem(userThemeStorageKey);
+
+            return null;
+        }
+    };
+    const persistLocalThemeSettings = (settings) => {
+        if (!userThemeStorageKey) {
+            return;
+        }
+
+        localStorage.setItem(userThemeStorageKey, JSON.stringify(settings));
+    };
     let currentSettings = window.currentThemeSettings || window.themeSettingsFromServer || persistedSettings.reduce((settings, name) => {
         const value = html.getAttribute(name);
 
@@ -30,6 +53,14 @@
 
         return settings;
     }, {});
+    const localThemeSettings = readLocalThemeSettings();
+
+    if (localThemeSettings) {
+        currentSettings = {
+            ...currentSettings,
+            ...localThemeSettings,
+        };
+    }
 
     const syncConfig = (settings) => {
         if (!window.config) {
@@ -100,6 +131,7 @@
         syncClasses(currentSettings);
         syncThemeControls(currentSettings);
         window.currentThemeSettings = currentSettings;
+        persistLocalThemeSettings(currentSettings);
     };
     const scheduleThemeReapply = (delay = 0) => {
         window.setTimeout(() => {
@@ -153,6 +185,18 @@
         }, 150);
     });
 
+    window.addEventListener('storage', (event) => {
+        if (event.key !== userThemeStorageKey || !event.newValue) {
+            return;
+        }
+
+        try {
+            applyThemeSettings(JSON.parse(event.newValue));
+        } catch (error) {
+            localStorage.removeItem(userThemeStorageKey);
+        }
+    });
+
     document.getElementById('theme-settings-offcanvas')?.addEventListener('shown.bs.offcanvas', () => {
         applyThemeSettings(window.currentThemeSettings || window.themeSettingsFromServer || currentSettings);
         syncThemeControls(window.currentThemeSettings || window.themeSettingsFromServer || currentSettings);
@@ -182,6 +226,7 @@
 
         applyThemeSettings(currentSettings);
         window.currentThemeSettings = currentSettings;
+        persistLocalThemeSettings(currentSettings);
 
         fetch(saveUrl, {
             method: 'POST',
@@ -196,6 +241,7 @@
             .then((payload) => {
                 if (payload?.theme_settings) {
                     applyThemeSettings(payload.theme_settings);
+                    persistLocalThemeSettings(currentSettings);
                     window.currentThemeSettings = currentSettings;
                     window.themeSettingsFromServer = currentSettings;
                 }

@@ -1,6 +1,6 @@
-# facigam — Documento Mestre de Contexto do Sistema
+# SB - CONTROLADORIA — Documento Mestre de Contexto do Sistema
 
-> Este arquivo é a memória técnica principal do projeto **facigam**. Ele é
+> Este arquivo é a memória técnica principal do projeto **SB - CONTROLADORIA**. Ele é
 > obrigatório como leitura para qualquer pessoa (ou agente de IA) que vá
 > continuar o desenvolvimento. Em novos chats, basta dizer:
 >
@@ -11,7 +11,7 @@
 > **quais padrões devem ser preservados**. Mudanças que conflitam com este
 > documento devem ser discutidas explicitamente antes de implementadas.
 
-Última atualização do documento: 2026-05-12 (inclui ajuste UN: sem exclusão; apenas inativar/ativar).
+Última atualização do documento: 2026-05-17 (inclui atualização do nome do sistema para SB - CONTROLADORIA).
 
 ---
 
@@ -37,16 +37,16 @@
 18. [Problemas Já Encontrados e Soluções](#18-problemas-já-encontrados-e-soluções)
 19. [Como Continuar o Projeto](#19-como-continuar-o-projeto)
 20. [Checklist Obrigatório para Novas Features](#20-checklist-obrigatório-para-novas-features)
-21. [Módulo de Unidades de Negócio (FACIGAM 2)](#21-módulo-de-unidades-de-negócio-facigam-2)
+21. [Módulo de Unidades de Negócio](#21-módulo-de-unidades-de-negócio)
 
 ---
 
 ## 1. Visão Geral do Sistema
 
-**facigam** é um sistema web administrativo interno usado para gerenciar o
+**SB - CONTROLADORIA** é um sistema web administrativo interno usado para gerenciar o
 **cadastro mestre de Empresas** que se relacionam com o ERP **CIGAM** da
 organização (Grupo Sítio Barreiras / Sítios Barreiras). O ERP CIGAM é a fonte
-primária de muitos dos dados de empresas, mas o facigam adiciona controle,
+primária de muitos dos dados de empresas, mas o SB - CONTROLADORIA adiciona controle,
 auditoria, importação em massa, relatórios e uma camada de governança que o
 CIGAM puro não oferece de forma amigável.
 
@@ -72,7 +72,7 @@ O sistema **não acessa o banco do CIGAM diretamente**. Ele é alimentado por:
 2. **Importação assíncrona** de planilha Excel (.xlsx/.xls) exportada do CIGAM,
    com layout fixo de 7 colunas (A..G) descritas em §10.
 
-A identificação principal de cada empresa no facigam é o campo `id_cigam`,
+A identificação principal de cada empresa no SB - CONTROLADORIA é o campo `id_cigam`,
 que **deve bater com o código numérico daquela empresa dentro do CIGAM**. Esse
 campo é único, obrigatório e armazenado como `varchar` (vem do ERP como
 string), mas é **ordenado numericamente** na UI (veja §7 e §16).
@@ -277,7 +277,7 @@ Ordem cronológica das migrations relevantes:
 11. `2026_05_11_212408_create_empresa_importacoes_table`.
 12. `2026_05_11_215346_create_empresa_exportacoes_table`.
 13. `2026_05_12_000001_create_unidades_negocio_table` — cadastro mestre de
-    unidades de negócio FACIGAM 2 (`id_cigam` único, `nome`, `status`).
+    unidades de negócio SB - CONTROLADORIA (`id_cigam` único, `nome`, `status`).
 14. `2026_05_12_100000_create_unidade_negocio_importacoes_table` — controle de
     importações Excel (preview + confirmação), espelhando `empresa_importacoes`.
 
@@ -931,7 +931,7 @@ e fica documentado apenas no código e no README.
 - `unidades-negocio-importacao` — usada por
   `ProcessarPreviewImportacaoUnidadesNegocioJob`.
 - `empresas-exportacao` — usada por `GerarPdfEmpresasJob`.
-- `default` — fallback (não usada hoje pelos módulos do facigam, mas
+- `default` — fallback (não usada hoje pelos módulos do SB - CONTROLADORIA, mas
   workers a incluem para futuras tarefas leves).
 
 **Por que duas filas?** Para que uma importação grande não bloqueie um PDF
@@ -1322,10 +1322,10 @@ Antes de abrir PR / dar deploy, percorra esta lista:
 
 ---
 
-## 21. Módulo de Unidades de Negócio (FACIGAM 2)
+## 21. Módulo de Unidades de Negócio
 
 Foi implementado o **cadastro mestre de Unidades de Negócio** usado pelo
-FACIGAM 2: entidade simples com vínculo ao código do ERP CIGAM e nome legível.
+SB - CONTROLADORIA: entidade simples com vínculo ao código do ERP CIGAM e nome legível.
 **Não existe exclusão física** nem rota `destroy`: o registro permanece no
 banco para histórico e vínculos futuros. A saída de uso é modelada apenas por
 **inativação** (`status = false`); a **reativação** é explícita (`status =

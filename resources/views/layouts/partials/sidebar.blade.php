@@ -22,14 +22,23 @@
 
     <div data-simplebar>
 
+        @php
+            $sidebarUserName = auth()->user()?->name ?? 'Visitante';
+            $sidebarUserEmail = auth()->user()?->email ?? '';
+        @endphp
+
         <div class="sidenav-user">
             <div class="dropdown-center">
                 <a class="topbar-link dropdown-toggle text-reset drop-arrow-none px-2 d-flex align-items-center justify-content-center"
                    data-bs-toggle="dropdown" data-bs-offset="0,19" type="button" aria-haspopup="false" aria-expanded="false">
                     <img src="{{ asset('assets/images/users/avatar-1.jpg') }}" width="42" class="rounded-circle me-2 d-flex" alt="user-image">
-                    <span class="d-flex flex-column gap-1 sidebar-user-name">
-                        <h4 class="my-0 fw-bold fs-15">{{ auth()->user()?->name ?? 'Visitante' }}</h4>
-                        <h6 class="my-0 text-truncate">{{ auth()->user()?->email }}</h6>
+                    <span class="d-flex flex-column gap-1 sidebar-user-name min-w-0">
+                        <h4 class="my-0 fw-bold fs-15 text-truncate sidebar-user-text" title="{{ $sidebarUserName }}">
+                            {{ \Illuminate\Support\Str::limit($sidebarUserName, 24) }}
+                        </h4>
+                        <h6 class="my-0 text-truncate sidebar-user-text" title="{{ $sidebarUserEmail }}">
+                            {{ \Illuminate\Support\Str::limit($sidebarUserEmail, 30) }}
+                        </h6>
                     </span>
                     <i class="ri-arrow-down-s-line d-block sidebar-user-arrow align-middle ms-2"></i>
                 </a>

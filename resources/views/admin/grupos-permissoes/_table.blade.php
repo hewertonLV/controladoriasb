@@ -11,8 +11,8 @@
                 <tr>
                     <x-admin.sortable-th label="Nome" sort="name" :filtros="$filtros" />
                     <x-admin.sortable-th label="Guard" sort="guard_name" :filtros="$filtros" />
-                    <x-admin.sortable-th label="Permissões" sort="permissions_count" :filtros="$filtros" class="text-center" />
-                    <x-admin.sortable-th label="Criado em" sort="created_at" :filtros="$filtros" />
+                    <x-admin.sortable-th label="Perm." sort="permissions_count" :filtros="$filtros" class="text-center" />
+                    <x-admin.sortable-th label="Criado" sort="created_at" :filtros="$filtros" />
                     <th class="text-end">Ações</th>
                 </tr>
             </thead>

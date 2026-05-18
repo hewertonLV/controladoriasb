@@ -1,4 +1,4 @@
-# Arquivos de deploy — facigam
+# Arquivos de deploy — SB - CONTROLADORIA
 
 Este diretório contém artefatos prontos para uso em servidores Linux de produção.
 

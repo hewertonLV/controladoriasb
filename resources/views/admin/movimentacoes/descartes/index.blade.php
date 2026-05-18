@@ -24,12 +24,12 @@
                     <thead class="table-light">
                         <tr>
                             <th>Data</th>
-                            <th>Unidade (origem)</th>
+                            <th>Origem</th>
                             <th>Fruta</th>
                             <th>Categoria</th>
-                            <th class="text-end">Qtd (UM)</th>
-                            <th class="text-end">Qtd (kg)</th>
-                            <th class="text-end">Valor econômico</th>
+                            <th class="text-end">UM</th>
+                            <th class="text-end">Kg</th>
+                            <th class="text-end">Valor</th>
                             <th>Status</th>
                             <th class="text-end">Ações</th>
                         </tr>
@@ -47,10 +47,14 @@
                                 <td>{{ $m->status_registro }}</td>
                                 <td class="text-end">
                                     @can('movimentacoes.descartes.visualizar')
-                                        <a href="{{ route('admin.movimentacoes.descartes.show', $m) }}" class="btn btn-light btn-sm">Ver</a>
+                                        <a href="{{ route('admin.movimentacoes.descartes.show', $m) }}" class="btn btn-light btn-sm" title="Ver">
+                                            <i class="ri-eye-line"></i> Ver
+                                        </a>
                                     @endcan
                                     @can('movimentacoes.descartes.editar')
-                                        <a href="{{ route('admin.movimentacoes.descartes.edit', $m) }}" class="btn btn-light btn-sm">Editar</a>
+                                        <a href="{{ route('admin.movimentacoes.descartes.edit', $m) }}" class="btn btn-light btn-sm" title="Editar">
+                                            <i class="ri-pencil-line"></i> Editar
+                                        </a>
                                     @endcan
                                 </td>
                             </tr>

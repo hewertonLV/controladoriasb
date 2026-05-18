@@ -1,5 +1,5 @@
 /*
- * Dynamic FACIGAM palette.
+ * Dynamic SB - CONTROLADORIA palette.
  * Loaded after Highdmin compiled CSS so we can keep vendor/template files intact.
  */
 :root {
@@ -212,6 +212,27 @@ a:hover,
 .side-nav .side-nav-link:hover,
 .side-nav .side-nav-link:focus {
   background-color: var(--highdmin-menu-item-hover-bg);
+}
+
+.sidenav-user .topbar-link {
+  max-width: 100%;
+  overflow: hidden;
+}
+
+.sidenav-user .sidebar-user-name {
+  flex: 1 1 auto;
+  max-width: calc(var(--highdmin-sidenav-width) - 92px);
+  min-width: 0;
+  overflow: hidden;
+}
+
+.sidenav-user .sidebar-user-text {
+  display: block;
+  max-width: 100%;
+}
+
+.sidenav-user .sidebar-user-arrow {
+  flex: 0 0 auto;
 }
 
 #preloader .spinner-border,

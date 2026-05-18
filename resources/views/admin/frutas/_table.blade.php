@@ -9,15 +9,15 @@
         <table class="table table-centered table-hover mb-0">
             <thead class="bg-light bg-opacity-50">
                 <tr>
-                    <x-admin.sortable-th label="ID CIGAM" sort="id_cigam" :filtros="$filtros" />
+                    <x-admin.sortable-th label="# CI." sort="id_cigam" :filtros="$filtros" />
                     <x-admin.sortable-th label="Nome" sort="nome" :filtros="$filtros" />
-                    <x-admin.sortable-th label="Unidade" sort="unidade_medicao" :filtros="$filtros" />
-                    <x-admin.sortable-th label="Kg/un." sort="kg_por_unidade_medicao" :filtros="$filtros" />
-                    <th>ICMS ex. compra</th>
-                    <th>ICMS na compra</th>
+                    <x-admin.sortable-th label="UM" sort="unidade_medicao" :filtros="$filtros" />
+                    <x-admin.sortable-th label="Kg/UM" sort="kg_por_unidade_medicao" :filtros="$filtros" />
+                    <th>ICMS ex.</th>
+                    <th>ICMS ent.</th>
                     <th>UM ICMS</th>
-                    <th>ICMS venda %</th>
-                    <x-admin.sortable-th label="Criado em" sort="created_at" :filtros="$filtros" />
+                    <th>ICMS venda</th>
+                    <x-admin.sortable-th label="Criado" sort="created_at" :filtros="$filtros" />
                     <th class="text-end">Ações</th>
                 </tr>
             </thead>

@@ -55,11 +55,12 @@ class ThemeSettingsTest extends TestCase
             ->assertSee('data-layout-mode="fluid"', false);
     }
 
-    public function test_layout_uses_session_theme_settings_before_database_settings(): void
+    public function test_layout_refreshes_stale_session_theme_settings_from_database(): void
     {
         $user = User::factory()->create([
             'theme_settings' => [
                 'data-layout-mode' => 'fluid',
+                'data-bs-theme' => 'dark',
             ],
         ]);
 
@@ -68,13 +69,18 @@ class ThemeSettingsTest extends TestCase
                 'theme_settings_user_id' => $user->getKey(),
                 'theme_settings' => array_merge(User::defaultThemeSettings(), [
                     'data-layout-mode' => 'detached',
+                    'data-bs-theme' => 'light',
                 ]),
             ])
             ->get(route('dashboard'))
             ->assertOk()
-            ->assertSee('data-layout-mode="detached"', false)
+            ->assertSessionHas('theme_settings.data-layout-mode', 'fluid')
+            ->assertSessionHas('theme_settings.data-bs-theme', 'dark')
+            ->assertSee('data-layout-mode="fluid"', false)
+            ->assertSee('data-bs-theme="dark"', false)
             ->assertSee('window.themeSettingsFromServer', false)
-            ->assertSee('"data-layout-mode":"detached"', false)
+            ->assertSee('"data-layout-mode":"fluid"', false)
+            ->assertSee('"data-bs-theme":"dark"', false)
             ->assertSee('data-theme-settings-source="server"', false);
     }
 
@@ -128,6 +134,11 @@ class ThemeSettingsTest extends TestCase
         $this->assertStringContainsString('querySelectorAll(`input[name="${name}"]`)', $persistenceScript);
         $this->assertStringContainsString('window.applyThemeSettings = applyThemeSettings', $persistenceScript);
         $this->assertStringContainsString('window.syncThemeControls = syncThemeControls', $persistenceScript);
+        $this->assertStringContainsString('__HIGHDMIN_THEME_SETTINGS__', $configScript);
+        $this->assertStringContainsString('__HIGHDMIN_THEME_SETTINGS__', $persistenceScript);
+        $this->assertStringContainsString('html.dataset.themeSettingsUserId', $configScript);
+        $this->assertStringContainsString('html.dataset.themeSettingsUserId', $persistenceScript);
+        $this->assertStringContainsString("window.addEventListener('storage'", $persistenceScript);
         $this->assertStringContainsString('input.checked = isSelected', $persistenceScript);
         $this->assertStringContainsString("card.classList.toggle('active', isSelected)", $persistenceScript);
         $this->assertStringContainsString('new MutationObserver', $persistenceScript);

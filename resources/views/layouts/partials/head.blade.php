@@ -14,6 +14,7 @@
 <link href="{{ asset('assets/css/icons.min.css') }}" rel="stylesheet" type="text/css" />
 
 <link href="{{ asset('assets/css/theme-dynamic.css') }}" rel="stylesheet" type="text/css" />
+<link href="{{ asset('assets/css/admin-tables.css') }}" rel="stylesheet" type="text/css" />
 
 <script src="{{ asset('assets/js/config.js') }}"></script>
 

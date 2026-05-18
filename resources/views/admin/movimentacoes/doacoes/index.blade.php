@@ -24,12 +24,12 @@
                     <thead class="table-light">
                         <tr>
                             <th>Data</th>
-                            <th>Unidade (origem)</th>
-                            <th>Cliente (destino)</th>
+                            <th>Origem</th>
+                            <th>Destino</th>
                             <th>Fruta</th>
-                            <th class="text-end">Qtd (UM)</th>
-                            <th class="text-end">Qtd (kg)</th>
-                            <th class="text-end">Valor (baixa)</th>
+                            <th class="text-end">UM</th>
+                            <th class="text-end">Kg</th>
+                            <th class="text-end">Baixa</th>
                             <th>Motivo</th>
                             <th class="text-end">Ações</th>
                         </tr>
@@ -47,10 +47,14 @@
                                 <td class="text-truncate" style="max-width: 12rem">{{ $m->motivo_doacao ?? '—' }}</td>
                                 <td class="text-end">
                                     @can('movimentacoes.doacoes.visualizar')
-                                        <a href="{{ route('admin.movimentacoes.doacoes.show', $m) }}" class="btn btn-light btn-sm">Ver</a>
+                                        <a href="{{ route('admin.movimentacoes.doacoes.show', $m) }}" class="btn btn-light btn-sm" title="Ver">
+                                            <i class="ri-eye-line"></i> Ver
+                                        </a>
                                     @endcan
                                     @can('movimentacoes.doacoes.editar')
-                                        <a href="{{ route('admin.movimentacoes.doacoes.edit', $m) }}" class="btn btn-light btn-sm">Editar</a>
+                                        <a href="{{ route('admin.movimentacoes.doacoes.edit', $m) }}" class="btn btn-light btn-sm" title="Editar">
+                                            <i class="ri-pencil-line"></i> Editar
+                                        </a>
                                     @endcan
                                 </td>
                             </tr>

@@ -18,6 +18,7 @@
     data-menu-color="{{ $themeSettings['data-menu-color'] }}"
     data-sidenav-size="{{ $themeSettings['data-sidenav-size'] }}"
     data-theme-settings-source="{{ auth()->check() ? 'server' : 'guest' }}"
+    data-theme-settings-user-id="{{ auth()->id() ?? '' }}"
     data-theme-settings-url="{{ auth()->check() ? route('theme-settings.update') : '' }}"
 >
 

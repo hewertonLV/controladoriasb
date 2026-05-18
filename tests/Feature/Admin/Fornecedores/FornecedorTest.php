@@ -28,9 +28,29 @@ class FornecedorTest extends FornecedorTestCase
             ->assertOk();
     }
 
+    public function test_listagem_usa_datatables_com_botoes_e_tabela_compacta(): void
+    {
+        Fornecedor::factory()->create([
+            'razao_social' => 'FORNECEDOR DATATABLE',
+            'fantasia' => null,
+        ]);
+
+        $this->actingAs($this->fornecedoresManager())
+            ->get(route('admin.fornecedores.index'))
+            ->assertOk()
+            ->assertSee('fornecedores-datatable', false)
+            ->assertSee('assets/vendor/datatables.net/js/jquery.dataTables.min.js', false)
+            ->assertSee('assets/vendor/datatables.net-buttons/js/dataTables.buttons.min.js', false)
+            ->assertSee('assets/vendor/datatables.net-keytable/js/dataTables.keyTable.min.js', false)
+            ->assertSee('FORNECEDOR DATATABLE', false);
+    }
+
     public function test_listagem_ajax_retorna_partial_da_tabela(): void
     {
-        Fornecedor::factory()->create(['razao_social' => 'FORNECEDOR AJAX']);
+        Fornecedor::factory()->create([
+            'razao_social' => 'FORNECEDOR AJAX',
+            'fantasia' => null,
+        ]);
 
         $this->actingAs($this->fornecedoresManager())
             ->withHeaders([

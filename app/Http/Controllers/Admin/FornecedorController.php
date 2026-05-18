@@ -27,7 +27,12 @@ class FornecedorController extends Controller
         $filtros = $this->fornecedorQuery->filtrosFromRequest($request);
         $query = $this->fornecedorQuery->aplicarFiltros(Fornecedor::query(), $filtros);
 
-        if ($filtros['per_page'] === 'all') {
+        if (! $request->ajax()) {
+            $resultados = $query->get();
+            $fornecedores = $resultados;
+            $total = $resultados->count();
+            $exibindo = $total;
+        } elseif ($filtros['per_page'] === 'all') {
             $total = (clone $query)->toBase()->count();
             $resultados = $query->get();
             $fornecedores = $resultados;

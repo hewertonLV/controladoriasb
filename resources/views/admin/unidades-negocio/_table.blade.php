@@ -11,15 +11,14 @@
         <table class="table table-centered table-hover mb-0">
             <thead class="bg-light bg-opacity-50">
                 <tr>
-                    <x-admin.sortable-th label="ID CIGAM" sort="id_cigam" :filtros="$filtros" />
-                    <x-admin.sortable-th label="Estado (ICMS)" sort="estado" :filtros="$filtros" />
-                    <x-admin.sortable-th label="Razão social" sort="razao_social" :filtros="$filtros" />
-                    <x-admin.sortable-th label="Nome" sort="nome" :filtros="$filtros" />
-                    <x-admin.sortable-th label="CPF/CNPJ" sort="cpf_cnpj" :filtros="$filtros" />
-                    <x-admin.sortable-th label="Custo op." sort="custo_operacional" :filtros="$filtros" />
-                    <x-admin.sortable-th label="Estoque" sort="possui_estoque" :filtros="$filtros" />
+                    <x-admin.sortable-th label="# CI." sort="id_cigam" :filtros="$filtros" />
+                    <x-admin.sortable-th label="UF" sort="estado" :filtros="$filtros" />
+                    <x-admin.sortable-th label="Unidade" sort="nome" :filtros="$filtros" />
+                    <x-admin.sortable-th label="Doc." sort="cpf_cnpj" :filtros="$filtros" />
+                    <x-admin.sortable-th label="C. op." sort="custo_operacional" :filtros="$filtros" />
+                    <x-admin.sortable-th label="Est." sort="possui_estoque" :filtros="$filtros" />
                     <x-admin.sortable-th label="Status" sort="status" :filtros="$filtros" />
-                    <x-admin.sortable-th label="Criado em" sort="created_at" :filtros="$filtros" />
+                    <x-admin.sortable-th label="Criado" sort="created_at" :filtros="$filtros" />
                     <th class="text-end">Ações</th>
                 </tr>
             </thead>
@@ -27,9 +26,8 @@
                 @forelse ($linhas as $unidade)
                     <tr class="{{ $unidade->status ? '' : 'text-muted bg-light bg-opacity-25' }}">
                         <td><code>{{ $unidade->id_cigam }}</code></td>
-                        <td>{{ $unidade->estado?->nome ?? '—' }}</td>
-                        <td><span class="fw-semibold">{{ $unidade->razao_social }}</span></td>
-                        <td>{{ $unidade->nome }}</td>
+                        <td>{{ $unidade->estado?->abreviacao ?? '—' }}</td>
+                        <td><span class="fw-semibold">{{ $unidade->nome ?: $unidade->razao_social }}</span></td>
                         <td><code>{{ $unidade->cpf_cnpj_formatado }}</code></td>
                         <td>{{ number_format((float) $unidade->custo_operacional, 2, ',', '.') }}</td>
                         <td>
@@ -99,7 +97,7 @@
                     </tr>
                 @empty
                     <tr>
-                        <td colspan="10" class="text-center text-muted py-4">
+                        <td colspan="9" class="text-center text-muted py-4">
                             @if (($filtros['search'] ?? '') !== '' || ($filtros['status'] ?? null) !== null || ($filtros['possui_estoque'] ?? null) !== null || ($filtros['id_estado'] ?? null) !== null)
                                 Nenhuma unidade corresponde aos filtros aplicados.
                             @else
@@ -123,7 +121,7 @@
             · Status: <code>{{ $filtros['status'] === '1' ? 'Ativas' : 'Inativas' }}</code>
         @endif
         @if (($filtros['id_estado'] ?? null) !== null)
-            · Estado: <code>{{ optional($estados->firstWhere('id', (int) $filtros['id_estado']))->nome ?? $filtros['id_estado'] }}</code>
+            · UF: <code>{{ optional($estados->firstWhere('id', (int) $filtros['id_estado']))->abreviacao ?? $filtros['id_estado'] }}</code>
         @endif
     </div>
     <x-admin.table-pagination :paginator="$unidadesNegocio" />

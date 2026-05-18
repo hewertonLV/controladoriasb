@@ -19,13 +19,8 @@ class LoadUserThemeSettings
             return $next($request);
         }
 
-        if (
-            ! $request->session()->has('theme_settings')
-            || $request->session()->get('theme_settings_user_id') !== $user->getKey()
-        ) {
-            $request->session()->put('theme_settings', $user->themeSettings());
-            $request->session()->put('theme_settings_user_id', $user->getKey());
-        }
+        $request->session()->put('theme_settings', $user->refresh()->themeSettings());
+        $request->session()->put('theme_settings_user_id', $user->getKey());
 
         return $next($request);
     }

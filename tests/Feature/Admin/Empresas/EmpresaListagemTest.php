@@ -13,7 +13,10 @@ class EmpresaListagemTest extends EmpresasTestCase
     public function test_listagem_carrega(): void
     {
         $user = $this->userWithPermissions([Permissions::EMPRESAS_VISUALIZAR]);
-        Cliente::factory()->create(['razao_social' => 'Empresa Visível']);
+        Cliente::factory()->create([
+            'razao_social' => 'Empresa Visível',
+            'fantasia' => null,
+        ]);
 
         $this->actingAs($user)
             ->get(route('admin.empresas.index'))
@@ -42,15 +45,18 @@ class EmpresaListagemTest extends EmpresasTestCase
             $this->actingAs($user)
                 ->get(route('admin.empresas.index', ['search' => $search]), ['X-Requested-With' => 'XMLHttpRequest'])
                 ->assertOk()
-                ->assertSee('ALPHA NOME')
-                ->assertDontSee('BETA NOME');
+                ->assertSee('ALPHA FANTASIA')
+                ->assertDontSee('BETA FANTASIA');
         }
     }
 
     public function test_filtro_status_listagem(): void
     {
         $user = $this->userWithPermissions([Permissions::EMPRESAS_VISUALIZAR]);
-        Cliente::factory()->create(['razao_social' => 'Cliente Sempre Ativo']);
+        Cliente::factory()->create([
+            'razao_social' => 'Cliente Sempre Ativo',
+            'fantasia' => null,
+        ]);
         UnidadeNegocio::factory()->create(['nome' => 'Un Ativa', 'status' => true]);
         UnidadeNegocio::factory()->create(['nome' => 'Un Inativa', 'status' => false]);
 
@@ -90,9 +96,9 @@ class EmpresaListagemTest extends EmpresasTestCase
     public function test_ordenacao_por_nome(): void
     {
         $user = $this->userWithPermissions([Permissions::EMPRESAS_VISUALIZAR]);
-        Cliente::factory()->create(['razao_social' => 'Zulu']);
-        Cliente::factory()->create(['razao_social' => 'Alpha']);
-        Cliente::factory()->create(['razao_social' => 'Mike']);
+        Cliente::factory()->create(['razao_social' => 'Zulu', 'fantasia' => null]);
+        Cliente::factory()->create(['razao_social' => 'Alpha', 'fantasia' => null]);
+        Cliente::factory()->create(['razao_social' => 'Mike', 'fantasia' => null]);
 
         $this->actingAs($user)
             ->get(route('admin.empresas.index', ['sort' => 'nome_exibicao', 'direction' => 'asc']), ['X-Requested-With' => 'XMLHttpRequest'])

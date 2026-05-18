@@ -1,6 +1,9 @@
 (function () {
     const storageKey = '__HIGHDMIN_CONFIG__';
     const html = document.documentElement;
+    const userThemeStorageKey = html.dataset.themeSettingsUserId
+        ? `__HIGHDMIN_THEME_SETTINGS__:${html.dataset.themeSettingsUserId}`
+        : null;
     const defaults = {
         theme: 'light',
         layout: { mode: 'fluid' },
@@ -9,6 +12,28 @@
         sidenav: { size: 'sm-hover-active' },
     };
     const clone = (value) => JSON.parse(JSON.stringify(value));
+    const readUserThemeSettings = () => {
+        if (!userThemeStorageKey) {
+            return null;
+        }
+
+        try {
+            return JSON.parse(localStorage.getItem(userThemeStorageKey) || 'null');
+        } catch (error) {
+            localStorage.removeItem(userThemeStorageKey);
+
+            return null;
+        }
+    };
+    const storedThemeSettings = readUserThemeSettings();
+
+    if (storedThemeSettings && window.themeSettingsFromServer) {
+        window.themeSettingsFromServer = {
+            ...window.themeSettingsFromServer,
+            ...storedThemeSettings,
+        };
+        window.currentThemeSettings = window.themeSettingsFromServer;
+    }
     const fromThemeSettings = (settings) => {
         const config = clone(defaults);
 

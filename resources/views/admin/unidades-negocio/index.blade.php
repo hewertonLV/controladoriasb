@@ -14,7 +14,7 @@
     @endcan
 
     <x-admin.data-table
-        title="Unidades de Negócio FACIGAM 2"
+        title="Unidades de Negócio SB - CONTROLADORIA"
         subtitle="Cadastro mestre de unidades de negócio (CIGAM, estado ICMS, razão social, nome, CPF/CNPJ, custo operacional e flag de estoque)."
         search-placeholder="Pesquisar por ID CIGAM, razão social, nome, CPF/CNPJ ou estado..."
         :endpoint="route('admin.unidades-negocio.index')"

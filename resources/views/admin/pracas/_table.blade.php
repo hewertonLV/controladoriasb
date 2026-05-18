@@ -10,8 +10,8 @@
             <thead class="bg-light bg-opacity-50">
                 <tr>
                     <x-admin.sortable-th label="Nome" sort="nome" :filtros="$filtros" />
-                    <x-admin.sortable-th label="Unidade de negócio" sort="id_unidade_negocio" :filtros="$filtros" />
-                    <x-admin.sortable-th label="Criado em" sort="created_at" :filtros="$filtros" />
+                    <x-admin.sortable-th label="UN" sort="id_unidade_negocio" :filtros="$filtros" />
+                    <x-admin.sortable-th label="Criado" sort="created_at" :filtros="$filtros" />
                     <th class="text-end">Ações</th>
                 </tr>
             </thead>

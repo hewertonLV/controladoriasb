@@ -28,9 +28,9 @@
                             <th>Origem</th>
                             <th>Cliente</th>
                             <th>Fruta</th>
-                            <th class="text-end">Qtd kg</th>
-                            <th class="text-end">Valor vendido</th>
-                            <th class="text-end">Resultado</th>
+                            <th class="text-end">Kg</th>
+                            <th class="text-end">Venda</th>
+                            <th class="text-end">Res.</th>
                             <th class="text-end">Ações</th>
                         </tr>
                     </thead>
@@ -47,10 +47,14 @@
                                 <td class="text-end">R$ {{ number_format((float) $m->resultado_movimentacao, 2, ',', '.') }}</td>
                                 <td class="text-end">
                                     @can('movimentacoes.vendas.visualizar')
-                                        <a href="{{ route('admin.movimentacoes.vendas.show', $m) }}" class="btn btn-light btn-sm">Ver</a>
+                                        <a href="{{ route('admin.movimentacoes.vendas.show', $m) }}" class="btn btn-light btn-sm" title="Ver">
+                                            <i class="ri-eye-line"></i> Ver
+                                        </a>
                                     @endcan
                                     @can('movimentacoes.vendas.editar')
-                                        <a href="{{ route('admin.movimentacoes.vendas.edit', $m) }}" class="btn btn-light btn-sm">Editar</a>
+                                        <a href="{{ route('admin.movimentacoes.vendas.edit', $m) }}" class="btn btn-light btn-sm" title="Editar">
+                                            <i class="ri-pencil-line"></i> Editar
+                                        </a>
                                     @endcan
                                 </td>
                             </tr>
