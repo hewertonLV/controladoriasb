@@ -77,6 +77,36 @@ class DevolucaoMovimentacaoTest extends TestCase
         ]);
     }
 
+    public function test_show_devolucao_exibe_layout_organizado_com_resumo_itens_observacoes_e_acoes(): void
+    {
+        $this->seedBase();
+        $c = $this->cenarioBase();
+        $this->registrarCompra($c, '10', '500,00');
+        $venda = $this->registrarVenda($c, '4', '800,00');
+        $devolucao = $this->registrarDevolucao($venda, TipoDevolucao::COM_RETORNO_ESTOQUE, '2');
+
+        $html = $this->actingAs($this->userWithPermissions([
+            Permissions::MOVIMENTACOES_DEVOLUCOES_VISUALIZAR,
+            Permissions::MOVIMENTACOES_DEVOLUCOES_EDITAR,
+            Permissions::MOVIMENTACOES_DEVOLUCOES_CANCELAR_ADMIN,
+        ]))
+            ->get(route('admin.movimentacoes.devolucoes.show', $devolucao))
+            ->assertOk()
+            ->getContent();
+
+        $htmlDecodificado = html_entity_decode((string) $html, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+
+        $this->assertStringContainsString('Detalhe da Devolução', $htmlDecodificado);
+        $this->assertStringContainsString('Resumo principal', $htmlDecodificado);
+        $this->assertStringContainsString('Itens da devolução', $htmlDecodificado);
+        $this->assertStringContainsString('Observações', $htmlDecodificado);
+        $this->assertStringContainsString('Sem observações', $htmlDecodificado);
+        $this->assertStringContainsString($c['fruta']->nome, $htmlDecodificado);
+        $this->assertStringContainsString('DEV-001', $htmlDecodificado);
+        $this->assertStringContainsString('NF-VENDA', $htmlDecodificado);
+        $this->assertStringContainsString('Cancelar devolução', $htmlDecodificado);
+    }
+
     public function test_devolucao_sem_retorno_nao_altera_estoque_mas_estorna_resultado(): void
     {
         $this->seedBase();
