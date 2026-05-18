@@ -13,6 +13,7 @@ use App\Http\Requests\Admin\Movimentacoes\StoreDevolucaoMovimentacaoRequest;
 use App\Http\Requests\Admin\Movimentacoes\UpdateDevolucaoMovimentacaoRequest;
 use App\Models\Movimentacao;
 use App\Services\Movimentacoes\DevolucaoMovimentacaoService;
+use App\Services\Permissoes\UnidadeNegocioAccessService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\View\View;
@@ -21,10 +22,22 @@ class DevolucaoMovimentacaoController extends Controller
 {
     public function index(): View
     {
-        $movimentacoes = Movimentacao::query()
+        $query = Movimentacao::query()
             ->with(['vendaOrigem.vendaNota', 'empresaOrigem', 'empresaDestino', 'fruta', 'unidadeRetorno'])
             ->where('categoria_movimentacao_id', CategoriaMovimentacaoTipo::Devolucao->value)
-            ->where('status_registro', MovimentacaoStatusRegistro::ATIVO->value)
+            ->where('status_registro', MovimentacaoStatusRegistro::ATIVO->value);
+
+        $access = app(UnidadeNegocioAccessService::class);
+        $unidadeIds = $access->unidadeIdsPermitidas(auth()->user());
+        $empresaIds = $access->empresaIdsPermitidas(auth()->user());
+        if ($unidadeIds !== null && $empresaIds !== null) {
+            $query->where(function ($q) use ($empresaIds, $unidadeIds): void {
+                $q->whereIn('id_unidade_negocio_retorno', $unidadeIds)
+                    ->orWhereIn('id_empresa_destino', $empresaIds);
+            });
+        }
+
+        $movimentacoes = $query
             ->orderByDesc('data_movimentacao')
             ->orderByDesc('id')
             ->paginate(15)

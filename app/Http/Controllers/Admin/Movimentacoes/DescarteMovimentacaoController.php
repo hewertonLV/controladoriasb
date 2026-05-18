@@ -12,6 +12,7 @@ use App\Http\Requests\Admin\Movimentacoes\UpdateDescarteMovimentacaoRequest;
 use App\Models\Movimentacao;
 use App\Models\StatusMovimentacao;
 use App\Services\Movimentacoes\DescarteMovimentacaoService;
+use App\Services\Permissoes\UnidadeNegocioAccessService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\View\View;
@@ -20,11 +21,18 @@ class DescarteMovimentacaoController extends Controller
 {
     public function index(): View
     {
-        $movimentacoes = Movimentacao::query()
+        $query = Movimentacao::query()
             ->with(['empresaOrigem', 'fruta', 'categoriaDescarte'])
             ->where('categoria_movimentacao_id', CategoriaMovimentacaoTipo::Descarte->value)
             ->where('status_movimentacao_id', StatusMovimentacao::ID_SAIDA)
-            ->where('status_registro', MovimentacaoStatusRegistro::ATIVO->value)
+            ->where('status_registro', MovimentacaoStatusRegistro::ATIVO->value);
+
+        $empresaIds = app(UnidadeNegocioAccessService::class)->empresaIdsPermitidas(auth()->user());
+        if ($empresaIds !== null) {
+            $query->whereIn('id_empresa_origem', $empresaIds);
+        }
+
+        $movimentacoes = $query
             ->orderByDesc('data_movimentacao')
             ->orderByDesc('id')
             ->paginate(15)

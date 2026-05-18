@@ -30,8 +30,8 @@ class ClienteFactory extends Factory
             'cnpj_cpf' => $cnpjCpf,
             'id_unidade_negocio' => UnidadeNegocio::factory(),
             'grupo_id' => null,
-            'desconto_nf' => $this->faker->randomFloat(2, 0, 100),
-            'desconto_contrato' => $this->faker->randomFloat(2, 0, 100),
+            'desconto_nf' => '0.00',
+            'desconto_contrato' => '0.00',
         ];
     }
 

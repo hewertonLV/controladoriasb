@@ -13,6 +13,7 @@
                     <x-admin.sortable-th label="Login" sort="login" :filtros="$filtros" />
                     <x-admin.sortable-th label="Email" sort="email" :filtros="$filtros" />
                     <th>Grupos</th>
+                    <th>Unidades permitidas</th>
                     <x-admin.sortable-th label="Status" sort="ativo" :filtros="$filtros" />
                     <x-admin.sortable-th label="Senha" sort="must_change_password" :filtros="$filtros" />
                     <x-admin.sortable-th label="Criado" sort="created_at" :filtros="$filtros" />
@@ -42,6 +43,17 @@
                             @empty
                                 <span class="text-muted">—</span>
                             @endforelse
+                        </td>
+                        <td>
+                            @if ($isProgramador || $user->hasRole(\App\Enums\Roles::ADMINISTRADOR->value))
+                                <span class="badge bg-success-subtle text-success">Todas</span>
+                            @else
+                                @forelse ($user->unidadesNegocio as $unidade)
+                                    <span class="badge bg-info-subtle text-info">{{ $unidade->nome }}</span>
+                                @empty
+                                    <span class="badge bg-warning-subtle text-warning">Sem vínculo</span>
+                                @endforelse
+                            @endif
                         </td>
                         <td>
                             @if ($user->ativo)
@@ -122,7 +134,7 @@
                     </tr>
                 @empty
                     <tr>
-                        <td colspan="8" class="text-center text-muted py-4">
+                        <td colspan="9" class="text-center text-muted py-4">
                             @if (($filtros['search'] ?? '') !== '')
                                 Nenhum usuário corresponde à pesquisa.
                             @else

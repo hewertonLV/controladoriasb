@@ -18,6 +18,7 @@ use App\Models\StatusMovimentacao;
 use App\Models\UnidadeNegocio;
 use App\Models\User;
 use App\Models\VendaNota;
+use App\Services\Permissoes\UnidadeNegocioAccessService;
 use App\Support\Movimentacoes\FrutasComEstoqueOrigem;
 use App\Support\TextoCadastro;
 use Illuminate\Database\Eloquent\Collection;
@@ -46,7 +47,9 @@ final class VendaMovimentacaoService
     public function opcoesFormularioVenda(): array
     {
         return [
-            'empresas_origem' => Empresa::query()->where('entidade_type', UnidadeNegocio::class)->with('entidade')->get()->sortBy(fn (Empresa $e): string => mb_strtolower($e->nomeExibicao()))->values(),
+            'empresas_origem' => Empresa::query()->where('entidade_type', UnidadeNegocio::class)->with('entidade')->get()
+                ->filter(fn (Empresa $e): bool => app(UnidadeNegocioAccessService::class)->canAccess(auth()->user(), (int) $e->entidade->id))
+                ->sortBy(fn (Empresa $e): string => mb_strtolower($e->nomeExibicao()))->values(),
             'empresas_destino_cliente' => Empresa::query()->where('entidade_type', Cliente::class)->with('entidade')->get()->sortBy(fn (Empresa $e): string => mb_strtolower($e->nomeExibicao()))->values(),
             'unidades_faturamento' => UnidadeNegocio::query()->where('is_hub', false)->orderBy('nome')->get(),
             'frutas' => FrutasComEstoqueOrigem::listar(),
@@ -141,7 +144,7 @@ final class VendaMovimentacaoService
             $kgPorUm = (float) $fruta->kg_por_unidade_medicao;
             $qtdUm = (float) $item['qtd_fruta_um'];
             $qtdKg = round($qtdUm * $kgPorUm, 2);
-            $valorNfTotal = (float) $item['valor_nf_total'];
+            $valorNfTotal = $this->valorRealVendaComDesconto((float) $item['valor_nf_total'], $empresaDestino);
             $valorNfUm = round($valorNfTotal / $qtdUm, 2);
             $valorNfKg = round($valorNfTotal / $qtdKg, 2);
 
@@ -243,7 +246,7 @@ final class VendaMovimentacaoService
         $kgPorUm = (float) $fruta->kg_por_unidade_medicao;
         $qtdUm = (float) $item['qtd_fruta_um'];
         $qtdKg = round($qtdUm * $kgPorUm, 2);
-        $valorNfTotal = (float) $item['valor_nf_total'];
+        $valorNfTotal = $this->valorRealVendaComDesconto((float) $item['valor_nf_total'], $empresaDestino);
         $valorNfUm = round($valorNfTotal / $qtdUm, 2);
         $valorNfKg = round($valorNfTotal / $qtdKg, 2);
 
@@ -442,6 +445,20 @@ final class VendaMovimentacaoService
             ->sum('valor_nf_total');
 
         $nota->forceFill(['valor_total_nf' => number_format((float) $total, 2, '.', '')])->save();
+    }
+
+    private function valorRealVendaComDesconto(float $valorBruto, Empresa $empresaDestino): float
+    {
+        $empresaDestino->loadMissing('entidade');
+        $cliente = $empresaDestino->entidade;
+
+        if (! $cliente instanceof Cliente) {
+            return round($valorBruto, 2);
+        }
+
+        $percentualDesconto = min(100.0, max(0.0, (float) $cliente->desconto_nf));
+
+        return round($valorBruto * (1 - ($percentualDesconto / 100)), 2);
     }
 
     private function obterOuCriarEstoqueComLock(int $idUnidade, int $idFruta): Estoque

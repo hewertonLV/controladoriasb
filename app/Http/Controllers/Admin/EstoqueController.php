@@ -9,6 +9,7 @@ use App\Models\Fruta;
 use App\Models\UnidadeNegocio;
 use App\Queries\EstoqueQuery;
 use App\Services\Estoques\EstoqueMovimentacaoService;
+use App\Services\Permissoes\UnidadeNegocioAccessService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -33,6 +34,7 @@ class EstoqueController extends Controller
     public function unidade(UnidadeNegocio $unidadeNegocio): View
     {
         abort_unless($unidadeNegocio->possui_estoque, 404);
+        abort_unless(app(UnidadeNegocioAccessService::class)->canAccess(auth()->user(), $unidadeNegocio->id), 403);
 
         $filtros = $this->estoqueQuery->normalizarFiltros([
             'id_unidade_negocio' => $unidadeNegocio->id,
@@ -88,6 +90,7 @@ class EstoqueController extends Controller
         return view('admin.estoques.movimentar', [
             'unidades' => UnidadeNegocio::query()
                 ->where('possui_estoque', true)
+                ->permitidasPara($request->user())
                 ->orderBy('nome')
                 ->get(['id', 'nome', 'id_cigam']),
             'frutas' => Fruta::query()
@@ -134,6 +137,7 @@ class EstoqueController extends Controller
         return UnidadeNegocio::query()
             ->leftJoin('estoques', 'estoques.id_unidade_negocio', '=', 'unidades_negocio.id')
             ->where('unidades_negocio.possui_estoque', true)
+            ->permitidasPara(auth()->user())
             ->groupBy('unidades_negocio.id', 'unidades_negocio.nome', 'unidades_negocio.id_cigam')
             ->orderBy('unidades_negocio.nome')
             ->get([

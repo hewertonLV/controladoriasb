@@ -3,6 +3,7 @@
 namespace App\Http\Requests\Admin\Movimentacoes;
 
 use App\Enums\FreteStatusSituacao;
+use App\Http\Requests\Admin\Movimentacoes\Concerns\ValidaAcessoUnidadeNegocio;
 use App\Models\Empresa;
 use App\Models\Fornecedor;
 use App\Models\UnidadeNegocio;
@@ -13,6 +14,8 @@ use Illuminate\Validation\Validator;
 
 class StoreCompraMovimentacaoRequest extends FormRequest
 {
+    use ValidaAcessoUnidadeNegocio;
+
     public function authorize(): bool
     {
         return true;
@@ -114,6 +117,8 @@ class StoreCompraMovimentacaoRequest extends FormRequest
                     'A unidade de destino deve controlar estoque (possui_estoque).',
                 );
             }
+
+            $this->validarAcessoEmpresaUnidade($v, 'id_empresa_destino', 'Compra');
         });
     }
 

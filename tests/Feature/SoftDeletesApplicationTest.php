@@ -67,6 +67,7 @@ class SoftDeletesApplicationTest extends TestCase
     {
         return [
             'users',
+            'unidade_negocio_user',
             'permissions',
             'roles',
             'model_has_permissions',

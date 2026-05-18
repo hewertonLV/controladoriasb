@@ -40,6 +40,8 @@ class StoreUsuarioRequest extends FormRequest
                 'integer',
                 Rule::exists('roles', 'id')->where('guard_name', 'web'),
             ],
+            'unidades_negocio' => ['nullable', 'array'],
+            'unidades_negocio.*' => ['integer', Rule::exists('unidades_negocio', 'id')],
         ];
     }
 
@@ -54,6 +56,8 @@ class StoreUsuarioRequest extends FormRequest
             'email' => 'e-mail',
             'roles' => 'grupos',
             'roles.*' => 'grupo',
+            'unidades_negocio' => 'unidades de negócio permitidas',
+            'unidades_negocio.*' => 'unidade de negócio permitida',
         ];
     }
 

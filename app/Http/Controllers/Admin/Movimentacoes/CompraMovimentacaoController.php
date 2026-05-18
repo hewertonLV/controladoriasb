@@ -11,6 +11,7 @@ use App\Http\Requests\Admin\Movimentacoes\StoreCompraMovimentacaoRequest;
 use App\Http\Requests\Admin\Movimentacoes\UpdateCompraMovimentacaoRequest;
 use App\Models\Movimentacao;
 use App\Services\Movimentacoes\CompraMovimentacaoService;
+use App\Services\Permissoes\UnidadeNegocioAccessService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\View\View;
@@ -19,10 +20,17 @@ class CompraMovimentacaoController extends Controller
 {
     public function index(): View
     {
-        $movimentacoes = Movimentacao::query()
+        $query = Movimentacao::query()
             ->with(['empresaOrigem', 'empresaDestino', 'fruta', 'frete'])
             ->where('categoria_movimentacao_id', CategoriaMovimentacaoTipo::Compra->value)
-            ->where('status_registro', MovimentacaoStatusRegistro::ATIVO->value)
+            ->where('status_registro', MovimentacaoStatusRegistro::ATIVO->value);
+
+        $empresaIds = app(UnidadeNegocioAccessService::class)->empresaIdsPermitidas(auth()->user());
+        if ($empresaIds !== null) {
+            $query->whereIn('id_empresa_destino', $empresaIds);
+        }
+
+        $movimentacoes = $query
             ->orderByDesc('data_movimentacao')
             ->orderByDesc('id')
             ->paginate(15)

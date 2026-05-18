@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests\Admin\Movimentacoes;
 
+use App\Http\Requests\Admin\Movimentacoes\Concerns\ValidaAcessoUnidadeNegocio;
 use App\Models\Empresa;
 use App\Models\Estoque;
 use App\Models\UnidadeNegocio;
@@ -12,6 +13,8 @@ use Illuminate\Validation\Validator;
 
 class StoreDescarteMovimentacaoRequest extends FormRequest
 {
+    use ValidaAcessoUnidadeNegocio;
+
     public function authorize(): bool
     {
         return true;
@@ -73,6 +76,8 @@ class StoreDescarteMovimentacaoRequest extends FormRequest
 
                 return;
             }
+
+            $this->validarAcessoUnidade($v, 'id_empresa_origem', (int) $unidade->id, 'Descarte');
 
             $itens = $this->input('itens');
             $frutas = is_array($itens)

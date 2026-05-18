@@ -15,6 +15,7 @@ use App\Models\MovimentacaoEstoque;
 use App\Models\StatusMovimentacao;
 use App\Models\UnidadeNegocio;
 use App\Models\User;
+use App\Services\Permissoes\UnidadeNegocioAccessService;
 use App\Support\TextoCadastro;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\DB;
@@ -41,9 +42,15 @@ final class DevolucaoMovimentacaoService
                 ->where('status_movimentacao_id', StatusMovimentacao::ID_SAIDA)
                 ->orderByDesc('data_movimentacao')
                 ->limit(200)
-                ->get(),
+                ->get()
+                ->filter(function (Movimentacao $venda): bool {
+                    $unidadeId = app(UnidadeNegocioAccessService::class)->unidadeIdDaEmpresa((int) $venda->id_empresa_origem);
+
+                    return $unidadeId !== null && app(UnidadeNegocioAccessService::class)->canAccess(auth()->user(), $unidadeId);
+                })
+                ->values(),
             'tipos' => TipoDevolucao::cases(),
-            'unidades_retorno' => UnidadeNegocio::query()->ativas()->orderBy('nome')->get(),
+            'unidades_retorno' => UnidadeNegocio::query()->ativas()->permitidasPara(auth()->user())->orderBy('nome')->get(),
         ];
     }
 

@@ -5,8 +5,10 @@ namespace App\Http\Requests\Admin\Movimentacoes;
 use App\Enums\CategoriaMovimentacaoTipo;
 use App\Enums\MovimentacaoStatusRegistro;
 use App\Enums\TipoDevolucao;
+use App\Http\Requests\Admin\Movimentacoes\Concerns\ValidaAcessoUnidadeNegocio;
 use App\Models\Movimentacao;
 use App\Models\StatusMovimentacao;
+use App\Services\Permissoes\UnidadeNegocioAccessService;
 use App\Support\TextoCadastro;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
@@ -14,6 +16,8 @@ use Illuminate\Validation\Validator;
 
 class StoreDevolucaoMovimentacaoRequest extends FormRequest
 {
+    use ValidaAcessoUnidadeNegocio;
+
     public function authorize(): bool
     {
         return true;
@@ -63,6 +67,14 @@ class StoreDevolucaoMovimentacaoRequest extends FormRequest
 
             if ((float) $this->input('qtd_fruta_um') > $venda->saldoDevolvivelUm($ignorar) + 1e-6) {
                 $v->errors()->add('qtd_fruta_um', 'Quantidade devolvida maior que o saldo devolvível da venda.');
+            }
+
+            $unidadeDestinoId = $this->input('id_unidade_negocio_retorno') !== null && $this->input('id_unidade_negocio_retorno') !== ''
+                ? (int) $this->input('id_unidade_negocio_retorno')
+                : app(UnidadeNegocioAccessService::class)->unidadeIdDaEmpresa((int) $venda->id_empresa_origem);
+
+            if ($unidadeDestinoId !== null) {
+                $this->validarAcessoUnidade($v, 'id_unidade_negocio_retorno', $unidadeDestinoId, 'Devolucao');
             }
         });
     }

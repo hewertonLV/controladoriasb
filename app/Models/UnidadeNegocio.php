@@ -2,12 +2,14 @@
 
 namespace App\Models;
 
+use App\Services\Permissoes\UnidadeNegocioAccessService;
 use App\Support\TextoCadastro;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\Relations\MorphOne;
@@ -147,6 +149,19 @@ class UnidadeNegocio extends Model
     }
 
     /**
+     * @param  Builder<self>  $query
+     * @return Builder<self>
+     */
+    public function scopePermitidasPara(Builder $query, ?User $user): Builder
+    {
+        if ($user === null || app(UnidadeNegocioAccessService::class)->isAdministradorUnidades($user)) {
+            return $query;
+        }
+
+        return $query->whereIn('unidades_negocio.id', $user->unidadeNegocioIdsPermitidas());
+    }
+
+    /**
      * @return BelongsTo<Estado, $this>
      */
     public function estado(): BelongsTo
@@ -190,6 +205,15 @@ class UnidadeNegocio extends Model
     public function estoques(): HasMany
     {
         return $this->hasMany(Estoque::class, 'id_unidade_negocio');
+    }
+
+    /**
+     * @return BelongsToMany<User, $this>
+     */
+    public function usuarios(): BelongsToMany
+    {
+        return $this->belongsToMany(User::class, 'unidade_negocio_user')
+            ->withTimestamps();
     }
 
     /**

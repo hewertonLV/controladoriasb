@@ -3,6 +3,7 @@
 namespace App\Http\Requests\Admin\Movimentacoes;
 
 use App\Enums\FreteStatusSituacao;
+use App\Http\Requests\Admin\Movimentacoes\Concerns\ValidaAcessoUnidadeNegocio;
 use App\Models\Empresa;
 use App\Models\UnidadeNegocio;
 use App\Support\TextoCadastro;
@@ -12,6 +13,8 @@ use Illuminate\Validation\Validator;
 
 class StoreTransferenciaMovimentacaoRequest extends FormRequest
 {
+    use ValidaAcessoUnidadeNegocio;
+
     public function authorize(): bool
     {
         return true;
@@ -126,6 +129,8 @@ class StoreTransferenciaMovimentacaoRequest extends FormRequest
                     );
                 }
             }
+
+            $this->validarAcessoEmpresaUnidade($v, 'id_empresa_origem', 'Transferencia');
         });
     }
 

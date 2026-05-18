@@ -3,17 +3,16 @@
 namespace App\Http\Controllers\Admin\Movimentacoes;
 
 use App\Actions\Movimentacoes\Doacao\AtualizarDoacaoMovimentacaoAction;
-use App\Actions\Movimentacoes\Doacao\CancelarDoacaoMovimentacaoAdminAction;
 use App\Actions\Movimentacoes\Doacao\CriarDoacaoMovimentacaoAction;
 use App\Enums\CategoriaMovimentacaoTipo;
 use App\Enums\MovimentacaoStatusRegistro;
 use App\Http\Controllers\Controller;
-use App\Http\Requests\Admin\Movimentacoes\CancelarDoacaoMovimentacaoAdminRequest;
 use App\Http\Requests\Admin\Movimentacoes\StoreDoacaoMovimentacaoRequest;
 use App\Http\Requests\Admin\Movimentacoes\UpdateDoacaoMovimentacaoRequest;
 use App\Models\Movimentacao;
 use App\Models\StatusMovimentacao;
 use App\Services\Movimentacoes\DoacaoMovimentacaoService;
+use App\Services\Permissoes\UnidadeNegocioAccessService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\View\View;
@@ -22,11 +21,18 @@ class DoacaoMovimentacaoController extends Controller
 {
     public function index(): View
     {
-        $movimentacoes = Movimentacao::query()
+        $query = Movimentacao::query()
             ->with(['empresaOrigem', 'empresaDestino', 'fruta'])
             ->where('categoria_movimentacao_id', CategoriaMovimentacaoTipo::Doacao->value)
             ->where('status_movimentacao_id', StatusMovimentacao::ID_SAIDA)
-            ->where('status_registro', MovimentacaoStatusRegistro::ATIVO->value)
+            ->where('status_registro', MovimentacaoStatusRegistro::ATIVO->value);
+
+        $empresaIds = app(UnidadeNegocioAccessService::class)->empresaIdsPermitidas(auth()->user());
+        if ($empresaIds !== null) {
+            $query->whereIn('id_empresa_origem', $empresaIds);
+        }
+
+        $movimentacoes = $query
             ->orderByDesc('data_movimentacao')
             ->orderByDesc('id')
             ->paginate(15)

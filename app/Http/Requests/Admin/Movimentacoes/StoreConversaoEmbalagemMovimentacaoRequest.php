@@ -2,12 +2,16 @@
 
 namespace App\Http\Requests\Admin\Movimentacoes;
 
+use App\Http\Requests\Admin\Movimentacoes\Concerns\ValidaAcessoUnidadeNegocio;
 use App\Models\UnidadeNegocio;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\Validator;
 
 class StoreConversaoEmbalagemMovimentacaoRequest extends FormRequest
 {
+    use ValidaAcessoUnidadeNegocio;
+
     public function authorize(): bool
     {
         return true;
@@ -47,6 +51,13 @@ class StoreConversaoEmbalagemMovimentacaoRequest extends FormRequest
             'qtd_fruta_um' => $this->normalizarDecimal($this->input('qtd_fruta_um')),
             'qtd_resultante_um' => $this->normalizarDecimal($this->input('qtd_resultante_um')),
         ]);
+    }
+
+    public function withValidator(Validator $validator): void
+    {
+        $validator->after(function (Validator $v): void {
+            $this->validarAcessoEmpresaUnidade($v, 'id_empresa_origem', 'Conversao');
+        });
     }
 
     private function normalizarDecimal(mixed $value): mixed

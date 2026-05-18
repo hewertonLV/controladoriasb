@@ -2,8 +2,13 @@
     /** @var \App\Models\User $user */
     /** @var \Illuminate\Support\Collection<int, \Spatie\Permission\Models\Role> $roles */
     /** @var \Illuminate\Support\Collection<int, int>|array<int,int> $selectedRoleIds */
+    /** @var \Illuminate\Support\Collection<int, \App\Models\UnidadeNegocio> $unidadesNegocio */
+    /** @var \Illuminate\Support\Collection<int, int>|array<int,int> $selectedUnidadeNegocioIds */
     /** @var bool $isProtected */
     $selectedIds = collect(old('roles', is_object($selectedRoleIds) ? $selectedRoleIds->all() : $selectedRoleIds))
+        ->map(fn ($id) => (int) $id)
+        ->all();
+    $selectedUnidadesIds = collect(old('unidades_negocio', is_object($selectedUnidadeNegocioIds ?? null) ? $selectedUnidadeNegocioIds->all() : ($selectedUnidadeNegocioIds ?? [])))
         ->map(fn ($id) => (int) $id)
         ->all();
 @endphp
@@ -93,6 +98,42 @@
                             @if ($forceChecked)
                                 <input type="hidden" name="roles[]" value="{{ $role->id }}">
                             @endif
+                        </div>
+                    </div>
+                @endforeach
+            </div>
+        @endif
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header">
+        <h4 class="header-title mb-0">Unidades de Negócio Permitidas</h4>
+        <p class="text-muted mb-0">Selecione as unidades que este usuário pode movimentar. Programador e Administrador mantêm acesso total.</p>
+    </div>
+    <div class="card-body">
+        @error('unidades_negocio')
+            <div class="alert alert-danger">{{ $message }}</div>
+        @enderror
+        @error('unidades_negocio.*')
+            <div class="alert alert-danger">{{ $message }}</div>
+        @enderror
+
+        @if (($unidadesNegocio ?? collect())->isEmpty())
+            <p class="text-muted mb-0">Nenhuma unidade de negócio ativa cadastrada.</p>
+        @else
+            <div class="row g-2">
+                @foreach ($unidadesNegocio as $unidade)
+                    <div class="col-md-4 col-sm-6">
+                        <div class="form-check border rounded p-2 ps-4 h-100">
+                            <input class="form-check-input" type="checkbox"
+                                   name="unidades_negocio[]" value="{{ $unidade->id }}"
+                                   id="unidade-negocio-{{ $unidade->id }}"
+                                   @checked(in_array($unidade->id, $selectedUnidadesIds, true))>
+                            <label class="form-check-label w-100" for="unidade-negocio-{{ $unidade->id }}">
+                                <span class="fw-medium">{{ $unidade->nome }}</span>
+                                <span class="text-muted d-block small">CIGAM {{ $unidade->id_cigam ?: '—' }}</span>
+                            </label>
                         </div>
                     </div>
                 @endforeach

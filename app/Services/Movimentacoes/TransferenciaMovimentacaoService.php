@@ -16,6 +16,7 @@ use App\Models\Movimentacao;
 use App\Models\MovimentacaoEstoque;
 use App\Models\StatusMovimentacao;
 use App\Models\UnidadeNegocio;
+use App\Services\Permissoes\UnidadeNegocioAccessService;
 use App\Support\EmpresaEntidadeQuery;
 use App\Support\Movimentacoes\FrutasComEstoqueOrigem;
 use App\Support\TextoCadastro;
@@ -71,6 +72,7 @@ final class TransferenciaMovimentacaoService
         $empresasUn = EmpresaEntidadeQuery::unidadesComEstoque()
             ->with('entidade')
             ->get()
+            ->filter(fn (Empresa $e): bool => app(UnidadeNegocioAccessService::class)->canAccess(auth()->user(), (int) $e->entidade->id))
             ->sortBy(fn (Empresa $e): string => mb_strtolower($e->nomeExibicao()))
             ->values();
 

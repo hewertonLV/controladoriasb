@@ -4,6 +4,7 @@ namespace Tests\Support;
 
 use App\Enums\Permissions;
 use App\Enums\Roles;
+use App\Models\UnidadeNegocio;
 use App\Models\User;
 use Spatie\Permission\Models\Permission;
 use Spatie\Permission\Models\Role;
@@ -35,6 +36,7 @@ trait CreatesUsersWithRoles
         }
 
         $user->assignRole($role);
+        $user->unidadesNegocio()->sync(UnidadeNegocio::query()->pluck('id')->all());
 
         return $user->refresh();
     }

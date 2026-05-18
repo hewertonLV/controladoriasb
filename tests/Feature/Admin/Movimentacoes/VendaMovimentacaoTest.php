@@ -218,6 +218,47 @@ class VendaMovimentacaoTest extends TestCase
         $this->assertStringContainsString(MovimentacaoStatusRegistro::CANCELADO->value, $htmlDecodificado);
     }
 
+    public function test_venda_abate_apenas_desconto_nf_do_cliente_no_valor_vendido_real(): void
+    {
+        $this->seedBase();
+        $c = $this->cenarioBase(clienteOverrides: [
+            'desconto_nf' => '10.00',
+            'desconto_contrato' => '5.00',
+        ]);
+
+        $this->registrarCompra($c, '10', '500,00');
+        $venda = $this->registrarVenda($c, '2', '300,00');
+
+        $this->assertSame('270.00', (string) $venda->valor_nf_total);
+        $this->assertSame('135.00', (string) $venda->valor_nf_um);
+        $this->assertSame('13.50', (string) $venda->valor_nf_kg);
+        $this->assertSame('100.00', (string) $venda->valor_custo_saida);
+        $this->assertSame('170.00', (string) $venda->resultado_movimentacao);
+        $this->assertDatabaseHas('vendas_notas', [
+            'id' => $venda->venda_nota_id,
+            'valor_total_nf' => '270.00',
+        ]);
+
+        $this->actingAs($this->movimentacoesVendasUsuario())->putJson(route('admin.movimentacoes.vendas.update', $venda), [
+            'numero_nf' => 'NF-TESTE',
+            'id_empresa_origem' => $c['empresa_unidade']->id,
+            'id_empresa_destino' => $c['empresa_cliente']->id,
+            'id_fruta' => $c['fruta']->id,
+            'qtd_fruta_um' => '2',
+            'valor_nf_total' => '400,00',
+            'motivo_substituicao' => 'Ajuste do valor vendido bruto.',
+        ])->assertOk();
+
+        $vendaCorrigida = Movimentacao::query()
+            ->where('categoria_movimentacao_id', CategoriaMovimentacaoTipo::Venda->value)
+            ->where('status_registro', MovimentacaoStatusRegistro::ATIVO->value)
+            ->orderByDesc('id')
+            ->firstOrFail();
+
+        $this->assertSame('360.00', (string) $vendaCorrigida->valor_nf_total);
+        $this->assertSame('260.00', (string) $vendaCorrigida->resultado_movimentacao);
+    }
+
     public function test_criacao_rejeita_data_emissao_informada_pelo_usuario(): void
     {
         $this->seedBase();
@@ -408,10 +449,28 @@ class VendaMovimentacaoTest extends TestCase
     /**
      * @return array<string, mixed>
      */
-    private function cenarioBase(bool $origemHub = false): array
+    /**
+     * @param  array<string, mixed>  $clienteOverrides
+     * @return array<string, mixed>
+     */
+    private function cenarioBase(bool $origemHub = false, array $clienteOverrides = []): array
+    {
+        $clienteOverrides = array_replace([
+            'desconto_nf' => '0.00',
+            'desconto_contrato' => '0.00',
+        ], $clienteOverrides);
+
+        return $this->montarCenarioBase($origemHub, $clienteOverrides);
+    }
+
+    /**
+     * @param  array<string, mixed>  $clienteOverrides
+     * @return array<string, mixed>
+     */
+    private function montarCenarioBase(bool $origemHub, array $clienteOverrides): array
     {
         $fornecedor = Fornecedor::factory()->create(['id_estado' => Estado::ID_PERNAMBUCO]);
-        $cliente = Cliente::factory()->create();
+        $cliente = Cliente::factory()->create($clienteOverrides);
         $unidade = UnidadeNegocio::factory()->create([
             'possui_estoque' => true,
             'id_estado' => Estado::ID_PERNAMBUCO,

@@ -8,6 +8,7 @@ use App\Http\Requests\Admin\Movimentacoes\StoreConversaoEmbalagemMovimentacaoReq
 use App\Models\Movimentacao;
 use App\Models\StatusMovimentacao;
 use App\Services\Movimentacoes\ConversaoEmbalagemMovimentacaoService;
+use App\Services\Permissoes\UnidadeNegocioAccessService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\View\View;
 use InvalidArgumentException;
@@ -16,10 +17,17 @@ class ConversaoEmbalagemMovimentacaoController extends Controller
 {
     public function index(): View
     {
-        $movimentacoes = Movimentacao::query()
+        $query = Movimentacao::query()
             ->with(['empresaOrigem.entidade', 'fruta', 'frutaDestinoConversao', 'movimentacaoPareada.fruta'])
             ->where('categoria_movimentacao_id', CategoriaMovimentacaoTipo::ConversaoEmbalagem->value)
-            ->where('status_movimentacao_id', StatusMovimentacao::ID_SAIDA)
+            ->where('status_movimentacao_id', StatusMovimentacao::ID_SAIDA);
+
+        $empresaIds = app(UnidadeNegocioAccessService::class)->empresaIdsPermitidas(auth()->user());
+        if ($empresaIds !== null) {
+            $query->whereIn('id_empresa_origem', $empresaIds);
+        }
+
+        $movimentacoes = $query
             ->latest()
             ->paginate(15);
 

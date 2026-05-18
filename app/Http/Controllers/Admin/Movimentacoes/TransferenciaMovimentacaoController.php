@@ -14,6 +14,7 @@ use App\Http\Requests\Admin\Movimentacoes\StoreTransferenciaMovimentacaoRequest;
 use App\Models\Movimentacao;
 use App\Models\StatusMovimentacao;
 use App\Services\Movimentacoes\TransferenciaMovimentacaoService;
+use App\Services\Permissoes\UnidadeNegocioAccessService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Validation\ValidationException;
@@ -24,11 +25,18 @@ class TransferenciaMovimentacaoController extends Controller
 {
     public function index(): View
     {
-        $movimentacoes = Movimentacao::query()
+        $query = Movimentacao::query()
             ->with(['empresaOrigem', 'empresaDestino', 'fruta', 'frete'])
             ->where('categoria_movimentacao_id', CategoriaMovimentacaoTipo::Transferencia->value)
             ->where('status_movimentacao_id', StatusMovimentacao::ID_SAIDA)
-            ->where('status_registro', MovimentacaoStatusRegistro::ATIVO->value)
+            ->where('status_registro', MovimentacaoStatusRegistro::ATIVO->value);
+
+        $empresaIds = app(UnidadeNegocioAccessService::class)->empresaIdsPermitidas(auth()->user());
+        if ($empresaIds !== null) {
+            $query->whereIn('id_empresa_origem', $empresaIds);
+        }
+
+        $movimentacoes = $query
             ->orderByDesc('data_movimentacao')
             ->orderByDesc('id')
             ->paginate(15)

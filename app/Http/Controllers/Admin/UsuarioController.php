@@ -6,6 +6,7 @@ use App\Enums\Roles;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Admin\StoreUsuarioRequest;
 use App\Http\Requests\Admin\UpdateUsuarioRequest;
+use App\Models\UnidadeNegocio;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\RedirectResponse;
@@ -51,7 +52,7 @@ class UsuarioController extends Controller
     public function index(Request $request): View
     {
         $filtros = $this->extrairFiltros($request);
-        $query = $this->aplicarFiltros(User::query()->with('roles'), $filtros);
+        $query = $this->aplicarFiltros(User::query()->with(['roles', 'unidadesNegocio:id,nome']), $filtros);
 
         if ($filtros['per_page'] === 'all') {
             $total = (clone $query)->toBase()->count();
@@ -141,6 +142,8 @@ class UsuarioController extends Controller
             'user' => new User,
             'roles' => $this->roles(),
             'selectedRoleIds' => collect(),
+            'unidadesNegocio' => $this->unidadesNegocio(),
+            'selectedUnidadeNegocioIds' => collect(),
             'isProtected' => false,
         ]);
     }
@@ -160,6 +163,7 @@ class UsuarioController extends Controller
         ]);
 
         $user->syncRoles($this->resolveRoles($data['roles'] ?? []));
+        $user->unidadesNegocio()->sync($data['unidades_negocio'] ?? []);
 
         return redirect()
             ->route('admin.usuarios.index')
@@ -172,6 +176,8 @@ class UsuarioController extends Controller
             'user' => $user,
             'roles' => $this->roles(),
             'selectedRoleIds' => $user->roles->pluck('id'),
+            'unidadesNegocio' => $this->unidadesNegocio(),
+            'selectedUnidadeNegocioIds' => $user->unidadesNegocio()->pluck('unidades_negocio.id'),
             'isProtected' => $this->isProtected($user),
         ]);
     }
@@ -200,6 +206,7 @@ class UsuarioController extends Controller
         }
 
         $user->syncRoles($rolesToSync);
+        $user->unidadesNegocio()->sync($data['unidades_negocio'] ?? []);
 
         return redirect()
             ->route('admin.usuarios.index')
@@ -287,6 +294,14 @@ class UsuarioController extends Controller
             ->where('guard_name', self::GUARD)
             ->orderBy('name')
             ->get();
+    }
+
+    private function unidadesNegocio(): Collection
+    {
+        return UnidadeNegocio::query()
+            ->ativas()
+            ->orderBy('nome')
+            ->get(['id', 'nome', 'id_cigam']);
     }
 
     /**

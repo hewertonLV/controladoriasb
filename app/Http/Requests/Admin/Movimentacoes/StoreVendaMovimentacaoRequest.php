@@ -3,6 +3,7 @@
 namespace App\Http\Requests\Admin\Movimentacoes;
 
 use App\Enums\FreteStatusSituacao;
+use App\Http\Requests\Admin\Movimentacoes\Concerns\ValidaAcessoUnidadeNegocio;
 use App\Models\Cliente;
 use App\Models\Empresa;
 use App\Models\Fruta;
@@ -14,6 +15,8 @@ use Illuminate\Validation\Validator;
 
 class StoreVendaMovimentacaoRequest extends FormRequest
 {
+    use ValidaAcessoUnidadeNegocio;
+
     public function authorize(): bool
     {
         return true;
@@ -54,6 +57,10 @@ class StoreVendaMovimentacaoRequest extends FormRequest
             $empresaOrigem = Empresa::query()->with('entidade')->find((int) $this->input('id_empresa_origem'));
             $origem = $empresaOrigem?->entidade instanceof UnidadeNegocio ? $empresaOrigem->entidade : null;
             $faturamentoInformado = ! blank($this->input('id_unidade_negocio_faturamento'));
+
+            if ($origem !== null) {
+                $this->validarAcessoUnidade($v, 'id_empresa_origem', (int) $origem->id, 'Venda');
+            }
 
             if ($origem !== null && $origem->is_hub && ! $faturamentoInformado) {
                 $v->errors()->add('id_unidade_negocio_faturamento', 'Informe a unidade de faturamento quando a origem física for HUB.');

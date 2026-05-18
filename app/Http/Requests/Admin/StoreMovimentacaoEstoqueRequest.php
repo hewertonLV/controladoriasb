@@ -3,6 +3,7 @@
 namespace App\Http\Requests\Admin;
 
 use App\Models\UnidadeNegocio;
+use App\Services\Permissoes\UnidadeNegocioAccessService;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Validator;
@@ -56,6 +57,11 @@ class StoreMovimentacaoEstoqueRequest extends FormRequest
             $un = UnidadeNegocio::query()->find($idUn);
             if ($un !== null && ! $un->possui_estoque) {
                 $v->errors()->add('id_unidade_negocio', 'A unidade selecionada não possui controle de estoque.');
+            }
+
+            $user = $this->user();
+            if ($user === null || ! app(UnidadeNegocioAccessService::class)->canAccess($user, $idUn)) {
+                $v->errors()->add('id_unidade_negocio', UnidadeNegocioAccessService::MENSAGEM_SEM_ACESSO);
             }
         });
     }
