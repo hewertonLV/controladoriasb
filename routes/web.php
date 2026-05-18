@@ -28,6 +28,7 @@ use App\Http\Controllers\Admin\Movimentacoes\CancelarDoacaoMovimentacaoAdminCont
 use App\Http\Controllers\Admin\Movimentacoes\CancelarTransferenciaMovimentacaoAdminController;
 use App\Http\Controllers\Admin\Movimentacoes\CancelarVendaMovimentacaoAdminController;
 use App\Http\Controllers\Admin\Movimentacoes\CompraMovimentacaoController;
+use App\Http\Controllers\Admin\Movimentacoes\ConversaoEmbalagemMovimentacaoController;
 use App\Http\Controllers\Admin\Movimentacoes\DescarteMovimentacaoController;
 use App\Http\Controllers\Admin\Movimentacoes\DevolucaoMovimentacaoController;
 use App\Http\Controllers\Admin\Movimentacoes\DoacaoMovimentacaoController;
@@ -691,6 +692,10 @@ Route::middleware(['auth', 'verified', 'user.active', 'password.changed'])->grou
                 ->middleware('permission:estoques.movimentar')
                 ->name('movimentar.store');
 
+            Route::get('/unidades/{unidadeNegocio}', [EstoqueController::class, 'unidade'])
+                ->middleware('permission:estoques.visualizar')
+                ->name('unidade');
+
             Route::get('/{estoque}', [EstoqueController::class, 'show'])
                 ->middleware('permission:estoques.visualizar')
                 ->name('show');
@@ -878,6 +883,24 @@ Route::middleware(['auth', 'verified', 'user.active', 'password.changed'])->grou
             Route::post('/{movimentacaoDevolucao}/cancelar-admin', [DevolucaoMovimentacaoController::class, 'cancelarAdmin'])
                 ->middleware('role_or_permission:Administrador|movimentacoes.devolucoes.cancelar-admin')
                 ->name('cancelar-admin');
+        });
+
+        Route::prefix('movimentacoes/conversoes-embalagem')->name('movimentacoes.conversoes-embalagem.')->group(function () {
+            Route::get('/', [ConversaoEmbalagemMovimentacaoController::class, 'index'])
+                ->middleware('permission:movimentacoes.conversoes-embalagem.visualizar')
+                ->name('index');
+
+            Route::get('/criar', [ConversaoEmbalagemMovimentacaoController::class, 'create'])
+                ->middleware('permission:movimentacoes.conversoes-embalagem.criar')
+                ->name('create');
+
+            Route::post('/', [ConversaoEmbalagemMovimentacaoController::class, 'store'])
+                ->middleware('permission:movimentacoes.conversoes-embalagem.criar')
+                ->name('store');
+
+            Route::get('/{movimentacaoConversao}', [ConversaoEmbalagemMovimentacaoController::class, 'show'])
+                ->middleware('permission:movimentacoes.conversoes-embalagem.visualizar')
+                ->name('show');
         });
 
         Route::prefix('grupos-permissoes')->name('grupos-permissoes.')->group(function () {

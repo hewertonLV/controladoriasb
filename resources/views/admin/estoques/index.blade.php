@@ -6,77 +6,45 @@
 @section('content')
     <x-admin.flash-messages />
 
-    @can('estoques.exportar-pdf')
-        <x-admin.exportacao-pdf-async
-            queue="estoques-exportacao"
-            table-root-id="estoques-table-root"
-        />
-    @endcan
+    <div class="card mb-3">
+        <div class="card-header">
+            <h4 class="header-title mb-0">Selecione uma unidade de negócio</h4>
+            <p class="text-muted mb-0">Clique em uma unidade para abrir uma nova tela com as frutas daquele estoque.</p>
+        </div>
+    </div>
 
-    <x-admin.data-table
-        title="Estoques consolidados"
-        subtitle="Posição atual por unidade de negócio e fruta (quantidades em kg e unidade de medição da fruta)."
-        search-placeholder="Pesquisar por unidade, fruta ou ID CIGAM..."
-        :endpoint="route('admin.estoques.index')"
-        :current-search="$filtros['search'] ?? ''"
-        :current-per-page="$filtros['per_page'] ?? 20"
-        :current-sort="$filtros['sort'] ?? 'unidade'"
-        :current-direction="$filtros['direction'] ?? 'asc'"
-        :per-page-options="$perPageOptions"
-        container-id="estoques-table"
-    >
-        <x-slot:actions>
-            @can('estoques.exportar-pdf')
-                <button type="button"
-                        class="btn btn-soft-danger"
-                        id="btn-gerar-pdf"
-                        data-pdf-iniciar-url="{{ route('admin.estoques.exportacoes.pdf.iniciar') }}">
-                    <span class="spinner-border spinner-border-sm me-1 d-none" id="spinner-gerar-pdf" role="status" aria-hidden="true"></span>
-                    <i class="ri-file-pdf-2-line me-1"></i> Gerar PDF
-                </button>
-            @endcan
-            @can('estoques.importar')
-                <a href="{{ route('admin.estoques.importar') }}" class="btn btn-soft-success">
-                    <i class="ri-file-excel-2-line me-1"></i> Importar Excel
+    <div class="row g-3">
+        @foreach ($unidadesCards as $unidadeCard)
+            <div class="col-12 col-md-6 col-xl-3">
+                <a href="{{ route('admin.estoques.unidade', $unidadeCard) }}"
+                   class="card h-100 text-decoration-none border border-light-subtle">
+                    <div class="card-body">
+                        <div class="d-flex align-items-start gap-2">
+                            <span class="avatar-sm d-inline-flex align-items-center justify-content-center rounded bg-primary-subtle text-primary">
+                                <i class="ri-building-2-line fs-20"></i>
+                            </span>
+                            <div class="min-w-0">
+                                <h5 class="mb-1 text-body text-truncate" title="{{ $unidadeCard->nome }}">{{ $unidadeCard->nome }}</h5>
+                                <div class="small text-muted">CIGAM {{ $unidadeCard->id_cigam ?: '—' }}</div>
+                            </div>
+                        </div>
+                        <div class="row g-2 mt-3 small">
+                            <div class="col-4">
+                                <div class="text-muted">Frutas</div>
+                                <div class="fw-semibold text-body">{{ (int) $unidadeCard->posicoes_count }}</div>
+                            </div>
+                            <div class="col-4">
+                                <div class="text-muted">Kg</div>
+                                <div class="fw-semibold text-body">{{ number_format((float) $unidadeCard->total_kg, 2, ',', '.') }}</div>
+                            </div>
+                            <div class="col-4">
+                                <div class="text-muted">Valor</div>
+                                <div class="fw-semibold text-body">R$ {{ number_format((float) $unidadeCard->valor_total, 2, ',', '.') }}</div>
+                            </div>
+                        </div>
+                    </div>
                 </a>
-            @endcan
-            @can('estoques.movimentar')
-                <a href="{{ route('admin.estoques.movimentar') }}" class="btn btn-primary">
-                    <i class="ri-exchange-line me-1"></i> Movimentar estoque
-                </a>
-            @endcan
-        </x-slot:actions>
-
-        <x-slot:filters>
-            <div class="col-md-3">
-                <label class="form-label small text-muted mb-1" for="estoques-filtro-unidade">Unidade</label>
-                <select id="estoques-filtro-unidade" name="id_unidade_negocio" class="form-select" data-table-filter>
-                    <option value="">Todas</option>
-                    @foreach ($unidadesFiltro as $u)
-                        <option value="{{ $u->id }}" @selected(($filtros['id_unidade_negocio'] ?? null) === $u->id)>
-                            {{ $u->nome }} ({{ $u->id_cigam }})
-                        </option>
-                    @endforeach
-                </select>
             </div>
-            <div class="col-md-3">
-                <label class="form-label small text-muted mb-1" for="estoques-filtro-fruta">Fruta</label>
-                <select id="estoques-filtro-fruta" name="id_fruta" class="form-select" data-table-filter>
-                    <option value="">Todas</option>
-                    @foreach ($frutasFiltro as $f)
-                        <option value="{{ $f->id }}" @selected(($filtros['id_fruta'] ?? null) === $f->id)>
-                            {{ $f->nome }} ({{ $f->id_cigam }})
-                        </option>
-                    @endforeach
-                </select>
-            </div>
-        </x-slot:filters>
-
-        @include('admin.estoques._table', [
-            'estoques' => $estoques,
-            'filtros' => $filtros,
-            'total' => $total,
-            'exibindo' => $exibindo,
-        ])
-    </x-admin.data-table>
+        @endforeach
+    </div>
 @endsection

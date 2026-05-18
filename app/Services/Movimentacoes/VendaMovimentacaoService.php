@@ -18,6 +18,7 @@ use App\Models\StatusMovimentacao;
 use App\Models\UnidadeNegocio;
 use App\Models\User;
 use App\Models\VendaNota;
+use App\Support\Movimentacoes\FrutasComEstoqueOrigem;
 use App\Support\TextoCadastro;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Carbon;
@@ -48,7 +49,7 @@ final class VendaMovimentacaoService
             'empresas_origem' => Empresa::query()->where('entidade_type', UnidadeNegocio::class)->with('entidade')->get()->sortBy(fn (Empresa $e): string => mb_strtolower($e->nomeExibicao()))->values(),
             'empresas_destino_cliente' => Empresa::query()->where('entidade_type', Cliente::class)->with('entidade')->get()->sortBy(fn (Empresa $e): string => mb_strtolower($e->nomeExibicao()))->values(),
             'unidades_faturamento' => UnidadeNegocio::query()->where('is_hub', false)->orderBy('nome')->get(),
-            'frutas' => Fruta::query()->where('kg_por_unidade_medicao', '>', 0)->orderBy('nome')->get(),
+            'frutas' => FrutasComEstoqueOrigem::listar(),
             'fretes' => Frete::query()->where('status_situacao', FreteStatusSituacao::ABERTA->value)->orderBy('nome')->get(),
         ];
     }

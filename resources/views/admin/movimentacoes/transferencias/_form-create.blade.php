@@ -74,10 +74,10 @@
             @foreach ($itens as $i => $item)
                 <div class="row g-2 mb-2" data-item-row>
                     <div class="col-md-7">
-                        <select name="itens[{{ $i }}][id_fruta]" class="form-select @error("itens.$i.id_fruta") is-invalid @enderror" required>
+                        <select name="itens[{{ $i }}][id_fruta]" class="form-select @error("itens.$i.id_fruta") is-invalid @enderror" required data-fruta-select>
                             <option value="">Fruta</option>
                             @foreach ($frutas as $fruta)
-                                <option value="{{ $fruta->id }}" @selected((string) ($item['id_fruta'] ?? '') === (string) $fruta->id)>
+                                <option value="{{ $fruta->id }}" data-estoque-origens="{{ implode(',', $fruta->estoque_origem_empresa_ids ?? []) }}" @selected((string) ($item['id_fruta'] ?? '') === (string) $fruta->id)>
                                     {{ $fruta->nome }} ({{ $fruta->unidade_medicao }}) — {{ $fruta->kg_por_unidade_medicao }} kg/UM
                                 </option>
                             @endforeach
@@ -111,10 +111,10 @@
 <template id="transferencia-item-template">
     <div class="row g-2 mb-2" data-item-row>
         <div class="col-md-7">
-            <select name="itens[__INDEX__][id_fruta]" class="form-select" required>
+            <select name="itens[__INDEX__][id_fruta]" class="form-select" required data-fruta-select>
                 <option value="">Fruta</option>
                 @foreach ($frutas as $fruta)
-                    <option value="{{ $fruta->id }}">{{ $fruta->nome }} ({{ $fruta->unidade_medicao }}) — {{ $fruta->kg_por_unidade_medicao }} kg/UM</option>
+                    <option value="{{ $fruta->id }}" data-estoque-origens="{{ implode(',', $fruta->estoque_origem_empresa_ids ?? []) }}">{{ $fruta->nome }} ({{ $fruta->unidade_medicao }}) — {{ $fruta->kg_por_unidade_medicao }} kg/UM</option>
                 @endforeach
             </select>
         </div>
@@ -132,7 +132,26 @@
         const container = document.querySelector('[data-items-container="transferencia"]');
         const addButton = document.querySelector('[data-add-item="transferencia"]');
         const template = document.getElementById('transferencia-item-template');
-        if (!container || !addButton || !template) return;
+        const origem = document.getElementById('id_empresa_origem');
+        if (!container || !addButton || !template || !origem) return;
+
+        const filtrarFrutasPorOrigem = () => {
+            const origemId = origem.value;
+
+            container.querySelectorAll('[data-fruta-select]').forEach((select) => {
+                select.querySelectorAll('option').forEach((option) => {
+                    if (!option.value) return;
+
+                    const permitido = origemId !== '' && (option.dataset.estoqueOrigens || '').split(',').includes(origemId);
+                    option.hidden = !permitido;
+                    option.disabled = !permitido;
+                });
+
+                if (select.selectedOptions.length && select.selectedOptions[0].disabled) {
+                    select.value = '';
+                }
+            });
+        };
 
         const refreshRemoveButtons = () => {
             container.querySelectorAll('[data-remove-item]').forEach((button) => {
@@ -143,6 +162,7 @@
         addButton.addEventListener('click', () => {
             const index = container.querySelectorAll('[data-item-row]').length;
             container.insertAdjacentHTML('beforeend', template.innerHTML.replaceAll('__INDEX__', String(index)));
+            filtrarFrutasPorOrigem();
             refreshRemoveButtons();
         });
 
@@ -152,6 +172,8 @@
             refreshRemoveButtons();
         });
 
+        origem.addEventListener('change', filtrarFrutasPorOrigem);
+        filtrarFrutasPorOrigem();
         refreshRemoveButtons();
     });
 </script>

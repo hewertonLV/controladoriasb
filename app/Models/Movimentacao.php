@@ -54,6 +54,13 @@ use Illuminate\Support\Carbon;
  * @property int|null $id_unidade_negocio_retorno
  * @property int|null $movimentacao_venda_origem_id
  * @property int|null $devolucao_origem_id
+ * @property int|null $conversao_origem_id
+ * @property int|null $id_fruta_destino_conversao
+ * @property string $qtd_resultante_um
+ * @property string $qtd_resultante_kg
+ * @property string $qtd_perda_conversao_um
+ * @property string $qtd_perda_conversao_kg
+ * @property string $valor_perda_conversao
  * @property string|null $tipo_devolucao
  * @property string|null $numero_nf_devolucao
  * @property string|null $motivo_devolucao
@@ -104,6 +111,8 @@ use Illuminate\Support\Carbon;
  * @property-read UnidadeNegocio|null $unidadeRetorno
  * @property-read Movimentacao|null $vendaOrigem
  * @property-read Movimentacao|null $devolucaoOrigem
+ * @property-read Movimentacao|null $conversaoOrigem
+ * @property-read Fruta|null $frutaDestinoConversao
  * @property-read Movimentacao|null $origem
  * @property-read Movimentacao|null $substituidaPor
  * @property-read Movimentacao|null $versaoAnterior
@@ -156,6 +165,13 @@ class Movimentacao extends Model
         'id_unidade_negocio_retorno',
         'movimentacao_venda_origem_id',
         'devolucao_origem_id',
+        'conversao_origem_id',
+        'id_fruta_destino_conversao',
+        'qtd_resultante_um',
+        'qtd_resultante_kg',
+        'qtd_perda_conversao_um',
+        'qtd_perda_conversao_kg',
+        'valor_perda_conversao',
         'tipo_devolucao',
         'numero_nf_devolucao',
         'motivo_devolucao',
@@ -211,6 +227,8 @@ class Movimentacao extends Model
             'id_unidade_negocio_retorno' => 'integer',
             'movimentacao_venda_origem_id' => 'integer',
             'devolucao_origem_id' => 'integer',
+            'conversao_origem_id' => 'integer',
+            'id_fruta_destino_conversao' => 'integer',
             'status_movimentacao_id' => 'integer',
             'transferencia_origem_id' => 'integer',
             'pareada_movimentacao_id' => 'integer',
@@ -236,6 +254,11 @@ class Movimentacao extends Model
             'qtd_fruta_kg' => 'decimal:2',
             'qtd_recebida_um' => 'decimal:2',
             'qtd_recebida_kg' => 'decimal:2',
+            'qtd_resultante_um' => 'decimal:2',
+            'qtd_resultante_kg' => 'decimal:2',
+            'qtd_perda_conversao_um' => 'decimal:2',
+            'qtd_perda_conversao_kg' => 'decimal:2',
+            'valor_perda_conversao' => 'decimal:2',
             'valor_frete_rateio' => 'decimal:2',
             'valor_frete_um' => 'decimal:2',
             'valor_frete_kg' => 'decimal:2',
@@ -372,6 +395,22 @@ class Movimentacao extends Model
     public function devolucaoOrigem(): BelongsTo
     {
         return $this->belongsTo(self::class, 'devolucao_origem_id');
+    }
+
+    /**
+     * @return BelongsTo<Movimentacao, $this>
+     */
+    public function conversaoOrigem(): BelongsTo
+    {
+        return $this->belongsTo(self::class, 'conversao_origem_id');
+    }
+
+    /**
+     * @return BelongsTo<Fruta, $this>
+     */
+    public function frutaDestinoConversao(): BelongsTo
+    {
+        return $this->belongsTo(Fruta::class, 'id_fruta_destino_conversao');
     }
 
     /**

@@ -52,6 +52,13 @@ final class MovimentacaoAuditoriaService
             'id_unidade_negocio_retorno' => $movimentacao->id_unidade_negocio_retorno,
             'movimentacao_venda_origem_id' => $movimentacao->movimentacao_venda_origem_id,
             'devolucao_origem_id' => $movimentacao->devolucao_origem_id,
+            'conversao_origem_id' => $movimentacao->conversao_origem_id,
+            'id_fruta_destino_conversao' => $movimentacao->id_fruta_destino_conversao,
+            'qtd_resultante_um' => (string) ($movimentacao->qtd_resultante_um ?? '0.00'),
+            'qtd_resultante_kg' => (string) ($movimentacao->qtd_resultante_kg ?? '0.00'),
+            'qtd_perda_conversao_um' => (string) ($movimentacao->qtd_perda_conversao_um ?? '0.00'),
+            'qtd_perda_conversao_kg' => (string) ($movimentacao->qtd_perda_conversao_kg ?? '0.00'),
+            'valor_perda_conversao' => (string) ($movimentacao->valor_perda_conversao ?? '0.00'),
             'tipo_devolucao' => $movimentacao->tipo_devolucao,
             'numero_nf_devolucao' => $movimentacao->numero_nf_devolucao,
             'motivo_devolucao' => $movimentacao->motivo_devolucao,
@@ -231,6 +238,50 @@ final class MovimentacaoAuditoriaService
                 'venda_origem' => $movimentacao->vendaOrigem !== null
                     ? $this->snapshotVersao($movimentacao->vendaOrigem)
                     : null,
+            ],
+        ]);
+    }
+
+    /**
+     * @param  array<string, mixed>|null  $meSaidaAntes
+     * @param  array<string, mixed>|null  $meSaidaDepois
+     * @param  array<string, mixed>|null  $meEntradaAntes
+     * @param  array<string, mixed>|null  $meEntradaDepois
+     */
+    public function registrarRegistroConversaoEmbalagem(
+        Movimentacao $saida,
+        Movimentacao $entrada,
+        ?User $user,
+        array $estoqueOrigemAntes,
+        array $estoqueOrigemDepois,
+        array $estoqueDestinoAntes,
+        array $estoqueDestinoDepois,
+        ?array $meSaidaAntes,
+        ?array $meSaidaDepois,
+        ?array $meEntradaAntes,
+        ?array $meEntradaDepois,
+    ): MovimentacaoHistorico {
+        return MovimentacaoHistorico::query()->create([
+            'movimentacao_cadeia_raiz_id' => $saida->idCadeiaRaiz(),
+            'movimentacao_antes_id' => $saida->id,
+            'movimentacao_depois_id' => $entrada->id,
+            'user_id' => $user?->id,
+            'origem' => MovimentacaoHistorico::ORIGEM_CONVERSAO_EMBALAGEM,
+            'acao' => MovimentacaoHistorico::ACAO_REGISTRO_CONVERSAO_EMBALAGEM,
+            'motivo' => null,
+            'dados_antes' => [
+                'estoque_origem' => $estoqueOrigemAntes,
+                'movimentacao_estoque_origem' => $meSaidaAntes,
+                'estoque_destino' => $estoqueDestinoAntes,
+                'movimentacao_estoque_destino' => $meEntradaAntes,
+            ],
+            'dados_depois' => [
+                'saida' => $this->snapshotVersao($saida),
+                'entrada' => $this->snapshotVersao($entrada),
+                'estoque_origem' => $estoqueOrigemDepois,
+                'movimentacao_estoque_origem' => $meSaidaDepois,
+                'estoque_destino' => $estoqueDestinoDepois,
+                'movimentacao_estoque_destino' => $meEntradaDepois,
             ],
         ]);
     }

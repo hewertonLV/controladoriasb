@@ -130,6 +130,31 @@ trait NormalizaAtributosMonetariosMovimentacao
         $this->attributes['qtd_fruta_kg'] = TextoCadastro::normalizarDecimalNaoNegativo($value);
     }
 
+    protected function setQtdResultanteUmAttribute(mixed $value): void
+    {
+        $this->attributes['qtd_resultante_um'] = TextoCadastro::normalizarDecimalNaoNegativo($value);
+    }
+
+    protected function setQtdResultanteKgAttribute(mixed $value): void
+    {
+        $this->attributes['qtd_resultante_kg'] = TextoCadastro::normalizarDecimalNaoNegativo($value);
+    }
+
+    protected function setQtdPerdaConversaoKgAttribute(mixed $value): void
+    {
+        $this->attributes['qtd_perda_conversao_kg'] = TextoCadastro::normalizarDecimalNaoNegativo($value);
+    }
+
+    protected function setQtdPerdaConversaoUmAttribute(mixed $value): void
+    {
+        $this->attributes['qtd_perda_conversao_um'] = TextoCadastro::normalizarDecimalNaoNegativo($value);
+    }
+
+    protected function setValorPerdaConversaoAttribute(mixed $value): void
+    {
+        $this->attributes['valor_perda_conversao'] = TextoCadastro::normalizarValorMonetarioBrasileiro($value);
+    }
+
     private function normalizarDecimalComSinal(mixed $value): string
     {
         if (is_numeric($value)) {

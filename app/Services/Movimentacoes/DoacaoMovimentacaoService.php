@@ -17,6 +17,7 @@ use App\Models\UnidadeNegocio;
 use App\Models\User;
 use App\Support\EmpresaEntidadeQuery;
 use App\Support\Movimentacoes\DoacaoValorEconomico;
+use App\Support\Movimentacoes\FrutasComEstoqueOrigem;
 use App\Support\TextoCadastro;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\DB;
@@ -55,15 +56,10 @@ final class DoacaoMovimentacaoService
             ->sortBy(fn (Empresa $e): string => mb_strtolower($e->nomeExibicao()))
             ->values();
 
-        $frutas = Fruta::query()
-            ->where('kg_por_unidade_medicao', '>', 0)
-            ->orderBy('nome')
-            ->get();
-
         return [
             'empresas_origem' => $empresasOrigem,
             'empresas_destino_cliente' => $empresasDestinoCliente,
-            'frutas' => $frutas,
+            'frutas' => FrutasComEstoqueOrigem::listar(),
         ];
     }
 

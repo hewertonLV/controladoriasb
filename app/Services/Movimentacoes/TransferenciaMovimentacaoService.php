@@ -17,6 +17,7 @@ use App\Models\MovimentacaoEstoque;
 use App\Models\StatusMovimentacao;
 use App\Models\UnidadeNegocio;
 use App\Support\EmpresaEntidadeQuery;
+use App\Support\Movimentacoes\FrutasComEstoqueOrigem;
 use App\Support\TextoCadastro;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Carbon;
@@ -73,11 +74,6 @@ final class TransferenciaMovimentacaoService
             ->sortBy(fn (Empresa $e): string => mb_strtolower($e->nomeExibicao()))
             ->values();
 
-        $frutas = Fruta::query()
-            ->where('kg_por_unidade_medicao', '>', 0)
-            ->orderBy('nome')
-            ->get();
-
         $fretes = Frete::query()
             ->where('status_situacao', FreteStatusSituacao::ABERTA->value)
             ->orderBy('nome')
@@ -86,7 +82,7 @@ final class TransferenciaMovimentacaoService
         return [
             'empresas_origem' => $empresasUn,
             'empresas_destino' => $empresasUn,
-            'frutas' => $frutas,
+            'frutas' => FrutasComEstoqueOrigem::listar(),
             'fretes' => $fretes,
         ];
     }

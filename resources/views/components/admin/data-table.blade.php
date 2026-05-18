@@ -40,7 +40,7 @@
         <div class="card-body border-bottom">
             <div class="row g-2 align-items-end">
                 @if ($showSearch)
-                    <div class="col-md-{{ $hasFilters ? 5 : 9 }}">
+                    <div class="col-md-{{ $hasFilters ? 4 : 7 }}">
                         <label class="form-label small text-muted mb-1" for="{{ $containerId }}-search">Pesquisa</label>
                         <div class="input-group">
                             <span class="input-group-text bg-white">
@@ -59,6 +59,18 @@
                         </div>
                     </div>
                 @endif
+
+                <div class="col-md-{{ $hasFilters ? 3 : 3 }}">
+                    <label class="form-label small text-muted mb-1">Ações da tabela</label>
+                    <div class="d-flex flex-wrap gap-1">
+                        <button type="button" class="btn btn-light btn-sm" data-table-copy>
+                            <i class="ri-file-copy-line me-1"></i> Copiar
+                        </button>
+                        <button type="button" class="btn btn-light btn-sm" data-table-print>
+                            <i class="ri-printer-line me-1"></i> Imprimir
+                        </button>
+                    </div>
+                </div>
 
                 @if ($hasFilters)
                     {{ $filters }}
@@ -262,6 +274,73 @@
             });
         }
 
+        function tableText(root) {
+            const table = root.querySelector('[data-table-container] table');
+            if (!table) return '';
+
+            return Array.from(table.querySelectorAll('tr')).map((row) => {
+                const cells = Array.from(row.querySelectorAll('th,td'));
+                const visibleCells = cells.filter((cell, index) => index < cells.length - 1);
+
+                return visibleCells.map((cell) => cell.innerText.trim().replace(/\s+/g, ' ')).join('\t');
+            }).filter(Boolean).join('\n');
+        }
+
+        async function copyTable(root) {
+            const text = tableText(root);
+            if (!text) return;
+
+            if (navigator.clipboard && window.isSecureContext) {
+                await navigator.clipboard.writeText(text);
+                return;
+            }
+
+            const area = document.createElement('textarea');
+            area.value = text;
+            area.style.position = 'fixed';
+            area.style.opacity = '0';
+            document.body.appendChild(area);
+            area.focus();
+            area.select();
+            document.execCommand('copy');
+            area.remove();
+        }
+
+        function printTable(root) {
+            const table = root.querySelector('[data-table-container] table');
+            if (!table) return;
+
+            const title = root.querySelector('.header-title')?.innerText || document.title;
+            const win = window.open('', '_blank', 'noopener,noreferrer');
+            if (!win) return;
+
+            win.document.write(`
+                <!doctype html>
+                <html>
+                <head>
+                    <meta charset="utf-8">
+                    <title>${title}</title>
+                    <style>
+                        body { color: #1f2937; font-family: Arial, Helvetica, sans-serif; font-size: 11px; }
+                        h1 { border-bottom: 2px solid #0d6efd; font-size: 18px; padding-bottom: 8px; }
+                        table { border-collapse: collapse; width: 100%; }
+                        th { background: #eef2ff; color: #1e293b; text-transform: uppercase; }
+                        th, td { border: 1px solid #dbe3ef; padding: 6px 7px; text-align: left; vertical-align: top; }
+                        tr:nth-child(even) td { background: #f8fafc; }
+                        th:last-child, td:last-child { display: none; }
+                    </style>
+                </head>
+                <body>
+                    <h1>${title}</h1>
+                    ${table.outerHTML}
+                </body>
+                </html>
+            `);
+            win.document.close();
+            win.focus();
+            win.print();
+        }
+
         async function reload(root, urlOverride = null) {
             const endpoint = root.getAttribute('data-endpoint');
             if (!endpoint) return;
@@ -323,6 +402,9 @@
                 perPageEl.addEventListener('change', () => reload(root));
             }
             filterEls.forEach((el) => el.addEventListener('change', () => reload(root)));
+
+            root.querySelector('[data-table-copy]')?.addEventListener('click', () => copyTable(root));
+            root.querySelector('[data-table-print]')?.addEventListener('click', () => printTable(root));
 
             const containerId = root.getAttribute('data-container');
             const container = document.getElementById(containerId);

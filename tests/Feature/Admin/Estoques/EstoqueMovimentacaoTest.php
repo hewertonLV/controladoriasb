@@ -52,4 +52,54 @@ class EstoqueMovimentacaoTest extends TestCase
             ])
             ->assertForbidden();
     }
+
+    public function test_index_exibe_cards_de_unidades_e_lista_apenas_unidade_selecionada(): void
+    {
+        $unidadeA = UnidadeNegocio::factory()->create(['nome' => 'UNIDADE ESTOQUE A', 'possui_estoque' => true]);
+        $unidadeB = UnidadeNegocio::factory()->create(['nome' => 'UNIDADE ESTOQUE B', 'possui_estoque' => true]);
+        $frutaA = Fruta::factory()->create(['nome' => 'FRUTA ESTOQUE A', 'kg_por_unidade_medicao' => '10.00']);
+        $frutaB = Fruta::factory()->create(['nome' => 'FRUTA ESTOQUE B', 'kg_por_unidade_medicao' => '10.00']);
+
+        $service = app(EstoqueMovimentacaoService::class);
+        $service->movimentarPorTipo($unidadeA, $frutaA, 'entrada', '100', '2.00');
+        $service->movimentarPorTipo($unidadeB, $frutaB, 'entrada', '50', '3.00');
+
+        $user = $this->userWithPermissions([Permissions::ESTOQUES_VISUALIZAR]);
+
+        $this->actingAs($user)
+            ->get(route('admin.estoques.index'))
+            ->assertOk()
+            ->assertSeeText('UNIDADE ESTOQUE A')
+            ->assertSeeText('UNIDADE ESTOQUE B')
+            ->assertSeeText('Selecione uma unidade de negócio')
+            ->assertSee(route('admin.estoques.unidade', $unidadeA), false)
+            ->assertDontSeeText('FRUTA ESTOQUE A')
+            ->assertDontSeeText('FRUTA ESTOQUE B')
+            ->assertDontSee('<table id="estoques-datatable"', false)
+            ->assertDontSee('assets/vendor/datatables.net-buttons/js/dataTables.buttons.min.js', false);
+
+        $this->actingAs($user)
+            ->get(route('admin.estoques.unidade', $unidadeA))
+            ->assertOk()
+            ->assertSeeText('Estoque — UNIDADE ESTOQUE A')
+            ->assertSeeText('FRUTA ESTOQUE A')
+            ->assertDontSeeText('FRUTA ESTOQUE B')
+            ->assertSee('estoques-datatable', false)
+            ->assertSee('fornecedores-datatable-card', false)
+            ->assertSee('fornecedores-table', false)
+            ->assertSee('fornecedores-datatable-toolbar', false)
+            ->assertSee('fornecedor-action-link', false)
+            ->assertSee('estoques-table-container', false)
+            ->assertSee('table-layout: fixed', false)
+            ->assertSee('overflow-x: visible', false)
+            ->assertDontSee('<div class="table-responsive">', false)
+            ->assertSee('<th># CI.</th>', false)
+            ->assertSee('<th>Qtd.</th>', false)
+            ->assertSee('<th>Custo</th>', false)
+            ->assertSee('assets/vendor/datatables.net-buttons/js/dataTables.buttons.min.js', false)
+            ->assertSee('searchPlaceholder: \'Fruta, ID CIGAM, quantidade ou valor\'', false)
+            ->assertSee('text: \'Copiar\'', false)
+            ->assertSee('text: \'Imprimir\'', false)
+            ->assertDontSee('estoques-filtro-fruta', false);
+    }
 }

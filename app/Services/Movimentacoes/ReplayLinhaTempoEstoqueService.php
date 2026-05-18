@@ -169,6 +169,15 @@ class ReplayLinhaTempoEstoqueService
             ->get()
             ->map(static fn (Movimentacao $m): array => ['tipo' => 'entrada', 'movimentacao' => $m]);
 
+        $entradasConversao = Movimentacao::query()
+            ->vigentesParaCalculo()
+            ->where('categoria_movimentacao_id', CategoriaMovimentacaoTipo::ConversaoEmbalagem->value)
+            ->where('status_movimentacao_id', StatusMovimentacao::ID_ENTRADA)
+            ->where('id_empresa_destino', $empresaId)
+            ->where('id_fruta', $idFruta)
+            ->get()
+            ->map(static fn (Movimentacao $m): array => ['tipo' => 'entrada', 'movimentacao' => $m]);
+
         $saidasDoacao = Movimentacao::query()
             ->vigentesParaCalculo()
             ->where('categoria_movimentacao_id', CategoriaMovimentacaoTipo::Doacao->value)
@@ -205,13 +214,24 @@ class ReplayLinhaTempoEstoqueService
             ->get()
             ->map(static fn (Movimentacao $m): array => ['tipo' => 'saida', 'movimentacao' => $m]);
 
+        $saidasConversao = Movimentacao::query()
+            ->vigentesParaCalculo()
+            ->where('categoria_movimentacao_id', CategoriaMovimentacaoTipo::ConversaoEmbalagem->value)
+            ->where('status_movimentacao_id', StatusMovimentacao::ID_SAIDA)
+            ->where('id_empresa_origem', $empresaId)
+            ->where('id_fruta', $idFruta)
+            ->get()
+            ->map(static fn (Movimentacao $m): array => ['tipo' => 'saida', 'movimentacao' => $m]);
+
         return $entradasCompra
             ->concat($entradasTransferencia)
             ->concat($entradasDevolucao)
+            ->concat($entradasConversao)
             ->concat($saidasDoacao)
             ->concat($saidasDescarte)
             ->concat($saidasVenda)
             ->concat($saidasTransferencia)
+            ->concat($saidasConversao)
             ->sortBy(static function (array $evento): array {
                 /** @var Movimentacao $m */
                 $m = $evento['movimentacao'];
@@ -253,7 +273,7 @@ class ReplayLinhaTempoEstoqueService
 
         $runUm = round($runUm + $qUm, 2);
         $runKg = round($runKg + $qKg, 2);
-        $valorEntrada = (int) $m->categoria_movimentacao_id === CategoriaMovimentacaoTipo::Devolucao->value
+        $valorEntrada = in_array((int) $m->categoria_movimentacao_id, [CategoriaMovimentacaoTipo::Devolucao->value, CategoriaMovimentacaoTipo::ConversaoEmbalagem->value], true)
             ? (float) $m->valor_total_movimentacao
             : (float) $m->preco_medio_fruta_kg * $qKg;
         $valorAcumulado = round($valorAcumulado + $valorEntrada, 2);
@@ -281,10 +301,10 @@ class ReplayLinhaTempoEstoqueService
             'versao_replay' => (int) ($m->versao_replay ?? 1) + 1,
         ];
 
-        if ((int) $m->categoria_movimentacao_id === CategoriaMovimentacaoTipo::Devolucao->value) {
+        if (in_array((int) $m->categoria_movimentacao_id, [CategoriaMovimentacaoTipo::Devolucao->value, CategoriaMovimentacaoTipo::ConversaoEmbalagem->value], true)) {
             $attrs['preco_medio_fruta_kg'] = number_format($precoMedioKg, 2, '.', '');
             $attrs['preco_medio_fruta_um'] = number_format($precoMedioUm, 2, '.', '');
-            $attrs['valor_total_movimentacao'] = number_format((float) $m->valor_custo_devolucao, 2, '.', '');
+            $attrs['valor_total_movimentacao'] = number_format((float) $m->valor_total_movimentacao, 2, '.', '');
         }
 
         $m->forceFill($attrs)->saveQuietly();
@@ -340,7 +360,7 @@ class ReplayLinhaTempoEstoqueService
             'versao_replay' => (int) ($m->versao_replay ?? 1) + 1,
         ];
 
-        if (in_array((int) $m->categoria_movimentacao_id, [CategoriaMovimentacaoTipo::Doacao->value, CategoriaMovimentacaoTipo::Descarte->value], true)) {
+        if (in_array((int) $m->categoria_movimentacao_id, [CategoriaMovimentacaoTipo::Doacao->value, CategoriaMovimentacaoTipo::Descarte->value, CategoriaMovimentacaoTipo::ConversaoEmbalagem->value], true)) {
             $attrs['valor_total_movimentacao'] = number_format($valorMovimentacao, 2, '.', '');
             $attrs['valor_nf_total'] = '0.00';
             $attrs['valor_nf_um'] = '0.00';

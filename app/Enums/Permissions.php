@@ -218,6 +218,10 @@ final class Permissions
 
     public const MOVIMENTACOES_DEVOLUCOES_CANCELAR_ADMIN = 'movimentacoes.devolucoes.cancelar-admin';
 
+    public const MOVIMENTACOES_CONVERSOES_EMBALAGEM_VISUALIZAR = 'movimentacoes.conversoes-embalagem.visualizar';
+
+    public const MOVIMENTACOES_CONVERSOES_EMBALAGEM_CRIAR = 'movimentacoes.conversoes-embalagem.criar';
+
     public const GRUPOS_VISUALIZAR = 'grupos.visualizar';
 
     public const GRUPOS_CRIAR = 'grupos.criar';
@@ -385,6 +389,10 @@ final class Permissions
                 self::MOVIMENTACOES_DEVOLUCOES_CRIAR,
                 self::MOVIMENTACOES_DEVOLUCOES_EDITAR,
                 self::MOVIMENTACOES_DEVOLUCOES_CANCELAR_ADMIN,
+            ],
+            'Movimentações — Conversão de Embalagem' => [
+                self::MOVIMENTACOES_CONVERSOES_EMBALAGEM_VISUALIZAR,
+                self::MOVIMENTACOES_CONVERSOES_EMBALAGEM_CRIAR,
             ],
         ];
     }

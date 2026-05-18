@@ -15,6 +15,7 @@ enum CategoriaMovimentacaoTipo: int
     case Doacao = CategoriaMovimentacao::ID_DOACAO;
     case Descarte = CategoriaMovimentacao::ID_DESCARTE;
     case Devolucao = CategoriaMovimentacao::ID_DEVOLUCAO;
+    case ConversaoEmbalagem = CategoriaMovimentacao::ID_CONVERSAO_EMBALAGEM;
 
     public function nomeLegivel(): string
     {
@@ -25,6 +26,7 @@ enum CategoriaMovimentacaoTipo: int
             self::Doacao => 'Doação',
             self::Descarte => 'Descarte',
             self::Devolucao => 'Devolução',
+            self::ConversaoEmbalagem => 'Conversão de embalagem',
         };
     }
 }

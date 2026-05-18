@@ -71,9 +71,9 @@
         <div class="row g-3">
             <div class="col-md-4">
                 <label class="form-label">Fruta</label>
-                <select name="id_fruta" class="form-select" required>
+                <select name="id_fruta" class="form-select" required data-fruta-select>
                     @foreach ($opcoes['frutas'] as $fruta)
-                        <option value="{{ $fruta->id }}" @selected((int) old('id_fruta', $movimentacao->id_fruta) === $fruta->id)>{{ $fruta->nome }}</option>
+                        <option value="{{ $fruta->id }}" data-estoque-origens="{{ implode(',', $fruta->estoque_origem_empresa_ids ?? []) }}" @selected((int) old('id_fruta', $movimentacao->id_fruta) === $fruta->id)>{{ $fruta->nome }}</option>
                     @endforeach
                 </select>
             </div>
@@ -104,10 +104,10 @@
             @foreach ($itens as $i => $item)
                 <div class="row g-3 mb-2" data-item-row>
                     <div class="col-md-5">
-                        <select name="itens[{{ $i }}][id_fruta]" class="form-select" required>
+                        <select name="itens[{{ $i }}][id_fruta]" class="form-select" required data-fruta-select>
                             <option value="">Fruta</option>
                             @foreach ($opcoes['frutas'] as $fruta)
-                                <option value="{{ $fruta->id }}" @selected((int) ($item['id_fruta'] ?? 0) === $fruta->id)>{{ $fruta->nome }}</option>
+                                <option value="{{ $fruta->id }}" data-estoque-origens="{{ implode(',', $fruta->estoque_origem_empresa_ids ?? []) }}" @selected((int) ($item['id_fruta'] ?? 0) === $fruta->id)>{{ $fruta->nome }}</option>
                             @endforeach
                         </select>
                     </div>
@@ -135,10 +135,10 @@
     <template id="venda-item-template">
         <div class="row g-3 mb-2" data-item-row>
             <div class="col-md-5">
-                <select name="itens[__INDEX__][id_fruta]" class="form-select" required>
+                <select name="itens[__INDEX__][id_fruta]" class="form-select" required data-fruta-select>
                     <option value="">Fruta</option>
                     @foreach ($opcoes['frutas'] as $fruta)
-                        <option value="{{ $fruta->id }}">{{ $fruta->nome }}</option>
+                        <option value="{{ $fruta->id }}" data-estoque-origens="{{ implode(',', $fruta->estoque_origem_empresa_ids ?? []) }}">{{ $fruta->nome }}</option>
                     @endforeach
                 </select>
             </div>
@@ -181,6 +181,27 @@
         origem.addEventListener('change', atualizarFaturamento);
         atualizarFaturamento();
 
+        const filtrarFrutasPorOrigem = () => {
+            const origemId = origem.value;
+
+            document.querySelectorAll('[data-fruta-select]').forEach((select) => {
+                select.querySelectorAll('option').forEach((option) => {
+                    if (!option.value) return;
+
+                    const permitido = origemId !== '' && (option.dataset.estoqueOrigens || '').split(',').includes(origemId);
+                    option.hidden = !permitido;
+                    option.disabled = !permitido;
+                });
+
+                if (select.selectedOptions.length && select.selectedOptions[0].disabled) {
+                    select.value = '';
+                }
+            });
+        };
+
+        origem.addEventListener('change', filtrarFrutasPorOrigem);
+        filtrarFrutasPorOrigem();
+
         const container = document.querySelector('[data-items-container="venda"]');
         const addButton = document.querySelector('[data-add-item="venda"]');
         const template = document.getElementById('venda-item-template');
@@ -197,6 +218,7 @@
         addButton.addEventListener('click', () => {
             const index = container.querySelectorAll('[data-item-row]').length;
             container.insertAdjacentHTML('beforeend', template.innerHTML.replaceAll('__INDEX__', String(index)));
+            filtrarFrutasPorOrigem();
             refreshRemoveButtons();
         });
 

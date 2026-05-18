@@ -11,6 +11,7 @@ use App\Queries\EstoqueQuery;
 use App\Services\Estoques\EstoqueMovimentacaoService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
 
 class EstoqueController extends Controller
@@ -20,10 +21,27 @@ class EstoqueController extends Controller
         private readonly EstoqueMovimentacaoService $movimentacaoService,
     ) {}
 
-    public function index(Request $request): View
+    public function index(): View
     {
-        $filtros = $this->estoqueQuery->filtrosFromRequest($request);
-        $query = $this->estoqueQuery->aplicarFiltros(
+        $payload = [
+            'unidadesCards' => $this->unidadesCards(),
+        ];
+
+        return view('admin.estoques.index', $payload);
+    }
+
+    public function unidade(UnidadeNegocio $unidadeNegocio): View
+    {
+        abort_unless($unidadeNegocio->possui_estoque, 404);
+
+        $filtros = $this->estoqueQuery->normalizarFiltros([
+            'id_unidade_negocio' => $unidadeNegocio->id,
+            'per_page' => 'all',
+            'sort' => 'fruta',
+            'direction' => 'asc',
+        ]);
+
+        $estoques = $this->estoqueQuery->aplicarFiltros(
             Estoque::query()
                 ->select('estoques.*')
                 ->join('unidades_negocio', 'unidades_negocio.id', '=', 'estoques.id_unidade_negocio')
@@ -33,45 +51,15 @@ class EstoqueController extends Controller
                     'fruta:id,nome,id_cigam,unidade_medicao,kg_por_unidade_medicao',
                 ]),
             $filtros,
-        );
+        )->get();
 
-        if ($filtros['per_page'] === 'all') {
-            $total = (clone $query)->toBase()->count();
-            $resultados = $query->get();
-            $estoques = $resultados;
-            $exibindo = $resultados->count();
-        } else {
-            $paginator = $query->paginate((int) $filtros['per_page'])->appends($filtros);
-            $estoques = $paginator;
-            $total = $paginator->total();
-            $exibindo = count((array) $paginator->items());
-        }
-
-        $unidadesFiltro = UnidadeNegocio::query()
-            ->where('possui_estoque', true)
-            ->orderBy('nome')
-            ->get(['id', 'nome', 'id_cigam']);
-
-        $frutasFiltro = Fruta::query()
-            ->whereRaw('CAST(kg_por_unidade_medicao AS DECIMAL(15,2)) > 0')
-            ->orderBy('nome')
-            ->get(['id', 'nome', 'id_cigam']);
-
-        $payload = [
+        return view('admin.estoques.unidade', [
             'estoques' => $estoques,
             'filtros' => $filtros,
-            'perPageOptions' => EstoqueQuery::PER_PAGE_OPTIONS,
-            'total' => $total,
-            'exibindo' => $exibindo,
-            'unidadesFiltro' => $unidadesFiltro,
-            'frutasFiltro' => $frutasFiltro,
-        ];
-
-        if ($request->ajax()) {
-            return view('admin.estoques._table', $payload);
-        }
-
-        return view('admin.estoques.index', $payload);
+            'total' => $estoques->count(),
+            'exibindo' => $estoques->count(),
+            'unidadeSelecionada' => $unidadeNegocio,
+        ]);
     }
 
     public function show(Estoque $estoque): View
@@ -139,5 +127,22 @@ class EstoqueController extends Controller
         return redirect()
             ->route('admin.estoques.show', $estoque)
             ->with('success', 'Movimentação registrada com sucesso.');
+    }
+
+    private function unidadesCards()
+    {
+        return UnidadeNegocio::query()
+            ->leftJoin('estoques', 'estoques.id_unidade_negocio', '=', 'unidades_negocio.id')
+            ->where('unidades_negocio.possui_estoque', true)
+            ->groupBy('unidades_negocio.id', 'unidades_negocio.nome', 'unidades_negocio.id_cigam')
+            ->orderBy('unidades_negocio.nome')
+            ->get([
+                'unidades_negocio.id',
+                'unidades_negocio.nome',
+                'unidades_negocio.id_cigam',
+                DB::raw('COUNT(estoques.id) as posicoes_count'),
+                DB::raw('COALESCE(SUM(estoques.qtd_fruta_kg), 0) as total_kg'),
+                DB::raw('COALESCE(SUM(estoques.valor_total_acumulado), 0) as valor_total'),
+            ]);
     }
 }

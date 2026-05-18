@@ -17,6 +17,7 @@ use App\Models\UnidadeNegocio;
 use App\Models\User;
 use App\Support\EmpresaEntidadeQuery;
 use App\Support\Movimentacoes\DoacaoValorEconomico;
+use App\Support\Movimentacoes\FrutasComEstoqueOrigem;
 use App\Support\TextoCadastro;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\DB;
@@ -50,7 +51,7 @@ final class DescarteMovimentacaoService
 
         return [
             'empresas_origem' => $empresasOrigem,
-            'frutas' => Fruta::query()->where('kg_por_unidade_medicao', '>', 0)->orderBy('nome')->get(),
+            'frutas' => FrutasComEstoqueOrigem::listar(),
             'categorias_descarte' => CategoriaDescarte::query()->orderBy('id')->get(),
         ];
     }
