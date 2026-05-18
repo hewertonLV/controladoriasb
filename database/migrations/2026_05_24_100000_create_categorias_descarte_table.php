@@ -17,6 +17,7 @@ return new class extends Migration
             $table->string('nome', 120)->unique();
             $table->text('descricao')->nullable();
             $table->boolean('impacta_kpi_perda')->default(true);
+            $table->softDeletes();
             $table->timestamps();
         });
     }

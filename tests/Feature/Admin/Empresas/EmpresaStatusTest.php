@@ -17,7 +17,7 @@ class EmpresaStatusTest extends EmpresasTestCase
 
         $cliente->delete();
 
-        $this->assertDatabaseMissing('empresas', ['id' => $empresa->id]);
+        $this->assertSoftDeleted('empresas', ['id' => $empresa->id]);
     }
 
     public function test_nao_existe_rota_de_exclusao_direta_de_hub(): void

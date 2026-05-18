@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Carbon;
 
 /**
@@ -21,6 +22,8 @@ use Illuminate\Support\Carbon;
  */
 class MovimentacaoHistorico extends Model
 {
+    use SoftDeletes;
+
     public const ACAO_SUBSTITUICAO_VERSAO = 'SUBSTITUICAO_VERSAO';
 
     public const ACAO_CANCELAMENTO_ADMIN = 'CANCELAMENTO_ADMIN';

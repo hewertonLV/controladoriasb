@@ -18,6 +18,7 @@ return new class extends Migration
             $table->text('descricao')->nullable();
             $table->string('status_situacao', 20)->default('ABERTA')->index();
             $table->decimal('valor_fruta_kg', 15, 2)->default(0);
+            $table->softDeletes();
             $table->timestamps();
 
             $table->index('id_veiculo');

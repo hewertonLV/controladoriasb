@@ -23,6 +23,7 @@ return new class extends Migration
             $table->decimal('preco_medio_kg', 15, 2)->default(0);
             $table->decimal('preco_medio_um', 15, 2)->default(0);
             $table->decimal('valor_total_acumulado', 15, 2)->default(0);
+            $table->softDeletes();
             $table->timestamps();
 
             $table->unique(['id_unidade_negocio', 'id_fruta']);

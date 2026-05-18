@@ -14,6 +14,7 @@ return new class extends Migration
             $table->string('nome', 255);
             $table->string('unidade_medicao', 20);
             $table->decimal('kg_por_unidade_medicao', 15, 2)->default(0);
+            $table->softDeletes();
             $table->timestamps();
         });
     }

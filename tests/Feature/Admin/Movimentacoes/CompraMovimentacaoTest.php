@@ -88,6 +88,7 @@ class CompraMovimentacaoTest extends TestCase
             'id_fruta' => $fruta->id,
             'qtd_fruta_um' => '5',
             'valor_nf_total' => 'R$ 1.000,00',
+            'numero_nf_origem' => '123456',
             'id_frete' => $frete->id,
         ]);
 
@@ -97,6 +98,7 @@ class CompraMovimentacaoTest extends TestCase
         $mov = Movimentacao::query()->firstOrFail();
         $this->assertSame(CategoriaMovimentacaoTipo::Compra->value, (int) $mov->categoria_movimentacao_id);
         $this->assertSame(1, $mov->numero_compra);
+        $this->assertSame('123456', $mov->numero_nf_origem);
         $this->assertSame('50.00', (string) $mov->qtd_fruta_kg);
         $this->assertSame(1, $mov->versao);
         $this->assertSame(MovimentacaoStatusRegistro::ATIVO->value, $mov->status_registro);
@@ -117,6 +119,24 @@ class CompraMovimentacaoTest extends TestCase
         $this->assertSame('5.00', (string) $estoque->qtd_fruta_um);
 
         $this->assertSame(1, MovimentacaoEstoque::query()->where('status_ultima_posicao', true)->where('id_unidade_negocio', $unidade->id)->where('id_fruta', $fruta->id)->count());
+    }
+
+    public function test_numero_nf_compra_aceita_somente_numeros(): void
+    {
+        $this->seedCategoriasEEstados();
+        [$empresaFornecedor, $empresaUnidade, , $fruta, $frete] = $this->criarCenarioCompra();
+
+        $this->actingAs($this->userWithPermissions([Permissions::MOVIMENTACOES_COMPRAS_CRIAR]))
+            ->postJson(route('admin.movimentacoes.compras.store'), [
+                'id_empresa_origem' => $empresaFornecedor->id,
+                'id_empresa_destino' => $empresaUnidade->id,
+                'id_fruta' => $fruta->id,
+                'qtd_fruta_um' => '5',
+                'valor_nf_total' => '1000.00',
+                'numero_nf_origem' => 'NF-123,45',
+                'id_frete' => $frete->id,
+            ])
+            ->assertJsonValidationErrors(['numero_nf_origem']);
     }
 
     public function test_registrar_compra_multi_item_cria_uma_movimentacao_por_fruta(): void

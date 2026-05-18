@@ -14,6 +14,7 @@ return new class extends Migration
             $table->string('razao_social', 255);
             $table->string('fantasia', 255)->nullable();
             $table->string('cnpj_cpf', 14);
+            $table->softDeletes();
             $table->timestamps();
         });
     }

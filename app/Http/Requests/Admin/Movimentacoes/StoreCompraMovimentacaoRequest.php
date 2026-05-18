@@ -77,6 +77,7 @@ class StoreCompraMovimentacaoRequest extends FormRequest
             ],
             'qtd_fruta_um' => ['required_without:itens', 'numeric', 'min:0.01'],
             'valor_nf_total' => ['required_without:itens', 'numeric', 'min:0.01'],
+            'numero_nf_origem' => ['nullable', 'string', 'max:120', 'regex:/^\d+$/'],
             'itens' => ['sometimes', 'array', 'min:1'],
             'itens.*.id_fruta' => [
                 'required_with:itens',
@@ -127,10 +128,21 @@ class StoreCompraMovimentacaoRequest extends FormRequest
             'id_fruta' => 'fruta',
             'qtd_fruta_um' => 'quantidade na unidade de medida',
             'valor_nf_total' => 'valor total da NF',
+            'numero_nf_origem' => 'número da NF de compra',
             'itens.*.id_fruta' => 'fruta',
             'itens.*.qtd_fruta_um' => 'quantidade na unidade de medida',
             'itens.*.valor_nf_total' => 'valor total da NF',
             'id_frete' => 'frete',
+        ];
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    public function messages(): array
+    {
+        return [
+            'numero_nf_origem.regex' => 'O número da NF de compra deve conter somente números.',
         ];
     }
 
@@ -148,6 +160,11 @@ class StoreCompraMovimentacaoRequest extends FormRequest
             $merge['qtd_fruta_um'] = TextoCadastro::normalizarDecimalNaoNegativo(
                 $this->input('qtd_fruta_um'),
             );
+        }
+
+        if ($this->has('numero_nf_origem')) {
+            $numeroNf = trim((string) $this->input('numero_nf_origem', ''));
+            $merge['numero_nf_origem'] = $numeroNf !== '' ? $numeroNf : null;
         }
 
         if ($this->has('itens')) {

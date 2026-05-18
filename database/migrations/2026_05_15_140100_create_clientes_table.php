@@ -21,6 +21,7 @@ return new class extends Migration
             $table->decimal('desconto_nf', 15, 2)->default(0);
             $table->decimal('desconto_contrato', 15, 2)->default(0);
 
+            $table->softDeletes();
             $table->timestamps();
 
             $table->foreign('id_unidade_negocio')

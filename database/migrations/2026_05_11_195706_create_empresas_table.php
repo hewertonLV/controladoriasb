@@ -19,6 +19,7 @@ return new class extends Migration
             $table->unsignedInteger('unidade_negocio');
             $table->string('tipo_pessoa', 10);
 
+            $table->softDeletes();
             $table->timestamps();
 
             $table->index('status');

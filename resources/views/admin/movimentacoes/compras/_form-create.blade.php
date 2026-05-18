@@ -49,6 +49,22 @@
         <small class="text-muted">Apenas fretes com situação ABERTA.</small>
     </div>
 
+    <div class="col-md-6">
+        <label for="numero_nf_origem" class="form-label">Número da NF de compra</label>
+        <input type="text"
+               name="numero_nf_origem"
+               id="numero_nf_origem"
+               value="{{ old('numero_nf_origem') }}"
+               class="form-control @error('numero_nf_origem') is-invalid @enderror"
+               maxlength="120"
+               inputmode="numeric"
+               pattern="[0-9]*"
+               autocomplete="off"
+               placeholder="Ex.: 12345">
+        @error('numero_nf_origem')<div class="invalid-feedback">{{ $message }}</div>@enderror
+        <small class="text-muted">Informe somente números. Esse número será replicado para todos os itens da compra.</small>
+    </div>
+
     @php
         $itens = old('itens', [[
             'id_fruta' => old('id_fruta'),

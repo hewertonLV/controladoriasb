@@ -27,6 +27,7 @@ return new class extends Migration
             $table->text('erro_mensagem')->nullable();
             $table->timestamp('started_at')->nullable();
             $table->timestamp('finished_at')->nullable();
+            $table->softDeletes();
             $table->timestamps();
 
             $table->index(['user_id', 'created_at']);

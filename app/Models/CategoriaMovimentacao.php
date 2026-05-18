@@ -6,6 +6,7 @@ use App\Support\TextoCadastro;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Carbon;
 
 /**
@@ -17,6 +18,7 @@ use Illuminate\Support\Carbon;
 class CategoriaMovimentacao extends Model
 {
     use HasFactory;
+    use SoftDeletes;
 
     public const ID_COMPRA = 1;
 

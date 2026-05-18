@@ -6,11 +6,13 @@ use App\Models\Concerns\HasImportacaoAssincrona;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 class FornecedorImportacao extends Model
 {
     use HasFactory;
     use HasImportacaoAssincrona;
+    use SoftDeletes;
 
     protected $table = 'fornecedor_importacoes';
 

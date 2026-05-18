@@ -38,6 +38,10 @@
                     <div class="text-muted small">Status do registro</div>
                     <div class="fw-semibold">{{ $movimentacao->status_registro }}</div>
                 </div>
+                <div class="col-md-6">
+                    <div class="text-muted small">NF de compra</div>
+                    <div class="fw-semibold">{{ $movimentacao->numero_nf_origem ?? '—' }}</div>
+                </div>
                 @if ($movimentacao->movimentacao_origem_id || $movimentacao->versaoAnterior)
                     <div class="col-md-6">
                         <div class="text-muted small">Número da compra na linha do tempo</div>

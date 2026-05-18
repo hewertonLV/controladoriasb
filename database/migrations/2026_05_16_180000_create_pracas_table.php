@@ -12,6 +12,7 @@ return new class extends Migration
             $table->id();
             $table->string('nome', 255)->index();
             $table->unsignedBigInteger('id_unidade_negocio')->index();
+            $table->softDeletes();
             $table->timestamps();
 
             $table->unique(['nome', 'id_unidade_negocio']);

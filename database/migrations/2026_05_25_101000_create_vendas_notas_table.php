@@ -22,6 +22,7 @@ return new class extends Migration
             $table->decimal('valor_total_nf', 15, 2)->default(0);
             $table->string('status_registro', 20)->default('ATIVO');
             $table->text('observacao')->nullable();
+            $table->softDeletes();
             $table->timestamps();
 
             $table->index(['numero_nf', 'status_registro']);

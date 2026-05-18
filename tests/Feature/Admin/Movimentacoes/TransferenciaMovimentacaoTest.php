@@ -154,13 +154,15 @@ class TransferenciaMovimentacaoTest extends TestCase
         $destinoSelect = $this->selectHtml((string) $html, 'id_empresa_destino');
 
         foreach ([$origemSelect, $destinoSelect] as $select) {
+            $selectDecodificado = html_entity_decode($select, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+
             $this->assertStringContainsString((string) $empresaOrigem->id, $select);
             $this->assertStringContainsString((string) $empresaDestino->id, $select);
-            $this->assertStringContainsString($unidadeOrigem->nome, $select);
-            $this->assertStringContainsString($unidadeDestino->nome, $select);
-            $this->assertStringNotContainsString($unidadeSemEstoque->nome, $select);
-            $this->assertStringNotContainsString($cliente->razao_social, $select);
-            $this->assertStringNotContainsString($fornecedor->razao_social, $select);
+            $this->assertStringContainsString($unidadeOrigem->nome, $selectDecodificado);
+            $this->assertStringContainsString($unidadeDestino->nome, $selectDecodificado);
+            $this->assertStringNotContainsString($unidadeSemEstoque->nome, $selectDecodificado);
+            $this->assertStringNotContainsString($cliente->razao_social, $selectDecodificado);
+            $this->assertStringNotContainsString($fornecedor->razao_social, $selectDecodificado);
         }
     }
 

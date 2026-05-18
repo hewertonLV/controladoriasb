@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
+use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Carbon;
 
 /**
@@ -24,6 +25,7 @@ use Illuminate\Support\Carbon;
 class Empresa extends Model
 {
     use HasFactory;
+    use SoftDeletes;
 
     /**
      * Constantes reutilizadas por validações legadas (requests/importador descontinuado no hub).

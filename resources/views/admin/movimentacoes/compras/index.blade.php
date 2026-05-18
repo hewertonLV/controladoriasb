@@ -24,6 +24,7 @@
                     <thead class="table-light">
                         <tr>
                             <th>Compra</th>
+                            <th>NF</th>
                             <th>Data</th>
                             <th>Forn.</th>
                             <th>Unidade</th>
@@ -39,6 +40,7 @@
                         @forelse ($movimentacoes as $m)
                             <tr>
                                 <td class="fw-semibold">Compra #{{ $m->numero_compra ?? $m->id }}</td>
+                                <td>{{ $m->numero_nf_origem ?? '—' }}</td>
                                 <td>{{ $m->data_movimentacao?->format('d/m/Y H:i') }}</td>
                                 <td>{{ $m->empresaOrigem?->nomeExibicao() ?? '—' }}</td>
                                 <td>{{ $m->empresaDestino?->nomeExibicao() ?? '—' }}</td>
@@ -62,7 +64,7 @@
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="10" class="text-center text-muted py-4">Nenhuma compra registrada.</td>
+                                <td colspan="11" class="text-center text-muted py-4">Nenhuma compra registrada.</td>
                             </tr>
                         @endforelse
                     </tbody>

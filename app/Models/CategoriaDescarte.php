@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Support\TextoCadastro;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Carbon;
 
 /**
@@ -17,6 +18,8 @@ use Illuminate\Support\Carbon;
  */
 class CategoriaDescarte extends Model
 {
+    use SoftDeletes;
+
     public const ID_AVARIA = 1;
 
     public const ID_VENCIMENTO = 2;

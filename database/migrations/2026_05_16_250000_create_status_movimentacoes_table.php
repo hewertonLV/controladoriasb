@@ -11,6 +11,7 @@ return new class extends Migration
         Schema::create('status_movimentacoes', function (Blueprint $table) {
             $table->id();
             $table->string('nome', 255)->unique();
+            $table->softDeletes();
             $table->timestamps();
         });
     }

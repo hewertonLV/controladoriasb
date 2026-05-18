@@ -89,6 +89,7 @@ final class CompraMovimentacaoService
      *     qtd_fruta_um:numeric-string|float|int|string,
      *     valor_nf_total:numeric-string|float|int|string,
      *     id_frete:int,
+     *     numero_nf_origem?:string|null,
      * }  $input
      */
     public function registrarCompra(array $input): Movimentacao
@@ -140,6 +141,10 @@ final class CompraMovimentacaoService
 
             $valorNfUm = round($valorNfTotal / $qtdUm, 2);
             $valorNfKg = round($valorNfTotal / $qtdKg, 2);
+            $numeroNfOrigem = isset($input['numero_nf_origem']) ? trim((string) $input['numero_nf_origem']) : null;
+            if ($numeroNfOrigem === '') {
+                $numeroNfOrigem = null;
+            }
 
             $co = HistoricoCOUnNg::query()
                 ->where('id_unidade_negocio', $unidade->id)
@@ -222,6 +227,7 @@ final class CompraMovimentacaoService
                 'valor_icms_kg' => $icmsHistorico['valor_icms_kg'],
                 'valor_icms_um' => $icmsHistorico['valor_icms_um'],
                 'categoria_movimentacao_id' => $categoriaId,
+                'numero_nf_origem' => $numeroNfOrigem,
                 'data_movimentacao' => now(),
                 'versao' => 1,
                 'movimentacao_origem_id' => null,

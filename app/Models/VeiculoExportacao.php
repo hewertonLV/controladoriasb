@@ -6,11 +6,13 @@ use App\Models\Concerns\HasExportacaoAssincrona;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 class VeiculoExportacao extends Model
 {
     use HasExportacaoAssincrona;
     use HasFactory;
+    use SoftDeletes;
 
     protected $table = 'veiculo_exportacoes';
 

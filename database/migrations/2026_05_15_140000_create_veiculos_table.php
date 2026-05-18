@@ -19,6 +19,7 @@ return new class extends Migration
 
             $table->string('status', 10)->index();
 
+            $table->softDeletes();
             $table->timestamps();
 
             $table->foreign('id_unidade_negocio')

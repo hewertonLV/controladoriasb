@@ -77,6 +77,7 @@ return new class extends Migration
                 ->cascadeOnUpdate()
                 ->restrictOnDelete();
 
+            $table->softDeletes();
             $table->timestamps();
 
             $table->index(['categoria_movimentacao_id', 'id_fruta']);

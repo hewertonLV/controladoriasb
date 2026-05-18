@@ -13,6 +13,7 @@ return new class extends Migration
             $table->string('id_cigam')->unique();
             $table->string('nome');
             $table->boolean('status')->default(true);
+            $table->softDeletes();
             $table->timestamps();
         });
     }

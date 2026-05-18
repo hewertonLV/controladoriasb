@@ -43,10 +43,11 @@ class VendaMovimentacaoTest extends TestCase
             ->get(route('admin.movimentacoes.vendas.create'))
             ->assertOk()
             ->getContent();
+        $htmlDecodificado = html_entity_decode((string) $html, ENT_QUOTES | ENT_HTML5, 'UTF-8');
 
-        $this->assertStringContainsString($c['unidade']->nome, (string) $html);
-        $this->assertStringContainsString($c['empresa_cliente']->nomeExibicao(), (string) $html);
-        $this->assertStringContainsString($c['unidade_faturamento']->nome, (string) $html);
+        $this->assertStringContainsString($c['unidade']->nome, $htmlDecodificado);
+        $this->assertStringContainsString($c['empresa_cliente']->nomeExibicao(), $htmlDecodificado);
+        $this->assertStringContainsString($c['unidade_faturamento']->nome, $htmlDecodificado);
         $this->assertStringNotContainsString('name="data_emissao"', (string) $html);
     }
 
