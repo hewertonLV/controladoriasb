@@ -4,9 +4,11 @@ namespace App\Models;
 
 use App\Enums\Roles;
 use Database\Factories\UserFactory;
+use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Spatie\Permission\Traits\HasRoles;
@@ -43,6 +45,7 @@ class User extends Authenticatable
         'must_change_password',
         'ativo',
         'theme_settings',
+        'avatar_path',
     ];
 
     /**
@@ -76,6 +79,19 @@ class User extends Authenticatable
             self::defaultThemeSettings(),
             is_array($this->theme_settings) ? $this->theme_settings : [],
         );
+    }
+
+    protected function avatarUrl(): Attribute
+    {
+        return Attribute::get(function (): string {
+            $path = $this->avatar_path;
+
+            if (is_string($path) && $path !== '' && Storage::disk('public')->exists($path)) {
+                return Storage::disk('public')->url($path);
+            }
+
+            return asset('assets/images/users/avatar-1.jpg');
+        });
     }
 
     /**

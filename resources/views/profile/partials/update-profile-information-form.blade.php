@@ -2,9 +2,22 @@
     @csrf
 </form>
 
-<form method="post" action="{{ route('profile.update') }}">
+<form method="post" action="{{ route('profile.update') }}" enctype="multipart/form-data">
     @csrf
     @method('patch')
+
+    @if ($errors->updateProfileInformation->isNotEmpty())
+        <div class="alert alert-danger" role="alert">
+            <strong>Não foi possível salvar:</strong>
+            <ul class="mb-0 mt-2">
+                @foreach ($errors->updateProfileInformation->all() as $message)
+                    <li>{{ $message }}</li>
+                @endforeach
+            </ul>
+        </div>
+    @endif
+
+    @include('profile.partials.update-profile-avatar-fields')
 
     <div class="mb-3">
         <label for="name" class="form-label">Nome</label>

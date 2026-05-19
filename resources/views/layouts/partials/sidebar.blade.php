@@ -31,7 +31,7 @@
             <div class="dropdown-center">
                 <a class="topbar-link dropdown-toggle text-reset drop-arrow-none px-2 d-flex align-items-center justify-content-center"
                    data-bs-toggle="dropdown" data-bs-offset="0,19" type="button" aria-haspopup="false" aria-expanded="false">
-                    <img src="{{ asset('assets/images/users/avatar-1.jpg') }}" width="42" class="rounded-circle me-2 d-flex" alt="user-image">
+                    <x-user-avatar :size="42" class="me-2 d-flex" alt="user-image" />
                     <span class="d-flex flex-column gap-1 sidebar-user-name min-w-0">
                         <h4 class="my-0 fw-bold fs-15 text-truncate sidebar-user-text" title="{{ $sidebarUserName }}">
                             {{ \Illuminate\Support\Str::limit($sidebarUserName, 24) }}

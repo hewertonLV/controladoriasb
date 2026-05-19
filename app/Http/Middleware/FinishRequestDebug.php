@@ -86,9 +86,14 @@ class FinishRequestDebug
         $keys = config('request_debug.redact_input_keys', []);
 
         return collect($request->except($keys))
-            ->map(fn ($value) => is_string($value) && strlen($value) > 500
-                ? substr($value, 0, 500).'…'
-                : $value)
+            ->reject(fn ($value) => $value instanceof \Illuminate\Http\UploadedFile)
+            ->map(function ($value) {
+                if (is_string($value) && strlen($value) > 500) {
+                    return substr($value, 0, 500).'…';
+                }
+
+                return $value;
+            })
             ->all();
     }
 
