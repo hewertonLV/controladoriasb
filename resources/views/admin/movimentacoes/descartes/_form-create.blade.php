@@ -3,7 +3,7 @@
 
     <div class="col-md-6">
         <label for="id_empresa_origem" class="form-label">Unidade de origem <span class="text-danger">*</span></label>
-        <select name="id_empresa_origem" id="id_empresa_origem" class="form-select @error('id_empresa_origem') is-invalid @enderror" required>
+        <select name="id_empresa_origem" id="id_empresa_origem" class="form-select @error('id_empresa_origem') is-invalid @enderror" data-search-select data-placeholder="Selecione ou pesquise a unidade de origem" required>
             <option value="">Selecione…</option>
             @foreach ($empresas_origem as $e)
                 <option value="{{ $e->id }}" @selected(old('id_empresa_origem') == $e->id)>{{ $e->nomeExibicao() }}</option>
@@ -14,7 +14,7 @@
 
     <div class="col-md-8">
         <label for="categoria_descarte_id" class="form-label">Categoria de descarte <span class="text-danger">*</span></label>
-        <select name="categoria_descarte_id" id="categoria_descarte_id" class="form-select @error('categoria_descarte_id') is-invalid @enderror" required>
+        <select name="categoria_descarte_id" id="categoria_descarte_id" class="form-select @error('categoria_descarte_id') is-invalid @enderror" data-search-select data-placeholder="Selecione ou pesquise a categoria" required>
             <option value="">Selecione…</option>
             @foreach ($categorias_descarte as $categoria)
                 <option value="{{ $categoria->id }}" @selected(old('categoria_descarte_id') == $categoria->id)>{{ $categoria->nome }}</option>
@@ -41,7 +41,7 @@
             @foreach ($itens as $i => $item)
                 <div class="row g-2 mb-2" data-item-row>
                     <div class="col-md-7">
-                        <select name="itens[{{ $i }}][id_fruta]" class="form-select @error("itens.$i.id_fruta") is-invalid @enderror" required data-fruta-select>
+                        <select name="itens[{{ $i }}][id_fruta]" class="form-select @error("itens.$i.id_fruta") is-invalid @enderror" required data-fruta-select data-search-select data-placeholder="Selecione ou pesquise a fruta">
                             <option value="">Fruta</option>
                             @foreach ($frutas as $f)
                                 <option value="{{ $f->id }}" data-estoque-origens="{{ implode(',', $f->estoque_origem_empresa_ids ?? []) }}" @selected((string) ($item['id_fruta'] ?? '') === (string) $f->id)>{{ $f->nome }}</option>
@@ -82,7 +82,7 @@
 <template id="descarte-item-template">
     <div class="row g-2 mb-2" data-item-row>
         <div class="col-md-7">
-            <select name="itens[__INDEX__][id_fruta]" class="form-select" required data-fruta-select>
+            <select name="itens[__INDEX__][id_fruta]" class="form-select" required data-fruta-select data-search-select data-placeholder="Selecione ou pesquise a fruta">
                 <option value="">Fruta</option>
                 @foreach ($frutas as $f)
                     <option value="{{ $f->id }}" data-estoque-origens="{{ implode(',', $f->estoque_origem_empresa_ids ?? []) }}">{{ $f->nome }}</option>
@@ -121,6 +121,8 @@
                 if (select.selectedOptions.length && select.selectedOptions[0].disabled) {
                     select.value = '';
                 }
+
+                window.AdminSearchSelect?.refresh(select);
             });
         };
 
@@ -134,12 +136,17 @@
             const index = container.querySelectorAll('[data-item-row]').length;
             container.insertAdjacentHTML('beforeend', template.innerHTML.replaceAll('__INDEX__', String(index)));
             filtrarFrutasPorOrigem();
+            window.AdminSearchSelect?.init(container.lastElementChild);
             refreshRemoveButtons();
         });
 
         container.addEventListener('click', (event) => {
             if (!event.target.matches('[data-remove-item]')) return;
-            event.target.closest('[data-item-row]')?.remove();
+            const row = event.target.closest('[data-item-row]');
+            if (row) {
+                window.AdminSearchSelect?.destroy(row);
+            }
+            row?.remove();
             refreshRemoveButtons();
         });
 

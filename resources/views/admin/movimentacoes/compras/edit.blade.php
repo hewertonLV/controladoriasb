@@ -42,12 +42,21 @@
 
                 <div class="col-md-6">
                     <label for="valor_nf_total" class="form-label">Valor total da nota fiscal <span class="text-danger">*</span></label>
+                    @php
+                        $valorNfTotal = old('valor_nf_total');
+                        if ($valorNfTotal === null) {
+                            $valorNfTotal = number_format((float) $movimentacao->valor_nf_total, 2, ',', '.');
+                        }
+                    @endphp
                     <input type="text"
                            name="valor_nf_total"
                            id="valor_nf_total"
-                           data-mask-money-br
-                           value="{{ old('valor_nf_total', 'R$ ' . number_format((float) $movimentacao->valor_nf_total, 2, ',', '.')) }}"
+                           data-mask-decimal-br-cents
+                           value="{{ $valorNfTotal }}"
                            class="form-control @error('valor_nf_total') is-invalid @enderror"
+                           inputmode="numeric"
+                           autocomplete="off"
+                           placeholder=""
                            required>
                     @error('valor_nf_total')<div class="invalid-feedback">{{ $message }}</div>@enderror
                 </div>
@@ -70,5 +79,5 @@
 @endsection
 
 @push('scripts')
-    @include('admin.movimentacoes.compras._masks')
+    @include('partials.admin.movimentacoes-form-scripts')
 @endpush

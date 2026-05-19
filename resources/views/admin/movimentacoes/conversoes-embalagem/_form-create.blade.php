@@ -9,7 +9,7 @@
 
     <div class="col-md-6">
         <label for="id_empresa_origem" class="form-label">Unidade de origem <span class="text-danger">*</span></label>
-        <select name="id_empresa_origem" id="id_empresa_origem" class="form-select @error('id_empresa_origem') is-invalid @enderror" required>
+        <select name="id_empresa_origem" id="id_empresa_origem" class="form-select @error('id_empresa_origem') is-invalid @enderror" data-search-select data-placeholder="Selecione ou pesquise a unidade de origem" required>
             <option value="">Selecione…</option>
             @foreach ($empresas_origem as $empresa)
                 <option value="{{ $empresa->id }}" @selected((string) old('id_empresa_origem') === (string) $empresa->id)>
@@ -22,7 +22,7 @@
 
     <div class="col-md-6">
         <label for="id_fruta_origem" class="form-label">Fruta que possuo <span class="text-danger">*</span></label>
-        <select name="id_fruta_origem" id="id_fruta_origem" class="form-select @error('id_fruta_origem') is-invalid @enderror" required>
+        <select name="id_fruta_origem" id="id_fruta_origem" class="form-select @error('id_fruta_origem') is-invalid @enderror" data-search-select data-placeholder="Selecione ou pesquise a fruta de origem" required>
             <option value="">Selecione…</option>
             @foreach ($frutas_origem as $fruta)
                 <option
@@ -52,7 +52,7 @@
 
     <div class="col-md-4">
         <label for="id_fruta_destino" class="form-label">Converter para <span class="text-danger">*</span></label>
-        <select name="id_fruta_destino" id="id_fruta_destino" class="form-select @error('id_fruta_destino') is-invalid @enderror" required>
+        <select name="id_fruta_destino" id="id_fruta_destino" class="form-select @error('id_fruta_destino') is-invalid @enderror" data-search-select data-placeholder="Selecione ou pesquise a fruta de destino" required>
             <option value="">Selecione…</option>
             @foreach ($frutas_destino as $fruta)
                 <option
@@ -130,6 +130,8 @@
             if (frutaOrigem.selectedOptions.length && frutaOrigem.selectedOptions[0].disabled) {
                 frutaOrigem.value = '';
             }
+
+            window.AdminSearchSelect?.refresh(frutaOrigem);
         };
 
         const recalcular = () => {

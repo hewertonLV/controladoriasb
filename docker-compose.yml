@@ -4,6 +4,8 @@ services:
     image: facigam-app:latest
     restart: unless-stopped
     container_name: facigam-app
+    environment:
+      TZ: America/Sao_Paulo
     ports:
       - '44432:80'
     volumes:
@@ -24,6 +26,8 @@ services:
     image: facigam-app:latest
     restart: unless-stopped
     container_name: facigam-worker-importacao
+    environment:
+      TZ: America/Sao_Paulo
     # Formato em lista (exec): `php` vira PID 1 — SIGTERM do Docker chega direto ao
     # artisan queue:work (evita shell intermediário atrasando encerramento).
     # `--timeout=900` é intencional: previews Excel/PDF podem exceder 120s; reduzir
@@ -60,6 +64,8 @@ services:
     image: facigam-app:latest
     restart: unless-stopped
     container_name: facigam-worker-exportacao
+    environment:
+      TZ: America/Sao_Paulo
     command:
       - php
       - artisan
@@ -85,6 +91,7 @@ services:
     image: mysql:8.0
     restart: unless-stopped
     container_name: facigam-mysql
+    command: --default-time-zone=-03:00
     ports:
       - '44433:3306'
     environment:

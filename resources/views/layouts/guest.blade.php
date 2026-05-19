@@ -26,7 +26,9 @@
         </div>
     </div>
 
-    @include('layouts.partials.scripts')
+    <script src="{{ asset('assets/js/vendor.min.js') }}"></script>
+    <script src="{{ asset('assets/js/password-toggle.js') }}"></script>
+    @stack('scripts')
 </body>
 
 </html>

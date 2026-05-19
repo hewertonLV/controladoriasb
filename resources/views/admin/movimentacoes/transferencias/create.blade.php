@@ -27,5 +27,5 @@
 @endsection
 
 @push('scripts')
-    @include('admin.movimentacoes.compras._masks')
+    @include('partials.admin.movimentacoes-form-scripts')
 @endpush

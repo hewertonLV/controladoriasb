@@ -16,3 +16,7 @@
         </div>
     </div>
 @endsection
+
+@push('scripts')
+    @include('partials.admin.movimentacoes-form-scripts')
+@endpush

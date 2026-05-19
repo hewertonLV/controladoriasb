@@ -25,7 +25,7 @@
 
                 <div class="col-md-8">
                     <label for="categoria_descarte_id" class="form-label">Categoria de descarte <span class="text-danger">*</span></label>
-                    <select name="categoria_descarte_id" id="categoria_descarte_id" class="form-select @error('categoria_descarte_id') is-invalid @enderror" required>
+                    <select name="categoria_descarte_id" id="categoria_descarte_id" class="form-select @error('categoria_descarte_id') is-invalid @enderror" data-search-select data-placeholder="Selecione ou pesquise a categoria" required>
                         <option value="">Selecione…</option>
                         @foreach ($opcoes['categorias_descarte'] as $categoria)
                             <option value="{{ $categoria->id }}" @selected(old('categoria_descarte_id', $movimentacao->categoria_descarte_id) == $categoria->id)>{{ $categoria->nome }}</option>
@@ -61,5 +61,5 @@
 @endsection
 
 @push('scripts')
-    @include('admin.movimentacoes.compras._masks')
+    @include('partials.admin.movimentacoes-form-scripts')
 @endpush

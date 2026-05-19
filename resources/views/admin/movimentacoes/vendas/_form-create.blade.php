@@ -16,7 +16,7 @@
         </div>
         <div class="col-md-3">
             <label class="form-label">Origem física</label>
-            <select name="id_empresa_origem" class="form-select" required data-venda-origem>
+            <select name="id_empresa_origem" class="form-select" required data-venda-origem data-search-select data-placeholder="Selecione ou pesquise a origem física">
                 <option value="">Selecione</option>
                 @foreach ($opcoes['empresas_origem'] as $empresa)
                     <option value="{{ $empresa->id }}" data-is-hub="{{ $empresa->entidade?->is_hub ? '1' : '0' }}" @selected((int) old('id_empresa_origem', $movimentacao->id_empresa_origem ?? 0) === $empresa->id)>
@@ -27,7 +27,7 @@
         </div>
         <div class="col-md-3">
             <label class="form-label">Cliente destino</label>
-            <select name="id_empresa_destino" class="form-select" required>
+            <select name="id_empresa_destino" class="form-select" required data-search-select data-placeholder="Selecione ou pesquise o cliente">
                 <option value="">Selecione</option>
                 @foreach ($opcoes['empresas_destino_cliente'] as $empresa)
                     <option value="{{ $empresa->id }}" @selected((int) old('id_empresa_destino', $movimentacao->id_empresa_destino ?? 0) === $empresa->id)>
@@ -38,7 +38,7 @@
         </div>
         <div class="col-md-3" data-venda-faturamento-wrapper>
             <label class="form-label">Unidade faturamento</label>
-            <select name="id_unidade_negocio_faturamento" class="form-select" data-venda-faturamento>
+            <select name="id_unidade_negocio_faturamento" class="form-select" data-venda-faturamento data-search-select data-placeholder="Selecione ou pesquise a unidade de faturamento">
                 <option value="">Selecione</option>
                 @foreach ($opcoes['unidades_faturamento'] as $unidade)
                     <option value="{{ $unidade->id }}" @selected((int) old('id_unidade_negocio_faturamento', $movimentacao->id_unidade_negocio_faturamento ?? 0) === $unidade->id)>
@@ -50,7 +50,7 @@
         </div>
         <div class="col-md-3">
             <label class="form-label">Frete</label>
-            <select name="id_frete" class="form-select">
+            <select name="id_frete" class="form-select" data-search-select data-placeholder="Selecione ou pesquise o frete">
                 <option value="">Sem frete</option>
                 @foreach ($opcoes['fretes'] as $frete)
                     <option value="{{ $frete->id }}" @selected((int) old('id_frete', $movimentacao->id_frete ?? 0) === $frete->id)>
@@ -71,7 +71,7 @@
         <div class="row g-3">
             <div class="col-md-4">
                 <label class="form-label">Fruta</label>
-                <select name="id_fruta" class="form-select" required data-fruta-select>
+                <select name="id_fruta" class="form-select" required data-fruta-select data-search-select data-placeholder="Selecione ou pesquise a fruta">
                     @foreach ($opcoes['frutas'] as $fruta)
                         <option value="{{ $fruta->id }}" data-estoque-origens="{{ implode(',', $fruta->estoque_origem_empresa_ids ?? []) }}" @selected((int) old('id_fruta', $movimentacao->id_fruta) === $fruta->id)>{{ $fruta->nome }}</option>
                     @endforeach
@@ -83,7 +83,21 @@
             </div>
             <div class="col-md-3">
                 <label class="form-label">Valor vendido</label>
-                <input name="valor_nf_total" class="form-control money-mask" required value="{{ old('valor_nf_total', number_format((float) $movimentacao->valor_nf_total, 2, ',', '.')) }}">
+                @php
+                    $valorVendido = old('valor_nf_total');
+                    if ($valorVendido === null) {
+                        $valorVendido = number_format((float) $movimentacao->valor_nf_total, 2, ',', '.');
+                    }
+                @endphp
+                <input type="text"
+                       name="valor_nf_total"
+                       class="form-control @error('valor_nf_total') is-invalid @enderror"
+                       data-mask-decimal-br-cents
+                       inputmode="numeric"
+                       autocomplete="off"
+                       placeholder=""
+                       required
+                       value="{{ $valorVendido }}">
             </div>
             <div class="col-md-12">
                 <label class="form-label">Motivo da correção</label>
@@ -104,7 +118,7 @@
             @foreach ($itens as $i => $item)
                 <div class="row g-3 mb-2" data-item-row>
                     <div class="col-md-5">
-                        <select name="itens[{{ $i }}][id_fruta]" class="form-select" required data-fruta-select>
+                        <select name="itens[{{ $i }}][id_fruta]" class="form-select" required data-fruta-select data-search-select data-placeholder="Selecione ou pesquise a fruta">
                             <option value="">Fruta</option>
                             @foreach ($opcoes['frutas'] as $fruta)
                                 <option value="{{ $fruta->id }}" data-estoque-origens="{{ implode(',', $fruta->estoque_origem_empresa_ids ?? []) }}" @selected((int) ($item['id_fruta'] ?? 0) === $fruta->id)>{{ $fruta->nome }}</option>
@@ -115,7 +129,15 @@
                         <input name="itens[{{ $i }}][qtd_fruta_um]" class="form-control" placeholder="Qtd UM" value="{{ $item['qtd_fruta_um'] ?? '' }}" required>
                     </div>
                     <div class="col-md-3">
-                        <input name="itens[{{ $i }}][valor_nf_total]" class="form-control money-mask" placeholder="Valor vendido" value="{{ $item['valor_nf_total'] ?? '' }}" required>
+                        <input type="text"
+                               name="itens[{{ $i }}][valor_nf_total]"
+                               class="form-control @error("itens.$i.valor_nf_total") is-invalid @enderror"
+                               data-mask-decimal-br-cents
+                               inputmode="numeric"
+                               autocomplete="off"
+                               placeholder="R$ total"
+                               value="{{ $item['valor_nf_total'] ?? '' }}"
+                               required>
                     </div>
                     <div class="col-md-1">
                         <button type="button" class="btn btn-outline-danger w-100" data-remove-item aria-label="Remover item">&times;</button>
@@ -135,7 +157,7 @@
     <template id="venda-item-template">
         <div class="row g-3 mb-2" data-item-row>
             <div class="col-md-5">
-                <select name="itens[__INDEX__][id_fruta]" class="form-select" required data-fruta-select>
+                <select name="itens[__INDEX__][id_fruta]" class="form-select" required data-fruta-select data-search-select data-placeholder="Selecione ou pesquise a fruta">
                     <option value="">Fruta</option>
                     @foreach ($opcoes['frutas'] as $fruta)
                         <option value="{{ $fruta->id }}" data-estoque-origens="{{ implode(',', $fruta->estoque_origem_empresa_ids ?? []) }}">{{ $fruta->nome }}</option>
@@ -146,7 +168,14 @@
                 <input name="itens[__INDEX__][qtd_fruta_um]" class="form-control" placeholder="Qtd UM" required>
             </div>
             <div class="col-md-3">
-                <input name="itens[__INDEX__][valor_nf_total]" class="form-control money-mask" placeholder="Valor vendido" required>
+                <input type="text"
+                       name="itens[__INDEX__][valor_nf_total]"
+                       class="form-control"
+                       data-mask-decimal-br-cents
+                       inputmode="numeric"
+                       autocomplete="off"
+                       placeholder="R$ total"
+                       required>
             </div>
             <div class="col-md-1">
                 <button type="button" class="btn btn-outline-danger w-100" data-remove-item aria-label="Remover item">&times;</button>
@@ -176,6 +205,8 @@
             if (!origemEhHub) {
                 faturamento.value = '';
             }
+
+            window.AdminSearchSelect?.refresh(faturamento);
         };
 
         origem.addEventListener('change', atualizarFaturamento);
@@ -196,6 +227,8 @@
                 if (select.selectedOptions.length && select.selectedOptions[0].disabled) {
                     select.value = '';
                 }
+
+                window.AdminSearchSelect?.refresh(select);
             });
         };
 
@@ -219,6 +252,12 @@
             const index = container.querySelectorAll('[data-item-row]').length;
             container.insertAdjacentHTML('beforeend', template.innerHTML.replaceAll('__INDEX__', String(index)));
             filtrarFrutasPorOrigem();
+            if (container.lastElementChild) {
+                window.AdminSearchSelect?.init(container.lastElementChild);
+                if (window.AdminDecimalMask) {
+                    window.AdminDecimalMask.bindCentsIn(container.lastElementChild);
+                }
+            }
             refreshRemoveButtons();
         });
 
@@ -226,7 +265,11 @@
             if (!event.target.matches('[data-remove-item]')) {
                 return;
             }
-            event.target.closest('[data-item-row]')?.remove();
+            const row = event.target.closest('[data-item-row]');
+            if (row) {
+                window.AdminSearchSelect?.destroy(row);
+            }
+            row?.remove();
             refreshRemoveButtons();
         });
 

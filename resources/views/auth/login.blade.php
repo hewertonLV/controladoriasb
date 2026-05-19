@@ -24,18 +24,23 @@
             @enderror
         </div>
 
-        <div class="mb-3">
-            <label class="form-label" for="password">Senha</label>
-            <input type="password" id="password" name="password" required autocomplete="current-password"
-                   class="form-control @error('password') is-invalid @enderror" placeholder="Sua senha">
-            @error('password')
-                <div class="invalid-feedback">{{ $message }}</div>
-            @enderror
-        </div>
+        <x-password-input
+            id="password"
+            name="password"
+            label="Senha"
+            :required="true"
+            autocomplete="current-password"
+            placeholder="Sua senha"
+        />
 
-        <div class="d-flex justify-content-between mb-3">
+        <div class="d-flex justify-content-between align-items-center mb-3">
             <div class="form-check">
-                <input type="checkbox" class="form-check-input" id="remember_me" name="remember">
+                <input type="checkbox"
+                       class="form-check-input"
+                       id="remember_me"
+                       name="remember"
+                       value="1"
+                       @checked(old('remember'))>
                 <label class="form-check-label" for="remember_me">Lembrar-me</label>
             </div>
 
@@ -48,9 +53,4 @@
             <button class="btn btn-primary fw-semibold" type="submit">Entrar</button>
         </div>
     </form>
-
-    <p class="text-muted fs-14 mb-4">
-        Não tem uma conta?
-        <a href="{{ route('register') }}" class="fw-semibold text-danger ms-1">Cadastre-se</a>
-    </p>
 @endsection

@@ -25,7 +25,7 @@
 
                 <div class="col-md-8">
                     <label for="id_empresa_destino" class="form-label">Cliente destino (opcional)</label>
-                    <select name="id_empresa_destino" id="id_empresa_destino" class="form-select @error('id_empresa_destino') is-invalid @enderror">
+                    <select name="id_empresa_destino" id="id_empresa_destino" class="form-select @error('id_empresa_destino') is-invalid @enderror" data-search-select data-placeholder="Selecione ou pesquise o cliente destino">
                         <option value="">—</option>
                         @foreach ($opcoes['empresas_destino_cliente'] as $e)
                             <option value="{{ $e->id }}" @selected(old('id_empresa_destino', $movimentacao->id_empresa_destino) == $e->id)>{{ $e->nomeExibicao() }}</option>
@@ -69,5 +69,5 @@
 @endsection
 
 @push('scripts')
-    @include('admin.movimentacoes.compras._masks')
+    @include('partials.admin.movimentacoes-form-scripts')
 @endpush

@@ -1,5 +1,7 @@
 FROM php:8.3-apache
 
+ENV TZ=America/Sao_Paulo
+
 RUN a2enmod rewrite headers \
     && apt-get update \
     && apt-get install -y --no-install-recommends \

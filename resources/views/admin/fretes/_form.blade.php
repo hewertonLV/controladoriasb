@@ -2,6 +2,38 @@
     /** @var \App\Models\Frete $frete */
     /** @var \Illuminate\Support\Collection<int, \App\Models\Veiculo> $veiculos */
     $criando = ! $frete->exists;
+
+    $valorCampo = old('valor');
+    if ($valorCampo === null) {
+        $valorCampo = $criando ? '' : $frete->valor;
+    }
+
+    $valorFrutaKgCampo = old('valor_fruta_kg');
+    if ($valorFrutaKgCampo === null && ! $criando) {
+        $valorFrutaKgCampo = $frete->valor_fruta_kg;
+    }
+
+    $formatDecimalBrInput = static function (mixed $value): string {
+        if ($value === null || $value === '') {
+            return '';
+        }
+
+        $s = trim((string) $value);
+        if ($s === '') {
+            return '';
+        }
+
+        if (str_contains($s, ',')) {
+            return $s;
+        }
+
+        $num = (float) $s;
+        if ($num <= 0) {
+            return '';
+        }
+
+        return number_format($num, 2, ',', '.');
+    };
 @endphp
 
 <div class="card">
@@ -27,13 +59,15 @@
             </div>
             <div class="col-md-3">
                 <label for="valor" class="form-label">Valor <span class="text-danger">*</span></label>
-                <input type="number"
+                <input type="text"
                        id="valor"
                        name="valor"
-                       value="{{ old('valor', $frete->valor) }}"
+                       value="{{ $formatDecimalBrInput($valorCampo) }}"
                        class="form-control @error('valor') is-invalid @enderror"
-                       min="0"
-                       step="0.01"
+                       data-mask-decimal-br-cents
+                       inputmode="numeric"
+                       autocomplete="off"
+                       placeholder=""
                        required>
                 @error('valor')
                     <div class="invalid-feedback">{{ $message }}</div>
@@ -42,13 +76,15 @@
             @unless ($criando)
                 <div class="col-md-3">
                     <label for="valor_fruta_kg" class="form-label">Valor fruta/kg <span class="text-danger">*</span></label>
-                    <input type="number"
+                    <input type="text"
                            id="valor_fruta_kg"
                            name="valor_fruta_kg"
-                           value="{{ old('valor_fruta_kg', $frete->valor_fruta_kg) }}"
+                           value="{{ $formatDecimalBrInput($valorFrutaKgCampo) }}"
                            class="form-control @error('valor_fruta_kg') is-invalid @enderror"
-                           min="0"
-                           step="0.01"
+                           data-mask-decimal-br-cents
+                           inputmode="numeric"
+                           autocomplete="off"
+                           placeholder=""
                            required>
                     @error('valor_fruta_kg')
                         <div class="invalid-feedback">{{ $message }}</div>
@@ -60,8 +96,10 @@
                 <select id="id_veiculo"
                         name="id_veiculo"
                         class="form-select @error('id_veiculo') is-invalid @enderror"
+                        data-search-select
+                        data-placeholder="Selecione ou pesquise o veículo"
                         required>
-                    <option value="">Selecione...</option>
+                    <option value="">Selecione…</option>
                     @foreach ($veiculos as $veiculo)
                         <option value="{{ $veiculo->id }}"
                             @selected((int) old('id_veiculo', $frete->id_veiculo) === (int) $veiculo->id)>
@@ -80,6 +118,8 @@
                     <select id="status_situacao"
                             name="status_situacao"
                             class="form-select @error('status_situacao') is-invalid @enderror"
+                            data-search-select
+                            data-placeholder="Selecione a situação"
                             required>
                         <option value="ABERTA" @selected(old('status_situacao', $frete->status_situacao) === 'ABERTA')>Aberta</option>
                         <option value="ENCERRADA" @selected(old('status_situacao', $frete->status_situacao) === 'ENCERRADA')>Encerrada</option>
@@ -118,3 +158,7 @@
         </button>
     </div>
 </div>
+
+@push('scripts')
+    @include('partials.admin.movimentacoes-form-scripts')
+@endpush

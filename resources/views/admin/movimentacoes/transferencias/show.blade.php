@@ -74,7 +74,7 @@
                         @csrf
                         <div class="col-md-4">
                             <label class="form-label">Status <span class="text-danger">*</span></label>
-                            <select name="status_recebimento" class="form-select @error('status_recebimento') is-invalid @enderror" data-status-recebimento required>
+                            <select name="status_recebimento" class="form-select @error('status_recebimento') is-invalid @enderror" data-status-recebimento data-search-select data-placeholder="Selecione o status" required>
                                 <option value="">Selecione…</option>
                                 <option value="{{ StatusRecebimentoTransferencia::CONFORME->value }}" @selected(old('status_recebimento') === StatusRecebimentoTransferencia::CONFORME->value)>Conforme</option>
                                 <option value="{{ StatusRecebimentoTransferencia::DIVERGENTE->value }}" @selected(old('status_recebimento') === StatusRecebimentoTransferencia::DIVERGENTE->value)>Divergente</option>
@@ -168,7 +168,7 @@
                                 </div>
                                 <div class="col-12">
                                     <label class="form-label">Frete</label>
-                                    <select name="id_frete" class="form-select">
+                                    <select name="id_frete" class="form-select" data-search-select data-placeholder="Selecione ou pesquise o frete">
                                         <option value="">Manter / sem frete</option>
                                         @foreach (\App\Models\Frete::query()->where('status_situacao', \App\Enums\FreteStatusSituacao::ABERTA->value)->orderBy('nome')->get() as $frete)
                                             <option value="{{ $frete->id }}" @selected((string) old('id_frete') === (string) $frete->id)>{{ $frete->nome }}</option>
@@ -225,5 +225,5 @@
 @endsection
 
 @push('scripts')
-    @include('admin.movimentacoes.compras._masks')
+    @include('partials.admin.movimentacoes-form-scripts')
 @endpush

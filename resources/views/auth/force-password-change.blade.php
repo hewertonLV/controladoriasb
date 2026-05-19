@@ -19,22 +19,24 @@
         @csrf
         @method('PUT')
 
-        <div class="mb-3">
-            <label class="form-label" for="password">Nova senha <span class="text-danger">*</span></label>
-            <input type="password" id="password" name="password" required autofocus autocomplete="new-password"
-                   class="form-control @error('password') is-invalid @enderror"
-                   placeholder="Mínimo 8 caracteres">
-            @error('password')
-                <div class="invalid-feedback">{{ $message }}</div>
-            @enderror
-        </div>
+        <x-password-input
+            id="password"
+            name="password"
+            label='Nova senha <span class="text-danger">*</span>'
+            :required="true"
+            autofocus
+            autocomplete="new-password"
+            placeholder="Mínimo 8 caracteres"
+        />
 
-        <div class="mb-3">
-            <label class="form-label" for="password_confirmation">Confirmar nova senha <span class="text-danger">*</span></label>
-            <input type="password" id="password_confirmation" name="password_confirmation" required autocomplete="new-password"
-                   class="form-control"
-                   placeholder="Repita a nova senha">
-        </div>
+        <x-password-input
+            id="password_confirmation"
+            name="password_confirmation"
+            label='Confirmar nova senha <span class="text-danger">*</span>'
+            :required="true"
+            autocomplete="new-password"
+            placeholder="Repita a nova senha"
+        />
 
         <div class="d-grid gap-2">
             <button class="btn btn-primary fw-semibold" type="submit">

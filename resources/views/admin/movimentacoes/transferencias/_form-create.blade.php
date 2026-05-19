@@ -10,7 +10,7 @@
 
     <div class="col-md-6">
         <label for="id_empresa_origem" class="form-label">Unidade de origem <span class="text-danger">*</span></label>
-        <select name="id_empresa_origem" id="id_empresa_origem" class="form-select @error('id_empresa_origem') is-invalid @enderror" required>
+        <select name="id_empresa_origem" id="id_empresa_origem" class="form-select @error('id_empresa_origem') is-invalid @enderror" data-search-select data-placeholder="Selecione ou pesquise a unidade de origem" required>
             <option value="">Selecione…</option>
             @foreach ($empresas_origem as $empresa)
                 <option value="{{ $empresa->id }}" @selected((string) old('id_empresa_origem') === (string) $empresa->id)>
@@ -23,7 +23,7 @@
 
     <div class="col-md-6">
         <label for="id_empresa_destino" class="form-label">Unidade de destino <span class="text-danger">*</span></label>
-        <select name="id_empresa_destino" id="id_empresa_destino" class="form-select @error('id_empresa_destino') is-invalid @enderror" required>
+        <select name="id_empresa_destino" id="id_empresa_destino" class="form-select @error('id_empresa_destino') is-invalid @enderror" data-search-select data-placeholder="Selecione ou pesquise a unidade de destino" required>
             <option value="">Selecione…</option>
             @foreach ($empresas_destino as $empresa)
                 <option value="{{ $empresa->id }}" @selected((string) old('id_empresa_destino') === (string) $empresa->id)>
@@ -37,7 +37,7 @@
 
     <div class="col-md-6">
         <label for="id_frete" class="form-label">Frete</label>
-        <select name="id_frete" id="id_frete" class="form-select @error('id_frete') is-invalid @enderror">
+        <select name="id_frete" id="id_frete" class="form-select @error('id_frete') is-invalid @enderror" data-search-select data-placeholder="Selecione ou pesquise o frete">
             <option value="">Sem frete (valores zerados)</option>
             @foreach ($fretes as $frete)
                 <option value="{{ $frete->id }}" @selected((string) old('id_frete') === (string) $frete->id)>
@@ -74,7 +74,7 @@
             @foreach ($itens as $i => $item)
                 <div class="row g-2 mb-2" data-item-row>
                     <div class="col-md-7">
-                        <select name="itens[{{ $i }}][id_fruta]" class="form-select @error("itens.$i.id_fruta") is-invalid @enderror" required data-fruta-select>
+                        <select name="itens[{{ $i }}][id_fruta]" class="form-select @error("itens.$i.id_fruta") is-invalid @enderror" required data-fruta-select data-search-select data-placeholder="Selecione ou pesquise a fruta">
                             <option value="">Fruta</option>
                             @foreach ($frutas as $fruta)
                                 <option value="{{ $fruta->id }}" data-estoque-origens="{{ implode(',', $fruta->estoque_origem_empresa_ids ?? []) }}" @selected((string) ($item['id_fruta'] ?? '') === (string) $fruta->id)>
@@ -111,7 +111,7 @@
 <template id="transferencia-item-template">
     <div class="row g-2 mb-2" data-item-row>
         <div class="col-md-7">
-            <select name="itens[__INDEX__][id_fruta]" class="form-select" required data-fruta-select>
+            <select name="itens[__INDEX__][id_fruta]" class="form-select" required data-fruta-select data-search-select data-placeholder="Selecione ou pesquise a fruta">
                 <option value="">Fruta</option>
                 @foreach ($frutas as $fruta)
                     <option value="{{ $fruta->id }}" data-estoque-origens="{{ implode(',', $fruta->estoque_origem_empresa_ids ?? []) }}">{{ $fruta->nome }} ({{ $fruta->unidade_medicao }}) — {{ $fruta->kg_por_unidade_medicao }} kg/UM</option>
@@ -150,6 +150,8 @@
                 if (select.selectedOptions.length && select.selectedOptions[0].disabled) {
                     select.value = '';
                 }
+
+                window.AdminSearchSelect?.refresh(select);
             });
         };
 
@@ -163,12 +165,17 @@
             const index = container.querySelectorAll('[data-item-row]').length;
             container.insertAdjacentHTML('beforeend', template.innerHTML.replaceAll('__INDEX__', String(index)));
             filtrarFrutasPorOrigem();
+            window.AdminSearchSelect?.init(container.lastElementChild);
             refreshRemoveButtons();
         });
 
         container.addEventListener('click', (event) => {
             if (!event.target.matches('[data-remove-item]')) return;
-            event.target.closest('[data-item-row]')?.remove();
+            const row = event.target.closest('[data-item-row]');
+            if (row) {
+                window.AdminSearchSelect?.destroy(row);
+            }
+            row?.remove();
             refreshRemoveButtons();
         });
 

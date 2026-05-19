@@ -48,6 +48,23 @@ class AuthenticationTest extends TestCase
         $this->assertGuest();
     }
 
+    public function test_users_can_login_with_remember_me(): void
+    {
+        $user = User::factory()->create();
+
+        $response = $this->post('/login', [
+            'email' => $user->email,
+            'password' => 'password',
+            'remember' => '1',
+        ]);
+
+        $response->assertRedirect(route('dashboard', absolute: false));
+        $this->assertAuthenticated();
+
+        $recaller = $this->app['auth']->getRecallerName();
+        $response->assertCookie($recaller);
+    }
+
     public function test_users_can_logout(): void
     {
         $user = User::factory()->create();

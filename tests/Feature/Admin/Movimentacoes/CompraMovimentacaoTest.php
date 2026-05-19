@@ -569,8 +569,8 @@ class CompraMovimentacaoTest extends TestCase
         $this->assertStringContainsString((string) $frete->id, (string) $html);
         $this->assertStringNotContainsString($nomeFreteEncerrado, (string) $html);
         $this->assertStringNotContainsString($nomeFrutaSemKg, (string) $html);
-        $this->assertStringContainsString('data-compra-search-select', (string) $html);
-        $this->assertStringContainsString('select2({', (string) $html);
+        $this->assertStringContainsString('data-search-select', (string) $html);
+        $this->assertStringContainsString('admin-search-select.js', (string) $html);
         $this->assertStringContainsString('Selecione ou pesquise a fornecedora', (string) $html);
         $this->assertStringContainsString('Selecione ou pesquise a fruta', (string) $html);
     }

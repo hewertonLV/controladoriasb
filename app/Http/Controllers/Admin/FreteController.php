@@ -42,8 +42,6 @@ class FreteController extends Controller
         return view('admin.fretes.create', [
             'frete' => new Frete([
                 'status_situacao' => FreteStatusSituacao::ABERTA->value,
-                'valor' => '0.00',
-                'valor_fruta_kg' => '0.00',
             ]),
             'veiculos' => $this->veiculosAtivos(),
         ]);

@@ -74,6 +74,38 @@ class FreteTest extends FreteTestCase
         ]);
     }
 
+    public function test_cadastro_aceita_valor_formatado_com_milhar_pt_br(): void
+    {
+        $veiculo = Veiculo::factory()->create();
+
+        $this->actingAs($this->userWithPermissions([Permissions::FRETES_CRIAR]))
+            ->post(route('admin.fretes.store'), [
+                'nome' => 'frete milhar',
+                'valor' => '1.500,75',
+                'id_veiculo' => $veiculo->id,
+            ])
+            ->assertRedirect(route('admin.fretes.index'))
+            ->assertSessionHasNoErrors();
+
+        $this->assertDatabaseHas('fretes', [
+            'nome' => 'FRETE MILHAR',
+            'valor' => '1500.75',
+            'valor_fruta_kg' => '1500.75',
+        ]);
+    }
+
+    public function test_formulario_de_criacao_exibe_mascara_decimal_no_valor(): void
+    {
+        Veiculo::factory()->create();
+
+        $this->actingAs($this->userWithPermissions([Permissions::FRETES_CRIAR]))
+            ->get(route('admin.fretes.create'))
+            ->assertOk()
+            ->assertSee('data-mask-decimal-br-cents', false)
+            ->assertSee('admin-decimal-mask.js', false)
+            ->assertDontSee('value="0,00"', false);
+    }
+
     public function test_cadastro_nao_exige_status_nem_valor_fruta_kg(): void
     {
         $veiculo = Veiculo::factory()->create();
@@ -107,7 +139,10 @@ class FreteTest extends FreteTestCase
             ->assertOk()
             ->assertDontSee('name="status_situacao"', false)
             ->assertDontSee('name="valor_fruta_kg"', false)
-            ->assertSee('será criado como', false);
+            ->assertSee('será criado como', false)
+            ->assertSee('data-search-select', false)
+            ->assertSee('admin-search-select.js', false)
+            ->assertSee('Selecione ou pesquise o veículo', false);
     }
 
     public function test_nome_duplicado_falha_na_validacao(): void

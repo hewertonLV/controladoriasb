@@ -45,7 +45,7 @@ trait ValidatesFreteAttributes
 
     protected function prepareFreteForValidation(bool $criando = false): void
     {
-        $valor = TextoCadastro::normalizarDecimalNaoNegativo($this->input('valor'));
+        $valor = TextoCadastro::normalizarValorMonetarioBrasileiro($this->input('valor'));
 
         /** @noinspection PhpUndefinedMethodInspection */
         $this->merge([
@@ -60,7 +60,7 @@ trait ValidatesFreteAttributes
                 : mb_strtoupper(trim((string) ($this->input('status_situacao') ?: FreteStatusSituacao::ABERTA->value)), 'UTF-8'),
             'valor_fruta_kg' => $criando
                 ? $valor
-                : TextoCadastro::normalizarDecimalNaoNegativo($this->input('valor_fruta_kg')),
+                : TextoCadastro::normalizarValorMonetarioBrasileiro($this->input('valor_fruta_kg')),
         ]);
     }
 }

@@ -12,7 +12,7 @@
     <div class="row g-3">
         <div class="col-md-6">
             <label class="form-label">Venda original</label>
-            <select name="movimentacao_venda_origem_id" class="form-select" required>
+            <select name="movimentacao_venda_origem_id" class="form-select" required data-search-select data-placeholder="Selecione ou pesquise a venda original">
                 <option value="">Selecione</option>
                 @foreach ($opcoes['vendas'] as $venda)
                     <option value="{{ $venda->id }}" @selected((int) old('movimentacao_venda_origem_id', $movimentacao->movimentacao_venda_origem_id ?? 0) === $venda->id)>
@@ -24,7 +24,7 @@
         </div>
         <div class="col-md-3">
             <label class="form-label">Tipo</label>
-            <select name="tipo_devolucao" class="form-select" required>
+            <select name="tipo_devolucao" class="form-select" required data-search-select data-placeholder="Selecione o tipo de devolução">
                 <option value="">Selecione</option>
                 @foreach ($opcoes['tipos'] as $tipo)
                     <option value="{{ $tipo->value }}" @selected(old('tipo_devolucao', $movimentacao->tipo_devolucao ?? '') === $tipo->value)>
@@ -39,7 +39,7 @@
         </div>
         <div class="col-md-4">
             <label class="form-label">Unidade física de retorno</label>
-            <select name="id_unidade_negocio_retorno" class="form-select">
+            <select name="id_unidade_negocio_retorno" class="form-select" data-search-select data-placeholder="Selecione ou pesquise a unidade de retorno">
                 <option value="">Obrigatória quando há retorno ao estoque</option>
                 @foreach ($opcoes['unidades_retorno'] as $unidade)
                     <option value="{{ $unidade->id }}" @selected((int) old('id_unidade_negocio_retorno', $movimentacao->id_unidade_negocio_retorno ?? 0) === $unidade->id)>
