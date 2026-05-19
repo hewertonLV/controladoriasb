@@ -24,6 +24,7 @@ use App\Models\MovimentacaoEstoque;
 use App\Models\MovimentacaoHistorico;
 use App\Models\StatusMovimentacao;
 use App\Models\UnidadeNegocio;
+use App\Services\Frutas\FrutaIcmsSyncService;
 use App\Services\UnidadesNegocio\HistoricoCustoOperacionalUnidadeNegocioService;
 use Database\Seeders\CategoriaDescarteSeeder;
 use Database\Seeders\CategoriaMovimentacaoSeeder;
@@ -149,10 +150,14 @@ class FluxoIntegradoMovimentacoesComCustosEImpostosTest extends TestCase
 
         // 14. Alterar ICMS da fruta. Não há tabela histórica de ICMS hoje; o teste documenta isso e valida o valor salvo nas movimentações.
         $this->evento(function () use ($c): void {
-            $c['fruta']->forceFill([
-                'icms_na_compra' => 3,
-                'icms_ex_compra' => 0,
-            ])->save();
+            app(FrutaIcmsSyncService::class)->sync($c['fruta'], [
+                Estado::ID_CEARA => [
+                    'entrada_nacional' => 3,
+                    'entrada_externo' => 0,
+                    'entrada_um' => FrutaUmIcms::KG->value,
+                    'saida_venda' => '12.00',
+                ],
+            ]);
         });
 
         // 15. Compra Unidade A após ICMS novo.
@@ -360,12 +365,13 @@ class FluxoIntegradoMovimentacoesComCustosEImpostosTest extends TestCase
 
         $cliente = Cliente::factory()->create(['id_unidade_negocio' => $unidadeA->id]);
 
-        $fruta = Fruta::factory()->create([
+        $fruta = Fruta::factory()->comIcmsCeara([
+            'entrada_nacional' => 1,
+            'entrada_externo' => 0,
+            'entrada_um' => FrutaUmIcms::KG->value,
+        ])->create([
             'nome' => 'BANANA STRESS '.uniqid(),
             'kg_por_unidade_medicao' => 20,
-            'icms_na_compra' => 1,
-            'icms_ex_compra' => 0,
-            'um_icms' => FrutaUmIcms::KG->value,
         ]);
 
         return [

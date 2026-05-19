@@ -19,7 +19,14 @@ class EmpresaExportacaoController extends Controller
 
     public function iniciar(Request $request): JsonResponse
     {
-        $filtros = $this->empresaQuery->normalizarFiltros($request->only(['search', 'per_page', 'status', 'sort', 'direction']));
+        $filtros = $this->empresaQuery->normalizarFiltros($request->only([
+            'search',
+            'per_page',
+            'status',
+            'tipo_entidade',
+            'sort',
+            'direction',
+        ]));
 
         $exportacao = EmpresaExportacao::create([
             'uuid' => (string) Str::uuid(),

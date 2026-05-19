@@ -24,33 +24,12 @@ class GrupoController extends Controller
     public function index(Request $request): View
     {
         $filtros = $this->grupoQuery->filtrosFromRequest($request);
-        $query = $this->grupoQuery->aplicarFiltros(Grupo::query(), $filtros);
+        $grupos = $this->grupoQuery->aplicarFiltros(Grupo::query(), $filtros)->get();
 
-        if ($filtros['per_page'] === 'all') {
-            $total = (clone $query)->toBase()->count();
-            $resultados = $query->get();
-            $grupos = $resultados;
-            $exibindo = $resultados->count();
-        } else {
-            $paginator = $query->paginate((int) $filtros['per_page'])->appends($filtros);
-            $grupos = $paginator;
-            $total = $paginator->total();
-            $exibindo = count((array) $paginator->items());
-        }
-
-        $payload = [
+        return view('admin.grupos.index', [
             'grupos' => $grupos,
             'filtros' => $filtros,
-            'perPageOptions' => GrupoQuery::PER_PAGE_OPTIONS,
-            'total' => $total,
-            'exibindo' => $exibindo,
-        ];
-
-        if ($request->ajax()) {
-            return view('admin.grupos._table', $payload);
-        }
-
-        return view('admin.grupos.index', $payload);
+        ]);
     }
 
     public function create(): View

@@ -13,10 +13,6 @@ class FrutaAuditoriaService
         'nome',
         'unidade_medicao',
         'kg_por_unidade_medicao',
-        'icms_ex_compra',
-        'icms_na_compra',
-        'um_icms',
-        'icms_venda',
     ];
 
     public function registrarCriacao(Fruta $fruta, ?User $user, string $origem): FrutaHistorico
@@ -74,15 +70,34 @@ class FrutaAuditoriaService
      */
     public function snapshot(Fruta $fruta): array
     {
+        $fruta->loadMissing(['icms.estado']);
+
+        $icms = [];
+        foreach ($fruta->icms as $registro) {
+            $uf = $registro->estado?->abreviacao ?? (string) $registro->id_estado;
+            $chave = $uf.'_'.$registro->operacao->value;
+            $icms[$chave] = [
+                'estado' => $registro->estado?->nome,
+                'operacao' => $registro->operacao->value,
+                'icms_externo' => $this->formatDecimal($registro->icms_externo),
+                'um_icms_externo' => (string) $registro->um_icms_externo,
+                'icms_nacional' => $this->formatDecimal($registro->icms_nacional),
+                'um_icms_nacional' => (string) $registro->um_icms_nacional,
+                'icms_venda_importada' => $this->formatDecimal($registro->icms_venda_importada),
+                'um_icms_venda_importada' => (string) $registro->um_icms_venda_importada,
+                'icms_venda_nacional' => $this->formatDecimal($registro->icms_venda_nacional),
+                'um_icms_venda_nacional' => (string) $registro->um_icms_venda_nacional,
+            ];
+        }
+
+        ksort($icms);
+
         return [
             'id_cigam' => $fruta->id_cigam,
             'nome' => $fruta->nome,
             'unidade_medicao' => $fruta->unidade_medicao,
             'kg_por_unidade_medicao' => $this->formatKg($fruta->kg_por_unidade_medicao),
-            'icms_ex_compra' => $this->formatDecimal($fruta->icms_ex_compra),
-            'icms_na_compra' => $this->formatDecimal($fruta->icms_na_compra),
-            'um_icms' => (string) $fruta->um_icms,
-            'icms_venda' => $this->formatDecimal($fruta->icms_venda),
+            'icms_por_estado' => $icms,
         ];
     }
 
@@ -102,9 +117,6 @@ class FrutaAuditoriaService
             if ($campo === 'kg_por_unidade_medicao') {
                 $a = $this->formatKg($valorAntes);
                 $b = $this->formatKg($valorDepois);
-            } elseif (in_array($campo, ['icms_ex_compra', 'icms_na_compra', 'icms_venda'], true)) {
-                $a = $this->formatDecimal($valorAntes);
-                $b = $this->formatDecimal($valorDepois);
             } else {
                 $a = (string) ($valorAntes ?? '');
                 $b = (string) ($valorDepois ?? '');
@@ -117,6 +129,17 @@ class FrutaAuditoriaService
                     'depois' => $valorDepois,
                 ];
             }
+        }
+
+        $icmsAntes = $antes['icms_por_estado'] ?? [];
+        $icmsDepois = $depois['icms_por_estado'] ?? [];
+
+        if ($icmsAntes !== $icmsDepois) {
+            $alteracoes[] = [
+                'campo' => 'icms_por_estado',
+                'antes' => $icmsAntes,
+                'depois' => $icmsDepois,
+            ];
         }
 
         return $alteracoes;

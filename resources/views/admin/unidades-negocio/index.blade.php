@@ -13,17 +13,29 @@
         />
     @endcan
 
-    <x-admin.data-table
+    <x-admin.datatable
         title="Unidades de Negócio SB - CONTROLADORIA"
         subtitle="Cadastro mestre de unidades de negócio (CIGAM, estado ICMS, razão social, nome, CPF/CNPJ, custo operacional e flag de estoque)."
-        search-placeholder="Pesquisar por ID CIGAM, razão social, nome, CPF/CNPJ ou estado..."
-        :endpoint="route('admin.unidades-negocio.index')"
-        :current-search="$filtros['search'] ?? ''"
-        :current-per-page="$filtros['per_page'] ?? 20"
-        :current-sort="$filtros['sort'] ?? 'nome'"
-        :current-direction="$filtros['direction'] ?? 'asc'"
-        :per-page-options="$perPageOptions"
-        container-id="unidades-negocio-table"
+        table-id="unidades-negocio-datatable"
+        root-id="unidades-negocio-table-root"
+        print-title="Unidades de Negócio"
+        entity-label="unidades"
+        entity-label-singular="unidade"
+        :order="[2, 'asc']"
+        :sort-column-map="[
+            0 => 'id_cigam',
+            1 => 'estado',
+            2 => 'nome',
+            3 => 'cpf_cnpj',
+            4 => 'custo_operacional',
+            5 => 'possui_estoque',
+            6 => 'status',
+            7 => 'created_at',
+        ]"
+        :column-defs="[
+            ['targets' => -1, 'orderable' => false, 'searchable' => false],
+            ['targets' => [0, 1, 3, 4, 5, 6, 7], 'className' => 'text-nowrap'],
+        ]"
     >
         <x-slot:actions>
             @can('unidades-negocio.exportar-pdf')
@@ -48,26 +60,38 @@
         </x-slot:actions>
 
         <x-slot:filters>
-            <div class="col-md-2">
+            <div class="col-md-3">
                 <label class="form-label small text-muted mb-1" for="unidades-negocio-estado">Estado (ICMS)</label>
-                <select id="unidades-negocio-estado" name="id_estado" class="form-select" data-table-filter>
+                <select id="unidades-negocio-estado"
+                        name="id_estado"
+                        class="form-select form-select-sm"
+                        data-table-filter
+                        data-datatable-row-filter>
                     <option value="">Todos</option>
                     @foreach ($estados as $estado)
                         <option value="{{ $estado->id }}" @selected((string) ($filtros['id_estado'] ?? '') === (string) $estado->id)>{{ $estado->nome }}</option>
                     @endforeach
                 </select>
             </div>
-            <div class="col-md-2">
+            <div class="col-md-3">
                 <label class="form-label small text-muted mb-1" for="unidades-negocio-status">Status</label>
-                <select id="unidades-negocio-status" name="status" class="form-select" data-table-filter>
+                <select id="unidades-negocio-status"
+                        name="status"
+                        class="form-select form-select-sm"
+                        data-table-filter
+                        data-datatable-row-filter>
                     <option value="">Todos</option>
                     <option value="1" @selected(($filtros['status'] ?? null) === '1')>Ativas</option>
                     <option value="0" @selected(($filtros['status'] ?? null) === '0')>Inativas</option>
                 </select>
             </div>
-            <div class="col-md-2">
+            <div class="col-md-3">
                 <label class="form-label small text-muted mb-1" for="unidades-negocio-possui-estoque">Estoque</label>
-                <select id="unidades-negocio-possui-estoque" name="possui_estoque" class="form-select" data-table-filter>
+                <select id="unidades-negocio-possui-estoque"
+                        name="possui_estoque"
+                        class="form-select form-select-sm"
+                        data-table-filter
+                        data-datatable-row-filter>
                     <option value="">Todos</option>
                     <option value="1" @selected(($filtros['possui_estoque'] ?? null) === '1')>Com estoque</option>
                     <option value="0" @selected(($filtros['possui_estoque'] ?? null) === '0')>Sem estoque</option>
@@ -77,10 +101,6 @@
 
         @include('admin.unidades-negocio._table', [
             'unidadesNegocio' => $unidadesNegocio,
-            'filtros' => $filtros,
-            'total' => $total,
-            'exibindo' => $exibindo,
-            'estados' => $estados,
         ])
-    </x-admin.data-table>
+    </x-admin.datatable>
 @endsection

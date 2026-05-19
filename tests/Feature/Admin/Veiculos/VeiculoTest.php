@@ -27,18 +27,16 @@ class VeiculoTest extends VeiculoTestCase
             ->assertOk();
     }
 
-    public function test_listagem_ajax_retorna_partial_da_tabela(): void
+    public function test_listagem_usa_datatable_com_registros(): void
     {
-        Veiculo::factory()->create(['nome' => 'AJAX VEICULO']);
+        Veiculo::factory()->create(['nome' => 'VEICULO DATATABLE']);
 
         $this->actingAs($this->veiculosManager())
-            ->withHeaders([
-                'X-Requested-With' => 'XMLHttpRequest',
-                'Accept' => 'text/html',
-            ])
             ->get(route('admin.veiculos.index'))
             ->assertOk()
-            ->assertSee('AJAX VEICULO', false);
+            ->assertSee('VEICULO DATATABLE', false)
+            ->assertSee('id="veiculos-datatable"', false)
+            ->assertSee('data-admin-datatable', false);
     }
 
     public function test_cadastro_com_sucesso_normaliza_campos(): void

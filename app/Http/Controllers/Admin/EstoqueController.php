@@ -24,11 +24,9 @@ class EstoqueController extends Controller
 
     public function index(): View
     {
-        $payload = [
-            'unidadesCards' => $this->unidadesCards(),
-        ];
-
-        return view('admin.estoques.index', $payload);
+        return view('admin.estoques.index', [
+            'unidades' => $this->unidadesParaListagem(),
+        ]);
     }
 
     public function unidade(UnidadeNegocio $unidadeNegocio): View
@@ -132,7 +130,7 @@ class EstoqueController extends Controller
             ->with('success', 'Movimentação registrada com sucesso.');
     }
 
-    private function unidadesCards()
+    private function unidadesParaListagem()
     {
         return UnidadeNegocio::query()
             ->leftJoin('estoques', 'estoques.id_unidade_negocio', '=', 'unidades_negocio.id')

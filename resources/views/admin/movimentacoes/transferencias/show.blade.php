@@ -200,7 +200,13 @@
                     <div class="card border-danger">
                         <div class="card-header bg-danger-subtle"><h5 class="mb-0">Cancelar transferência</h5></div>
                         <div class="card-body">
-                            <form method="POST" action="{{ route('admin.movimentacoes.transferencias.cancelar', ['transferenciaOrigem' => $anchor]) }}" class="row g-2" onsubmit="return confirm('Cancelar esta transferência e estornar a origem?');">
+                            <form method="POST"
+                                  action="{{ route('admin.movimentacoes.transferencias.cancelar', ['transferenciaOrigem' => $anchor]) }}"
+                                  class="row g-2"
+                                  data-confirm="Cancelar esta transferência e estornar a origem?"
+                                  data-confirm-title="Cancelar transferência"
+                                  data-confirm-variant="danger"
+                                  data-confirm-btn="Cancelar">
                                 @csrf
                                 <div class="col-12">
                                     <label class="form-label">Motivo</label>

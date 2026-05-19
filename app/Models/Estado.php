@@ -12,6 +12,7 @@ use Illuminate\Validation\ValidationException;
 
 /**
  * @property int $id
+ * @property string $id_cigam
  * @property string $nome
  * @property string $abreviacao
  * @property string|null $descricao
@@ -35,6 +36,7 @@ class Estado extends Model
      * @var list<string>
      */
     protected $fillable = [
+        'id_cigam',
         'nome',
         'abreviacao',
         'descricao',
@@ -45,6 +47,7 @@ class Estado extends Model
      */
     protected $casts = [
         'id' => 'integer',
+        'id_cigam' => 'string',
         'nome' => 'string',
         'abreviacao' => 'string',
         'descricao' => 'string',
@@ -55,6 +58,13 @@ class Estado extends Model
         static::saving(function (self $estado): void {
             $estado->validarCadastro();
         });
+    }
+
+    protected function setIdCigamAttribute(mixed $value): void
+    {
+        $this->attributes['id_cigam'] = TextoCadastro::normalizarIdCigamAteSeisDigitos(
+            $value === null ? '' : (string) $value,
+        );
     }
 
     protected function setNomeAttribute(mixed $value): void
@@ -112,8 +122,15 @@ class Estado extends Model
     private function validarCadastro(): void
     {
         $erros = [];
+        $idCigam = (string) ($this->attributes['id_cigam'] ?? '');
         $nome = (string) ($this->attributes['nome'] ?? '');
         $abreviacao = (string) ($this->attributes['abreviacao'] ?? '');
+
+        if ($idCigam === '') {
+            $erros['id_cigam'][] = 'O ID CIGAM é obrigatório.';
+        } elseif (strlen($idCigam) > 6) {
+            $erros['id_cigam'][] = 'O ID CIGAM deve ter no máximo 6 dígitos numéricos.';
+        }
 
         if ($nome === '') {
             $erros['nome'][] = 'O nome é obrigatório.';
@@ -123,6 +140,10 @@ class Estado extends Model
             $erros['abreviacao'][] = 'A abreviação é obrigatória.';
         } elseif (mb_strlen($abreviacao, 'UTF-8') !== 2) {
             $erros['abreviacao'][] = 'A abreviação deve ter exatamente 2 caracteres.';
+        }
+
+        if ($idCigam !== '' && $this->existeOutroRegistroCom('id_cigam', $idCigam)) {
+            $erros['id_cigam'][] = 'O ID CIGAM já está em uso.';
         }
 
         if ($nome !== '' && $this->existeOutroRegistroCom('nome', $nome)) {
@@ -141,9 +162,30 @@ class Estado extends Model
     private function existeOutroRegistroCom(string $campo, string $valor): bool
     {
         return self::query()
+            ->whereNull('deleted_at')
             ->where($campo, $valor)
             ->when($this->exists, fn ($query) => $query->whereKeyNot($this->getKey()))
             ->exists();
+    }
+
+    public function estaAtivo(): bool
+    {
+        return ! $this->trashed();
+    }
+
+    public function possuiVinculosAtivos(): bool
+    {
+        return $this->unidadesNegocio()->exists()
+            || $this->fornecedores()->exists()
+            || $this->frutasIcms()->exists();
+    }
+
+    /**
+     * @return HasMany<FrutaIcms, $this>
+     */
+    public function frutasIcms(): HasMany
+    {
+        return $this->hasMany(FrutaIcms::class, 'id_estado');
     }
 
     /**

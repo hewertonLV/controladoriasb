@@ -28,18 +28,18 @@ class UnidadeNegocioTest extends UnidadeNegocioTestCase
             ->assertOk();
     }
 
-    public function test_listagem_ajax_retorna_partial_da_tabela(): void
+    public function test_listagem_usa_datatable_com_registros(): void
     {
-        UnidadeNegocio::factory()->create(['nome' => 'AJAX UNIDADE']);
+        UnidadeNegocio::factory()->create(['nome' => 'UNIDADE DATATABLE']);
 
         $this->actingAs($this->unidadesNegocioManager())
-            ->withHeaders([
-                'X-Requested-With' => 'XMLHttpRequest',
-                'Accept' => 'text/html',
-            ])
             ->get(route('admin.unidades-negocio.index'))
             ->assertOk()
-            ->assertSee('AJAX UNIDADE', false);
+            ->assertSee('UNIDADE DATATABLE', false)
+            ->assertSee('id="unidades-negocio-datatable"', false)
+            ->assertSee('data-admin-datatable', false)
+            ->assertSee('id="adminConfirmModal"', false)
+            ->assertSee('data-confirm-variant="danger"', false);
     }
 
     public function test_cadastro_com_sucesso_normaliza_campos(): void

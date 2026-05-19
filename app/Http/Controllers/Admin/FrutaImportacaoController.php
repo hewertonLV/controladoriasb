@@ -183,10 +183,6 @@ class FrutaImportacaoController extends Controller
                         'nome' => $dados['nome'],
                         'unidade_medicao' => $dados['unidade_medicao'],
                         'kg_por_unidade_medicao' => $dados['kg_por_unidade_medicao'],
-                        'icms_ex_compra' => $dados['icms_ex_compra'],
-                        'icms_na_compra' => $dados['icms_na_compra'],
-                        'um_icms' => $dados['um_icms'],
-                        'icms_venda' => $dados['icms_venda'],
                     ]);
 
                     $this->auditoria->registrarCriacao(
@@ -233,13 +229,9 @@ class FrutaImportacaoController extends Controller
                         'nome' => $dados['nome'],
                         'unidade_medicao' => $dados['unidade_medicao'],
                         'kg_por_unidade_medicao' => $dados['kg_por_unidade_medicao'],
-                        'icms_ex_compra' => $dados['icms_ex_compra'],
-                        'icms_na_compra' => $dados['icms_na_compra'],
-                        'um_icms' => $dados['um_icms'],
-                        'icms_venda' => $dados['icms_venda'],
                     ]);
 
-                    $depois = $this->auditoria->snapshot($fruta->fresh());
+                    $depois = $this->auditoria->snapshot($fruta);
 
                     $this->auditoria->registrarAtualizacao(
                         $fruta,

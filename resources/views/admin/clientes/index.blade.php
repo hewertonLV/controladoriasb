@@ -13,17 +13,27 @@
         />
     @endcan
 
-    <x-admin.data-table
+    <x-admin.datatable
         title="Clientes"
         subtitle="Cadastro mestre de clientes (CIGAM + razão social + fantasia + CPF/CNPJ)."
-        search-placeholder="Pesquisar por ID CIGAM, razão social, fantasia ou CPF/CNPJ..."
-        :endpoint="route('admin.clientes.index')"
-        :current-search="$filtros['search'] ?? ''"
-        :current-per-page="$filtros['per_page'] ?? 20"
-        :current-sort="$filtros['sort'] ?? 'razao_social'"
-        :current-direction="$filtros['direction'] ?? 'asc'"
-        :per-page-options="$perPageOptions"
-        container-id="clientes-table"
+        table-id="clientes-datatable"
+        root-id="clientes-table-root"
+        print-title="Clientes"
+        entity-label="clientes"
+        entity-label-singular="cliente"
+        :order="[1, 'asc']"
+        :sort-column-map="[
+            0 => 'id_cigam',
+            1 => 'fantasia',
+            2 => 'cnpj_cpf',
+            5 => 'desconto_nf',
+            6 => 'created_at',
+        ]"
+        :column-defs="[
+            ['targets' => -1, 'orderable' => false, 'searchable' => false],
+            ['targets' => [3, 4], 'orderable' => false],
+            ['targets' => [0, 1, 2, 5, 6], 'className' => 'text-nowrap'],
+        ]"
     >
         <x-slot:actions>
             @can('clientes.exportar-pdf')
@@ -49,9 +59,6 @@
 
         @include('admin.clientes._table', [
             'clientes' => $clientes,
-            'filtros' => $filtros,
-            'total' => $total,
-            'exibindo' => $exibindo,
         ])
-    </x-admin.data-table>
+    </x-admin.datatable>
 @endsection

@@ -396,11 +396,12 @@ class FluxoIntegradoMovimentacoesTest extends TestCase
         $unidadeB = $this->criarUnidadeComCustoZero(Estado::ID_PERNAMBUCO);
         $cliente = Cliente::factory()->create();
 
-        $fruta = Fruta::factory()->create([
+        $fruta = Fruta::factory()->comIcmsCeara([
+            'entrada_nacional' => 0,
+            'entrada_externo' => 0,
+            'entrada_um' => FrutaUmIcms::KG->value,
+        ])->create([
             'kg_por_unidade_medicao' => 10,
-            'icms_na_compra' => 0,
-            'icms_ex_compra' => 0,
-            'um_icms' => FrutaUmIcms::KG->value,
         ]);
 
         return [

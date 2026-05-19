@@ -21,7 +21,15 @@ class UnidadeNegocioExportacaoController extends Controller
 
     public function iniciar(Request $request): JsonResponse
     {
-        $filtros = $this->unidadeNegocioQuery->normalizarFiltros($request->only(['search', 'per_page', 'status', 'possui_estoque', 'sort', 'direction']));
+        $filtros = $this->unidadeNegocioQuery->normalizarFiltros($request->only([
+            'search',
+            'per_page',
+            'status',
+            'possui_estoque',
+            'id_estado',
+            'sort',
+            'direction',
+        ]));
 
         $exportacao = UnidadeNegocioExportacao::create([
             'uuid' => (string) Str::uuid(),

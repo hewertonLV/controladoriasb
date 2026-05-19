@@ -1,21 +1,19 @@
 @php
-    use Illuminate\Contracts\Pagination\LengthAwarePaginator;
-    $isPaginator = $empresas instanceof LengthAwarePaginator;
-    $linhas = $isPaginator ? $empresas->items() : $empresas;
+    /** @var \Illuminate\Support\Collection<int, \App\Models\Empresa>|\Illuminate\Database\Eloquent\Collection<int, \App\Models\Empresa> $empresas */
+    $linhas = $empresas;
 @endphp
 
-<div class="card-body p-0">
-    <div class="table-responsive">
-        <table class="table table-centered table-hover mb-0">
-            <thead class="bg-light bg-opacity-50">
+<div class="card-body">
+    <table id="empresas-datatable" class="table table-sm table-striped table-hover table-centered admin-datatable-table mb-0 w-100">
+            <thead>
                 <tr>
-                    <x-admin.sortable-th label="Tipo" sort="tipo_registro" :filtros="$filtros" />
-                    <x-admin.sortable-th label="# CI." sort="id_cigam" :filtros="$filtros" />
-                    <x-admin.sortable-th label="Nome" sort="nome_exibicao" :filtros="$filtros" />
-                    <x-admin.sortable-th label="Doc." sort="documento" :filtros="$filtros" />
-                    <x-admin.sortable-th label="UN" sort="unidade_referencia" :filtros="$filtros" />
-                    <x-admin.sortable-th label="Pessoa" sort="tipo_pessoa" :filtros="$filtros" />
-                    <x-admin.sortable-th label="Status" sort="status" :filtros="$filtros" />
+                    <th>Tipo</th>
+                    <th># CI.</th>
+                    <th>Nome</th>
+                    <th>Doc.</th>
+                    <th>UN</th>
+                    <th>Pessoa</th>
+                    <th>Status</th>
                     <th class="text-end">Ações</th>
                 </tr>
             </thead>
@@ -23,9 +21,11 @@
                 @forelse ($linhas as $empresa)
                     <tr class="{{ $empresa->statusExibicao() ? '' : 'text-muted bg-light bg-opacity-25' }}">
                         <td><span class="badge bg-secondary-subtle text-secondary">{{ $empresa->rotuloTipoRegistro() }}</span></td>
-                        <td><code>{{ $empresa->idCigamExibicao() }}</code></td>
+                        <td data-order="{{ (int) ltrim((string) $empresa->idCigamExibicao(), '0') ?: 0 }}">
+                            <code class="small">{{ $empresa->idCigamExibicao() }}</code>
+                        </td>
                         <td><span class="fw-semibold">{{ $empresa->fantasiaExibicao() ?: $empresa->nomeExibicao() }}</span></td>
-                        <td>{{ $empresa->documentoFormatado() }}</td>
+                        <td><code class="small">{{ $empresa->documentoFormatado() }}</code></td>
                         <td>{{ $empresa->unidadeNegocioExibicao() }}</td>
                         <td>
                             @if ($empresa->tipoPessoaExibicao() === 'FISICA')
@@ -48,23 +48,23 @@
                             @endif
                         </td>
                         <td class="text-end">
-                            <div class="d-inline-flex gap-1 flex-wrap justify-content-end">
+                            <div class="d-inline-flex gap-1 justify-content-end">
                                 @php
                                     $urlEditar = $empresa->urlModuloEdicao();
                                 @endphp
                                 @if ($urlEditar)
                                     <a href="{{ $urlEditar }}"
-                                       class="btn btn-sm btn-soft-primary"
+                                       class="admin-datatable-action-link text-primary"
                                        title="Editar cadastro de origem">
-                                        <i class="ri-pencil-line"></i> Editar
+                                        <i class="ri-pencil-line"></i>
                                     </a>
                                 @endif
 
                                 @can('empresas.historico')
                                     <a href="{{ route('admin.empresas.historico', $empresa) }}"
-                                       class="btn btn-sm btn-soft-info"
+                                       class="admin-datatable-action-link text-info"
                                        title="Histórico do registro corporativo">
-                                        <i class="ri-history-line"></i> Histórico
+                                        <i class="ri-history-line"></i>
                                     </a>
                                 @endcan
                             </div>
@@ -72,32 +72,9 @@
                     </tr>
                 @empty
                     <tr>
-                        <td colspan="8" class="text-center text-muted py-4">
-                            @if (($filtros['search'] ?? '') !== '' || ($filtros['status'] ?? null) !== null || ($filtros['tipo_entidade'] ?? null) !== null)
-                                Nenhum registro corresponde aos filtros aplicados.
-                            @else
-                                Nenhum registro no hub corporativo.
-                            @endif
-                        </td>
+                        <td colspan="8" class="text-center text-muted py-4">Nenhum registro no hub corporativo.</td>
                     </tr>
                 @endforelse
             </tbody>
         </table>
-    </div>
-</div>
-
-<div class="card-footer d-flex flex-wrap align-items-center gap-2">
-    <div class="text-muted small me-auto">
-        Exibindo <strong>{{ $exibindo }}</strong> de <strong>{{ $total }}</strong> registro(s).
-        @if (($filtros['search'] ?? '') !== '')
-            · Pesquisa: <code>{{ $filtros['search'] }}</code>
-        @endif
-        @if (($filtros['status'] ?? null) !== null)
-            · Status: <code>{{ $filtros['status'] === '1' ? 'Ativos / ativas' : 'Somente unidades inativas' }}</code>
-        @endif
-        @if (($filtros['tipo_entidade'] ?? null) !== null)
-            · Tipo: <code>{{ $filtros['tipo_entidade'] }}</code>
-        @endif
-    </div>
-    <x-admin.table-pagination :paginator="$empresas" />
 </div>

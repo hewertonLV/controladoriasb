@@ -26,36 +26,15 @@ class PracaController extends Controller
     public function index(Request $request): View
     {
         $filtros = $this->pracaQuery->filtrosFromRequest($request);
-        $query = $this->pracaQuery->aplicarFiltros(
+        $pracas = $this->pracaQuery->aplicarFiltros(
             Praca::query()->with('unidadeNegocio:id,nome,id_cigam'),
             $filtros,
-        );
+        )->get();
 
-        if ($filtros['per_page'] === 'all') {
-            $total = (clone $query)->toBase()->count();
-            $resultados = $query->get();
-            $pracas = $resultados;
-            $exibindo = $resultados->count();
-        } else {
-            $paginator = $query->paginate((int) $filtros['per_page'])->appends($filtros);
-            $pracas = $paginator;
-            $total = $paginator->total();
-            $exibindo = count((array) $paginator->items());
-        }
-
-        $payload = [
+        return view('admin.pracas.index', [
             'pracas' => $pracas,
             'filtros' => $filtros,
-            'perPageOptions' => PracaQuery::PER_PAGE_OPTIONS,
-            'total' => $total,
-            'exibindo' => $exibindo,
-        ];
-
-        if ($request->ajax()) {
-            return view('admin.pracas._table', $payload);
-        }
-
-        return view('admin.pracas.index', $payload);
+        ]);
     }
 
     public function create(): View

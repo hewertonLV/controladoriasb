@@ -5,7 +5,6 @@ namespace Tests\Feature\Admin\Movimentacoes;
 use App\Contracts\Movimentacoes\ReprocessaEntradasDevolucaoDestino;
 use App\Enums\CategoriaMovimentacaoTipo;
 use App\Enums\FreteStatusSituacao;
-use App\Enums\FrutaUmIcms;
 use App\Enums\MovimentacaoStatusRegistro;
 use App\Enums\Permissions;
 use App\Enums\TipoDevolucao;
@@ -349,9 +348,6 @@ class DevolucaoMovimentacaoTest extends TestCase
             'unidade_faturamento' => $unidadeFaturamento,
             'fruta' => Fruta::factory()->create([
                 'kg_por_unidade_medicao' => 10,
-                'icms_na_compra' => 0,
-                'icms_ex_compra' => 0,
-                'um_icms' => FrutaUmIcms::KG->value,
             ]),
             'frete' => Frete::factory()->create(['valor' => '0.00', 'status_situacao' => FreteStatusSituacao::ABERTA->value]),
         ];

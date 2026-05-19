@@ -5,6 +5,7 @@ namespace Tests\Feature\Admin\Frutas;
 use App\Enums\FrutaUmIcms;
 use App\Enums\FrutaUnidadeMedicao;
 use App\Enums\Permissions;
+use App\Models\Estado;
 use App\Models\Fruta;
 
 class FrutaTest extends FrutaTestCase
@@ -29,18 +30,16 @@ class FrutaTest extends FrutaTestCase
             ->assertOk();
     }
 
-    public function test_listagem_ajax_retorna_partial_da_tabela(): void
+    public function test_listagem_usa_datatable_com_registros(): void
     {
-        Fruta::factory()->create(['nome' => 'MANGA AJAX']);
+        Fruta::factory()->create(['nome' => 'MANGA DATATABLE']);
 
         $this->actingAs($this->frutasManager())
-            ->withHeaders([
-                'X-Requested-With' => 'XMLHttpRequest',
-                'Accept' => 'text/html',
-            ])
             ->get(route('admin.frutas.index'))
             ->assertOk()
-            ->assertSee('MANGA AJAX', false);
+            ->assertSee('MANGA DATATABLE', false)
+            ->assertSee('id="frutas-datatable"', false)
+            ->assertSee('data-admin-datatable', false);
     }
 
     public function test_cadastro_com_sucesso_normaliza_campos(): void
@@ -62,7 +61,6 @@ class FrutaTest extends FrutaTestCase
             'nome' => 'MAÇÃ FUJI',
             'unidade_medicao' => 'CAIXA',
             'kg_por_unidade_medicao' => '12.50',
-            'um_icms' => FrutaUmIcms::KG->value,
         ]);
     }
 
@@ -105,16 +103,24 @@ class FrutaTest extends FrutaTestCase
         ]);
 
         $this->actingAs($this->userWithPermissions([Permissions::FRUTAS_EDITAR]))
-            ->put(route('admin.frutas.update', $fruta), [
+            ->put(route('admin.frutas.update', $fruta), $this->frutaPayload([
                 'id_cigam' => '50',
                 'nome' => 'Depois',
                 'unidade_medicao' => FrutaUnidadeMedicao::SACO->value,
                 'kg_por_unidade_medicao' => '20',
-                'icms_ex_compra' => '1.00',
-                'icms_na_compra' => '2.00',
-                'um_icms' => FrutaUmIcms::UM->value,
-                'icms_venda' => '18.00',
-            ])
+                'icms' => [
+                    Estado::ID_CEARA => [
+                        'entrada_externo' => '1.00',
+                        'entrada_um_externo' => FrutaUmIcms::UM->value,
+                        'entrada_nacional' => '2.00',
+                        'entrada_um_nacional' => FrutaUmIcms::UM->value,
+                        'saida_importada' => '5.00',
+                        'saida_um_importada' => FrutaUmIcms::KG->value,
+                        'saida_nacional' => '18.00',
+                        'saida_um_nacional' => FrutaUmIcms::KG->value,
+                    ],
+                ],
+            ]))
             ->assertRedirect(route('admin.frutas.index'))
             ->assertSessionHas('success');
 
@@ -123,6 +129,8 @@ class FrutaTest extends FrutaTestCase
         $this->assertSame('DEPOIS', $fruta->nome);
         $this->assertSame(FrutaUnidadeMedicao::SACO->value, $fruta->unidade_medicao);
         $this->assertSame('20.00', $fruta->kg_por_unidade_medicao);
-        $this->assertSame(FrutaUmIcms::UM->value, $fruta->um_icms);
+        $icmsEntrada = $fruta->icms()->where('id_estado', Estado::ID_CEARA)->where('operacao', 'ENTRADA')->first();
+        $this->assertNotNull($icmsEntrada);
+        $this->assertSame(FrutaUmIcms::UM->value, $icmsEntrada->um_icms_nacional);
     }
 }

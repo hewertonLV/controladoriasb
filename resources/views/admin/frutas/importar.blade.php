@@ -9,12 +9,11 @@
             <div class="me-auto">
                 <h4 class="header-title mb-0">Importação por planilha Excel</h4>
                 <p class="text-muted mb-0">
-                    Layout fixo (linha 1 é cabeçalho e pode ter qualquer texto):
+                    Layout fixo (linha 1 = cabeçalho): somente dados da fruta —
                     <code>A</code> ID CIGAM · <code>B</code> Nome ·
-                    <code>C</code> Unidade de medição · <code>D</code> Kg por unidade ·
-                    <code>E</code> ICMS externo na compra · <code>F</code> ICMS nacional na compra ·
-                    <code>G</code> UM ICMS ({{ implode('/', \App\Enums\FrutaUmIcms::values()) }}) ·
-                    <code>H</code> ICMS venda (%)
+                    <code>C</code> Unidade de medição · <code>D</code> Kg por unidade.
+                    ICMS é importado em
+                    <a href="{{ route('admin.frutas.icms.importar') }}">Importar ICMS</a>.
                 </p>
             </div>
             <a href="{{ route('admin.frutas.index') }}" class="btn btn-light">
@@ -128,10 +127,6 @@
                                 <th>Nome</th>
                                 <th>Unidade</th>
                                 <th>Kg</th>
-                                <th>ICMS ex.</th>
-                                <th>ICMS na compra</th>
-                                <th>UM</th>
-                                <th>ICMS venda %</th>
                             </tr>
                         </thead>
                         <tbody id="tbody-novas"></tbody>
@@ -404,10 +399,6 @@
                     <td>${escapeHtml(d.nome)}</td>
                     <td>${escapeHtml(d.unidade_medicao || '—')}</td>
                     <td>${fmtKg(d.kg_por_unidade_medicao)}</td>
-                    <td>${fmtKg(d.icms_ex_compra)}</td>
-                    <td>${fmtKg(d.icms_na_compra)}</td>
-                    <td>${escapeHtml(d.um_icms || '—')}</td>
-                    <td>${fmtKg(d.icms_venda)}</td>
                 `;
                 tbodyNovas.appendChild(tr);
             });

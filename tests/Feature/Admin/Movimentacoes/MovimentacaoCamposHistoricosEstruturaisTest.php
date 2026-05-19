@@ -6,13 +6,16 @@ use App\Enums\CategoriaMovimentacaoTipo;
 use App\Enums\FreteStatusSituacao;
 use App\Enums\FrutaUmIcms;
 use App\Enums\Permissions;
+use App\Http\Requests\Admin\Movimentacoes\StoreDescarteMovimentacaoRequest;
 use App\Models\CategoriaDescarte;
 use App\Models\Estado;
+use App\Models\Fornecedor;
 use App\Models\Frete;
 use App\Models\Fruta;
 use App\Models\HistoricoCOUnNg;
 use App\Models\Movimentacao;
 use App\Models\UnidadeNegocio;
+use App\Services\Frutas\FrutaIcmsSyncService;
 use App\Services\Movimentacoes\MovimentacaoAuditoriaService;
 use Database\Seeders\CategoriaDescarteSeeder;
 use Database\Seeders\CategoriaMovimentacaoSeeder;
@@ -38,10 +41,14 @@ class MovimentacaoCamposHistoricosEstruturaisTest extends TestCase
         $this->assertSame('20.00', (string) $compraAntiga->valor_icms_kg);
         $this->assertSame('2000.00', (string) $compraAntiga->valor_icms_total);
 
-        $cenario['fruta']->forceFill([
-            'icms_na_compra' => '100.00',
-            'icms_ex_compra' => '0.00',
-        ])->save();
+        app(FrutaIcmsSyncService::class)->sync($cenario['fruta'], [
+            Estado::ID_CEARA => [
+                'entrada_nacional' => '100.00',
+                'entrada_externo' => '0.00',
+                'entrada_um_nacional' => FrutaUmIcms::KG->value,
+                'saida_nacional' => '12.00',
+            ],
+        ]);
 
         $this->registrarCompra($cenario, '5', '250,00');
 
@@ -60,10 +67,14 @@ class MovimentacaoCamposHistoricosEstruturaisTest extends TestCase
         $compraAntiga = $this->registrarCompra($cenario, '10', '500,00');
         $versaoReplayAntes = (int) $compraAntiga->versao_replay;
 
-        $cenario['fruta']->forceFill([
-            'icms_na_compra' => '100.00',
-            'icms_ex_compra' => '0.00',
-        ])->save();
+        app(FrutaIcmsSyncService::class)->sync($cenario['fruta'], [
+            Estado::ID_CEARA => [
+                'entrada_nacional' => '100.00',
+                'entrada_externo' => '0.00',
+                'entrada_um_nacional' => FrutaUmIcms::KG->value,
+                'saida_nacional' => '12.00',
+            ],
+        ]);
 
         $compraNova = $this->registrarCompra($cenario, '5', '250,00');
         $this->cancelarCompraAdmin($compraNova);
@@ -108,7 +119,7 @@ class MovimentacaoCamposHistoricosEstruturaisTest extends TestCase
             'categoria_movimentacao_id' => CategoriaMovimentacaoTipo::Descarte->value,
             'id_fruta' => $cenario['fruta']->id,
             'qtd_fruta_kg' => '10.00',
-        ], (new \App\Http\Requests\Admin\Movimentacoes\StoreDescarteMovimentacaoRequest())->rules());
+        ], (new StoreDescarteMovimentacaoRequest)->rules());
 
         $this->assertTrue($validator->fails());
         $this->assertArrayHasKey('categoria_descarte_id', $validator->errors()->toArray());
@@ -163,7 +174,7 @@ class MovimentacaoCamposHistoricosEstruturaisTest extends TestCase
      */
     private function cenarioCompraComIcms(): array
     {
-        $fornecedor = \App\Models\Fornecedor::factory()->create(['id_estado' => Estado::ID_PERNAMBUCO]);
+        $fornecedor = Fornecedor::factory()->create(['id_estado' => Estado::ID_PERNAMBUCO]);
         $unidade = UnidadeNegocio::factory()->create([
             'possui_estoque' => true,
             'id_estado' => Estado::ID_CEARA,
@@ -183,11 +194,12 @@ class MovimentacaoCamposHistoricosEstruturaisTest extends TestCase
         return [
             'empresa_fornecedor' => $fornecedor->registroCorporativo()->firstOrFail(),
             'empresa_unidade' => $unidade->registroCorporativo()->firstOrFail(),
-            'fruta' => Fruta::factory()->create([
+            'fruta' => Fruta::factory()->comIcmsCeara([
+                'entrada_nacional' => '20.00',
+                'entrada_externo' => '0.00',
+                'entrada_um' => FrutaUmIcms::KG->value,
+            ])->create([
                 'kg_por_unidade_medicao' => 10,
-                'icms_na_compra' => '20.00',
-                'icms_ex_compra' => '0.00',
-                'um_icms' => FrutaUmIcms::KG->value,
             ]),
             'frete' => Frete::factory()->create([
                 'valor' => '0.00',

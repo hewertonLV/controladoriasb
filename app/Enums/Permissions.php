@@ -50,6 +50,20 @@ final class Permissions
 
     public const EMPRESAS_EXPORTAR_PDF = 'empresas.exportar-pdf';
 
+    public const ESTADOS_VISUALIZAR = 'estados.visualizar';
+
+    public const ESTADOS_CRIAR = 'estados.criar';
+
+    public const ESTADOS_EDITAR = 'estados.editar';
+
+    public const ESTADOS_INATIVAR = 'estados.inativar';
+
+    public const ESTADOS_REATIVAR = 'estados.reativar';
+
+    public const ESTADOS_IMPORTAR = 'estados.importar';
+
+    public const ESTADOS_IMPORTAR_CONFIRMAR = 'estados.importar-confirmar';
+
     public const UNIDADES_NEGOCIO_VISUALIZAR = 'unidades-negocio.visualizar';
 
     public const UNIDADES_NEGOCIO_CRIAR = 'unidades-negocio.criar';
@@ -123,6 +137,16 @@ final class Permissions
     public const FRUTAS_IMPORTAR = 'frutas.importar';
 
     public const FRUTAS_IMPORTAR_CONFIRMAR = 'frutas.importar-confirmar';
+
+    public const FRUTAS_ICMS_VISUALIZAR = 'frutas.icms.visualizar';
+
+    public const FRUTAS_ICMS_CRIAR = 'frutas.icms.criar';
+
+    public const FRUTAS_ICMS_EDITAR = 'frutas.icms.editar';
+
+    public const FRUTAS_ICMS_IMPORTAR = 'frutas.icms.importar';
+
+    public const FRUTAS_ICMS_IMPORTAR_CONFIRMAR = 'frutas.icms.importar-confirmar';
 
     public const FRUTAS_HISTORICO = 'frutas.historico';
 
@@ -281,6 +305,15 @@ final class Permissions
                 self::EMPRESAS_HISTORICO,
                 self::EMPRESAS_EXPORTAR_PDF,
             ],
+            'Estados' => [
+                self::ESTADOS_VISUALIZAR,
+                self::ESTADOS_CRIAR,
+                self::ESTADOS_EDITAR,
+                self::ESTADOS_INATIVAR,
+                self::ESTADOS_REATIVAR,
+                self::ESTADOS_IMPORTAR,
+                self::ESTADOS_IMPORTAR_CONFIRMAR,
+            ],
             'Unidades de Negócio' => [
                 self::UNIDADES_NEGOCIO_VISUALIZAR,
                 self::UNIDADES_NEGOCIO_CRIAR,
@@ -344,6 +377,11 @@ final class Permissions
                 self::FRUTAS_EDITAR,
                 self::FRUTAS_IMPORTAR,
                 self::FRUTAS_IMPORTAR_CONFIRMAR,
+                self::FRUTAS_ICMS_VISUALIZAR,
+                self::FRUTAS_ICMS_CRIAR,
+                self::FRUTAS_ICMS_EDITAR,
+                self::FRUTAS_ICMS_IMPORTAR,
+                self::FRUTAS_ICMS_IMPORTAR_CONFIRMAR,
                 self::FRUTAS_HISTORICO,
                 self::FRUTAS_EXPORTAR_PDF,
             ],

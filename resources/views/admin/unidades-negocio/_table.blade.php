@@ -1,35 +1,36 @@
 @php
-    use Illuminate\Contracts\Pagination\LengthAwarePaginator;
-    $isPaginator = $unidadesNegocio instanceof LengthAwarePaginator;
-    $linhas = $isPaginator ? $unidadesNegocio->items() : $unidadesNegocio;
-    /** @var \Illuminate\Support\Collection<int, \App\Models\Estado>|null $estados */
-    $estados = $estados ?? collect();
+    /** @var \Illuminate\Support\Collection<int, \App\Models\UnidadeNegocio>|\Illuminate\Database\Eloquent\Collection<int, \App\Models\UnidadeNegocio> $unidadesNegocio */
+    $linhas = $unidadesNegocio;
 @endphp
 
-<div class="card-body p-0">
-    <div class="table-responsive">
-        <table class="table table-centered table-hover mb-0">
-            <thead class="bg-light bg-opacity-50">
+<div class="card-body">
+    <table id="unidades-negocio-datatable" class="table table-sm table-striped table-hover table-centered admin-datatable-table mb-0 w-100">
+            <thead>
                 <tr>
-                    <x-admin.sortable-th label="# CI." sort="id_cigam" :filtros="$filtros" />
-                    <x-admin.sortable-th label="UF" sort="estado" :filtros="$filtros" />
-                    <x-admin.sortable-th label="Unidade" sort="nome" :filtros="$filtros" />
-                    <x-admin.sortable-th label="Doc." sort="cpf_cnpj" :filtros="$filtros" />
-                    <x-admin.sortable-th label="C. op." sort="custo_operacional" :filtros="$filtros" />
-                    <x-admin.sortable-th label="Est." sort="possui_estoque" :filtros="$filtros" />
-                    <x-admin.sortable-th label="Status" sort="status" :filtros="$filtros" />
-                    <x-admin.sortable-th label="Criado" sort="created_at" :filtros="$filtros" />
+                    <th># CI.</th>
+                    <th>UF</th>
+                    <th>Unidade</th>
+                    <th>Doc.</th>
+                    <th>C. op.</th>
+                    <th>Est.</th>
+                    <th>Status</th>
+                    <th>Criado</th>
                     <th class="text-end">Ações</th>
                 </tr>
             </thead>
             <tbody>
                 @forelse ($linhas as $unidade)
-                    <tr class="{{ $unidade->status ? '' : 'text-muted bg-light bg-opacity-25' }}">
-                        <td><code>{{ $unidade->id_cigam }}</code></td>
+                    <tr class="{{ $unidade->status ? '' : 'text-muted bg-light bg-opacity-25' }}"
+                        data-id-estado="{{ $unidade->id_estado }}"
+                        data-status="{{ $unidade->status ? '1' : '0' }}"
+                        data-possui-estoque="{{ $unidade->possui_estoque ? '1' : '0' }}">
+                        <td data-order="{{ (int) ltrim((string) $unidade->id_cigam, '0') ?: 0 }}">
+                            <code class="small">{{ $unidade->id_cigam }}</code>
+                        </td>
                         <td>{{ $unidade->estado?->abreviacao ?? '—' }}</td>
                         <td><span class="fw-semibold">{{ $unidade->nome ?: $unidade->razao_social }}</span></td>
-                        <td><code>{{ $unidade->cpf_cnpj_formatado }}</code></td>
-                        <td>{{ number_format((float) $unidade->custo_operacional, 2, ',', '.') }}</td>
+                        <td><code class="small">{{ $unidade->cpf_cnpj_formatado }}</code></td>
+                        <td data-order="{{ (float) $unidade->custo_operacional }}">{{ number_format((float) $unidade->custo_operacional, 2, ',', '.') }}</td>
                         <td>
                             @if ($unidade->possui_estoque)
                                 <span class="badge bg-info-subtle text-info">Sim</span>
@@ -48,22 +49,22 @@
                                 </span>
                             @endif
                         </td>
-                        <td>{{ optional($unidade->created_at)->format('d/m/Y H:i') ?? '—' }}</td>
+                        <td data-order="{{ $unidade->created_at?->timestamp ?? 0 }}">{{ optional($unidade->created_at)->format('d/m/Y H:i') ?? '—' }}</td>
                         <td class="text-end">
-                            <div class="d-inline-flex gap-1 flex-wrap justify-content-end">
+                            <div class="d-inline-flex gap-1 justify-content-end flex-nowrap">
                                 @can('unidades-negocio.editar')
                                     <a href="{{ route('admin.unidades-negocio.edit', $unidade) }}"
-                                       class="btn btn-sm btn-soft-primary"
+                                       class="admin-datatable-action-link text-primary"
                                        title="Editar">
-                                        <i class="ri-pencil-line"></i> Editar
+                                        <i class="ri-pencil-line"></i>
                                     </a>
                                 @endcan
 
                                 @can('unidades-negocio.historico')
                                     <a href="{{ route('admin.unidades-negocio.historico', $unidade) }}"
-                                       class="btn btn-sm btn-soft-info"
+                                       class="admin-datatable-action-link text-info"
                                        title="Histórico">
-                                        <i class="ri-history-line"></i> Histórico
+                                        <i class="ri-history-line"></i>
                                     </a>
                                 @endcan
 
@@ -71,11 +72,16 @@
                                     @can('unidades-negocio.inativar')
                                         <form method="POST"
                                               action="{{ route('admin.unidades-negocio.inativar', $unidade) }}"
-                                              onsubmit="return confirm({{ json_encode('Inativar a Unidade de Negócio '.$unidade->nome.'?') }});"
-                                              class="d-inline">
+                                              class="d-inline"
+                                              data-confirm="{{ 'Inativar a Unidade de Negócio '.$unidade->nome.'?' }}"
+                                              data-confirm-title="Inativar unidade"
+                                              data-confirm-variant="danger"
+                                              data-confirm-btn="Inativar">
                                             @csrf
-                                            <button type="submit" class="btn btn-sm btn-soft-secondary" title="Inativar">
-                                                <i class="ri-close-circle-line"></i> Inativar
+                                            <button type="submit"
+                                                    class="admin-datatable-action-link text-secondary border-0 bg-transparent p-0"
+                                                    title="Inativar">
+                                                <i class="ri-close-circle-line"></i>
                                             </button>
                                         </form>
                                     @endcan
@@ -83,11 +89,16 @@
                                     @can('unidades-negocio.ativar')
                                         <form method="POST"
                                               action="{{ route('admin.unidades-negocio.ativar', $unidade) }}"
-                                              onsubmit="return confirm({{ json_encode('Ativar a Unidade de Negócio '.$unidade->nome.'?') }});"
-                                              class="d-inline">
+                                              class="d-inline"
+                                              data-confirm="{{ 'Ativar a Unidade de Negócio '.$unidade->nome.'?' }}"
+                                              data-confirm-title="Ativar unidade"
+                                              data-confirm-variant="success"
+                                              data-confirm-btn="Ativar">
                                             @csrf
-                                            <button type="submit" class="btn btn-sm btn-soft-success" title="Ativar">
-                                                <i class="ri-checkbox-circle-line"></i> Ativar
+                                            <button type="submit"
+                                                    class="admin-datatable-action-link text-success border-0 bg-transparent p-0"
+                                                    title="Ativar">
+                                                <i class="ri-checkbox-circle-line"></i>
                                             </button>
                                         </form>
                                     @endcan
@@ -97,32 +108,9 @@
                     </tr>
                 @empty
                     <tr>
-                        <td colspan="9" class="text-center text-muted py-4">
-                            @if (($filtros['search'] ?? '') !== '' || ($filtros['status'] ?? null) !== null || ($filtros['possui_estoque'] ?? null) !== null || ($filtros['id_estado'] ?? null) !== null)
-                                Nenhuma unidade corresponde aos filtros aplicados.
-                            @else
-                                Nenhuma unidade de negócio cadastrada.
-                            @endif
-                        </td>
+                        <td colspan="9" class="text-center text-muted py-4">Nenhuma unidade de negócio cadastrada.</td>
                     </tr>
                 @endforelse
             </tbody>
         </table>
-    </div>
-</div>
-
-<div class="card-footer d-flex flex-wrap align-items-center gap-2">
-    <div class="text-muted small me-auto">
-        Exibindo <strong>{{ $exibindo }}</strong> de <strong>{{ $total }}</strong> unidade(s).
-        @if (($filtros['search'] ?? '') !== '')
-            · Pesquisa: <code>{{ $filtros['search'] }}</code>
-        @endif
-        @if (($filtros['status'] ?? null) !== null)
-            · Status: <code>{{ $filtros['status'] === '1' ? 'Ativas' : 'Inativas' }}</code>
-        @endif
-        @if (($filtros['id_estado'] ?? null) !== null)
-            · UF: <code>{{ optional($estados->firstWhere('id', (int) $filtros['id_estado']))->abreviacao ?? $filtros['id_estado'] }}</code>
-        @endif
-    </div>
-    <x-admin.table-pagination :paginator="$unidadesNegocio" />
 </div>

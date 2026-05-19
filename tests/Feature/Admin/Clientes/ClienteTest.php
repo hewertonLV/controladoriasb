@@ -27,21 +27,19 @@ class ClienteTest extends ClienteTestCase
             ->assertOk();
     }
 
-    public function test_listagem_ajax_retorna_partial_da_tabela(): void
+    public function test_listagem_usa_datatable_com_registros(): void
     {
         Cliente::factory()->create([
-            'razao_social' => 'CLIENTE AJAX',
+            'razao_social' => 'CLIENTE DATATABLE',
             'fantasia' => null,
         ]);
 
         $this->actingAs($this->clientesManager())
-            ->withHeaders([
-                'X-Requested-With' => 'XMLHttpRequest',
-                'Accept' => 'text/html',
-            ])
             ->get(route('admin.clientes.index'))
             ->assertOk()
-            ->assertSee('CLIENTE AJAX', false);
+            ->assertSee('CLIENTE DATATABLE', false)
+            ->assertSee('id="clientes-datatable"', false)
+            ->assertSee('data-admin-datatable', false);
     }
 
     public function test_cadastro_com_sucesso_normaliza_campos(): void

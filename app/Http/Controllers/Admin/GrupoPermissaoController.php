@@ -7,7 +7,6 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Admin\StoreGrupoPermissaoRequest;
 use App\Http\Requests\Admin\UpdateGrupoPermissaoRequest;
 use Illuminate\Http\RedirectResponse;
-use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use Illuminate\View\View;
 use Spatie\Permission\Models\Permission;
@@ -20,91 +19,19 @@ class GrupoPermissaoController extends Controller
      */
     private const GUARD = 'web';
 
-    private const PER_PAGE_OPTIONS = [10, 20, 50, 100];
-
-    private const PER_PAGE_DEFAULT = 20;
-
-    private const SORT_DEFAULT = 'name';
-
-    private const DIRECTION_DEFAULT = 'asc';
-
-    private const ALLOWED_SORTS = [
-        'name' => 'name',
-        'guard_name' => 'guard_name',
-        'permissions_count' => 'permissions_count',
-        'created_at' => 'created_at',
-    ];
-
-    public function index(Request $request): View
+    public function index(): View
     {
-        $filtros = $this->extrairFiltros($request);
-
-        $query = Role::query()
+        $roles = Role::query()
             ->where('guard_name', self::GUARD)
-            ->withCount('permissions');
+            ->withCount('permissions')
+            ->orderBy('name')
+            ->orderBy('id')
+            ->get();
 
-        if ($filtros['search'] !== '') {
-            $query->where('name', 'like', '%'.$filtros['search'].'%');
-        }
-
-        $query
-            ->orderBy(self::ALLOWED_SORTS[$filtros['sort']] ?? self::ALLOWED_SORTS[self::SORT_DEFAULT], $filtros['direction'])
-            ->orderBy('id');
-
-        if ($filtros['per_page'] === 'all') {
-            $total = (clone $query)->toBase()->count();
-            $roles = $query->get();
-            $exibindo = $roles->count();
-        } else {
-            $paginator = $query->paginate((int) $filtros['per_page'])->appends($filtros);
-            $roles = $paginator;
-            $total = $paginator->total();
-            $exibindo = count((array) $paginator->items());
-        }
-
-        $payload = [
+        return view('admin.grupos-permissoes.index', [
             'roles' => $roles,
             'roleProgramador' => Roles::PROGRAMADOR->value,
-            'filtros' => $filtros,
-            'perPageOptions' => self::PER_PAGE_OPTIONS,
-            'total' => $total,
-            'exibindo' => $exibindo,
-        ];
-
-        if ($request->ajax()) {
-            return view('admin.grupos-permissoes._table', $payload);
-        }
-
-        return view('admin.grupos-permissoes.index', $payload);
-    }
-
-    /**
-     * @return array{search: string, per_page: int|string, sort: string, direction: string}
-     */
-    private function extrairFiltros(Request $request): array
-    {
-        $search = trim((string) $request->query('search', ''));
-
-        $perPageRaw = (string) $request->query('per_page', (string) self::PER_PAGE_DEFAULT);
-        if ($perPageRaw === 'all') {
-            $perPage = 'all';
-        } else {
-            $candidate = (int) $perPageRaw;
-            $perPage = in_array($candidate, self::PER_PAGE_OPTIONS, true) ? $candidate : self::PER_PAGE_DEFAULT;
-        }
-
-        $sortRaw = (string) $request->query('sort', self::SORT_DEFAULT);
-        $sort = array_key_exists($sortRaw, self::ALLOWED_SORTS) ? $sortRaw : self::SORT_DEFAULT;
-
-        $directionRaw = mb_strtolower((string) $request->query('direction', self::DIRECTION_DEFAULT));
-        $direction = in_array($directionRaw, ['asc', 'desc'], true) ? $directionRaw : self::DIRECTION_DEFAULT;
-
-        return [
-            'search' => $search,
-            'per_page' => $perPage,
-            'sort' => $sort,
-            'direction' => $direction,
-        ];
+        ]);
     }
 
     public function create(): View

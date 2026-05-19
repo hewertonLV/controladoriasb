@@ -79,26 +79,34 @@
                 </a>
             </li>
 
-            @canany(['empresas.visualizar', 'unidades-negocio.visualizar', 'fornecedores.visualizar', 'veiculos.visualizar', 'clientes.visualizar', 'grupos.visualizar', 'grupos-contrato.visualizar', 'frutas.visualizar', 'fretes.visualizar', 'pracas.visualizar', 'estoques.visualizar'])
+            @canany(['empresas.visualizar', 'estados.visualizar', 'unidades-negocio.visualizar', 'fornecedores.visualizar', 'veiculos.visualizar', 'clientes.visualizar', 'grupos.visualizar', 'grupos-contrato.visualizar', 'frutas.visualizar', 'pracas.visualizar', 'estoques.visualizar'])
                 <li class="side-nav-title mt-2">Cadastros</li>
 
                 <li class="side-nav-item">
                     <a data-bs-toggle="collapse"
                        href="#sidebarCadastros"
-                       aria-expanded="{{ request()->routeIs('admin.empresas.*', 'admin.unidades-negocio.*', 'admin.fornecedores.*', 'admin.veiculos.*', 'admin.clientes.*', 'admin.grupos.*', 'admin.grupos-contrato.*', 'admin.frutas.*', 'admin.fretes.*', 'admin.pracas.*', 'admin.estoques.*') ? 'true' : 'false' }}"
+                       aria-expanded="{{ request()->routeIs('admin.empresas.*', 'admin.estados.*', 'admin.unidades-negocio.*', 'admin.fornecedores.*', 'admin.veiculos.*', 'admin.clientes.*', 'admin.grupos.*', 'admin.grupos-contrato.*', 'admin.frutas.*', 'admin.pracas.*', 'admin.estoques.*') ? 'true' : 'false' }}"
                        aria-controls="sidebarCadastros"
-                       class="side-nav-link {{ request()->routeIs('admin.empresas.*', 'admin.unidades-negocio.*', 'admin.fornecedores.*', 'admin.veiculos.*', 'admin.clientes.*', 'admin.grupos.*', 'admin.grupos-contrato.*', 'admin.frutas.*', 'admin.fretes.*', 'admin.pracas.*', 'admin.estoques.*') ? '' : 'collapsed' }}">
+                       class="side-nav-link {{ request()->routeIs('admin.empresas.*', 'admin.estados.*', 'admin.unidades-negocio.*', 'admin.fornecedores.*', 'admin.veiculos.*', 'admin.clientes.*', 'admin.grupos.*', 'admin.grupos-contrato.*', 'admin.frutas.*', 'admin.pracas.*', 'admin.estoques.*') ? '' : 'collapsed' }}">
                         <span class="menu-icon"><i class="ri-building-line"></i></span>
                         <span class="menu-text"> Cadastros </span>
                         <span class="menu-arrow"></span>
                     </a>
-                    <div class="collapse {{ request()->routeIs('admin.empresas.*', 'admin.unidades-negocio.*', 'admin.fornecedores.*', 'admin.veiculos.*', 'admin.clientes.*', 'admin.grupos.*', 'admin.grupos-contrato.*', 'admin.frutas.*', 'admin.fretes.*', 'admin.pracas.*', 'admin.estoques.*') ? 'show' : '' }}" id="sidebarCadastros">
+                    <div class="collapse {{ request()->routeIs('admin.empresas.*', 'admin.estados.*', 'admin.unidades-negocio.*', 'admin.fornecedores.*', 'admin.veiculos.*', 'admin.clientes.*', 'admin.grupos.*', 'admin.grupos-contrato.*', 'admin.frutas.*', 'admin.pracas.*', 'admin.estoques.*') ? 'show' : '' }}" id="sidebarCadastros">
                         <ul class="sub-menu">
                             @can('empresas.visualizar')
                                 <li class="side-nav-item">
                                     <a href="{{ route('admin.empresas.index') }}"
                                        class="side-nav-link {{ request()->routeIs('admin.empresas.*') ? 'active' : '' }}">
                                         <span class="menu-text">Empresas</span>
+                                    </a>
+                                </li>
+                            @endcan
+                            @can('estados.visualizar')
+                                <li class="side-nav-item">
+                                    <a href="{{ route('admin.estados.index') }}"
+                                       class="side-nav-link {{ request()->routeIs('admin.estados.*') ? 'active' : '' }}">
+                                        <span class="menu-text">Estados</span>
                                     </a>
                                 </li>
                             @endcan
@@ -124,15 +132,6 @@
                                     <a href="{{ route('admin.veiculos.index') }}"
                                        class="side-nav-link {{ request()->routeIs('admin.veiculos.*') ? 'active' : '' }}">
                                         <span class="menu-text">Veículos</span>
-                                    </a>
-                                </li>
-                            @endcan
-
-                            @can('fretes.visualizar')
-                                <li class="side-nav-item">
-                                    <a href="{{ route('admin.fretes.index') }}"
-                                       class="side-nav-link {{ request()->routeIs('admin.fretes.*') ? 'active' : '' }}">
-                                        <span class="menu-text">Fretes</span>
                                     </a>
                                 </li>
                             @endcan
@@ -167,8 +166,17 @@
                             @can('frutas.visualizar')
                                 <li class="side-nav-item">
                                     <a href="{{ route('admin.frutas.index') }}"
-                                       class="side-nav-link {{ request()->routeIs('admin.frutas.*') ? 'active' : '' }}">
+                                       class="side-nav-link {{ request()->routeIs('admin.frutas.index', 'admin.frutas.create', 'admin.frutas.edit', 'admin.frutas.importar', 'admin.frutas.historico') ? 'active' : '' }}">
                                         <span class="menu-text">Frutas</span>
+                                    </a>
+                                </li>
+                            @endcan
+
+                            @can('frutas.icms.visualizar')
+                                <li class="side-nav-item">
+                                    <a href="{{ route('admin.frutas.icms.index') }}"
+                                       class="side-nav-link {{ request()->routeIs('admin.frutas.icms.*') ? 'active' : '' }}">
+                                        <span class="menu-text">ICMS Frutas</span>
                                     </a>
                                 </li>
                             @endcan
@@ -187,6 +195,34 @@
                                     <a href="{{ route('admin.pracas.index') }}"
                                        class="side-nav-link {{ request()->routeIs('admin.pracas.*') ? 'active' : '' }}">
                                         <span class="menu-text">Praças</span>
+                                    </a>
+                                </li>
+                            @endcan
+                        </ul>
+                    </div>
+                </li>
+            @endcanany
+
+            @canany(['fretes.visualizar'])
+                <li class="side-nav-title mt-2">Logística</li>
+
+                <li class="side-nav-item">
+                    <a data-bs-toggle="collapse"
+                       href="#sidebarLogistica"
+                       aria-expanded="{{ request()->routeIs('admin.fretes.*') ? 'true' : 'false' }}"
+                       aria-controls="sidebarLogistica"
+                       class="side-nav-link {{ request()->routeIs('admin.fretes.*') ? '' : 'collapsed' }}">
+                        <span class="menu-icon"><i class="ri-truck-line"></i></span>
+                        <span class="menu-text"> Logística </span>
+                        <span class="menu-arrow"></span>
+                    </a>
+                    <div class="collapse {{ request()->routeIs('admin.fretes.*') ? 'show' : '' }}" id="sidebarLogistica">
+                        <ul class="sub-menu">
+                            @can('fretes.visualizar')
+                                <li class="side-nav-item">
+                                    <a href="{{ route('admin.fretes.index') }}"
+                                       class="side-nav-link {{ request()->routeIs('admin.fretes.*') ? 'active' : '' }}">
+                                        <span class="menu-text">Fretes</span>
                                     </a>
                                 </li>
                             @endcan
@@ -392,10 +428,7 @@
             @endcanany
         </ul>
 
-        <div class="help-box text-center">
-            <h5 class="fw-semibold fs-16">{{ config('app.name') }}</h5>
-            <p class="mb-3 opacity-75">Sistema em desenvolvimento</p>
-        </div>
+        
 
         <div class="clearfix"></div>
     </div>

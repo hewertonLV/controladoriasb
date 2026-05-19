@@ -2,7 +2,9 @@
 
 use App\Http\Middleware\EnsurePasswordWasChanged;
 use App\Http\Middleware\EnsureUserIsActive;
+use App\Http\Middleware\FinishRequestDebug;
 use App\Http\Middleware\LoadUserThemeSettings;
+use App\Http\Middleware\StartRequestDebug;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
@@ -25,8 +27,13 @@ return Application::configure(basePath: dirname(__DIR__))
             'user.active' => EnsureUserIsActive::class,
         ]);
 
+        $middleware->web(prepend: [
+            StartRequestDebug::class,
+        ]);
+
         $middleware->web(append: [
             LoadUserThemeSettings::class,
+            FinishRequestDebug::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

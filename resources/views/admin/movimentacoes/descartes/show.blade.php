@@ -102,14 +102,20 @@
                 @can('movimentacoes.descartes.cancelar-admin')
                     <hr class="my-4">
                     <h5 class="mb-3">Cancelamento administrativo</h5>
-                    <form method="post" action="{{ route('admin.movimentacoes.descartes.cancelar-admin', $movimentacao) }}" class="row g-2">
+                    <form method="post"
+                          action="{{ route('admin.movimentacoes.descartes.cancelar-admin', $movimentacao) }}"
+                          class="row g-2"
+                          data-confirm="Cancelar este descarte administrativamente?"
+                          data-confirm-title="Cancelar descarte"
+                          data-confirm-variant="danger"
+                          data-confirm-btn="Cancelar">
                         @csrf
                         <div class="col-12">
                             <label for="motivo_cancel" class="form-label">Motivo</label>
                             <textarea name="motivo" id="motivo_cancel" rows="2" class="form-control" required minlength="3"></textarea>
                         </div>
                         <div class="col-12">
-                            <button type="submit" class="btn btn-outline-danger btn-sm" onclick="return confirm('Cancelar este descarte administrativamente?');">
+                            <button type="submit" class="btn btn-outline-danger btn-sm">
                                 Cancelar administrativamente
                             </button>
                         </div>

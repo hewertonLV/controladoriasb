@@ -74,9 +74,6 @@ class DescarteMovimentacaoTest extends TestCase
         $this->registrarCompra($c, '10', '500,00');
         $fruta2 = Fruta::factory()->create([
             'kg_por_unidade_medicao' => 5,
-            'icms_na_compra' => 0,
-            'icms_ex_compra' => 0,
-            'um_icms' => FrutaUmIcms::KG->value,
         ]);
         $c2 = array_merge($c, ['fruta' => $fruta2]);
         $this->registrarCompra($c2, '4', '200,00');
@@ -406,11 +403,12 @@ class DescarteMovimentacaoTest extends TestCase
             'empresa_fornecedor' => $fornecedor->registroCorporativo()->firstOrFail(),
             'empresa_unidade' => $unidade->registroCorporativo()->firstOrFail(),
             'unidade' => $unidade,
-            'fruta' => Fruta::factory()->create([
+            'fruta' => Fruta::factory()->comIcmsCeara([
+                'entrada_nacional' => 0,
+                'entrada_externo' => 0,
+                'entrada_um' => FrutaUmIcms::KG->value,
+            ])->create([
                 'kg_por_unidade_medicao' => 10,
-                'icms_na_compra' => 0,
-                'icms_ex_compra' => 0,
-                'um_icms' => FrutaUmIcms::KG->value,
             ]),
             'frete' => Frete::factory()->create([
                 'valor' => '0.00',

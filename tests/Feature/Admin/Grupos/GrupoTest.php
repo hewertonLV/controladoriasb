@@ -27,18 +27,16 @@ class GrupoTest extends GrupoTestCase
             ->assertOk();
     }
 
-    public function test_listagem_ajax_retorna_partial_da_tabela(): void
+    public function test_listagem_usa_datatable_com_registros(): void
     {
-        Grupo::factory()->create(['nome' => 'GRUPO AJAX']);
+        Grupo::factory()->create(['nome' => 'GRUPO DATATABLE']);
 
         $this->actingAs($this->gruposManager())
-            ->withHeaders([
-                'X-Requested-With' => 'XMLHttpRequest',
-                'Accept' => 'text/html',
-            ])
             ->get(route('admin.grupos.index'))
             ->assertOk()
-            ->assertSee('GRUPO AJAX', false);
+            ->assertSee('GRUPO DATATABLE', false)
+            ->assertSee('id="grupos-datatable"', false)
+            ->assertSee('data-admin-datatable', false);
     }
 
     public function test_cadastro_com_sucesso_normaliza_nome(): void

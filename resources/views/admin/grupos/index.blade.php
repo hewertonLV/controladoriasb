@@ -13,17 +13,23 @@
         />
     @endcan
 
-    <x-admin.data-table
+    <x-admin.datatable
         title="Grupos"
         subtitle="Cadastro de grupos de clientes (nome único, maiúsculas)."
-        search-placeholder="Pesquisar por nome..."
-        :endpoint="route('admin.grupos.index')"
-        :current-search="$filtros['search'] ?? ''"
-        :current-per-page="$filtros['per_page'] ?? 20"
-        :current-sort="$filtros['sort'] ?? 'nome'"
-        :current-direction="$filtros['direction'] ?? 'asc'"
-        :per-page-options="$perPageOptions"
-        container-id="grupos-table"
+        table-id="grupos-datatable"
+        root-id="grupos-table-root"
+        print-title="Grupos"
+        entity-label="grupos"
+        entity-label-singular="grupo"
+        :order="[0, 'asc']"
+        :sort-column-map="[
+            0 => 'nome',
+            1 => 'created_at',
+        ]"
+        :column-defs="[
+            ['targets' => -1, 'orderable' => false, 'searchable' => false],
+            ['targets' => [0, 1], 'className' => 'text-nowrap'],
+        ]"
     >
         <x-slot:actions>
             @can('grupos.exportar-pdf')
@@ -49,9 +55,6 @@
 
         @include('admin.grupos._table', [
             'grupos' => $grupos,
-            'filtros' => $filtros,
-            'total' => $total,
-            'exibindo' => $exibindo,
         ])
-    </x-admin.data-table>
+    </x-admin.datatable>
 @endsection

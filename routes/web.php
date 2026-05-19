@@ -6,6 +6,8 @@ use App\Http\Controllers\Admin\ClienteImportacaoController;
 use App\Http\Controllers\Admin\EmpresaController;
 use App\Http\Controllers\Admin\EmpresaExportacaoController;
 use App\Http\Controllers\Admin\EmpresaImportacaoController;
+use App\Http\Controllers\Admin\EstadoController;
+use App\Http\Controllers\Admin\EstadoImportacaoController;
 use App\Http\Controllers\Admin\EstoqueController;
 use App\Http\Controllers\Admin\EstoqueExportacaoController;
 use App\Http\Controllers\Admin\EstoqueImportacaoController;
@@ -17,9 +19,11 @@ use App\Http\Controllers\Admin\FreteExportacaoController;
 use App\Http\Controllers\Admin\FreteImportacaoController;
 use App\Http\Controllers\Admin\FrutaController;
 use App\Http\Controllers\Admin\FrutaExportacaoController;
+use App\Http\Controllers\Admin\FrutaIcmsController;
+use App\Http\Controllers\Admin\FrutaIcmsImportacaoController;
 use App\Http\Controllers\Admin\FrutaImportacaoController;
-use App\Http\Controllers\Admin\GrupoController;
 use App\Http\Controllers\Admin\GrupoContratoController;
+use App\Http\Controllers\Admin\GrupoController;
 use App\Http\Controllers\Admin\GrupoExportacaoController;
 use App\Http\Controllers\Admin\GrupoImportacaoController;
 use App\Http\Controllers\Admin\GrupoPermissaoController;
@@ -49,6 +53,7 @@ use App\Http\Controllers\Admin\VeiculoImportacaoController;
 use App\Http\Controllers\Auth\ForcePasswordChangeController;
 use App\Http\Controllers\ClientErrorController;
 use App\Http\Controllers\ProfileController;
+use App\Http\Controllers\RequestDebugClientReportController;
 use App\Http\Controllers\ThemeSettingsController;
 use Illuminate\Support\Facades\Route;
 
@@ -58,6 +63,10 @@ Route::get('/', function () {
 
 Route::post('/client-errors', [ClientErrorController::class, 'store'])
     ->name('client-errors.store');
+
+Route::post('/request-debug/client-report', [RequestDebugClientReportController::class, 'store'])
+    ->middleware(['auth', 'user.active'])
+    ->name('request-debug.client-report');
 
 /*
  * Rotas autenticadas mas SEM o middleware password.changed,
@@ -478,6 +487,56 @@ Route::middleware(['auth', 'verified', 'user.active', 'password.changed'])->grou
                 ->name('update');
         });
 
+        Route::prefix('estados')->name('estados.')->group(function () {
+            Route::get('/', [EstadoController::class, 'index'])
+                ->middleware('permission:estados.visualizar')
+                ->name('index');
+
+            Route::get('/importar', [EstadoImportacaoController::class, 'importar'])
+                ->middleware('permission:estados.importar')
+                ->name('importar');
+
+            Route::post('/importar/iniciar', [EstadoImportacaoController::class, 'iniciar'])
+                ->middleware('permission:estados.importar')
+                ->name('importar.iniciar');
+
+            Route::get('/importar/{importacao:uuid}/status', [EstadoImportacaoController::class, 'status'])
+                ->middleware('permission:estados.importar')
+                ->name('importar.status');
+
+            Route::get('/importar/{importacao:uuid}/resultado', [EstadoImportacaoController::class, 'resultado'])
+                ->middleware('permission:estados.importar')
+                ->name('importar.resultado');
+
+            Route::post('/importar/{importacao:uuid}/confirmar', [EstadoImportacaoController::class, 'confirmar'])
+                ->middleware('permission:estados.importar-confirmar')
+                ->name('importar.confirmar');
+
+            Route::get('/criar', [EstadoController::class, 'create'])
+                ->middleware('permission:estados.criar')
+                ->name('create');
+
+            Route::post('/', [EstadoController::class, 'store'])
+                ->middleware('permission:estados.criar')
+                ->name('store');
+
+            Route::get('/{estado}/editar', [EstadoController::class, 'edit'])
+                ->middleware('permission:estados.editar')
+                ->name('edit');
+
+            Route::put('/{estado}', [EstadoController::class, 'update'])
+                ->middleware('permission:estados.editar')
+                ->name('update');
+
+            Route::post('/{estado}/inativar', [EstadoController::class, 'inativar'])
+                ->middleware('permission:estados.inativar')
+                ->name('inativar');
+
+            Route::post('/{estado}/reativar', [EstadoController::class, 'reativar'])
+                ->middleware('permission:estados.reativar')
+                ->name('reativar');
+        });
+
         Route::prefix('grupos-contrato')->name('grupos-contrato.')->group(function () {
             Route::get('/', [GrupoContratoController::class, 'index'])
                 ->middleware('permission:grupos-contrato.visualizar')
@@ -552,6 +611,46 @@ Route::middleware(['auth', 'verified', 'user.active', 'password.changed'])->grou
             Route::post('/importar/{importacao:uuid}/confirmar', [FrutaImportacaoController::class, 'confirmar'])
                 ->middleware('permission:frutas.importar-confirmar')
                 ->name('importar.confirmar');
+
+            Route::get('/icms', [FrutaIcmsController::class, 'index'])
+                ->middleware('permission:frutas.icms.visualizar')
+                ->name('icms.index');
+
+            Route::get('/icms/criar', [FrutaIcmsController::class, 'create'])
+                ->middleware('permission:frutas.icms.criar')
+                ->name('icms.create');
+
+            Route::post('/icms', [FrutaIcmsController::class, 'store'])
+                ->middleware('permission:frutas.icms.criar')
+                ->name('icms.store');
+
+            Route::get('/icms/{fruta}/estados/{estado}/editar', [FrutaIcmsController::class, 'edit'])
+                ->middleware('permission:frutas.icms.editar')
+                ->name('icms.edit');
+
+            Route::put('/icms/{fruta}/estados/{estado}', [FrutaIcmsController::class, 'update'])
+                ->middleware('permission:frutas.icms.editar')
+                ->name('icms.update');
+
+            Route::get('/icms/importar', [FrutaIcmsImportacaoController::class, 'importar'])
+                ->middleware('permission:frutas.icms.importar')
+                ->name('icms.importar');
+
+            Route::post('/icms/importar/iniciar', [FrutaIcmsImportacaoController::class, 'iniciar'])
+                ->middleware('permission:frutas.icms.importar')
+                ->name('icms.importar.iniciar');
+
+            Route::get('/icms/importar/{importacao:uuid}/status', [FrutaIcmsImportacaoController::class, 'status'])
+                ->middleware('permission:frutas.icms.importar')
+                ->name('icms.importar.status');
+
+            Route::get('/icms/importar/{importacao:uuid}/resultado', [FrutaIcmsImportacaoController::class, 'resultado'])
+                ->middleware('permission:frutas.icms.importar')
+                ->name('icms.importar.resultado');
+
+            Route::post('/icms/importar/{importacao:uuid}/confirmar', [FrutaIcmsImportacaoController::class, 'confirmar'])
+                ->middleware('permission:frutas.icms.importar-confirmar')
+                ->name('icms.importar.confirmar');
 
             Route::get('/criar', [FrutaController::class, 'create'])
                 ->middleware('permission:frutas.criar')

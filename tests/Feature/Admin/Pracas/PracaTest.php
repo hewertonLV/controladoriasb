@@ -28,22 +28,20 @@ class PracaTest extends PracaTestCase
             ->assertOk();
     }
 
-    public function test_listagem_ajax_retorna_partial_da_tabela(): void
+    public function test_listagem_usa_datatable_com_registros(): void
     {
         $unidade = UnidadeNegocio::factory()->create();
         Praca::factory()->create([
-            'nome' => 'PRACA AJAX',
+            'nome' => 'PRACA DATATABLE',
             'id_unidade_negocio' => $unidade->id,
         ]);
 
         $this->actingAs($this->pracasManager())
-            ->withHeaders([
-                'X-Requested-With' => 'XMLHttpRequest',
-                'Accept' => 'text/html',
-            ])
             ->get(route('admin.pracas.index'))
             ->assertOk()
-            ->assertSee('PRACA AJAX', false);
+            ->assertSee('PRACA DATATABLE', false)
+            ->assertSee('id="pracas-datatable"', false)
+            ->assertSee('data-admin-datatable', false);
     }
 
     public function test_cadastro_com_sucesso_normaliza_campos(): void

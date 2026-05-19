@@ -6,17 +6,25 @@
 @section('content')
     <x-admin.flash-messages />
 
-    <x-admin.data-table
+    <x-admin.datatable
         title="Grupos de Contrato"
         subtitle="Controle de grupos contratuais, membros por competência e descontos mensais."
-        search-placeholder="Pesquisar por nome ou descrição..."
-        :endpoint="route('admin.grupos-contrato.index')"
-        :current-search="$filtros['search'] ?? ''"
-        :current-per-page="$filtros['per_page'] ?? 20"
-        :current-sort="$filtros['sort'] ?? 'nome'"
-        :current-direction="$filtros['direction'] ?? 'asc'"
-        :per-page-options="$perPageOptions"
-        container-id="grupos-contrato-table"
+        table-id="grupos-contrato-datatable"
+        root-id="grupos-contrato-table-root"
+        print-title="Grupos de Contrato"
+        entity-label="grupos de contrato"
+        entity-label-singular="grupo de contrato"
+        :order="[0, 'asc']"
+        :sort-column-map="[
+            0 => 'nome',
+            1 => 'ativo',
+            4 => 'created_at',
+        ]"
+        :column-defs="[
+            ['targets' => -1, 'orderable' => false, 'searchable' => false],
+            ['targets' => [2, 3], 'orderable' => false],
+            ['targets' => [0, 1, 4], 'className' => 'text-nowrap'],
+        ]"
     >
         <x-slot:actions>
             @can('grupos-contrato.criar')
@@ -28,9 +36,6 @@
 
         @include('admin.grupos-contrato._table', [
             'gruposContrato' => $gruposContrato,
-            'filtros' => $filtros,
-            'total' => $total,
-            'exibindo' => $exibindo,
         ])
-    </x-admin.data-table>
+    </x-admin.datatable>
 @endsection

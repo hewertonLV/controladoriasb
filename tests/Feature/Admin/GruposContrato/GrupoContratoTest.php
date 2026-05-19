@@ -22,7 +22,9 @@ class GrupoContratoTest extends GrupoContratoTestCase
         $this->actingAs($this->grupoContratoUsuario(['grupos-contrato.visualizar']))
             ->get(route('admin.grupos-contrato.index'))
             ->assertOk()
-            ->assertSee('CONTRATO BANANA', false);
+            ->assertSee('CONTRATO BANANA', false)
+            ->assertSee('id="grupos-contrato-datatable"', false)
+            ->assertSee('data-admin-datatable', false);
     }
 
     public function test_cadastro_de_grupo_contrato_normaliza_nome_e_audita(): void

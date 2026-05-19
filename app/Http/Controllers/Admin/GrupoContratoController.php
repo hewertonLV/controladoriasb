@@ -30,36 +30,17 @@ class GrupoContratoController extends Controller
     public function index(Request $request): View
     {
         $filtros = $this->grupoContratoQuery->filtrosFromRequest($request);
-        $query = $this->grupoContratoQuery->aplicarFiltros(
+        $gruposContrato = $this->grupoContratoQuery->aplicarFiltros(
             GrupoContrato::query()
                 ->withCount('membros')
                 ->with(['descontos' => fn ($q) => $q->latest('competencia')->limit(1)]),
             $filtros,
-        );
+        )->get();
 
-        if ($filtros['per_page'] === 'all') {
-            $total = (clone $query)->toBase()->count();
-            $gruposContrato = $query->get();
-            $exibindo = $gruposContrato->count();
-        } else {
-            $gruposContrato = $query->paginate((int) $filtros['per_page'])->appends($filtros);
-            $total = $gruposContrato->total();
-            $exibindo = count((array) $gruposContrato->items());
-        }
-
-        $payload = [
+        return view('admin.grupos-contrato.index', [
             'gruposContrato' => $gruposContrato,
             'filtros' => $filtros,
-            'perPageOptions' => GrupoContratoQuery::PER_PAGE_OPTIONS,
-            'total' => $total,
-            'exibindo' => $exibindo,
-        ];
-
-        if ($request->ajax()) {
-            return view('admin.grupos-contrato._table', $payload);
-        }
-
-        return view('admin.grupos-contrato.index', $payload);
+        ]);
     }
 
     public function create(): View

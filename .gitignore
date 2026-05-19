@@ -108,3 +108,5 @@ npm-debug.log*
 # ---- Homestead (não usamos, mas redundância barata) ------------------------
 Homestead.json
 Homestead.yaml
+*.~lock*
+planilhas/

@@ -19,6 +19,7 @@ use App\Models\Movimentacao;
 use App\Models\MovimentacaoEstoque;
 use App\Models\MovimentacaoHistorico;
 use App\Models\UnidadeNegocio;
+use App\Services\Frutas\FrutaIcmsSyncService;
 use Database\Seeders\CategoriaMovimentacaoSeeder;
 use Database\Seeders\EstadoSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -62,11 +63,12 @@ class CompraMovimentacaoTest extends TestCase
             'status_position' => true,
         ]);
 
-        $fruta = Fruta::factory()->create([
+        $fruta = Fruta::factory()->comIcmsCeara([
+            'entrada_nacional' => '2.00',
+            'entrada_externo' => '1.00',
+            'entrada_um' => FrutaUmIcms::KG->value,
+        ])->create([
             'kg_por_unidade_medicao' => '10.00',
-            'icms_na_compra' => '2.00',
-            'icms_ex_compra' => '1.00',
-            'um_icms' => FrutaUmIcms::KG->value,
         ]);
 
         $frete = Frete::factory()->create(['valor' => '200.00']);
@@ -143,11 +145,12 @@ class CompraMovimentacaoTest extends TestCase
     {
         $this->seedCategoriasEEstados();
         [$empresaFornecedor, $empresaUnidade, $unidade, $fruta, $frete] = $this->criarCenarioCompra();
-        $fruta2 = Fruta::factory()->create([
+        $fruta2 = Fruta::factory()->comIcmsCeara([
+            'entrada_nacional' => '0.00',
+            'entrada_externo' => '0.00',
+            'entrada_um' => FrutaUmIcms::KG->value,
+        ])->create([
             'kg_por_unidade_medicao' => '5.00',
-            'icms_na_compra' => '0.00',
-            'icms_ex_compra' => '0.00',
-            'um_icms' => FrutaUmIcms::KG->value,
         ]);
 
         $this->actingAs($this->userWithPermissions([Permissions::MOVIMENTACOES_COMPRAS_CRIAR]))
@@ -339,10 +342,14 @@ class CompraMovimentacaoTest extends TestCase
             'custo_operacional' => '9.00',
             'status_position' => true,
         ]);
-        $fruta->forceFill([
-            'icms_na_compra' => '90.00',
-            'icms_ex_compra' => '9.00',
-        ])->save();
+        app(FrutaIcmsSyncService::class)->sync($fruta, [
+            Estado::ID_CEARA => [
+                'entrada_nacional' => '90.00',
+                'entrada_externo' => '9.00',
+                'entrada_um' => FrutaUmIcms::KG->value,
+                'saida_venda' => '12.00',
+            ],
+        ]);
 
         $this->actingAs($user)->putJson(route('admin.movimentacoes.compras.update', $compra), [
             'valor_nf_total' => '1.500,00',

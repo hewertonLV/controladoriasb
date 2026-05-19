@@ -16,6 +16,7 @@ use App\Models\Movimentacao;
 use App\Models\MovimentacaoEstoque;
 use App\Models\StatusMovimentacao;
 use App\Models\UnidadeNegocio;
+use App\Services\Frutas\FrutaIcmsCalculoService;
 use App\Services\Permissoes\UnidadeNegocioAccessService;
 use App\Support\EmpresaEntidadeQuery;
 use App\Support\Movimentacoes\FrutasComEstoqueOrigem;
@@ -317,7 +318,8 @@ final class TransferenciaMovimentacaoService
             $valorFreteUm = $qtdUm > 0 ? round($valorFreteRateio / $qtdUm, 2) : 0.0;
         }
 
-        $icmsKg = (float) $this->calcularIcmsTransferenciaKg($fruta, $unidadeOrigem, $unidadeDestino);
+        $icmsKg = (float) app(FrutaIcmsCalculoService::class)
+            ->calcularEntradaPorKg($fruta, $unidadeDestino, null, $unidadeOrigem, $dataMovimentacao);
         $icmsHistoricoEntrada = $this->camposIcmsHistorico($icmsKg, $qtdKg, $qtdUm);
         $valorCoDest = (float) $coDestino->custo_operacional;
         $precoEntradaKg = round($precoMedioOrigemKg + $valorFreteKg + $valorCoDest + $icmsKg, 2);
@@ -577,29 +579,6 @@ final class TransferenciaMovimentacaoService
         }
 
         return $co;
-    }
-
-    /**
-     * ICMS na transferência: origem fora do CEARÁ e destino no CEARÁ.
-     */
-    private function calcularIcmsTransferenciaKg(Fruta $fruta, UnidadeNegocio $origem, UnidadeNegocio $destino): string
-    {
-        $origem->loadMissing('estado');
-        $destino->loadMissing('estado');
-
-        $nomeOrigem = $origem->estado?->nome ?? '';
-        $nomeDest = $destino->estado?->nome ?? '';
-
-        if ($nomeOrigem === 'CEARA' || $nomeDest !== 'CEARA') {
-            return number_format(0, 2, '.', '');
-        }
-
-        $icmsUm = (float) $fruta->icms_na_compra + (float) $fruta->icms_ex_compra;
-        $kgPorUm = (float) $fruta->kg_por_unidade_medicao;
-        $umIcms = mb_strtoupper(trim((string) $fruta->um_icms), 'UTF-8');
-        $icmsKg = $umIcms === 'KG' ? $icmsUm : ($kgPorUm > 0 ? $icmsUm / $kgPorUm : 0.0);
-
-        return number_format(round(max(0, $icmsKg), 2), 2, '.', '');
     }
 
     /**

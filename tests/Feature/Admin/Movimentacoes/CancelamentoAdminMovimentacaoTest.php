@@ -70,11 +70,12 @@ class CancelamentoAdminMovimentacaoTest extends TestCase
             'status_position' => true,
         ]);
 
-        $fruta = Fruta::factory()->create([
+        $fruta = Fruta::factory()->comIcmsCeara([
+            'entrada_nacional' => '2.00',
+            'entrada_externo' => '1.00',
+            'entrada_um' => FrutaUmIcms::KG->value,
+        ])->create([
             'kg_por_unidade_medicao' => '10.00',
-            'icms_na_compra' => '2.00',
-            'icms_ex_compra' => '1.00',
-            'um_icms' => FrutaUmIcms::KG->value,
         ]);
 
         $frete = Frete::factory()->create(['valor' => '200.00', 'status_situacao' => FreteStatusSituacao::ABERTA->value]);
@@ -105,11 +106,12 @@ class CancelamentoAdminMovimentacaoTest extends TestCase
             'status_position' => true,
         ]);
 
-        $fruta = Fruta::factory()->create([
+        $fruta = Fruta::factory()->comIcmsCeara([
+            'entrada_nacional' => '2.00',
+            'entrada_externo' => '1.00',
+            'entrada_um' => FrutaUmIcms::KG->value,
+        ])->create([
             'kg_por_unidade_medicao' => '10.00',
-            'icms_na_compra' => '2.00',
-            'icms_ex_compra' => '1.00',
-            'um_icms' => FrutaUmIcms::KG->value,
         ]);
 
         $estoqueOrigem = Estoque::factory()->create([

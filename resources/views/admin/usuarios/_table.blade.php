@@ -1,159 +1,143 @@
 @php
-    use Illuminate\Contracts\Pagination\LengthAwarePaginator;
-    $isPaginator = $users instanceof LengthAwarePaginator;
-    $linhas = $isPaginator ? $users->items() : $users;
+    /** @var \Illuminate\Support\Collection<int, \App\Models\User>|\Illuminate\Database\Eloquent\Collection<int, \App\Models\User> $users */
+    $linhas = $users;
 @endphp
 
-<div class="card-body p-0">
-    <div class="table-responsive">
-        <table class="table table-centered table-hover mb-0">
-            <thead class="bg-light bg-opacity-50">
-                <tr>
-                    <x-admin.sortable-th label="Nome" sort="name" :filtros="$filtros" />
-                    <x-admin.sortable-th label="Login" sort="login" :filtros="$filtros" />
-                    <x-admin.sortable-th label="Email" sort="email" :filtros="$filtros" />
-                    <th>Grupos</th>
-                    <th>Unidades permitidas</th>
-                    <x-admin.sortable-th label="Status" sort="ativo" :filtros="$filtros" />
-                    <x-admin.sortable-th label="Senha" sort="must_change_password" :filtros="$filtros" />
-                    <x-admin.sortable-th label="Criado" sort="created_at" :filtros="$filtros" />
-                    <th class="text-end">Ações</th>
-                </tr>
-            </thead>
-            <tbody>
-                @forelse ($linhas as $user)
-                    @php
-                        $isProtected = strtolower((string) $user->email) === $protectedEmail;
-                        $isProgramador = $user->hasRole(\App\Enums\Roles::PROGRAMADOR->value);
-                        $isSelf = auth()->id() === $user->id;
-                        $isInactive = ! $user->ativo;
-                    @endphp
-                    <tr class="{{ $isInactive ? 'text-muted bg-light bg-opacity-25' : '' }}">
-                        <td>
-                            <span class="fw-semibold">{{ $user->name }}</span>
-                            @if ($isProtected)
-                                <span class="badge bg-danger-subtle text-danger ms-1">Programador</span>
-                            @endif
-                        </td>
-                        <td><code>{{ $user->login ?? '—' }}</code></td>
-                        <td>{{ $user->email }}</td>
-                        <td>
-                            @forelse ($user->roles as $role)
-                                <span class="badge bg-primary-subtle text-primary">{{ $role->name }}</span>
-                            @empty
-                                <span class="text-muted">—</span>
-                            @endforelse
-                        </td>
-                        <td>
-                            @if ($isProgramador || $user->hasRole(\App\Enums\Roles::ADMINISTRADOR->value))
-                                <span class="badge bg-success-subtle text-success">Todas</span>
-                            @else
-                                @forelse ($user->unidadesNegocio as $unidade)
-                                    <span class="badge bg-info-subtle text-info">{{ $unidade->nome }}</span>
-                                @empty
-                                    <span class="badge bg-warning-subtle text-warning">Sem vínculo</span>
-                                @endforelse
-                            @endif
-                        </td>
-                        <td>
-                            @if ($user->ativo)
-                                <span class="badge bg-success-subtle text-success">
-                                    <i class="ri-checkbox-circle-line me-1"></i>Ativo
-                                </span>
-                            @else
-                                <span class="badge bg-secondary-subtle text-secondary">
-                                    <i class="ri-close-circle-line me-1"></i>Inativo
-                                </span>
-                            @endif
-                        </td>
-                        <td>
-                            @if ($user->must_change_password)
-                                <span class="badge bg-warning-subtle text-warning">
-                                    <i class="ri-key-2-line me-1"></i>Senha temporária
-                                </span>
-                            @else
-                                <span class="badge bg-info-subtle text-info">
-                                    <i class="ri-shield-check-line me-1"></i>Senha definida
-                                </span>
-                            @endif
-                        </td>
-                        <td>{{ optional($user->created_at)->format('d/m/Y H:i') ?? '—' }}</td>
-                        <td class="text-end">
-                            <div class="d-inline-flex gap-1 flex-wrap justify-content-end">
-                                @can('usuarios.editar')
-                                    <a href="{{ route('admin.usuarios.edit', $user) }}"
-                                       class="btn btn-sm btn-soft-primary"
-                                       title="Editar">
-                                        <i class="ri-pencil-line"></i> Editar
-                                    </a>
-                                @endcan
+<div class="card-body">
+    <table id="usuarios-datatable" class="table table-sm table-striped table-hover table-centered admin-datatable-table mb-0 w-100">
+        <thead>
+            <tr>
+                <th>Nome</th>
+                <th>Login</th>
+                <th>E-mail</th>
+                <th>Grupos</th>
+                <th>Status</th>
+                <th>Senha</th>
+                <th>Criado</th>
+                <th class="text-end">Ações</th>
+            </tr>
+        </thead>
+        <tbody>
+            @forelse ($linhas as $user)
+                @php
+                    $isProtected = strtolower((string) $user->email) === $protectedEmail;
+                    $isProgramador = $user->hasRole(\App\Enums\Roles::PROGRAMADOR->value);
+                    $isSelf = auth()->id() === $user->id;
+                    $isInactive = ! $user->ativo;
+                @endphp
+                <tr class="{{ $isInactive ? 'text-muted' : '' }}">
+                    <td>
+                        <span class="fw-semibold">{{ $user->name }}</span>
+                        @if ($isProtected)
+                            <span class="badge bg-danger-subtle text-danger ms-1">Programador</span>
+                        @endif
+                    </td>
+                    <td><code>{{ $user->login ?? '—' }}</code></td>
+                    <td>{{ $user->email }}</td>
+                    <td>
+                        @forelse ($user->roles as $role)
+                            <span class="badge bg-primary-subtle text-primary">{{ $role->name }}</span>
+                        @empty
+                            <span class="text-muted">—</span>
+                        @endforelse
+                    </td>
+                    <td data-order="{{ $user->ativo ? 1 : 0 }}">
+                        @if ($user->ativo)
+                            <span class="badge bg-success-subtle text-success">
+                                <i class="ri-checkbox-circle-line me-1"></i>Ativo
+                            </span>
+                        @else
+                            <span class="badge bg-secondary-subtle text-secondary">
+                                <i class="ri-close-circle-line me-1"></i>Inativo
+                            </span>
+                        @endif
+                    </td>
+                    <td data-order="{{ $user->must_change_password ? 1 : 0 }}">
+                        @if ($user->must_change_password)
+                            <span class="badge bg-warning-subtle text-warning">
+                                <i class="ri-key-2-line me-1"></i>Temporária
+                            </span>
+                        @else
+                            <span class="badge bg-info-subtle text-info">
+                                <i class="ri-shield-check-line me-1"></i>Definida
+                            </span>
+                        @endif
+                    </td>
+                    <td data-order="{{ $user->created_at?->timestamp ?? 0 }}">{{ optional($user->created_at)->format('d/m/Y H:i') ?? '—' }}</td>
+                    <td class="text-end">
+                        <div class="d-inline-flex gap-1 justify-content-end flex-nowrap">
+                            @can('usuarios.editar')
+                                <a href="{{ route('admin.usuarios.edit', $user) }}"
+                                   class="admin-datatable-action-link text-primary"
+                                   title="Editar">
+                                    <i class="ri-pencil-line"></i>
+                                </a>
+                            @endcan
 
-                                @can('usuarios.resetar-senha')
-                                    @if (! $isProtected && ! $isSelf)
+                            @can('usuarios.resetar-senha')
+                                @if (! $isProtected && ! $isSelf)
+                                    <form method="POST"
+                                          action="{{ route('admin.usuarios.reset-password', $user) }}"
+                                          class="d-inline"
+                                          data-confirm="Resetar a senha de {{ $user->name }} para a senha padrão?"
+                                          data-confirm-title="Resetar senha"
+                                          data-confirm-variant="warning"
+                                          data-confirm-btn="Resetar senha">
+                                        @csrf
+                                        <button type="submit"
+                                                class="admin-datatable-action-link text-warning border-0 bg-transparent p-0"
+                                                title="Resetar senha">
+                                            <i class="ri-refresh-line"></i>
+                                        </button>
+                                    </form>
+                                @endif
+                            @endcan
+
+                            @if ($user->ativo)
+                                @can('usuarios.desativar')
+                                    @if (! $isProtected && ! $isProgramador && ! $isSelf)
                                         <form method="POST"
-                                              action="{{ route('admin.usuarios.reset-password', $user) }}"
-                                              onsubmit="return confirm('Resetar a senha de {{ $user->name }} para a senha padrão?');"
-                                              class="d-inline">
+                                              action="{{ route('admin.usuarios.desativar', $user) }}"
+                                              class="d-inline"
+                                              data-confirm="Desativar o usuário {{ $user->name }}? Ele perderá o acesso ao sistema."
+                                              data-confirm-title="Desativar usuário"
+                                              data-confirm-variant="danger"
+                                              data-confirm-btn="Desativar">
                                             @csrf
-                                            <button type="submit" class="btn btn-sm btn-soft-warning" title="Resetar senha">
-                                                <i class="ri-refresh-line"></i> Resetar senha
+                                            <button type="submit"
+                                                    class="admin-datatable-action-link text-secondary border-0 bg-transparent p-0"
+                                                    title="Desativar">
+                                                <i class="ri-user-unfollow-line"></i>
                                             </button>
                                         </form>
                                     @endif
                                 @endcan
-
-                                @if ($user->ativo)
-                                    @can('usuarios.desativar')
-                                        @if (! $isProtected && ! $isProgramador && ! $isSelf)
-                                            <form method="POST"
-                                                  action="{{ route('admin.usuarios.desativar', $user) }}"
-                                                  onsubmit="return confirm('Desativar o usuário {{ $user->name }}? Ele perderá o acesso ao sistema.');"
-                                                  class="d-inline">
-                                                @csrf
-                                                <button type="submit" class="btn btn-sm btn-soft-secondary" title="Desativar">
-                                                    <i class="ri-user-unfollow-line"></i> Desativar
-                                                </button>
-                                            </form>
-                                        @endif
-                                    @endcan
-                                @else
-                                    @can('usuarios.reativar')
-                                        <form method="POST"
-                                              action="{{ route('admin.usuarios.reativar', $user) }}"
-                                              onsubmit="return confirm('Reativar o usuário {{ $user->name }}?');"
-                                              class="d-inline">
-                                            @csrf
-                                            <button type="submit" class="btn btn-sm btn-soft-success" title="Reativar">
-                                                <i class="ri-user-follow-line"></i> Reativar
-                                            </button>
-                                        </form>
-                                    @endcan
-                                @endif
-                            </div>
-                        </td>
-                    </tr>
-                @empty
-                    <tr>
-                        <td colspan="9" class="text-center text-muted py-4">
-                            @if (($filtros['search'] ?? '') !== '')
-                                Nenhum usuário corresponde à pesquisa.
                             @else
-                                Nenhum usuário cadastrado.
+                                @can('usuarios.reativar')
+                                    <form method="POST"
+                                          action="{{ route('admin.usuarios.reativar', $user) }}"
+                                          class="d-inline"
+                                          data-confirm="Reativar o usuário {{ $user->name }}?"
+                                          data-confirm-title="Reativar usuário"
+                                          data-confirm-variant="success"
+                                          data-confirm-btn="Reativar">
+                                        @csrf
+                                        <button type="submit"
+                                                class="admin-datatable-action-link text-success border-0 bg-transparent p-0"
+                                                title="Reativar">
+                                            <i class="ri-user-follow-line"></i>
+                                        </button>
+                                    </form>
+                                @endcan
                             @endif
-                        </td>
-                    </tr>
-                @endforelse
-            </tbody>
-        </table>
-    </div>
-</div>
-
-<div class="card-footer d-flex flex-wrap align-items-center gap-2">
-    <div class="text-muted small me-auto">
-        Exibindo <strong>{{ $exibindo }}</strong> de <strong>{{ $total }}</strong> usuário(s).
-        @if (($filtros['search'] ?? '') !== '')
-            · Pesquisa: <code>{{ $filtros['search'] }}</code>
-        @endif
-    </div>
-    <x-admin.table-pagination :paginator="$users" />
+                        </div>
+                    </td>
+                </tr>
+            @empty
+                <tr>
+                    <td colspan="9" class="text-center text-muted py-4">Nenhum usuário cadastrado.</td>
+                </tr>
+            @endforelse
+        </tbody>
+    </table>
 </div>

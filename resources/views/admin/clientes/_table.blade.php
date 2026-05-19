@@ -1,49 +1,51 @@
 @php
-    use Illuminate\Contracts\Pagination\LengthAwarePaginator;
-    $isPaginator = $clientes instanceof LengthAwarePaginator;
-    $linhas = $isPaginator ? $clientes->items() : $clientes;
+    /** @var \Illuminate\Support\Collection<int, \App\Models\Cliente>|\Illuminate\Database\Eloquent\Collection<int, \App\Models\Cliente> $clientes */
+    $linhas = $clientes;
 @endphp
 
-<div class="card-body p-0">
-    <div class="table-responsive">
-        <table class="table table-centered table-hover mb-0">
-            <thead class="bg-light bg-opacity-50">
+<div class="card-body">
+    <table id="clientes-datatable" class="table table-sm table-striped table-hover table-centered admin-datatable-table mb-0 w-100">
+            <thead>
                 <tr>
-                    <x-admin.sortable-th label="# CI." sort="id_cigam" :filtros="$filtros" />
-                    <x-admin.sortable-th label="Cliente" sort="fantasia" :filtros="$filtros" />
-                    <x-admin.sortable-th label="Doc." sort="cnpj_cpf" :filtros="$filtros" />
+                    <th># CI.</th>
+                    <th>Cliente</th>
+                    <th>Doc.</th>
                     <th>Praça</th>
                     <th>Grupo</th>
-                    <x-admin.sortable-th label="Desc." sort="desconto_nf" :filtros="$filtros" />
-                    <x-admin.sortable-th label="Criado" sort="created_at" :filtros="$filtros" />
+                    <th>Desc.</th>
+                    <th>Criado</th>
                     <th class="text-end">Ações</th>
                 </tr>
             </thead>
             <tbody>
                 @forelse ($linhas as $cliente)
                     <tr>
-                        <td><code>{{ $cliente->id_cigam }}</code></td>
-                        <td><span class="fw-semibold">{{ $cliente->fantasia ?: $cliente->razao_social }}</span></td>
-                        <td><code>{{ $cliente->cnpj_cpf_formatado }}</code></td>
+                        <td data-order="{{ (int) $cliente->id_cigam }}">
+                            <code class="small">{{ $cliente->id_cigam }}</code>
+                        </td>
+                        <td data-order="{{ $cliente->fantasia ?: $cliente->razao_social }}">
+                            <span class="fw-semibold">{{ $cliente->fantasia ?: $cliente->razao_social }}</span>
+                        </td>
+                        <td><code class="small">{{ $cliente->cnpj_cpf_formatado }}</code></td>
                         <td>{{ $cliente->praca?->nome ?? '—' }}</td>
                         <td>{{ $cliente->grupo?->nome ?? '—' }}</td>
-                        <td>{{ number_format((float) $cliente->desconto_nf, 2, ',', '.') }}</td>
-                        <td>{{ optional($cliente->created_at)->format('d/m/Y H:i') ?? '—' }}</td>
+                        <td data-order="{{ (float) $cliente->desconto_nf }}">{{ number_format((float) $cliente->desconto_nf, 2, ',', '.') }}</td>
+                        <td data-order="{{ $cliente->created_at?->timestamp ?? 0 }}">{{ optional($cliente->created_at)->format('d/m/Y H:i') ?? '—' }}</td>
                         <td class="text-end">
-                            <div class="d-inline-flex gap-1 flex-wrap justify-content-end">
+                            <div class="d-inline-flex gap-1 justify-content-end flex-nowrap">
                                 @can('clientes.editar')
                                     <a href="{{ route('admin.clientes.edit', $cliente) }}"
-                                       class="btn btn-sm btn-soft-primary"
+                                       class="admin-datatable-action-link text-primary"
                                        title="Editar">
-                                        <i class="ri-pencil-line"></i> Editar
+                                        <i class="ri-pencil-line"></i>
                                     </a>
                                 @endcan
 
                                 @can('clientes.historico')
                                     <a href="{{ route('admin.clientes.historico', $cliente) }}"
-                                       class="btn btn-sm btn-soft-info"
+                                       class="admin-datatable-action-link text-info"
                                        title="Histórico">
-                                        <i class="ri-history-line"></i> Histórico
+                                        <i class="ri-history-line"></i>
                                     </a>
                                 @endcan
                             </div>
@@ -51,27 +53,9 @@
                     </tr>
                 @empty
                     <tr>
-                        <td colspan="8" class="text-center text-muted py-4">
-                            @if (($filtros['search'] ?? '') !== '')
-                                Nenhum cliente corresponde aos filtros aplicados.
-                            @else
-                                Nenhum cliente cadastrado.
-                            @endif
-                        </td>
+                        <td colspan="8" class="text-center text-muted py-4">Nenhum cliente cadastrado.</td>
                     </tr>
                 @endforelse
             </tbody>
         </table>
-    </div>
 </div>
-
-<div class="card-footer d-flex flex-wrap align-items-center gap-2">
-    <div class="text-muted small me-auto">
-        Exibindo <strong>{{ $exibindo }}</strong> de <strong>{{ $total }}</strong> cliente(s).
-        @if (($filtros['search'] ?? '') !== '')
-            · Pesquisa: <code>{{ $filtros['search'] }}</code>
-        @endif
-    </div>
-    <x-admin.table-pagination :paginator="$clientes" />
-</div>
-

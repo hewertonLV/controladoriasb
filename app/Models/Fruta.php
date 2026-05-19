@@ -15,10 +15,6 @@ use Illuminate\Support\Carbon;
  * @property string $nome
  * @property string $unidade_medicao
  * @property string $kg_por_unidade_medicao
- * @property string $icms_ex_compra
- * @property string $icms_na_compra
- * @property string $um_icms
- * @property string $icms_venda
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
  */
@@ -37,10 +33,6 @@ class Fruta extends Model
         'nome',
         'unidade_medicao',
         'kg_por_unidade_medicao',
-        'icms_ex_compra',
-        'icms_na_compra',
-        'um_icms',
-        'icms_venda',
     ];
 
     /**
@@ -50,9 +42,6 @@ class Fruta extends Model
     {
         return [
             'kg_por_unidade_medicao' => 'decimal:2',
-            'icms_ex_compra' => 'decimal:2',
-            'icms_na_compra' => 'decimal:2',
-            'icms_venda' => 'decimal:2',
         ];
     }
 
@@ -83,26 +72,12 @@ class Fruta extends Model
         $this->attributes['kg_por_unidade_medicao'] = number_format($kg, 2, '.', '');
     }
 
-    protected function setIcmsExCompraAttribute(mixed $value): void
+    /**
+     * @return HasMany<FrutaIcms, $this>
+     */
+    public function icms(): HasMany
     {
-        $this->attributes['icms_ex_compra'] = TextoCadastro::normalizarValorMonetarioBrasileiro($value);
-    }
-
-    protected function setIcmsNaCompraAttribute(mixed $value): void
-    {
-        $this->attributes['icms_na_compra'] = TextoCadastro::normalizarValorMonetarioBrasileiro($value);
-    }
-
-    protected function setUmIcmsAttribute(mixed $value): void
-    {
-        $this->attributes['um_icms'] = TextoCadastro::normalizarMaiusculas(
-            $value === null ? '' : (string) $value,
-        );
-    }
-
-    protected function setIcmsVendaAttribute(mixed $value): void
-    {
-        $this->attributes['icms_venda'] = TextoCadastro::normalizarValorMonetarioBrasileiro($value);
+        return $this->hasMany(FrutaIcms::class, 'fruta_id');
     }
 
     /**

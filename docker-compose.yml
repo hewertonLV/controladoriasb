@@ -32,7 +32,7 @@ services:
       - php
       - artisan
       - queue:work
-      - --queue=imports,empresas-importacao,unidades-negocio-importacao,clientes-importacao,grupos-importacao,veiculos-importacao,fretes-importacao,frutas-importacao,pracas-importacao,estoques-importacao
+      - --queue=imports,empresas-importacao,unidades-negocio-importacao,clientes-importacao,grupos-importacao,veiculos-importacao,fretes-importacao,frutas-importacao,pracas-importacao,estoques-importacao,estados-importacao
       - --sleep=1
       - --tries=1
       - --timeout=900

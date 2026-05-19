@@ -53,7 +53,7 @@ class EstoqueMovimentacaoTest extends TestCase
             ->assertForbidden();
     }
 
-    public function test_index_exibe_cards_de_unidades_e_lista_apenas_unidade_selecionada(): void
+    public function test_index_exibe_tabela_de_unidades_e_lista_apenas_unidade_selecionada(): void
     {
         $unidadeA = UnidadeNegocio::factory()->create(['nome' => 'UNIDADE ESTOQUE A', 'possui_estoque' => true]);
         $unidadeB = UnidadeNegocio::factory()->create(['nome' => 'UNIDADE ESTOQUE B', 'possui_estoque' => true]);
@@ -71,12 +71,13 @@ class EstoqueMovimentacaoTest extends TestCase
             ->assertOk()
             ->assertSeeText('UNIDADE ESTOQUE A')
             ->assertSeeText('UNIDADE ESTOQUE B')
-            ->assertSeeText('Selecione uma unidade de negócio')
+            ->assertSee('id="estoques-unidades-datatable"', false)
+            ->assertSee('data-admin-datatable', false)
+            ->assertSeeText('100,00')
+            ->assertSeeText('Abrir')
             ->assertSee(route('admin.estoques.unidade', $unidadeA), false)
             ->assertDontSeeText('FRUTA ESTOQUE A')
-            ->assertDontSeeText('FRUTA ESTOQUE B')
-            ->assertDontSee('<table id="estoques-datatable"', false)
-            ->assertDontSee('assets/vendor/datatables.net-buttons/js/dataTables.buttons.min.js', false);
+            ->assertDontSeeText('FRUTA ESTOQUE B');
 
         $this->actingAs($user)
             ->get(route('admin.estoques.unidade', $unidadeA))

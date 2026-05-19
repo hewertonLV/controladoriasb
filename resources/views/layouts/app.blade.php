@@ -49,6 +49,8 @@
 
     @include('layouts.partials.theme-settings')
 
+    <x-admin.confirm-modal />
+
     @include('layouts.partials.scripts')
 </body>
 

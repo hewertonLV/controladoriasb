@@ -34,18 +34,16 @@ class FreteTest extends FreteTestCase
             ->assertOk();
     }
 
-    public function test_listagem_ajax_retorna_partial_da_tabela(): void
+    public function test_listagem_usa_datatable_com_registros(): void
     {
-        Frete::factory()->create(['nome' => 'FRETE AJAX']);
+        Frete::factory()->create(['nome' => 'FRETE DATATABLE']);
 
         $this->actingAs($this->fretesManager())
-            ->withHeaders([
-                'X-Requested-With' => 'XMLHttpRequest',
-                'Accept' => 'text/html',
-            ])
             ->get(route('admin.fretes.index'))
             ->assertOk()
-            ->assertSee('FRETE AJAX', false);
+            ->assertSee('FRETE DATATABLE', false)
+            ->assertSee('id="fretes-datatable"', false)
+            ->assertSee('data-admin-datatable', false);
     }
 
     public function test_cadastro_com_sucesso_normaliza_campos(): void

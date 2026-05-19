@@ -16,6 +16,7 @@ use App\Models\Movimentacao;
 use App\Models\MovimentacaoEstoque;
 use App\Models\UnidadeNegocio;
 use App\Models\User;
+use App\Services\Frutas\FrutaIcmsCalculoService;
 use App\Services\Permissoes\UnidadeNegocioAccessService;
 use App\Support\EmpresaEntidadeQuery;
 use App\Support\TextoCadastro;
@@ -187,7 +188,9 @@ final class CompraMovimentacaoService
             $valorFreteRateio = round($valorFreteKg * $qtdKg, 2);
             $valorFreteUm = round($valorFreteRateio / $qtdUm, 2);
 
-            $icmsKg = (float) $this->calcularIcmsPorKg($fruta, $unidade, $fornecedor);
+            $dataMovimentacao = now();
+            $icmsKg = (float) app(FrutaIcmsCalculoService::class)
+                ->calcularEntradaPorKg($fruta, $unidade, $fornecedor, null, $dataMovimentacao);
             $icmsHistorico = $this->camposIcmsHistorico($icmsKg, $qtdKg, $qtdUm);
             $precoMedioKgLote = round($valorNfKg + $valorCo + $valorFreteKg + $icmsKg, 2);
             $precoMedioUmLote = round($precoMedioKgLote * $kgPorUm, 2);
@@ -230,7 +233,7 @@ final class CompraMovimentacaoService
                 'valor_icms_um' => $icmsHistorico['valor_icms_um'],
                 'categoria_movimentacao_id' => $categoriaId,
                 'numero_nf_origem' => $numeroNfOrigem,
-                'data_movimentacao' => now(),
+                'data_movimentacao' => $dataMovimentacao,
                 'versao' => 1,
                 'movimentacao_origem_id' => null,
                 'status_registro' => MovimentacaoStatusRegistro::ATIVO->value,
@@ -460,28 +463,6 @@ final class CompraMovimentacaoService
                 sprintf('Empresa «%d» deve ser do tipo %s.', $empresa->id, $tipo->rotulo()),
             );
         }
-    }
-
-    /**
-     * ICMS na compra (regra CEARA x fora) convertido para R$/kg conforme {@see Fruta::$um_icms}.
-     */
-    private function calcularIcmsPorKg(Fruta $fruta, UnidadeNegocio $unidade, Fornecedor $fornecedor): string
-    {
-        $unidade->loadMissing('estado');
-        $fornecedor->loadMissing('estado');
-
-        $nomeUnidade = $unidade->estado?->nome ?? '';
-        $nomeFornecedor = $fornecedor->estado?->nome ?? '';
-        if ($nomeUnidade !== 'CEARA' || $nomeFornecedor === 'CEARA') {
-            return number_format(0, 2, '.', '');
-        }
-
-        $icmsUm = (float) $fruta->icms_na_compra + (float) $fruta->icms_ex_compra;
-        $kgPorUm = (float) $fruta->kg_por_unidade_medicao;
-        $umIcms = mb_strtoupper(trim((string) $fruta->um_icms), 'UTF-8');
-        $icmsKg = $umIcms === 'KG' ? $icmsUm : ($kgPorUm > 0 ? $icmsUm / $kgPorUm : 0.0);
-
-        return number_format(round(max(0, $icmsKg), 2), 2, '.', '');
     }
 
     /**

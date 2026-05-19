@@ -58,7 +58,12 @@
                                             @can('movimentacoes.vendas.cancelar-admin')
                                                 <form method="POST"
                                                       action="{{ route('admin.movimentacoes.vendas.cancelar-item-admin', $item) }}"
-                                                      onsubmit="const motivo = prompt('Informe o motivo para cancelar apenas este item da venda:'); if (!motivo || !motivo.trim()) return false; this.querySelector('[name=motivo]').value = motivo.trim(); return confirm('Cancelar apenas este item da venda?');">
+                                                      data-confirm="Cancelar apenas este item da venda?"
+                                                      data-confirm-title="Cancelar item"
+                                                      data-confirm-variant="danger"
+                                                      data-confirm-btn="Cancelar item"
+                                                      data-confirm-prompt="Informe o motivo do cancelamento"
+                                                      data-confirm-prompt-field="motivo">
                                                     @csrf
                                                     <input type="hidden" name="motivo">
                                                     <button type="submit" class="btn btn-soft-danger btn-sm">
@@ -92,7 +97,13 @@
             @can('movimentacoes.vendas.cancelar-admin')
                 @if ($movimentacao->status_registro === \App\Enums\MovimentacaoStatusRegistro::ATIVO->value)
                     <hr>
-                    <form method="POST" action="{{ route('admin.movimentacoes.vendas.cancelar-admin', $movimentacao) }}" class="row g-2" onsubmit="return confirm('Cancelar esta venda completa e estornar todos os itens?');">
+                    <form method="POST"
+                          action="{{ route('admin.movimentacoes.vendas.cancelar-admin', $movimentacao) }}"
+                          class="row g-2"
+                          data-confirm="Cancelar esta venda completa e estornar todos os itens?"
+                          data-confirm-title="Cancelar venda"
+                          data-confirm-variant="danger"
+                          data-confirm-btn="Cancelar venda">
                         @csrf
                         <div class="col-md-10">
                             <input name="motivo" class="form-control" required placeholder="Motivo do cancelamento administrativo da venda completa">

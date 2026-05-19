@@ -36,23 +36,26 @@
                 <th width="22%">Nome</th>
                 <th width="10%">Unidade</th>
                 <th width="8%">Kg/un.</th>
-                <th width="10%">ICMS ex. compra</th>
-                <th width="10%">ICMS na compra</th>
-                <th width="6%">UM ICMS</th>
-                <th width="8%">ICMS venda %</th>
+                <th width="8%">ICMS compra nac.</th>
+                <th width="8%">ICMS compra ext.</th>
+                <th width="8%">ICMS venda imp.</th>
+                <th width="8%">ICMS venda nac.</th>
             </tr>
         </thead>
         <tbody>
             @forelse ($frutas as $fruta)
+                @php
+                    $icmsCe = app(\App\Services\Frutas\FrutaIcmsSyncService::class)->snapshotImportacao($fruta, \App\Models\Estado::ID_CEARA);
+                @endphp
                 <tr>
                     <td>{{ $fruta->id_cigam }}</td>
                     <td>{{ $fruta->nome }}</td>
                     <td>{{ $fruta->unidade_medicao }}</td>
                     <td>{{ number_format((float) $fruta->kg_por_unidade_medicao, 2, ',', '.') }}</td>
-                    <td>{{ number_format((float) $fruta->icms_ex_compra, 2, ',', '.') }}</td>
-                    <td>{{ number_format((float) $fruta->icms_na_compra, 2, ',', '.') }}</td>
-                    <td>{{ $fruta->um_icms }}</td>
-                    <td>{{ number_format((float) $fruta->icms_venda, 2, ',', '.') }}</td>
+                    <td>{{ number_format((float) $icmsCe['compra_nacional'], 2, ',', '.') }} {{ $icmsCe['um_compra_nacional'] }}</td>
+                    <td>{{ number_format((float) $icmsCe['compra_exterior'], 2, ',', '.') }} {{ $icmsCe['um_compra_exterior'] }}</td>
+                    <td>{{ number_format((float) $icmsCe['venda_importada'], 2, ',', '.') }} {{ $icmsCe['um_venda_importada'] }}</td>
+                    <td>{{ number_format((float) $icmsCe['venda_nacional'], 2, ',', '.') }} {{ $icmsCe['um_venda_nacional'] }}</td>
                 </tr>
             @empty
                 <tr>

@@ -25,34 +25,16 @@ class UnidadeNegocioController extends Controller
     public function index(Request $request): View
     {
         $filtros = $this->unidadeNegocioQuery->filtrosFromRequest($request);
-        $query = $this->unidadeNegocioQuery->aplicarFiltros(UnidadeNegocio::query(), $filtros);
+        $unidadesNegocio = $this->unidadeNegocioQuery->aplicarFiltros(
+            UnidadeNegocio::query(),
+            $filtros,
+        )->get();
 
-        if ($filtros['per_page'] === 'all') {
-            $total = (clone $query)->toBase()->count();
-            $resultados = $query->get();
-            $unidadesNegocio = $resultados;
-            $exibindo = $resultados->count();
-        } else {
-            $paginator = $query->paginate((int) $filtros['per_page'])->appends($filtros);
-            $unidadesNegocio = $paginator;
-            $total = $paginator->total();
-            $exibindo = count((array) $paginator->items());
-        }
-
-        $payload = [
+        return view('admin.unidades-negocio.index', [
             'unidadesNegocio' => $unidadesNegocio,
             'filtros' => $filtros,
-            'perPageOptions' => UnidadeNegocioQuery::PER_PAGE_OPTIONS,
-            'total' => $total,
-            'exibindo' => $exibindo,
             'estados' => Estado::query()->orderBy('nome')->get(['id', 'nome', 'abreviacao']),
-        ];
-
-        if ($request->ajax()) {
-            return view('admin.unidades-negocio._table', $payload);
-        }
-
-        return view('admin.unidades-negocio.index', $payload);
+        ]);
     }
 
     public function create(): View

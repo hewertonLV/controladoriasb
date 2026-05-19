@@ -57,11 +57,12 @@ class VendaMovimentacaoTest extends TestCase
 
         $this->seedBase();
         $c = $this->cenarioBase();
-        $fruta2 = Fruta::factory()->create([
+        $fruta2 = Fruta::factory()->comIcmsCeara([
+            'entrada_nacional' => 0,
+            'entrada_externo' => 0,
+            'entrada_um' => FrutaUmIcms::KG->value,
+        ])->create([
             'kg_por_unidade_medicao' => 5,
-            'icms_na_compra' => 0,
-            'icms_ex_compra' => 0,
-            'um_icms' => FrutaUmIcms::KG->value,
         ]);
 
         $this->registrarCompra($c, '10', '500,00');
@@ -156,11 +157,12 @@ class VendaMovimentacaoTest extends TestCase
     {
         $this->seedBase();
         $c = $this->cenarioBase();
-        $fruta2 = Fruta::factory()->create([
+        $fruta2 = Fruta::factory()->comIcmsCeara([
+            'entrada_nacional' => 0,
+            'entrada_externo' => 0,
+            'entrada_um' => FrutaUmIcms::KG->value,
+        ])->create([
             'kg_por_unidade_medicao' => 5,
-            'icms_na_compra' => 0,
-            'icms_ex_compra' => 0,
-            'um_icms' => FrutaUmIcms::KG->value,
         ]);
 
         $this->registrarCompra($c, '10', '500,00');
@@ -492,11 +494,12 @@ class VendaMovimentacaoTest extends TestCase
             'empresa_unidade' => $unidade->registroCorporativo()->firstOrFail(),
             'unidade' => $unidade,
             'unidade_faturamento' => $unidadeFaturamento,
-            'fruta' => Fruta::factory()->create([
+            'fruta' => Fruta::factory()->comIcmsCeara([
+                'entrada_nacional' => 0,
+                'entrada_externo' => 0,
+                'entrada_um' => FrutaUmIcms::KG->value,
+            ])->create([
                 'kg_por_unidade_medicao' => 10,
-                'icms_na_compra' => 0,
-                'icms_ex_compra' => 0,
-                'um_icms' => FrutaUmIcms::KG->value,
             ]),
             'frete' => Frete::factory()->create(['valor' => '0.00', 'status_situacao' => FreteStatusSituacao::ABERTA->value]),
         ];

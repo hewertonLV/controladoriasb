@@ -29,33 +29,12 @@ class FreteController extends Controller
     public function index(Request $request): View
     {
         $filtros = $this->freteQuery->filtrosFromRequest($request);
-        $query = $this->freteQuery->aplicarFiltros(Frete::query(), $filtros);
+        $fretes = $this->freteQuery->aplicarFiltros(Frete::query(), $filtros)->get();
 
-        if ($filtros['per_page'] === 'all') {
-            $total = (clone $query)->toBase()->count();
-            $resultados = $query->get();
-            $fretes = $resultados;
-            $exibindo = $resultados->count();
-        } else {
-            $paginator = $query->paginate((int) $filtros['per_page'])->appends($filtros);
-            $fretes = $paginator;
-            $total = $paginator->total();
-            $exibindo = count((array) $paginator->items());
-        }
-
-        $payload = [
+        return view('admin.fretes.index', [
             'fretes' => $fretes,
             'filtros' => $filtros,
-            'perPageOptions' => FreteQuery::PER_PAGE_OPTIONS,
-            'total' => $total,
-            'exibindo' => $exibindo,
-        ];
-
-        if ($request->ajax()) {
-            return view('admin.fretes._table', $payload);
-        }
-
-        return view('admin.fretes.index', $payload);
+        ]);
     }
 
     public function create(): View

@@ -12,6 +12,7 @@ use App\Enums\CategoriaMovimentacaoTipo;
 use App\Enums\MovimentacaoStatusRegistro;
 use App\Enums\Roles;
 use App\Models\Cliente;
+use App\Models\Estado;
 use App\Models\Fornecedor;
 use App\Models\Movimentacao;
 use App\Models\StatusMovimentacao;
@@ -53,6 +54,10 @@ class AppServiceProvider extends ServiceProvider
         // que também é compatível com o interceptor de cliques em
         // `a.page-link` do componente `<x-admin.data-table>`.
         Paginator::useBootstrapFive();
+
+        Route::bind('estado', function (string $value): Estado {
+            return Estado::withTrashed()->findOrFail($value);
+        });
 
         Route::bind('movimentacao', function (string $value): Movimentacao {
             $movimentacao = Movimentacao::query()

@@ -1,6 +1,5 @@
 @php
     use App\Enums\FrutaUnidadeMedicao;
-    use App\Enums\FrutaUmIcms;
     /** @var \App\Models\Fruta $fruta */
 @endphp
 
@@ -73,72 +72,20 @@
                     <div class="invalid-feedback">{{ $message }}</div>
                 @enderror
             </div>
-            <div class="col-md-3">
-                <label for="icms_ex_compra" class="form-label">ICMS externo na compra <span class="text-danger">*</span></label>
-                <input type="text"
-                       inputmode="decimal"
-                       id="icms_ex_compra"
-                       name="icms_ex_compra"
-                       value="{{ old('icms_ex_compra', $fruta->icms_ex_compra ?? '0.00') }}"
-                       class="form-control @error('icms_ex_compra') is-invalid @enderror"
-                       required>
-                @error('icms_ex_compra')
-                    <div class="invalid-feedback">{{ $message }}</div>
-                @enderror
-            </div>
-            <div class="col-md-3">
-                <label for="icms_na_compra" class="form-label">ICMS nacional na compra <span class="text-danger">*</span></label>
-                <input type="text"
-                       inputmode="decimal"
-                       id="icms_na_compra"
-                       name="icms_na_compra"
-                       value="{{ old('icms_na_compra', $fruta->icms_na_compra ?? '0.00') }}"
-                       class="form-control @error('icms_na_compra') is-invalid @enderror"
-                       required>
-                @error('icms_na_compra')
-                    <div class="invalid-feedback">{{ $message }}</div>
-                @enderror
-            </div>
-            <div class="col-md-3">
-                <label for="um_icms" class="form-label">Unidade do ICMS <span class="text-danger">*</span></label>
-                <select id="um_icms"
-                        name="um_icms"
-                        class="form-select @error('um_icms') is-invalid @enderror"
-                        required>
-                    <option value="">Selecione...</option>
-                    @foreach (FrutaUmIcms::cases() as $um)
-                        <option value="{{ $um->value }}"
-                            @selected(old('um_icms', $fruta->um_icms ?? FrutaUmIcms::KG->value) === $um->value)>
-                            {{ $um->value }}
-                        </option>
-                    @endforeach
-                </select>
-                @error('um_icms')
-                    <div class="invalid-feedback">{{ $message }}</div>
-                @enderror
-            </div>
-            <div class="col-md-3">
-                <label for="icms_venda" class="form-label">ICMS venda (%) <span class="text-danger">*</span></label>
-                <input type="text"
-                       inputmode="decimal"
-                       id="icms_venda"
-                       name="icms_venda"
-                       value="{{ old('icms_venda', $fruta->icms_venda ?? '0.00') }}"
-                       class="form-control @error('icms_venda') is-invalid @enderror"
-                       required>
-                @error('icms_venda')
-                    <div class="invalid-feedback">{{ $message }}</div>
-                @enderror
-            </div>
         </div>
     </div>
+</div>
 
-    <div class="card-footer d-flex gap-2 justify-content-end">
-        <a href="{{ route('admin.frutas.index') }}" class="btn btn-light">
-            <i class="ri-arrow-left-line me-1"></i> Voltar
-        </a>
-        <button type="submit" class="btn btn-primary">
-            <i class="ri-save-line me-1"></i> {{ $submitLabel ?? 'Salvar' }}
-        </button>
-    </div>
+@include('admin.frutas._icms_estados', [
+    'estados' => $estados,
+    'icmsForm' => $icmsForm,
+])
+
+<div class="d-flex gap-2 justify-content-end mb-3">
+    <a href="{{ route('admin.frutas.index') }}" class="btn btn-light">
+        <i class="ri-arrow-left-line me-1"></i> Voltar
+    </a>
+    <button type="submit" class="btn btn-primary">
+        <i class="ri-save-line me-1"></i> {{ $submitLabel ?? 'Salvar' }}
+    </button>
 </div>

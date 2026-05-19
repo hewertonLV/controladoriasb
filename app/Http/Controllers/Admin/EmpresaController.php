@@ -20,36 +20,15 @@ class EmpresaController extends Controller
     public function index(Request $request): View
     {
         $filtros = $this->empresaQuery->filtrosFromRequest($request);
-        $query = $this->empresaQuery->aplicarFiltros(
+        $empresas = $this->empresaQuery->aplicarFiltros(
             Empresa::query()->withEntidadeParaListagem(),
             $filtros,
-        );
+        )->get();
 
-        if ($filtros['per_page'] === 'all') {
-            $total = (clone $query)->toBase()->count();
-            $resultados = $query->get();
-            $empresas = $resultados;
-            $exibindo = $resultados->count();
-        } else {
-            $paginator = $query->paginate((int) $filtros['per_page'])->appends($filtros);
-            $empresas = $paginator;
-            $total = $paginator->total();
-            $exibindo = count((array) $paginator->items());
-        }
-
-        $payload = [
+        return view('admin.empresas.index', [
             'empresas' => $empresas,
             'filtros' => $filtros,
-            'perPageOptions' => EmpresaQuery::PER_PAGE_OPTIONS,
-            'total' => $total,
-            'exibindo' => $exibindo,
-        ];
-
-        if ($request->ajax()) {
-            return view('admin.empresas._table', $payload);
-        }
-
-        return view('admin.empresas.index', $payload);
+        ]);
     }
 
     public function exportarPdf(Request $request): Response

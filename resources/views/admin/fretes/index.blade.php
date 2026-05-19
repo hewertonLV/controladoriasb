@@ -13,17 +13,27 @@
         />
     @endcan
 
-    <x-admin.data-table
+    <x-admin.datatable
         title="Fretes"
         subtitle="Cadastro de fretes (nome, valores, veículo e situação ABERTA/ENCERRADA)."
-        search-placeholder="Pesquisar por nome, descrição, situação ou ID SBS do veículo..."
-        :endpoint="route('admin.fretes.index')"
-        :current-search="$filtros['search'] ?? ''"
-        :current-per-page="$filtros['per_page'] ?? 20"
-        :current-sort="$filtros['sort'] ?? 'nome'"
-        :current-direction="$filtros['direction'] ?? 'asc'"
-        :per-page-options="$perPageOptions"
-        container-id="fretes-table"
+        table-id="fretes-datatable"
+        root-id="fretes-table-root"
+        print-title="Fretes"
+        entity-label="fretes"
+        entity-label-singular="frete"
+        :order="[0, 'asc']"
+        :sort-column-map="[
+            0 => 'nome',
+            1 => 'valor',
+            3 => 'status_situacao',
+            4 => 'valor_fruta_kg',
+            5 => 'created_at',
+        ]"
+        :column-defs="[
+            ['targets' => -1, 'orderable' => false, 'searchable' => false],
+            ['targets' => 2, 'orderable' => false],
+            ['targets' => [0, 1, 3, 4, 5], 'className' => 'text-nowrap'],
+        ]"
     >
         <x-slot:actions>
             @can('fretes.exportar-pdf')
@@ -47,22 +57,8 @@
             @endcan
         </x-slot:actions>
 
-        <x-slot:filters>
-            <div class="col-md-3">
-                <label class="form-label small text-muted mb-1" for="fretes-status-situacao">Situação</label>
-                <select id="fretes-status-situacao" name="status_situacao" class="form-select" data-table-filter>
-                    <option value="">Todas</option>
-                    <option value="ABERTA" @selected(($filtros['status_situacao'] ?? null) === 'ABERTA')>Abertas</option>
-                    <option value="ENCERRADA" @selected(($filtros['status_situacao'] ?? null) === 'ENCERRADA')>Encerradas</option>
-                </select>
-            </div>
-        </x-slot:filters>
-
         @include('admin.fretes._table', [
             'fretes' => $fretes,
-            'filtros' => $filtros,
-            'total' => $total,
-            'exibindo' => $exibindo,
         ])
-    </x-admin.data-table>
+    </x-admin.datatable>
 @endsection

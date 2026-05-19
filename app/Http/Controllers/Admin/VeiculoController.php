@@ -24,33 +24,12 @@ class VeiculoController extends Controller
     public function index(Request $request): View
     {
         $filtros = $this->veiculoQuery->filtrosFromRequest($request);
-        $query = $this->veiculoQuery->aplicarFiltros(Veiculo::query(), $filtros);
+        $veiculos = $this->veiculoQuery->aplicarFiltros(Veiculo::query(), $filtros)->get();
 
-        if ($filtros['per_page'] === 'all') {
-            $total = (clone $query)->toBase()->count();
-            $resultados = $query->get();
-            $veiculos = $resultados;
-            $exibindo = $resultados->count();
-        } else {
-            $paginator = $query->paginate((int) $filtros['per_page'])->appends($filtros);
-            $veiculos = $paginator;
-            $total = $paginator->total();
-            $exibindo = count((array) $paginator->items());
-        }
-
-        $payload = [
+        return view('admin.veiculos.index', [
             'veiculos' => $veiculos,
             'filtros' => $filtros,
-            'perPageOptions' => VeiculoQuery::PER_PAGE_OPTIONS,
-            'total' => $total,
-            'exibindo' => $exibindo,
-        ];
-
-        if ($request->ajax()) {
-            return view('admin.veiculos._table', $payload);
-        }
-
-        return view('admin.veiculos.index', $payload);
+        ]);
     }
 
     public function create(): View

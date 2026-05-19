@@ -49,11 +49,12 @@ class PermissaoUnidadeNegocioMovimentacaoTest extends TestCase
             'status_position' => true,
         ]);
 
-        $fruta = Fruta::factory()->create([
+        $fruta = Fruta::factory()->comIcmsCeara([
+            'entrada_nacional' => '0.00',
+            'entrada_externo' => '0.00',
+            'entrada_um' => FrutaUmIcms::KG->value,
+        ])->create([
             'kg_por_unidade_medicao' => '10.00',
-            'icms_na_compra' => '0.00',
-            'icms_ex_compra' => '0.00',
-            'um_icms' => FrutaUmIcms::KG->value,
         ]);
 
         $estoque = Estoque::factory()->create([

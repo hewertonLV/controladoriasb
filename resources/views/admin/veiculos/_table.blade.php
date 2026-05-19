@@ -1,26 +1,26 @@
 @php
-    use Illuminate\Contracts\Pagination\LengthAwarePaginator;
-    $isPaginator = $veiculos instanceof LengthAwarePaginator;
-    $linhas = $isPaginator ? $veiculos->items() : $veiculos;
+    /** @var \Illuminate\Support\Collection<int, \App\Models\Veiculo>|\Illuminate\Database\Eloquent\Collection<int, \App\Models\Veiculo> $veiculos */
+    $linhas = $veiculos;
 @endphp
 
-<div class="card-body p-0">
-    <div class="table-responsive">
-        <table class="table table-centered table-hover mb-0">
-            <thead class="bg-light bg-opacity-50">
+<div class="card-body">
+    <table id="veiculos-datatable" class="table table-sm table-striped table-hover table-centered admin-datatable-table mb-0 w-100">
+            <thead>
                 <tr>
-                    <x-admin.sortable-th label="# SBS" sort="id_sbs" :filtros="$filtros" />
-                    <x-admin.sortable-th label="Nome" sort="nome" :filtros="$filtros" />
-                    <x-admin.sortable-th label="Tipo" sort="tipo" :filtros="$filtros" />
-                    <x-admin.sortable-th label="Status" sort="status" :filtros="$filtros" />
-                    <x-admin.sortable-th label="Criado" sort="created_at" :filtros="$filtros" />
+                    <th># SBS</th>
+                    <th>Nome</th>
+                    <th>Tipo</th>
+                    <th>Status</th>
+                    <th>Criado</th>
                     <th class="text-end">Ações</th>
                 </tr>
             </thead>
             <tbody>
                 @forelse ($linhas as $veiculo)
                     <tr class="{{ $veiculo->status === 'ATIVO' ? '' : 'text-muted bg-light bg-opacity-25' }}">
-                        <td><code>{{ $veiculo->id_sbs }}</code></td>
+                        <td data-order="{{ (int) $veiculo->id_sbs }}">
+                            <code class="small">{{ $veiculo->id_sbs }}</code>
+                        </td>
                         <td><span class="fw-semibold">{{ $veiculo->nome }}</span></td>
                         <td>{{ $veiculo->tipo }}</td>
                         <td>
@@ -34,22 +34,22 @@
                                 </span>
                             @endif
                         </td>
-                        <td>{{ optional($veiculo->created_at)->format('d/m/Y H:i') ?? '—' }}</td>
+                        <td data-order="{{ $veiculo->created_at?->timestamp ?? 0 }}">{{ optional($veiculo->created_at)->format('d/m/Y H:i') ?? '—' }}</td>
                         <td class="text-end">
-                            <div class="d-inline-flex gap-1 flex-wrap justify-content-end">
+                            <div class="d-inline-flex gap-1 justify-content-end flex-nowrap">
                                 @can('veiculos.editar')
                                     <a href="{{ route('admin.veiculos.edit', $veiculo) }}"
-                                       class="btn btn-sm btn-soft-primary"
+                                       class="admin-datatable-action-link text-primary"
                                        title="Editar">
-                                        <i class="ri-pencil-line"></i> Editar
+                                        <i class="ri-pencil-line"></i>
                                     </a>
                                 @endcan
 
                                 @can('veiculos.historico')
                                     <a href="{{ route('admin.veiculos.historico', $veiculo) }}"
-                                       class="btn btn-sm btn-soft-info"
+                                       class="admin-datatable-action-link text-info"
                                        title="Histórico">
-                                        <i class="ri-history-line"></i> Histórico
+                                        <i class="ri-history-line"></i>
                                     </a>
                                 @endcan
 
@@ -57,11 +57,16 @@
                                     @can('veiculos.inativar')
                                         <form method="POST"
                                               action="{{ route('admin.veiculos.inativar', $veiculo) }}"
-                                              onsubmit="return confirm('Inativar o veículo {{ $veiculo->nome }}?');"
-                                              class="d-inline">
+                                              class="d-inline"
+                                              data-confirm="Inativar o veículo {{ $veiculo->nome }}?"
+                                              data-confirm-title="Inativar veículo"
+                                              data-confirm-variant="danger"
+                                              data-confirm-btn="Inativar">
                                             @csrf
-                                            <button type="submit" class="btn btn-sm btn-soft-secondary" title="Inativar">
-                                                <i class="ri-close-circle-line"></i> Inativar
+                                            <button type="submit"
+                                                    class="admin-datatable-action-link text-secondary border-0 bg-transparent p-0"
+                                                    title="Inativar">
+                                                <i class="ri-close-circle-line"></i>
                                             </button>
                                         </form>
                                     @endcan
@@ -69,11 +74,16 @@
                                     @can('veiculos.reativar')
                                         <form method="POST"
                                               action="{{ route('admin.veiculos.reativar', $veiculo) }}"
-                                              onsubmit="return confirm('Reativar o veículo {{ $veiculo->nome }}?');"
-                                              class="d-inline">
+                                              class="d-inline"
+                                              data-confirm="Reativar o veículo {{ $veiculo->nome }}?"
+                                              data-confirm-title="Reativar veículo"
+                                              data-confirm-variant="success"
+                                              data-confirm-btn="Reativar">
                                             @csrf
-                                            <button type="submit" class="btn btn-sm btn-soft-success" title="Reativar">
-                                                <i class="ri-checkbox-circle-line"></i> Reativar
+                                            <button type="submit"
+                                                    class="admin-datatable-action-link text-success border-0 bg-transparent p-0"
+                                                    title="Reativar">
+                                                <i class="ri-checkbox-circle-line"></i>
                                             </button>
                                         </form>
                                     @endcan
@@ -83,30 +93,9 @@
                     </tr>
                 @empty
                     <tr>
-                        <td colspan="6" class="text-center text-muted py-4">
-                            @if (($filtros['search'] ?? '') !== '' || ($filtros['status'] ?? null) !== null)
-                                Nenhum veículo corresponde aos filtros aplicados.
-                            @else
-                                Nenhum veículo cadastrado.
-                            @endif
-                        </td>
+                        <td colspan="6" class="text-center text-muted py-4">Nenhum veículo cadastrado.</td>
                     </tr>
                 @endforelse
             </tbody>
         </table>
-    </div>
 </div>
-
-<div class="card-footer d-flex flex-wrap align-items-center gap-2">
-    <div class="text-muted small me-auto">
-        Exibindo <strong>{{ $exibindo }}</strong> de <strong>{{ $total }}</strong> veículo(s).
-        @if (($filtros['search'] ?? '') !== '')
-            · Pesquisa: <code>{{ $filtros['search'] }}</code>
-        @endif
-        @if (($filtros['status'] ?? null) !== null)
-            · Status: <code>{{ $filtros['status'] }}</code>
-        @endif
-    </div>
-    <x-admin.table-pagination :paginator="$veiculos" />
-</div>
-

@@ -28,10 +28,6 @@ class FrutaImportacaoProcessor
         'nome',
         'unidade_medicao',
         'kg_por_unidade_medicao',
-        'icms_ex_compra',
-        'icms_na_compra',
-        'um_icms',
-        'icms_venda',
     ];
 
     private const HEADER_ALIASES = [
@@ -39,10 +35,6 @@ class FrutaImportacaoProcessor
         'nome' => ['NOME', 'DESCRICAO', 'DESCRICAOMAT', 'DESCRICAOMATERIAL'],
         'unidade_medicao' => ['UNIDADE', 'UNIDADEMEDICAO', 'UNIDMEDIDA', 'UMMEDIDA', 'UNMEDIDA'],
         'kg_por_unidade_medicao' => ['KG', 'KGPORUNIDADE', 'KGPORUNIDADEMEDICAO', 'PESO', 'PESOMAT'],
-        'icms_ex_compra' => ['ICMSEXCOMPRA', 'ICMSEXTERNOCOMPRA', 'ICMSEXTERNONACOMPRA'],
-        'icms_na_compra' => ['ICMSNACOMPRA', 'ICMSNACIONALCOMPRA', 'ICMSNACIONALNACOMPRA'],
-        'um_icms' => ['UMICMS', 'UNIDADEICMS'],
-        'icms_venda' => ['ICMSVENDA', 'ICMSVENDAPERCENTUAL', 'ICMSVENDA%'],
     ];
 
     public function __construct(private readonly FrutaPlanilhaNormalizer $normalizer) {}
@@ -94,10 +86,6 @@ class FrutaImportacaoProcessor
                 $this->valorPorHeaderOuCelula($sheet, $headers, $r, 'nome', 'B'),
                 $this->valorPorHeaderOuCelula($sheet, $headers, $r, 'unidade_medicao', 'C'),
                 $this->valorPorHeaderOuCelula($sheet, $headers, $r, 'kg_por_unidade_medicao', 'D'),
-                $this->valorPorHeaderOuCelula($sheet, $headers, $r, 'icms_ex_compra', 'E'),
-                $this->valorPorHeaderOuCelula($sheet, $headers, $r, 'icms_na_compra', 'F'),
-                $this->valorPorHeaderOuCelula($sheet, $headers, $r, 'um_icms', 'G'),
-                $this->valorPorHeaderOuCelula($sheet, $headers, $r, 'icms_venda', 'H'),
             ];
 
             $linhasProcessadas++;
@@ -554,7 +542,7 @@ class FrutaImportacaoProcessor
         $snapshot = $this->snapshot($fruta);
 
         foreach (self::COMPARABLE_FIELDS as $campo) {
-            if (in_array($campo, ['kg_por_unidade_medicao', 'icms_ex_compra', 'icms_na_compra', 'icms_venda'], true)) {
+            if ($campo === 'kg_por_unidade_medicao') {
                 $atual = number_format(max(0, (float) ($snapshot[$campo] ?? 0)), 2, '.', '');
                 $novo = number_format(max(0, (float) ($dados[$campo] ?? 0)), 2, '.', '');
             } else {
@@ -584,10 +572,6 @@ class FrutaImportacaoProcessor
             'nome' => $fruta->nome,
             'unidade_medicao' => $fruta->unidade_medicao,
             'kg_por_unidade_medicao' => number_format(max(0, (float) $fruta->kg_por_unidade_medicao), 2, '.', ''),
-            'icms_ex_compra' => number_format(max(0, (float) $fruta->icms_ex_compra), 2, '.', ''),
-            'icms_na_compra' => number_format(max(0, (float) $fruta->icms_na_compra), 2, '.', ''),
-            'um_icms' => (string) $fruta->um_icms,
-            'icms_venda' => number_format(max(0, (float) $fruta->icms_venda), 2, '.', ''),
         ];
     }
 }

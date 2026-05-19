@@ -22,7 +22,8 @@ class EmpresaListagemTest extends EmpresasTestCase
             ->get(route('admin.empresas.index'))
             ->assertOk()
             ->assertSee('Hub corporativo')
-            ->assertSee('EMPRESA VISÍVEL');
+            ->assertSee('EMPRESA VISÍVEL')
+            ->assertSee('id="empresas-datatable"', false);
     }
 
     public function test_pesquisa_razao_social_id_cigam_e_cnpj(): void
@@ -43,7 +44,7 @@ class EmpresaListagemTest extends EmpresasTestCase
 
         foreach (['Alpha Nome', 'Alpha Fantasia', '7001', '12.345.678/0001-90'] as $search) {
             $this->actingAs($user)
-                ->get(route('admin.empresas.index', ['search' => $search]), ['X-Requested-With' => 'XMLHttpRequest'])
+                ->get(route('admin.empresas.index', ['search' => $search]))
                 ->assertOk()
                 ->assertSee('ALPHA FANTASIA')
                 ->assertDontSee('BETA FANTASIA');
@@ -61,36 +62,32 @@ class EmpresaListagemTest extends EmpresasTestCase
         UnidadeNegocio::factory()->create(['nome' => 'Un Inativa', 'status' => false]);
 
         $this->actingAs($user)
-            ->get(route('admin.empresas.index', ['status' => '1']), ['X-Requested-With' => 'XMLHttpRequest'])
+            ->get(route('admin.empresas.index', ['status' => '1']))
             ->assertOk()
             ->assertSee('CLIENTE SEMPRE ATIVO')
             ->assertSee('UN ATIVA')
             ->assertDontSee('UN INATIVA');
 
         $this->actingAs($user)
-            ->get(route('admin.empresas.index', ['status' => '0']), ['X-Requested-With' => 'XMLHttpRequest'])
+            ->get(route('admin.empresas.index', ['status' => '0']))
             ->assertOk()
             ->assertSee('UN INATIVA')
             ->assertDontSee('UN ATIVA')
             ->assertDontSee('CLIENTE SEMPRE ATIVO');
     }
 
-    public function test_paginacao_respeita_per_page_e_all(): void
+    public function test_listagem_inclui_todos_os_registros_para_datatable_client_side(): void
     {
         $user = $this->userWithPermissions([Permissions::EMPRESAS_VISUALIZAR]);
-        foreach (range('A', 'K') as $letra) {
+        foreach (range(1, 11) as $_) {
             Empresa::factory()->create();
         }
 
         $this->actingAs($user)
-            ->get(route('admin.empresas.index', ['per_page' => 10, 'sort' => 'nome_exibicao']), ['X-Requested-With' => 'XMLHttpRequest'])
+            ->get(route('admin.empresas.index'))
             ->assertOk()
-            ->assertSeeInOrder(['Exibindo', '<strong>10</strong>', 'de', '<strong>11</strong>'], false);
-
-        $this->actingAs($user)
-            ->get(route('admin.empresas.index', ['per_page' => 'all', 'sort' => 'nome_exibicao']), ['X-Requested-With' => 'XMLHttpRequest'])
-            ->assertOk()
-            ->assertSeeInOrder(['Exibindo', '<strong>11</strong>', 'de', '<strong>11</strong>'], false);
+            ->assertSee('data-admin-datatable', false)
+            ->assertSee('assets/js/admin-datatable.js', false);
     }
 
     public function test_ordenacao_por_nome(): void
@@ -101,7 +98,7 @@ class EmpresaListagemTest extends EmpresasTestCase
         Cliente::factory()->create(['razao_social' => 'Mike', 'fantasia' => null]);
 
         $this->actingAs($user)
-            ->get(route('admin.empresas.index', ['sort' => 'nome_exibicao', 'direction' => 'asc']), ['X-Requested-With' => 'XMLHttpRequest'])
+            ->get(route('admin.empresas.index', ['sort' => 'nome_exibicao', 'direction' => 'asc']))
             ->assertOk()
             ->assertSeeInOrder(['ALPHA', 'MIKE', 'ZULU']);
     }
@@ -121,36 +118,34 @@ class EmpresaListagemTest extends EmpresasTestCase
             ->get(route('admin.empresas.index', [
                 'sort' => 'id_cigam',
                 'direction' => 'asc',
-                'per_page' => 'all',
-            ]), ['X-Requested-With' => 'XMLHttpRequest'])
+            ]))
             ->assertOk()
             ->assertSeeInOrder([
-                '<code>000001</code>',
-                '<code>000002</code>',
-                '<code>000010</code>',
-                '<code>000020</code>',
-                '<code>000100</code>',
-                '<code>001000</code>',
+                '000001</code>',
+                '000002</code>',
+                '000010</code>',
+                '000020</code>',
+                '000100</code>',
+                '001000</code>',
             ], false);
 
         $this->actingAs($user)
             ->get(route('admin.empresas.index', [
                 'sort' => 'id_cigam',
                 'direction' => 'desc',
-                'per_page' => 'all',
-            ]), ['X-Requested-With' => 'XMLHttpRequest'])
+            ]))
             ->assertOk()
             ->assertSeeInOrder([
-                '<code>001000</code>',
-                '<code>000100</code>',
-                '<code>000020</code>',
-                '<code>000010</code>',
-                '<code>000002</code>',
-                '<code>000001</code>',
+                '001000</code>',
+                '000100</code>',
+                '000020</code>',
+                '000010</code>',
+                '000002</code>',
+                '000001</code>',
             ], false);
     }
 
-    public function test_busca_paginacao_per_page_e_ordenacao_coexistem(): void
+    public function test_busca_e_ordenacao_na_carga_inicial(): void
     {
         $user = $this->userWithPermissions([Permissions::EMPRESAS_VISUALIZAR]);
         foreach (['10', '2', '1'] as $idCigam) {
@@ -164,12 +159,11 @@ class EmpresaListagemTest extends EmpresasTestCase
         $this->actingAs($user)
             ->get(route('admin.empresas.index', [
                 'search' => 'Cliente Comum',
-                'per_page' => 2,
                 'sort' => 'id_cigam',
                 'direction' => 'asc',
-            ]), ['X-Requested-With' => 'XMLHttpRequest'])
+            ]))
             ->assertOk()
-            ->assertSeeInOrder(['<code>000001</code>', '<code>000002</code>'], false)
+            ->assertSeeInOrder(['000001</code>', '000002</code>', '000010</code>'], false)
             ->assertDontSee('OUTRO CLIENTE');
     }
 }

@@ -13,17 +13,26 @@
         />
     @endcan
 
-    <x-admin.data-table
+    <x-admin.datatable
         title="Veículos"
         subtitle="Cadastro de veículos (SBS, nome, tipo e unidade de negócio)."
-        search-placeholder="Pesquisar por ID SBS, nome, tipo..."
-        :endpoint="route('admin.veiculos.index')"
-        :current-search="$filtros['search'] ?? ''"
-        :current-per-page="$filtros['per_page'] ?? 20"
-        :current-sort="$filtros['sort'] ?? 'nome'"
-        :current-direction="$filtros['direction'] ?? 'asc'"
-        :per-page-options="$perPageOptions"
-        container-id="veiculos-table"
+        table-id="veiculos-datatable"
+        root-id="veiculos-table-root"
+        print-title="Veículos"
+        entity-label="veículos"
+        entity-label-singular="veículo"
+        :order="[1, 'asc']"
+        :sort-column-map="[
+            0 => 'id_sbs',
+            1 => 'nome',
+            2 => 'tipo',
+            3 => 'status',
+            4 => 'created_at',
+        ]"
+        :column-defs="[
+            ['targets' => -1, 'orderable' => false, 'searchable' => false],
+            ['targets' => [0, 1, 2, 3, 4], 'className' => 'text-nowrap'],
+        ]"
     >
         <x-slot:actions>
             @can('veiculos.exportar-pdf')
@@ -47,22 +56,8 @@
             @endcan
         </x-slot:actions>
 
-        <x-slot:filters>
-            <div class="col-md-3">
-                <label class="form-label small text-muted mb-1" for="veiculos-status">Status</label>
-                <select id="veiculos-status" name="status" class="form-select" data-table-filter>
-                    <option value="">Todos</option>
-                    <option value="ATIVO" @selected(($filtros['status'] ?? null) === 'ATIVO')>Ativos</option>
-                    <option value="INATIVO" @selected(($filtros['status'] ?? null) === 'INATIVO')>Inativos</option>
-                </select>
-            </div>
-        </x-slot:filters>
-
         @include('admin.veiculos._table', [
             'veiculos' => $veiculos,
-            'filtros' => $filtros,
-            'total' => $total,
-            'exibindo' => $exibindo,
         ])
-    </x-admin.data-table>
+    </x-admin.datatable>
 @endsection

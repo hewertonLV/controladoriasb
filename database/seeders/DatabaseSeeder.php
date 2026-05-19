@@ -19,7 +19,6 @@ class DatabaseSeeder extends Seeder
             StatusMovimentacaoSeeder::class,
             CategoriaMovimentacaoSeeder::class,
             CategoriaDescarteSeeder::class,
-            GrupoSeeder::class,
         ]);
     }
 }

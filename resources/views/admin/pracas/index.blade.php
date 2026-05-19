@@ -13,17 +13,24 @@
         />
     @endcan
 
-    <x-admin.data-table
+    <x-admin.datatable
         title="Praças"
         subtitle="Cadastro de praças por unidade de negócio."
-        search-placeholder="Pesquisar por nome ou ID da unidade..."
-        :endpoint="route('admin.pracas.index')"
-        :current-search="$filtros['search'] ?? ''"
-        :current-per-page="$filtros['per_page'] ?? 20"
-        :current-sort="$filtros['sort'] ?? 'nome'"
-        :current-direction="$filtros['direction'] ?? 'asc'"
-        :per-page-options="$perPageOptions"
-        container-id="pracas-table"
+        table-id="pracas-datatable"
+        root-id="pracas-table-root"
+        print-title="Praças"
+        entity-label="praças"
+        entity-label-singular="praça"
+        :order="[0, 'asc']"
+        :sort-column-map="[
+            0 => 'nome',
+            1 => 'id_unidade_negocio',
+            2 => 'created_at',
+        ]"
+        :column-defs="[
+            ['targets' => -1, 'orderable' => false, 'searchable' => false],
+            ['targets' => [0, 1, 2], 'className' => 'text-nowrap'],
+        ]"
     >
         <x-slot:actions>
             @can('pracas.exportar-pdf')
@@ -49,9 +56,6 @@
 
         @include('admin.pracas._table', [
             'pracas' => $pracas,
-            'filtros' => $filtros,
-            'total' => $total,
-            'exibindo' => $exibindo,
         ])
-    </x-admin.data-table>
+    </x-admin.datatable>
 @endsection

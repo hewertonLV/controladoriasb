@@ -20,21 +20,7 @@ class StoreFrutaRequest extends FormRequest
      */
     public function rules(): array
     {
-        return [
-            'id_cigam' => [
-                'required',
-                'string',
-                'regex:/^\d{6}$/',
-                Rule::unique('frutas', 'id_cigam'),
-            ],
-            'nome' => ['required', 'string', 'max:255'],
-            'unidade_medicao' => ['required', 'string', Rule::in(FrutaUnidadeMedicao::values())],
-            'kg_por_unidade_medicao' => ['required', 'numeric', 'min:0'],
-            'icms_ex_compra' => ['required', 'numeric', 'min:0', 'decimal:0,2'],
-            'icms_na_compra' => ['required', 'numeric', 'min:0', 'decimal:0,2'],
-            'um_icms' => ['required', 'string', Rule::in(FrutaUmIcms::values())],
-            'icms_venda' => ['required', 'numeric', 'min:0', 'decimal:0,2'],
-        ];
+        return array_merge($this->regrasFruta(), $this->regrasIcms());
     }
 
     /**
@@ -47,10 +33,14 @@ class StoreFrutaRequest extends FormRequest
             'nome' => 'nome',
             'unidade_medicao' => 'unidade de medição',
             'kg_por_unidade_medicao' => 'kg por unidade de medição',
-            'icms_ex_compra' => 'ICMS externo na compra',
-            'icms_na_compra' => 'ICMS nacional na compra',
-            'um_icms' => 'unidade de medida do ICMS',
-            'icms_venda' => 'ICMS na venda (%)',
+            'icms.*.entrada_nacional' => 'ICMS compra nacional',
+            'icms.*.entrada_um_nacional' => 'UM ICMS compra nacional',
+            'icms.*.entrada_externo' => 'ICMS compra exterior',
+            'icms.*.entrada_um_externo' => 'UM ICMS compra exterior',
+            'icms.*.saida_importada' => 'ICMS venda fruta importada',
+            'icms.*.saida_um_importada' => 'UM ICMS venda importada',
+            'icms.*.saida_nacional' => 'ICMS venda fruta nacional',
+            'icms.*.saida_um_nacional' => 'UM ICMS venda nacional',
         ];
     }
 
@@ -64,19 +54,105 @@ class StoreFrutaRequest extends FormRequest
         ];
     }
 
+    /**
+     * @return array<string, mixed>
+     */
+    public function validatedFruta(): array
+    {
+        return $this->only([
+            'id_cigam',
+            'nome',
+            'unidade_medicao',
+            'kg_por_unidade_medicao',
+        ]);
+    }
+
+    /**
+     * @return array<int|string, array<string, mixed>>
+     */
+    public function validatedIcms(): array
+    {
+        /** @var array<int|string, array<string, mixed>> */
+        return $this->input('icms', []);
+    }
+
     protected function prepareForValidation(): void
     {
-        $idCigam = TextoCadastro::normalizarIdCigamAteSeisDigitos((string) $this->input('id_cigam', ''));
+        $icms = $this->input('icms', []);
+        if (is_array($icms)) {
+            foreach ($icms as $idEstado => $linha) {
+                if (! is_array($linha)) {
+                    continue;
+                }
+                $icms[$idEstado]['entrada_nacional'] = TextoCadastro::normalizarValorMonetarioBrasileiro(
+                    $linha['entrada_nacional'] ?? 0,
+                );
+                $icms[$idEstado]['entrada_um_nacional'] = TextoCadastro::normalizarMaiusculas(
+                    (string) ($linha['entrada_um_nacional'] ?? FrutaUmIcms::KG->value),
+                );
+                $icms[$idEstado]['entrada_externo'] = TextoCadastro::normalizarValorMonetarioBrasileiro(
+                    $linha['entrada_externo'] ?? 0,
+                );
+                $icms[$idEstado]['entrada_um_externo'] = TextoCadastro::normalizarMaiusculas(
+                    (string) ($linha['entrada_um_externo'] ?? FrutaUmIcms::KG->value),
+                );
+                $icms[$idEstado]['saida_importada'] = TextoCadastro::normalizarValorMonetarioBrasileiro(
+                    $linha['saida_importada'] ?? 0,
+                );
+                $icms[$idEstado]['saida_um_importada'] = TextoCadastro::normalizarMaiusculas(
+                    (string) ($linha['saida_um_importada'] ?? FrutaUmIcms::KG->value),
+                );
+                $icms[$idEstado]['saida_nacional'] = TextoCadastro::normalizarValorMonetarioBrasileiro(
+                    $linha['saida_nacional'] ?? 0,
+                );
+                $icms[$idEstado]['saida_um_nacional'] = TextoCadastro::normalizarMaiusculas(
+                    (string) ($linha['saida_um_nacional'] ?? FrutaUmIcms::KG->value),
+                );
+            }
+        }
 
         $this->merge([
-            'id_cigam' => $idCigam,
+            'id_cigam' => TextoCadastro::normalizarIdCigamAteSeisDigitos((string) $this->input('id_cigam', '')),
             'nome' => trim((string) $this->input('nome')),
             'unidade_medicao' => mb_strtoupper(trim((string) $this->input('unidade_medicao', '')), 'UTF-8'),
             'kg_por_unidade_medicao' => $this->input('kg_por_unidade_medicao', 0),
-            'icms_ex_compra' => TextoCadastro::normalizarValorMonetarioBrasileiro($this->input('icms_ex_compra', 0)),
-            'icms_na_compra' => TextoCadastro::normalizarValorMonetarioBrasileiro($this->input('icms_na_compra', 0)),
-            'um_icms' => TextoCadastro::normalizarMaiusculas((string) $this->input('um_icms', '')),
-            'icms_venda' => TextoCadastro::normalizarValorMonetarioBrasileiro($this->input('icms_venda', 0)),
+            'icms' => $icms,
         ]);
+    }
+
+    /**
+     * @return array<string, array<int, mixed>>
+     */
+    private function regrasFruta(): array
+    {
+        return [
+            'id_cigam' => [
+                'required',
+                'string',
+                'regex:/^\d{6}$/',
+                Rule::unique('frutas', 'id_cigam'),
+            ],
+            'nome' => ['required', 'string', 'max:255'],
+            'unidade_medicao' => ['required', 'string', Rule::in(FrutaUnidadeMedicao::values())],
+            'kg_por_unidade_medicao' => ['required', 'numeric', 'min:0'],
+        ];
+    }
+
+    /**
+     * @return array<string, array<int, mixed>>
+     */
+    private function regrasIcms(): array
+    {
+        return [
+            'icms' => ['required', 'array'],
+            'icms.*.entrada_nacional' => ['nullable', 'numeric', 'min:0', 'decimal:0,2'],
+            'icms.*.entrada_um_nacional' => ['nullable', 'string', Rule::in(FrutaUmIcms::values())],
+            'icms.*.entrada_externo' => ['nullable', 'numeric', 'min:0', 'decimal:0,2'],
+            'icms.*.entrada_um_externo' => ['nullable', 'string', Rule::in(FrutaUmIcms::values())],
+            'icms.*.saida_importada' => ['nullable', 'numeric', 'min:0', 'decimal:0,2'],
+            'icms.*.saida_um_importada' => ['nullable', 'string', Rule::in(FrutaUmIcms::values())],
+            'icms.*.saida_nacional' => ['nullable', 'numeric', 'min:0', 'decimal:0,2'],
+            'icms.*.saida_um_nacional' => ['nullable', 'string', Rule::in(FrutaUmIcms::values())],
+        ];
     }
 }

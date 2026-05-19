@@ -1,22 +1,20 @@
 @php
-    use Illuminate\Contracts\Pagination\LengthAwarePaginator;
-    $isPaginator = $fretes instanceof LengthAwarePaginator;
-    $linhas = $isPaginator ? $fretes->items() : $fretes;
+    /** @var \Illuminate\Support\Collection<int, \App\Models\Frete>|\Illuminate\Database\Eloquent\Collection<int, \App\Models\Frete> $fretes */
+    $linhas = $fretes;
 
     $fmtMoeda = fn ($v) => 'R$ ' . number_format((float) $v, 2, ',', '.');
 @endphp
 
-<div class="card-body p-0">
-    <div class="table-responsive">
-        <table class="table table-centered table-hover mb-0">
-            <thead class="bg-light bg-opacity-50">
+<div class="card-body">
+    <table id="fretes-datatable" class="table table-sm table-striped table-hover table-centered admin-datatable-table mb-0 w-100">
+            <thead>
                 <tr>
-                    <x-admin.sortable-th label="Nome" sort="nome" :filtros="$filtros" />
-                    <x-admin.sortable-th label="Valor" sort="valor" :filtros="$filtros" />
+                    <th>Nome</th>
+                    <th>Valor</th>
                     <th>Veículo</th>
-                    <x-admin.sortable-th label="Sit." sort="status_situacao" :filtros="$filtros" />
-                    <x-admin.sortable-th label="Fruta/kg" sort="valor_fruta_kg" :filtros="$filtros" />
-                    <x-admin.sortable-th label="Criado" sort="created_at" :filtros="$filtros" />
+                    <th>Sit.</th>
+                    <th>Fruta/kg</th>
+                    <th>Criado</th>
                     <th class="text-end">Ações</th>
                 </tr>
             </thead>
@@ -24,10 +22,10 @@
                 @forelse ($linhas as $frete)
                     <tr>
                         <td><span class="fw-semibold">{{ $frete->nome }}</span></td>
-                        <td>{{ $fmtMoeda($frete->valor) }}</td>
+                        <td data-order="{{ (float) $frete->valor }}">{{ $fmtMoeda($frete->valor) }}</td>
                         <td>
                             @if ($frete->veiculo)
-                                <code>{{ $frete->veiculo->id_sbs }}</code>
+                                <code class="small">{{ $frete->veiculo->id_sbs }}</code>
                                 <span class="text-muted small d-block">{{ $frete->veiculo->nome }}</span>
                             @else
                                 —
@@ -40,23 +38,23 @@
                                 <span class="badge bg-secondary-subtle text-secondary">Encerrada</span>
                             @endif
                         </td>
-                        <td>{{ $fmtMoeda($frete->valor_fruta_kg) }}</td>
-                        <td>{{ optional($frete->created_at)->format('d/m/Y H:i') ?? '—' }}</td>
+                        <td data-order="{{ (float) $frete->valor_fruta_kg }}">{{ $fmtMoeda($frete->valor_fruta_kg) }}</td>
+                        <td data-order="{{ $frete->created_at?->timestamp ?? 0 }}">{{ optional($frete->created_at)->format('d/m/Y H:i') ?? '—' }}</td>
                         <td class="text-end">
-                            <div class="d-inline-flex gap-1 flex-wrap justify-content-end">
+                            <div class="d-inline-flex gap-1 justify-content-end flex-nowrap">
                                 @can('fretes.editar')
                                     <a href="{{ route('admin.fretes.edit', $frete) }}"
-                                       class="btn btn-sm btn-soft-primary"
+                                       class="admin-datatable-action-link text-primary"
                                        title="Editar">
-                                        <i class="ri-pencil-line"></i> Editar
+                                        <i class="ri-pencil-line"></i>
                                     </a>
                                 @endcan
 
                                 @can('fretes.historico')
                                     <a href="{{ route('admin.fretes.historico', $frete) }}"
-                                       class="btn btn-sm btn-soft-info"
+                                       class="admin-datatable-action-link text-info"
                                        title="Histórico">
-                                        <i class="ri-history-line"></i> Histórico
+                                        <i class="ri-history-line"></i>
                                     </a>
                                 @endcan
                             </div>
@@ -64,29 +62,9 @@
                     </tr>
                 @empty
                     <tr>
-                        <td colspan="7" class="text-center text-muted py-4">
-                            @if (($filtros['search'] ?? '') !== '' || ($filtros['status_situacao'] ?? null))
-                                Nenhum frete corresponde aos filtros aplicados.
-                            @else
-                                Nenhum frete cadastrado.
-                            @endif
-                        </td>
+                        <td colspan="7" class="text-center text-muted py-4">Nenhum frete cadastrado.</td>
                     </tr>
                 @endforelse
             </tbody>
         </table>
-    </div>
-</div>
-
-<div class="card-footer d-flex flex-wrap align-items-center gap-2">
-    <div class="text-muted small me-auto">
-        Exibindo <strong>{{ $exibindo }}</strong> de <strong>{{ $total }}</strong> frete(s).
-        @if (($filtros['search'] ?? '') !== '')
-            · Pesquisa: <code>{{ $filtros['search'] }}</code>
-        @endif
-        @if (($filtros['status_situacao'] ?? null))
-            · Situação: <code>{{ $filtros['status_situacao'] }}</code>
-        @endif
-    </div>
-    <x-admin.table-pagination :paginator="$fretes" />
 </div>

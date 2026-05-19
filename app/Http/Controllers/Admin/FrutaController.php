@@ -5,10 +5,12 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Admin\StoreFrutaRequest;
 use App\Http\Requests\Admin\UpdateFrutaRequest;
+use App\Models\Estado;
 use App\Models\Fruta;
 use App\Models\FrutaHistorico;
 use App\Queries\FrutaQuery;
 use App\Services\Frutas\FrutaAuditoriaService;
+use App\Services\Frutas\FrutaIcmsSyncService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -19,54 +21,40 @@ class FrutaController extends Controller
     public function __construct(
         private readonly FrutaAuditoriaService $auditoria,
         private readonly FrutaQuery $frutaQuery,
+        private readonly FrutaIcmsSyncService $icmsSync,
     ) {}
 
     public function index(Request $request): View
     {
         $filtros = $this->frutaQuery->filtrosFromRequest($request);
-        $query = $this->frutaQuery->aplicarFiltros(Fruta::query(), $filtros);
+        $frutas = $this->frutaQuery->aplicarFiltros(
+            Fruta::query()->withCount('icms'),
+            $filtros,
+        )->get();
 
-        if ($filtros['per_page'] === 'all') {
-            $total = (clone $query)->toBase()->count();
-            $resultados = $query->get();
-            $frutas = $resultados;
-            $exibindo = $resultados->count();
-        } else {
-            $paginator = $query->paginate((int) $filtros['per_page'])->appends($filtros);
-            $frutas = $paginator;
-            $total = $paginator->total();
-            $exibindo = count((array) $paginator->items());
-        }
-
-        $payload = [
+        return view('admin.frutas.index', [
             'frutas' => $frutas,
             'filtros' => $filtros,
-            'perPageOptions' => FrutaQuery::PER_PAGE_OPTIONS,
-            'total' => $total,
-            'exibindo' => $exibindo,
-        ];
-
-        if ($request->ajax()) {
-            return view('admin.frutas._table', $payload);
-        }
-
-        return view('admin.frutas.index', $payload);
+        ]);
     }
 
     public function create(): View
     {
         return view('admin.frutas.create', [
             'fruta' => new Fruta,
+            'estados' => Estado::query()->orderBy('nome')->get(),
+            'icmsForm' => $this->icmsSync->mapaParaFormulario(new Fruta),
         ]);
     }
 
     public function store(StoreFrutaRequest $request): RedirectResponse
     {
         $user = $request->user();
-        $dados = $request->validated();
 
-        $fruta = DB::transaction(function () use ($dados, $user) {
-            $fruta = Fruta::create($dados);
+        $fruta = DB::transaction(function () use ($request, $user) {
+            $fruta = Fruta::create($request->validatedFruta());
+            $this->icmsSync->sync($fruta, $request->validatedIcms());
+            $fruta->load('icms.estado');
 
             $this->auditoria->registrarCriacao(
                 $fruta,
@@ -84,22 +72,27 @@ class FrutaController extends Controller
 
     public function edit(Fruta $fruta): View
     {
+        $fruta->load('icms.estado');
+
         return view('admin.frutas.edit', [
             'fruta' => $fruta,
+            'estados' => Estado::query()->orderBy('nome')->get(),
+            'icmsForm' => $this->icmsSync->mapaParaFormulario($fruta),
         ]);
     }
 
     public function update(UpdateFrutaRequest $request, Fruta $fruta): RedirectResponse
     {
         $user = $request->user();
-        $dados = $request->validated();
 
-        DB::transaction(function () use ($fruta, $dados, $user) {
+        DB::transaction(function () use ($request, $fruta, $user) {
             $antes = $this->auditoria->snapshot($fruta);
 
-            $fruta->update($dados);
+            $fruta->update($request->validatedFruta());
+            $this->icmsSync->sync($fruta, $request->validatedIcms());
+            $fruta->load('icms.estado');
 
-            $depois = $this->auditoria->snapshot($fruta->fresh());
+            $depois = $this->auditoria->snapshot($fruta);
 
             $this->auditoria->registrarAtualizacao(
                 $fruta,

@@ -52,12 +52,16 @@ class FrutaImportacaoTest extends FrutaTestCase
             'um_icms' => FrutaUmIcms::UM->value,
             'icms_venda' => '12.00',
         ];
-        $existenteIgual = Fruta::factory()->create([
+        $existenteIgual = Fruta::factory()->comIcmsCeara([
+            'entrada_externo' => '1.00',
+            'entrada_nacional' => '2.00',
+            'entrada_um_nacional' => FrutaUmIcms::UM->value,
+            'saida_nacional' => '12.00',
+        ])->create([
             'id_cigam' => '9001',
             'nome' => 'BANANA IGUAL',
             'unidade_medicao' => FrutaUnidadeMedicao::CAIXA->value,
             'kg_por_unidade_medicao' => '18.00',
-            ...$icmsIgual,
         ]);
         $icmsAlterado = [
             'icms_ex_compra' => '0.50',
@@ -65,35 +69,31 @@ class FrutaImportacaoTest extends FrutaTestCase
             'um_icms' => FrutaUmIcms::KG->value,
             'icms_venda' => '7.50',
         ];
-        $existenteAlterado = Fruta::factory()->create([
+        $existenteAlterado = Fruta::factory()->comIcmsCeara([
+            'entrada_externo' => '0.50',
+            'entrada_nacional' => '0.50',
+            'entrada_um_externo' => FrutaUmIcms::KG->value,
+            'saida_nacional' => '7.50',
+        ])->create([
             'id_cigam' => '9002',
             'nome' => 'MANGA ANTIGA',
             'unidade_medicao' => FrutaUnidadeMedicao::PACOTE->value,
             'kg_por_unidade_medicao' => '5.00',
-            ...$icmsAlterado,
         ]);
 
         $path = $this->storeSpreadsheet([
-            ['9003', 'UVA NOVA', FrutaUnidadeMedicao::UNIDADE->value, '0.25', '0.00', '0.00', FrutaUmIcms::KG->value, '0.00'],
+            ['9003', 'UVA NOVA', FrutaUnidadeMedicao::UNIDADE->value, '0.25'],
             [
                 $existenteIgual->id_cigam,
                 $existenteIgual->nome,
                 $existenteIgual->unidade_medicao,
                 '18.00',
-                $icmsIgual['icms_ex_compra'],
-                $icmsIgual['icms_na_compra'],
-                $icmsIgual['um_icms'],
-                $icmsIgual['icms_venda'],
             ],
             [
                 $existenteAlterado->id_cigam,
                 'MANGA ALTERADA',
                 $existenteAlterado->unidade_medicao,
                 '6.50',
-                $icmsAlterado['icms_ex_compra'],
-                $icmsAlterado['icms_na_compra'],
-                $icmsAlterado['um_icms'],
-                $icmsAlterado['icms_venda'],
             ],
         ]);
 
@@ -119,15 +119,16 @@ class FrutaImportacaoTest extends FrutaTestCase
     public function test_confirmacao_cria_atualiza_com_historico(): void
     {
         $user = $this->userWithPermissions([Permissions::FRUTAS_IMPORTAR_CONFIRMAR]);
-        $fruta = Fruta::factory()->create([
+        $fruta = Fruta::factory()->comIcmsCeara([
+            'entrada_externo' => '0.00',
+            'entrada_nacional' => '0.00',
+            'entrada_um' => FrutaUmIcms::KG->value,
+            'saida_venda' => '0.00',
+        ])->create([
             'id_cigam' => '9101',
             'nome' => 'ANTES',
             'unidade_medicao' => FrutaUnidadeMedicao::CAIXA->value,
             'kg_por_unidade_medicao' => '10.00',
-            'icms_ex_compra' => '0.00',
-            'icms_na_compra' => '0.00',
-            'um_icms' => FrutaUmIcms::KG->value,
-            'icms_venda' => '0.00',
         ]);
 
         $importacao = FrutaImportacao::create([
@@ -150,20 +151,12 @@ class FrutaImportacaoTest extends FrutaTestCase
                         'nome' => 'ANTES',
                         'unidade_medicao' => FrutaUnidadeMedicao::CAIXA->value,
                         'kg_por_unidade_medicao' => '10.00',
-                        'icms_ex_compra' => '0.00',
-                        'icms_na_compra' => '0.00',
-                        'um_icms' => FrutaUmIcms::KG->value,
-                        'icms_venda' => '0.00',
                     ],
                     'dados_novos' => [
                         'id_cigam' => '9101',
                         'nome' => 'DEPOIS',
                         'unidade_medicao' => FrutaUnidadeMedicao::CAIXA->value,
                         'kg_por_unidade_medicao' => '11.00',
-                        'icms_ex_compra' => '0.00',
-                        'icms_na_compra' => '0.00',
-                        'um_icms' => FrutaUmIcms::KG->value,
-                        'icms_venda' => '0.00',
                     ],
                     'campos_alterados' => [['campo' => 'nome', 'atual' => 'ANTES', 'novo' => 'DEPOIS']],
                 ]],
@@ -257,7 +250,7 @@ class FrutaImportacaoTest extends FrutaTestCase
         $spreadsheet = new Spreadsheet;
         $sheet = $spreadsheet->getActiveSheet();
         $sheet->fromArray([
-            'ID CIGAM', 'Nome', 'Unidade', 'Kg', 'ICMS ex. compra', 'ICMS na compra', 'UM ICMS', 'ICMS venda %',
+            'ID CIGAM', 'Nome', 'Unidade', 'Kg',
         ], null, 'A1');
 
         foreach ($rows as $index => $row) {
@@ -315,10 +308,6 @@ class FrutaImportacaoTest extends FrutaTestCase
         string $nome,
         string $unidade,
         string $kg,
-        string $icmsEx = '0.00',
-        string $icmsNa = '0.00',
-        string $umIcms = 'KG',
-        string $icmsVenda = '0.00',
     ): array {
         return [
             'row_id' => $rowId,
@@ -328,10 +317,6 @@ class FrutaImportacaoTest extends FrutaTestCase
                 'nome' => mb_strtoupper($nome, 'UTF-8'),
                 'unidade_medicao' => $unidade,
                 'kg_por_unidade_medicao' => $kg,
-                'icms_ex_compra' => $icmsEx,
-                'icms_na_compra' => $icmsNa,
-                'um_icms' => $umIcms,
-                'icms_venda' => $icmsVenda,
             ],
         ];
     }

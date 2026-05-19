@@ -141,7 +141,10 @@
                     <form method="POST"
                           action="{{ route('admin.movimentacoes.devolucoes.cancelar-admin', $movimentacao) }}"
                           class="d-flex flex-wrap gap-2"
-                          onsubmit="return confirm('Cancelar esta devolução administrativamente?');">
+                          data-confirm="Cancelar esta devolução administrativamente?"
+                          data-confirm-title="Cancelar devolução"
+                          data-confirm-variant="danger"
+                          data-confirm-btn="Cancelar">
                         @csrf
                         <input name="motivo" class="form-control form-control-sm" required placeholder="Motivo do cancelamento administrativo" style="min-width: 280px;">
                         <button class="btn btn-danger btn-sm" type="submit">Cancelar devolução</button>
