@@ -131,6 +131,46 @@ final class DashboardStatsService
     }
 
     /**
+     * Payload vazio para renderização isolada da view (ex.: testes de layout guest).
+     *
+     * @return array{
+     *     acesso_total: bool,
+     *     escopo_label: string,
+     *     totais: array{
+     *         unidades: int,
+     *         clientes: int,
+     *         veiculos: int,
+     *         pracas: int,
+     *         estoques: int,
+     *         movimentacoes: int,
+     *         movimentacoes_mes: int
+     *     },
+     *     unidades: list<array>,
+     *     movimentacoes_por_tipo: list<array>,
+     *     movimentacoes_recentes: list<array>
+     * }
+     */
+    public function vazio(): array
+    {
+        return [
+            'acesso_total' => false,
+            'escopo_label' => 'Pré-visualização',
+            'totais' => [
+                'unidades' => 0,
+                'clientes' => 0,
+                'veiculos' => 0,
+                'pracas' => 0,
+                'estoques' => 0,
+                'movimentacoes' => 0,
+                'movimentacoes_mes' => 0,
+            ],
+            'unidades' => [],
+            'movimentacoes_por_tipo' => [],
+            'movimentacoes_recentes' => [],
+        ];
+    }
+
+    /**
      * @param  Builder<Model>  $query
      */
     private function contarPorUnidade(Builder $query, User $user): int

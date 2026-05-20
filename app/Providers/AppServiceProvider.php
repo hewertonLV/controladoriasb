@@ -27,10 +27,12 @@ use App\Services\Movimentacoes\ReplayEstoqueDescarteService;
 use App\Services\Movimentacoes\ReplayEstoqueDevolucaoService;
 use App\Services\Movimentacoes\ReplayEstoqueDoacaoService;
 use App\Services\Movimentacoes\ReplayEstoqueTransferenciaService;
+use App\Services\Dashboard\DashboardStatsService;
 use App\Services\Movimentacoes\ReplayEstoqueVendaService;
 use Illuminate\Pagination\Paginator;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Route;
+use Illuminate\Support\Facades\View;
 use Illuminate\Support\ServiceProvider;
 
 class AppServiceProvider extends ServiceProvider
@@ -54,6 +56,12 @@ class AppServiceProvider extends ServiceProvider
         // que também é compatível com o interceptor de cliques em
         // `a.page-link` do componente `<x-admin.data-table>`.
         Paginator::useBootstrapFive();
+
+        View::composer('dashboard', function ($view): void {
+            if (! array_key_exists('dashboard', $view->getData())) {
+                $view->with('dashboard', app(DashboardStatsService::class)->vazio());
+            }
+        });
 
         Route::bind('estado', function (string $value): Estado {
             return Estado::withTrashed()->findOrFail($value);
