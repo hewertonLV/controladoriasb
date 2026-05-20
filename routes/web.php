@@ -52,6 +52,7 @@ use App\Http\Controllers\Admin\VeiculoExportacaoController;
 use App\Http\Controllers\Admin\VeiculoImportacaoController;
 use App\Http\Controllers\Auth\ForcePasswordChangeController;
 use App\Http\Controllers\ClientErrorController;
+use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\RequestDebugClientReportController;
 use App\Http\Controllers\ThemeSettingsController;
@@ -88,9 +89,7 @@ Route::middleware(['auth', 'verified', 'user.active', 'password.changed'])->grou
     Route::post('/theme-settings', [ThemeSettingsController::class, 'update'])
         ->name('theme-settings.update');
 
-    Route::get('/dashboard', function () {
-        return view('dashboard');
-    })->name('dashboard');
+    Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
 
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
