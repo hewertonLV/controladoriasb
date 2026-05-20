@@ -42,7 +42,7 @@
             <div class="topbar-search d-none d-xl-flex gap-2 me-2 align-items-center"
                  data-bs-toggle="modal" data-bs-target="#searchModal" type="button">
                 <i class="ri-search-line fs-18"></i>
-                <span class="me-2">Pesquisar...</span>
+                <span class="me-2">Filtrar menu...</span>
             </div>
 
             <div class="topbar-item d-none d-sm-flex">
@@ -93,16 +93,32 @@
 <div class="modal fade" id="searchModal" tabindex="-1" aria-labelledby="searchModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-lg">
         <div class="modal-content bg-transparent">
-            <form>
-                <div class="card mb-1">
-                    <div class="px-3 py-2 d-flex flex-row align-items-center" id="top-search">
-                        <i class="ri-search-line fs-22"></i>
-                        <input type="search" class="form-control border-0" id="search-modal-input"
-                               placeholder="Pesquisar...">
-                        <button type="submit" class="btn p-0" data-bs-dismiss="modal" aria-label="Close">[esc]</button>
-                    </div>
+            <div class="card mb-1">
+                <div class="px-3 py-2 d-flex flex-row align-items-center gap-2" id="top-search">
+                    <i class="ri-search-line fs-22 text-muted"></i>
+                    <input type="search"
+                           class="form-control border-0 shadow-none"
+                           id="search-modal-input"
+                           placeholder="Filtrar menu..."
+                           autocomplete="off"
+                           aria-label="Filtrar itens do menu"
+                           aria-controls="search-modal-results"
+                           aria-expanded="false">
+                    <button type="button" class="btn btn-sm btn-light" data-bs-dismiss="modal" aria-label="Fechar">esc</button>
                 </div>
-            </form>
+            </div>
+
+            <div class="card search-result-box d-none" id="search-modal-results-wrap">
+                <div class="card-body p-0">
+                    <div class="list-group list-group-flush" id="search-modal-results" role="listbox"></div>
+                    <p class="text-muted text-center py-4 mb-0 d-none" id="search-modal-empty">
+                        Nenhum item do menu encontrado.
+                    </p>
+                    <p class="text-muted text-center py-4 mb-0" id="search-modal-hint">
+                        Digite para buscar páginas do menu (ex.: empresas, fretes, venda).
+                    </p>
+                </div>
+            </div>
         </div>
     </div>
 </div>

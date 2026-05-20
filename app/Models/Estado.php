@@ -180,6 +180,16 @@ class Estado extends Model
             || $this->frutasIcms()->exists();
     }
 
+    public function cobraIcmsNaEntrada(): bool
+    {
+        return $this->id === self::ID_CEARA;
+    }
+
+    public function cobraIcmsNaSaida(): bool
+    {
+        return $this->id === self::ID_PERNAMBUCO;
+    }
+
     /**
      * @return HasMany<FrutaIcms, $this>
      */

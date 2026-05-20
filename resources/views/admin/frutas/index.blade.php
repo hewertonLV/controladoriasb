@@ -21,6 +21,7 @@
         print-title="Frutas"
         entity-label="frutas"
         entity-label-singular="fruta"
+        search-placeholder="ID CIGAM, nome, unidade..."
         :order="[1, 'asc']"
         :sort-column-map="[
             0 => 'id_cigam',
@@ -31,7 +32,7 @@
         ]"
         :column-defs="[
             ['targets' => -1, 'orderable' => false, 'searchable' => false],
-            ['targets' => 4, 'orderable' => false],
+            ['targets' => 4, 'orderable' => false, 'searchable' => false],
             ['targets' => [0, 1, 2, 3, 5], 'className' => 'text-nowrap'],
         ]"
     >

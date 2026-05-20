@@ -62,10 +62,10 @@ class StoreFrutaIcmsRequest extends FormRequest
             'entrada_um_nacional' => 'UM compra nacional',
             'entrada_externo' => 'ICMS compra exterior',
             'entrada_um_externo' => 'UM compra exterior',
-            'saida_importada' => 'ICMS venda importada',
-            'saida_um_importada' => 'UM venda importada',
-            'saida_nacional' => 'ICMS venda nacional',
-            'saida_um_nacional' => 'UM venda nacional',
+            'saida_importada' => 'ICMS venda fora do estado',
+            'saida_um_importada' => 'UM venda fora do estado',
+            'saida_nacional' => 'ICMS venda dentro do estado',
+            'saida_um_nacional' => 'UM venda dentro do estado',
         ];
     }
 

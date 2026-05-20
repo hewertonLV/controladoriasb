@@ -11,6 +11,7 @@
     'sortColumnMap' => null,
     'columnDefs' => null,
     'dataTable' => null,
+    'searchPlaceholder' => 'Pesquisar',
 ])
 
 @php
@@ -33,6 +34,7 @@
         'sortColumnMap' => $sortColumnMapJson,
         'columnDefs' => $columnDefs,
         'dataTable' => $dataTable,
+        'searchPlaceholder' => $searchPlaceholder,
     ], fn ($value) => $value !== null);
 @endphp
 
@@ -367,6 +369,10 @@
         <script src="{{ asset('assets/vendor/datatables.net-buttons/js/buttons.html5.min.js') }}"></script>
         <script src="{{ asset('assets/vendor/datatables.net-buttons/js/buttons.print.min.js') }}"></script>
         <script src="{{ asset('assets/vendor/datatables.net-keytable/js/dataTables.keyTable.min.js') }}"></script>
-        <script src="{{ asset('assets/js/admin-datatable.js') }}"></script>
+        @php
+            $adminDatatableJsPath = public_path('assets/js/admin-datatable.js');
+            $adminDatatableJsVersion = is_file($adminDatatableJsPath) ? (string) filemtime($adminDatatableJsPath) : '';
+        @endphp
+        <script src="{{ asset('assets/js/admin-datatable.js') }}{{ $adminDatatableJsVersion !== '' ? '?v='.$adminDatatableJsVersion : '' }}"></script>
     @endpush
 @endonce

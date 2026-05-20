@@ -37,10 +37,10 @@ class StoreFrutaRequest extends FormRequest
             'icms.*.entrada_um_nacional' => 'UM ICMS compra nacional',
             'icms.*.entrada_externo' => 'ICMS compra exterior',
             'icms.*.entrada_um_externo' => 'UM ICMS compra exterior',
-            'icms.*.saida_importada' => 'ICMS venda fruta importada',
-            'icms.*.saida_um_importada' => 'UM ICMS venda importada',
-            'icms.*.saida_nacional' => 'ICMS venda fruta nacional',
-            'icms.*.saida_um_nacional' => 'UM ICMS venda nacional',
+            'icms.*.saida_importada' => 'ICMS venda fora do estado',
+            'icms.*.saida_um_importada' => 'UM ICMS venda fora do estado',
+            'icms.*.saida_nacional' => 'ICMS venda dentro do estado',
+            'icms.*.saida_um_nacional' => 'UM ICMS venda dentro do estado',
         ];
     }
 

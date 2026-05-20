@@ -13,11 +13,15 @@ use App\Support\TextoCadastro;
  *   B → estado (ID, sigla ou nome)
  *   C/D → ICMS compra nacional + UM
  *   E/F → ICMS compra exterior + UM
- *   G/H → ICMS venda importada + UM
- *   I/J → ICMS venda nacional + UM
+ *   G/H → ICMS venda fora do estado + UM (PCT em PE)
+ *   I/J → ICMS venda dentro do estado + UM (PCT em PE)
  */
 class FrutaIcmsPlanilhaNormalizer
 {
+    public function __construct(
+        private readonly FrutaIcmsValidacaoService $validacaoService,
+    ) {}
+
     /**
      * @param  list<mixed>  $row
      * @return array{dados: array<string, mixed>, erros: list<string>}
@@ -49,11 +53,18 @@ class FrutaIcmsPlanilhaNormalizer
         foreach ([
             'UM compra nacional (D)' => $umCompraNacional,
             'UM compra exterior (F)' => $umCompraExterior,
-            'UM venda importada (H)' => $umVendaImportada,
-            'UM venda nacional (J)' => $umVendaNacional,
         ] as $rotulo => $um) {
-            if (! in_array($um, FrutaUmIcms::values(), true)) {
+            if (! in_array($um, FrutaUmIcms::valoresEntrada(), true)) {
                 $erros[] = "{$rotulo} inválida. Use KG ou UM.";
+            }
+        }
+
+        foreach ([
+            'UM venda fora do estado (H)' => $umVendaImportada,
+            'UM venda dentro do estado (J)' => $umVendaNacional,
+        ] as $rotulo => $um) {
+            if (! in_array($um, FrutaUmIcms::valoresSaida(), true)) {
+                $erros[] = "{$rotulo} inválida. Use KG, UM ou PCT.";
             }
         }
 
@@ -65,6 +76,23 @@ class FrutaIcmsPlanilhaNormalizer
         $idEstado = $estadoRef !== '' ? $this->resolverEstado($estadoRef) : null;
         if ($estadoRef !== '' && $idEstado === null) {
             $erros[] = "Estado não encontrado: {$estadoRef}.";
+        }
+
+        if ($idEstado !== null) {
+            $linhaNormalizada = $this->validacaoService->normalizarLinha($idEstado, [
+                'entrada_nacional' => $compraNacional,
+                'entrada_um_nacional' => $umCompraNacional,
+                'entrada_externo' => $compraExterior,
+                'entrada_um_externo' => $umCompraExterior,
+                'saida_importada' => $vendaImportada,
+                'saida_um_importada' => $umVendaImportada,
+                'saida_nacional' => $vendaNacional,
+                'saida_um_nacional' => $umVendaNacional,
+            ]);
+            $umCompraNacional = $linhaNormalizada['entrada_um_nacional'];
+            $umCompraExterior = $linhaNormalizada['entrada_um_externo'];
+            $umVendaImportada = $linhaNormalizada['saida_um_importada'];
+            $umVendaNacional = $linhaNormalizada['saida_um_nacional'];
         }
 
         return [

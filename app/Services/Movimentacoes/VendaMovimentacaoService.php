@@ -18,6 +18,7 @@ use App\Models\StatusMovimentacao;
 use App\Models\UnidadeNegocio;
 use App\Models\User;
 use App\Models\VendaNota;
+use App\Services\Frutas\FrutaIcmsCalculoService;
 use App\Services\Permissoes\UnidadeNegocioAccessService;
 use App\Support\Movimentacoes\FrutasComEstoqueOrigem;
 use App\Support\TextoCadastro;
@@ -33,6 +34,7 @@ final class VendaMovimentacaoService
         private readonly ReprocessaSaidasVendaOrigem $replayVenda,
         private readonly MovimentacaoAuditoriaService $auditoria,
         private readonly FreteRateioMovimentacaoService $freteRateio,
+        private readonly FrutaIcmsCalculoService $icmsCalculo,
     ) {}
 
     /**
@@ -255,6 +257,23 @@ final class VendaMovimentacaoService
         $precoMedioKg = (float) $estoque->preco_medio_kg;
         $precoMedioUm = (float) $estoque->preco_medio_um;
         $valorCustoSaida = round($precoMedioKg * $qtdKg, 2);
+
+        $empresaDestino->loadMissing('entidade');
+        $cliente = $empresaDestino->entidade;
+        if (! $cliente instanceof Cliente) {
+            throw new InvalidArgumentException('Empresa destino da venda deve ser um cliente.');
+        }
+
+        $icmsVenda = $this->icmsCalculo->calcularSaidaSobreValorVenda(
+            $fruta,
+            $unidadeFaturamento,
+            $cliente,
+            $valorNfTotal,
+            $qtdKg,
+            $qtdUm,
+            $dataMovimentacao,
+        );
+
         $saldoKgNovo = round((float) $posicaoOrigem->qtd_fruta_kg - $qtdKg, 2);
         $saldoUmNovo = round((float) $posicaoOrigem->qtd_fruta_um - $qtdUm, 2);
         $valorAcumuladoNovo = round((float) $estoque->valor_total_acumulado - $valorCustoSaida, 2);
@@ -264,7 +283,12 @@ final class VendaMovimentacaoService
         $posicaoOrigem->forceFill(['status_ultima_posicao' => false])->save();
 
         /** @var Movimentacao $mov */
-        $mov = Movimentacao::query()->create($this->atributosVenda([
+        $mov = Movimentacao::query()->create($this->atributosVenda(array_merge([
+            'valor_icms_total' => $icmsVenda['valor_icms_total'],
+            'valor_icms_kg' => $icmsVenda['valor_icms_kg'],
+            'valor_icms_um' => $icmsVenda['valor_icms_um'],
+            'icms_convertido_kg' => $icmsVenda['icms_convertido_kg'],
+        ], [
             'venda_nota_id' => $nota->id,
             'id_movimentacao_estoque_old' => $posicaoOrigem->id,
             'id_empresa_origem' => $empresaOrigem->id,
@@ -287,7 +311,7 @@ final class VendaMovimentacaoService
             'data_movimentacao' => $dataMovimentacao,
             'versao' => 1,
             'status_registro' => MovimentacaoStatusRegistro::ATIVO->value,
-        ]));
+        ])));
 
         $novaMe = MovimentacaoEstoque::query()->create([
             'id_estoque' => $estoque->id,

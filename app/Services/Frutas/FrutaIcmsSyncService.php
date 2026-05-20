@@ -14,6 +14,7 @@ class FrutaIcmsSyncService
 {
     public function __construct(
         private readonly FrutaIcmsHistoricoService $historicoService,
+        private readonly FrutaIcmsValidacaoService $validacaoService,
     ) {}
 
     /**
@@ -41,6 +42,9 @@ class FrutaIcmsSyncService
         ?User $user = null,
         string $origem = FrutaIcmsHistorico::ORIGEM_MANUAL,
     ): void {
+        $linha = $this->validacaoService->normalizarLinha($idEstado, $linha);
+        $this->validacaoService->validarLinha($idEstado, $linha);
+
         $this->upsertOperacao($fruta, $idEstado, FrutaIcmsOperacao::ENTRADA, [
             'icms_nacional' => $linha['entrada_nacional'] ?? $linha['compra_nacional'] ?? 0,
             'um_icms_nacional' => $linha['entrada_um_nacional'] ?? $linha['um_compra_nacional'] ?? FrutaUmIcms::KG->value,
@@ -58,9 +62,9 @@ class FrutaIcmsSyncService
             'icms_externo' => 0,
             'um_icms_externo' => FrutaUmIcms::KG->value,
             'icms_venda_importada' => $linha['saida_importada'] ?? $linha['venda_importada'] ?? 0,
-            'um_icms_venda_importada' => $linha['saida_um_importada'] ?? $linha['um_venda_importada'] ?? FrutaUmIcms::KG->value,
+            'um_icms_venda_importada' => $linha['saida_um_importada'] ?? $linha['um_venda_importada'] ?? FrutaUmIcms::PCT->value,
             'icms_venda_nacional' => $linha['saida_nacional'] ?? $linha['venda_nacional'] ?? 0,
-            'um_icms_venda_nacional' => $linha['saida_um_nacional'] ?? $linha['um_venda_nacional'] ?? FrutaUmIcms::KG->value,
+            'um_icms_venda_nacional' => $linha['saida_um_nacional'] ?? $linha['um_venda_nacional'] ?? FrutaUmIcms::PCT->value,
         ]);
 
         $this->historicoService->registrarSeAlterou($fruta, $idEstado, $linha, $user, $origem);
@@ -106,9 +110,9 @@ class FrutaIcmsSyncService
                 'entrada_externo' => $entrada ? number_format((float) $entrada->icms_externo, 2, '.', '') : '0.00',
                 'entrada_um_externo' => $entrada?->um_icms_externo ?? FrutaUmIcms::KG->value,
                 'saida_importada' => $saida ? number_format((float) $saida->icms_venda_importada, 2, '.', '') : '0.00',
-                'saida_um_importada' => $saida?->um_icms_venda_importada ?? FrutaUmIcms::KG->value,
+                'saida_um_importada' => $saida?->um_icms_venda_importada ?? FrutaUmIcms::PCT->value,
                 'saida_nacional' => $saida ? number_format((float) $saida->icms_venda_nacional, 2, '.', '') : '0.00',
-                'saida_um_nacional' => $saida?->um_icms_venda_nacional ?? FrutaUmIcms::KG->value,
+                'saida_um_nacional' => $saida?->um_icms_venda_nacional ?? FrutaUmIcms::PCT->value,
             ];
         }
 

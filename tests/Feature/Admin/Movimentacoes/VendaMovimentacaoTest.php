@@ -153,6 +153,41 @@ class VendaMovimentacaoTest extends TestCase
         Carbon::setTestNow();
     }
 
+    public function test_venda_em_pe_aplica_icms_percentual_conforme_estado_do_cliente(): void
+    {
+        $this->seedBase();
+        $c = $this->cenarioBase();
+        $unidadeCe = UnidadeNegocio::factory()->create(['id_estado' => Estado::ID_CEARA, 'possui_estoque' => false]);
+        $clienteFora = Cliente::factory()->create(['id_unidade_negocio' => $unidadeCe->id]);
+        $empresaClienteFora = $clienteFora->registroCorporativo()->firstOrFail();
+
+        $fruta = Fruta::factory()->comIcmsPernambuco()->create([
+            'kg_por_unidade_medicao' => 10,
+        ]);
+        $c['fruta'] = $fruta;
+
+        $this->registrarCompra($c, '10', '500,00');
+
+        $this->actingAs($this->movimentacoesVendasUsuario())->postJson(route('admin.movimentacoes.vendas.store'), [
+            'numero_nf' => 'NF-PE-ICMS',
+            'id_empresa_origem' => $c['empresa_unidade']->id,
+            'id_empresa_destino' => $empresaClienteFora->id,
+            'itens' => [
+                ['id_fruta' => $fruta->id, 'qtd_fruta_um' => '2', 'valor_nf_total' => '1000,00'],
+            ],
+        ])->assertCreated();
+
+        $venda = Movimentacao::query()
+            ->where('categoria_movimentacao_id', CategoriaMovimentacaoTipo::Venda->value)
+            ->where('id_fruta', $fruta->id)
+            ->orderByDesc('id')
+            ->firstOrFail();
+
+        $this->assertSame('120.00', (string) $venda->valor_icms_total);
+        $this->assertSame('6.00', (string) $venda->valor_icms_kg);
+        $this->assertSame('60.00', (string) $venda->valor_icms_um);
+    }
+
     public function test_cancelamento_individual_de_item_da_venda_nao_cancela_demais_frutas(): void
     {
         $this->seedBase();

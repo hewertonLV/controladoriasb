@@ -12,8 +12,8 @@
                     Layout fixo (linha 1 = cabeçalho). A fruta deve já existir no cadastro.
                     <code>A</code> ID CIGAM ou nome · <code>B</code> Estado (ID, sigla ou nome) ·
                     <code>C/D</code> ICMS compra nacional + UM · <code>E/F</code> compra exterior + UM ·
-                    <code>G/H</code> venda importada + UM · <code>I/J</code> venda nacional + UM
-                    ({{ implode('/', \App\Enums\FrutaUmIcms::values()) }}).
+                    <code>G/H</code> venda fora do estado + UM · <code>I/J</code> venda dentro do estado + UM.
+                    Compra: KG ou UM. Venda em PE: use <code>PCT</code> para percentual.
                 </p>
             </div>
             <a href="{{ route('admin.frutas.icms.index') }}" class="btn btn-light">

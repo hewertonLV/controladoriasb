@@ -8,6 +8,64 @@
     const TOAST_DURATION_MS = 8000;
     const TOAST_HOST_ID = 'admin-datatable-toast-host';
 
+    function isDebugEnabled() {
+        return window.DEBUG_ADMIN_DATATABLE === true;
+    }
+
+    function debugLog(label, payload) {
+        if (!isDebugEnabled()) {
+            return;
+        }
+        const line = payload === undefined ? label : `${label} ${JSON.stringify(payload)}`;
+        console.log(`[AdminDataTable] ${line}`);
+    }
+
+    function countDataTableInstances() {
+        if (!window.jQuery?.fn?.dataTable?.tables) {
+            return 0;
+        }
+        return window.jQuery.fn.dataTable.tables({ visible: true, api: true }).length;
+    }
+
+    function collectSnapshot(root, table, searchInput, label) {
+        const settings = table.settings()[0];
+        const dtNode = table.table().node();
+        const dtBody = table.table().body();
+        const scrollHost = root.querySelector('.admin-datatable-table-scroll');
+        const tablesInScroll = scrollHost
+            ? scrollHost.querySelectorAll('table').length
+            : 0;
+        const filterInputs = root.querySelectorAll('.dataTables_filter input');
+        const tbodyInDom = dtNode?.tBodies?.[0] || null;
+        const trInDtTbody = tbodyInDom ? tbodyInDom.querySelectorAll('tr').length : 0;
+        const trInScroll = scrollHost ? scrollHost.querySelectorAll('tbody tr').length : 0;
+
+        const snapshot = {
+            label,
+            tableId: dtNode?.id || null,
+            dtInstanceCount: countDataTableInstances(),
+            extSearchHandlers: window.jQuery?.fn?.dataTable?.ext?.search?.length ?? 0,
+            searchInputCount: filterInputs.length,
+            searchInputValue: searchInput?.value ?? null,
+            searchApi: table.search(),
+            bFilter: settings?.oFeatures?.bFilter ?? null,
+            aiDisplayLen: settings?.aiDisplay?.length ?? null,
+            aiDisplayMasterLen: settings?.aiDisplayMaster?.length ?? null,
+            rowsTotalCount: table.rows().count(),
+            rowsAppliedCount: table.rows({ search: 'applied' }).count(),
+            rowsPageAppliedCount: table.rows({ page: 'current', search: 'applied' }).count(),
+            tbodyTrCount: trInDtTbody,
+            tbodyTrInScrollHost: trInScroll,
+            tablesInsideScrollHost: tablesInScroll,
+            tbodyOwnedByDt: tbodyInDom === dtBody,
+            infoText: root.querySelector('.dataTables_info')?.textContent?.trim() || null,
+        };
+
+        window.__ADMIN_DT_LAST_SNAPSHOT__ = snapshot;
+        debugLog(`snapshot:${label}`, snapshot);
+        return snapshot;
+    }
+
     const SORT_COLUMN_MAP_DEFAULT = {
         0: 'tipo_registro',
         1: 'id_cigam',
@@ -181,6 +239,16 @@
                     e.preventDefault();
                 }
 
+                if (isDebugEnabled()) {
+                    const $input = window.jQuery(dt.table().container()).find('.dataTables_filter input').first();
+                    collectSnapshot(
+                        window.jQuery(dt.table().container()).closest('[data-admin-datatable]').get(0) || document.body,
+                        dt,
+                        $input.get(0),
+                        'copy-click',
+                    );
+                }
+
                 const text = tableExportText(dt, exportOptions);
                 if (!text) {
                     showToast('Nenhum dado visível para copiar.', 'danger');
@@ -202,7 +270,7 @@
 
         return {
             search: '',
-            searchPlaceholder: 'Pesquisar',
+            searchPlaceholder: config.searchPlaceholder || 'Pesquisar',
             lengthMenu: 'Mostrar _MENU_',
             info: `Exibindo _START_ a _END_ de _TOTAL_ ${entity}`,
             infoEmpty: `Nenhum ${entitySingular} para exibir`,
@@ -222,11 +290,163 @@
         };
     }
 
-    function buildDefaults(config) {
+    function purgeAttributeFilterHandlers() {
+        if (!window.jQuery?.fn?.dataTable?.ext?.search) {
+            return;
+        }
+
+        window.jQuery.fn.dataTable.ext.search = window.jQuery.fn.dataTable.ext.search.filter(
+            (fn) => !fn.adminDatatableAttrFilter,
+        );
+    }
+
+    function hasRowAttributeFilters(root) {
+        return Array.from(
+            root.querySelectorAll('[data-table-filter], [data-datatable-row-filter]'),
+        ).length > 0;
+    }
+
+    function chainCallback(defaultFn, overrideFn) {
+        if (!defaultFn && !overrideFn) {
+            return undefined;
+        }
+        if (!overrideFn) {
+            return defaultFn;
+        }
+        if (!defaultFn) {
+            return overrideFn;
+        }
+
+        return function chainedCallback() {
+            defaultFn.apply(this, arguments);
+            overrideFn.apply(this, arguments);
+        };
+    }
+
+    function normalizeOrder(order) {
+        if (!order || !Array.isArray(order)) {
+            return [[0, 'asc']];
+        }
+        if (order.length === 2 && typeof order[0] === 'number' && typeof order[1] === 'string') {
+            return [order];
+        }
+        return order;
+    }
+
+    function debounce(fn, waitMs) {
+        let timer = null;
+        return function debounced() {
+            const ctx = this;
+            const args = arguments;
+            window.clearTimeout(timer);
+            timer = window.setTimeout(() => fn.apply(ctx, args), waitMs);
+        };
+    }
+
+    /**
+     * Redesenha o tbody após filtro (ja). Não chamar table.draw() dentro de search.dt —
+     * isso reentra em za()/ka() e estoura a pilha ou deixa o DOM desatualizado.
+     */
+    function redrawFilteredRows(table, root) {
+        if (root.__adminDtRedrawLock) {
+            return;
+        }
+        root.__adminDtRedrawLock = true;
+        try {
+            table.draw(false);
+        } finally {
+            root.__adminDtRedrawLock = false;
+        }
+    }
+
+    /**
+     * Busca da toolbar: único fluxo após desligar handlers nativos keyup/input.DT.
+     * O handler nativo atualizava aiDisplay (export/copiar ok) sem ja() (linhas na tela).
+     */
+    function applyToolbarSearch(table, root, $input, sortColumnMap, source) {
+        if (!$input.length) {
+            debugLog('search:skip', { reason: 'no-input', source });
+            return;
+        }
+
+        const term = ($input.val() || '').toString();
+        const searchBefore = table.search();
+        debugLog('search:before', { source, term, searchBefore });
+        collectSnapshot(root, table, $input.get(0), `before:${source}`);
+
+        if (searchBefore !== term) {
+            table.search(term);
+        }
+        redrawFilteredRows(table, root);
+
+        debugLog('search:after-draw', { source, term, searchAfter: table.search() });
+        collectSnapshot(root, table, $input.get(0), `after:${source}`);
+        syncPdfFilters(root, table, sortColumnMap);
+    }
+
+    function buildToolbarSearchInitComplete(root, sortColumnMap) {
+        return function toolbarSearchInitComplete() {
+            const table = this.api();
+            const $container = window.jQuery(table.table().container());
+            const $input = $container.find('.dataTables_filter input').first();
+
+            debugLog('initComplete', {
+                tableId: table.table().node()?.id,
+                inputFound: $input.length > 0,
+                inputId: $input.attr('id') || null,
+                containerId: $container.attr('id') || null,
+            });
+
+            collectSnapshot(root, table, $input.get(0), 'initComplete');
+
+            const runSearch = function (source) {
+                applyToolbarSearch(table, root, $input, sortColumnMap, source);
+            };
+
+            $input.off('keyup.DT search.DT input.DT');
+
+            $container
+                .off('input.adminDtToolbarSearch search.adminDtToolbarSearch', '.dataTables_filter input')
+                .on(
+                    'input.adminDtToolbarSearch search.adminDtToolbarSearch',
+                    '.dataTables_filter input',
+                    debounce(function () {
+                        runSearch('toolbar-input');
+                    }, 150),
+                );
+
+            table.off('search.dt.adminDtPdfSync draw.dt.adminDtDebug')
+                .on('search.dt.adminDtPdfSync', function () {
+                    debugLog('event:search.dt', { term: table.search() });
+                    syncPdfFilters(root, table, sortColumnMap);
+                })
+                .on('draw.dt.adminDtDebug', function () {
+                    debugLog('event:draw.dt', { term: table.search() });
+                    collectSnapshot(root, table, $input.get(0), 'draw.dt');
+                });
+
+            const initial = (root.querySelector('[data-table-search]')?.value || '').trim();
+            if (initial !== '') {
+                if ($input.val() !== initial) {
+                    $input.val(initial);
+                }
+                runSearch('initial-hidden-field');
+            }
+        };
+    }
+
+    function buildDefaults(config, root, sortColumnMap) {
         const printTitle = config.printTitle || config.title || document.title;
 
         return {
             autoWidth: false,
+            searching: true,
+            search: {
+                search: '',
+                regex: false,
+                smart: false,
+                caseInsensitive: true,
+            },
             dom:
                 "<'row admin-datatable-toolbar px-3 pt-3'<'col-md-3'l><'col-md-6 text-center'B><'col-md-3'f>>" +
                 "<'row'<'col-12 admin-datatable-table-scroll'tr>>" +
@@ -244,13 +464,14 @@
                     },
                 },
             ],
-            keyTable: true,
+            keyTable: config.keyTable === true,
+            initComplete: buildToolbarSearchInitComplete(root, sortColumnMap),
             pageLength: config.pageLength ?? 25,
             lengthMenu: config.lengthMenu ?? [
                 [10, 25, 50, 100, -1],
                 [10, 25, 50, 100, 'Todos'],
             ],
-            order: config.order ?? [[0, 'asc']],
+            order: normalizeOrder(config.order),
             columnDefs: config.columnDefs ?? [
                 { targets: -1, orderable: false, searchable: false },
             ],
@@ -269,6 +490,7 @@
         if (overrides.buttons) {
             merged.buttons = overrides.buttons;
         }
+        merged.initComplete = chainCallback(defaults.initComplete, overrides.initComplete);
         return merged;
     }
 
@@ -312,24 +534,29 @@
     }
 
     function bindAttributeFilters(root, table) {
-        const filterKey = 'adminDatatableAttrFilter';
-
-        if (window.jQuery.fn.dataTable.ext.search) {
-            const existing = window.jQuery.fn.dataTable.ext.search.find((fn) => fn[filterKey]);
-            if (existing) {
-                const idx = window.jQuery.fn.dataTable.ext.search.indexOf(existing);
-                window.jQuery.fn.dataTable.ext.search.splice(idx, 1);
-            }
+        if (!hasRowAttributeFilters(root)) {
+            return;
         }
 
+        const filterKey = 'adminDatatableAttrFilter';
+        const tableNode = table.table().node();
+        const tableDomId = tableNode?.id || '';
+        const settingsInstance = table.settings()[0]?.sInstance;
+
+        purgeAttributeFilterHandlers();
+
         const handler = function (settings, data, dataIndex) {
-            if (settings.nTable.id !== table.table().node().id) {
+            const sameTable =
+                (settings.sInstance && settings.sInstance === settingsInstance) ||
+                (settings.nTable?.id && settings.nTable.id === tableDomId);
+
+            if (!sameTable) {
                 return true;
             }
 
-            const rowNode = table.row(dataIndex).node();
+            const rowNode = settings.aoData?.[dataIndex]?.nTr;
             if (!rowNode) {
-                return true;
+                return false;
             }
 
             const filters = root.querySelectorAll('[data-datatable-row-filter], [data-table-filter]');
@@ -348,7 +575,7 @@
 
             return true;
         };
-        handler[filterKey] = true;
+        handler[filterKey] = tableDomId;
 
         window.jQuery.fn.dataTable.ext.search.push(handler);
 
@@ -361,10 +588,6 @@
     }
 
     function initRoot(root) {
-        if (root.dataset.bound === '1') {
-            return;
-        }
-
         const tableId = root.dataset.tableId;
         if (!tableId) {
             return;
@@ -372,8 +595,26 @@
 
         const tableElement = document.getElementById(tableId);
         if (!tableElement || typeof window.jQuery === 'undefined' || !window.jQuery.fn.DataTable) {
+            debugLog('init:abort', { tableId, reason: 'missing-deps-or-element' });
             return;
         }
+
+        const alreadyDataTable = window.jQuery.fn.DataTable.isDataTable(tableElement);
+        if (root.dataset.bound === '1') {
+            if (alreadyDataTable) {
+                debugLog('init:skip', { tableId, reason: 'already-bound-and-isDataTable' });
+                return;
+            }
+            debugLog('init:rebind', { tableId, reason: 'bound-flag-without-datatable' });
+            root.dataset.bound = '0';
+        }
+
+        if (alreadyDataTable) {
+            debugLog('init:skip', { tableId, reason: 'isDataTable-without-bound-flag' });
+            return;
+        }
+
+        purgeAttributeFilterHandlers();
 
         let config = {};
         try {
@@ -385,12 +626,25 @@
         const sortColumnMap = config.sortColumnMap || SORT_COLUMN_MAP_DEFAULT;
         root.__adminDatatableSortMap = sortColumnMap;
 
-        const defaults = buildDefaults(config);
+        const defaults = buildDefaults(config, root, sortColumnMap);
         const overrides = config.dataTable || {};
         const options = mergeOptions(defaults, overrides);
 
+        debugLog('init:start', {
+            tableId,
+            extSearchHandlers: window.jQuery.fn.dataTable.ext.search.length,
+            dtInstancesBefore: countDataTableInstances(),
+        });
+
         const table = window.jQuery(tableElement).DataTable(options);
         root.dataset.bound = '1';
+        root.__adminDatatableApi = table;
+
+        debugLog('init:done', {
+            tableId,
+            dtInstancesAfter: countDataTableInstances(),
+            isDataTable: window.jQuery.fn.DataTable.isDataTable(tableElement),
+        });
 
         bindAttributeFilters(root, table);
 

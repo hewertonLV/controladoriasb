@@ -11,8 +11,8 @@
                 <th>Estado</th>
                 <th>Compra nac.</th>
                 <th>Compra ext.</th>
-                <th>Venda imp.</th>
-                <th>Venda nac.</th>
+                <th>Venda fora</th>
+                <th>Venda dentro</th>
                 <th class="text-end">Ações</th>
             </tr>
         </thead>

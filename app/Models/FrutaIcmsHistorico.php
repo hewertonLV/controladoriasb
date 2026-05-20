@@ -120,6 +120,22 @@ class FrutaIcmsHistorico extends Model
         return $config;
     }
 
+    public function comoConfigSaida(): FrutaIcms
+    {
+        $config = new FrutaIcms([
+            'fruta_id' => $this->fruta_id,
+            'id_estado' => $this->id_estado,
+            'operacao' => FrutaIcmsOperacao::SAIDA,
+            'icms_venda_importada' => $this->saida_importada,
+            'um_icms_venda_importada' => $this->um_icms_venda_importada ?: FrutaUmIcms::PCT->value,
+            'icms_venda_nacional' => $this->saida_nacional,
+            'um_icms_venda_nacional' => $this->um_icms_venda_nacional ?: FrutaUmIcms::PCT->value,
+        ]);
+        $config->exists = true;
+
+        return $config;
+    }
+
     /**
      * @param  array<string, mixed>  $linha
      */
@@ -133,9 +149,9 @@ class FrutaIcmsHistorico extends Model
             'entrada_externo' => $linha['entrada_externo'] ?? $linha['compra_exterior'] ?? 0,
             'um_icms_externo' => $linha['entrada_um_externo'] ?? $linha['um_compra_exterior'] ?? FrutaUmIcms::KG->value,
             'saida_importada' => $linha['saida_importada'] ?? $linha['venda_importada'] ?? 0,
-            'um_icms_venda_importada' => $linha['saida_um_importada'] ?? $linha['um_venda_importada'] ?? FrutaUmIcms::KG->value,
+            'um_icms_venda_importada' => $linha['saida_um_importada'] ?? $linha['um_venda_importada'] ?? FrutaUmIcms::PCT->value,
             'saida_nacional' => $linha['saida_nacional'] ?? $linha['venda_nacional'] ?? 0,
-            'um_icms_venda_nacional' => $linha['saida_um_nacional'] ?? $linha['um_venda_nacional'] ?? FrutaUmIcms::KG->value,
+            'um_icms_venda_nacional' => $linha['saida_um_nacional'] ?? $linha['um_venda_nacional'] ?? FrutaUmIcms::PCT->value,
         ]);
     }
 }

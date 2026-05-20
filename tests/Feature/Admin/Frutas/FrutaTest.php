@@ -39,7 +39,42 @@ class FrutaTest extends FrutaTestCase
             ->assertOk()
             ->assertSee('MANGA DATATABLE', false)
             ->assertSee('id="frutas-datatable"', false)
-            ->assertSee('data-admin-datatable', false);
+            ->assertSee('data-admin-datatable', false)
+            ->assertSee('dataTables_filter', false)
+            ->assertSee('assets/js/admin-datatable.js', false);
+    }
+
+    public function test_admin_datatable_js_forca_draw_apos_busca_na_toolbar(): void
+    {
+        $js = file_get_contents(public_path('assets/js/admin-datatable.js'));
+
+        $this->assertIsString($js);
+        $this->assertStringContainsString('applyToolbarSearch', $js);
+        $this->assertStringContainsString('redrawFilteredRows', $js);
+        $this->assertStringContainsString('normalizeOrder', $js);
+        $this->assertStringContainsString("search: ''", $js);
+        $this->assertStringContainsString('table.draw(false)', $js);
+        $this->assertStringContainsString("off('keyup.DT search.DT input.DT')", $js);
+        $this->assertStringContainsString('search.dt.adminDtPdfSync', $js);
+        $this->assertStringNotContainsString(
+            "debugLog('event:search.dt', { term: table.search() });\n                    table.draw();",
+            $js,
+        );
+        $this->assertStringContainsString('purgeAttributeFilterHandlers', $js);
+        $this->assertStringContainsString('isDataTable', $js);
+        $this->assertStringNotContainsString('buildDrawCallbackEnforceVisibleRows', $js);
+    }
+
+    public function test_listagem_filtra_por_pesquisa_na_url(): void
+    {
+        Fruta::factory()->create(['nome' => 'MANGA FILTRO']);
+        Fruta::factory()->create(['nome' => 'BANANA OUTRA']);
+
+        $this->actingAs($this->frutasManager())
+            ->get(route('admin.frutas.index', ['search' => 'MANGA']))
+            ->assertOk()
+            ->assertSee('MANGA FILTRO', false)
+            ->assertDontSee('BANANA OUTRA', false);
     }
 
     public function test_cadastro_com_sucesso_normaliza_campos(): void

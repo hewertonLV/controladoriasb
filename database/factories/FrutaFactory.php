@@ -36,9 +36,9 @@ class FrutaFactory extends Factory
                     'entrada_nacional' => '2.00',
                     'entrada_um_nacional' => FrutaUmIcms::KG->value,
                     'saida_importada' => '5.00',
-                    'saida_um_importada' => FrutaUmIcms::KG->value,
+                    'saida_um_importada' => FrutaUmIcms::PCT->value,
                     'saida_nacional' => '12.00',
-                    'saida_um_nacional' => FrutaUmIcms::KG->value,
+                    'saida_um_nacional' => FrutaUmIcms::PCT->value,
                 ],
             ]);
         });
@@ -57,10 +57,31 @@ class FrutaFactory extends Factory
                     'entrada_nacional' => '2.00',
                     'entrada_um_nacional' => FrutaUmIcms::KG->value,
                     'saida_importada' => '5.00',
-                    'saida_um_importada' => FrutaUmIcms::KG->value,
+                    'saida_um_importada' => FrutaUmIcms::PCT->value,
                     'saida_nacional' => '12.00',
-                    'saida_um_nacional' => FrutaUmIcms::KG->value,
+                    'saida_um_nacional' => FrutaUmIcms::PCT->value,
                 ], $icmsCeara),
+            ]);
+        });
+    }
+
+    /**
+     * @param  array<string, mixed>  $icmsPe
+     */
+    public function comIcmsPernambuco(array $icmsPe = []): static
+    {
+        return $this->afterCreating(function (Fruta $fruta) use ($icmsPe): void {
+            app(FrutaIcmsSyncService::class)->sync($fruta, [
+                Estado::ID_PERNAMBUCO => array_replace([
+                    'entrada_externo' => '0.00',
+                    'entrada_um_externo' => FrutaUmIcms::KG->value,
+                    'entrada_nacional' => '0.00',
+                    'entrada_um_nacional' => FrutaUmIcms::KG->value,
+                    'saida_importada' => '12.00',
+                    'saida_um_importada' => FrutaUmIcms::PCT->value,
+                    'saida_nacional' => '20.50',
+                    'saida_um_nacional' => FrutaUmIcms::PCT->value,
+                ], $icmsPe),
             ]);
         });
     }

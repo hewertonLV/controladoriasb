@@ -129,6 +129,51 @@ class FrutaIcms extends Model
         return number_format(round(max(0, $nacionalKg + $externoKg), 2), 2, '.', '');
     }
 
+    /**
+     * Percentual de ICMS na venda (linha SAIDA), conforme destino dentro ou fora do estado cadastrado.
+     */
+    public function percentualVendaSaida(bool $vendaDentroDoEstado): string
+    {
+        if ($this->operacao !== FrutaIcmsOperacao::SAIDA) {
+            return '0.00';
+        }
+
+        $valor = $vendaDentroDoEstado
+            ? (float) $this->icms_venda_nacional
+            : (float) $this->icms_venda_importada;
+
+        return number_format(max(0, $valor), 2, '.', '');
+    }
+
+    public function umPercentualVendaSaida(bool $vendaDentroDoEstado): string
+    {
+        if ($this->operacao !== FrutaIcmsOperacao::SAIDA) {
+            return FrutaUmIcms::PCT->value;
+        }
+
+        $um = $vendaDentroDoEstado
+            ? (string) $this->um_icms_venda_nacional
+            : (string) $this->um_icms_venda_importada;
+
+        return mb_strtoupper(trim($um), 'UTF-8') ?: FrutaUmIcms::PCT->value;
+    }
+
+    public function calcularIcmsSaidaSobreValor(float $valorVenda, bool $vendaDentroDoEstado): string
+    {
+        if ($this->operacao !== FrutaIcmsOperacao::SAIDA || $valorVenda <= 0) {
+            return '0.00';
+        }
+
+        $um = $this->umPercentualVendaSaida($vendaDentroDoEstado);
+        if ($um !== FrutaUmIcms::PCT->value) {
+            return '0.00';
+        }
+
+        $percentual = (float) $this->percentualVendaSaida($vendaDentroDoEstado);
+
+        return number_format(round($valorVenda * ($percentual / 100), 2), 2, '.', '');
+    }
+
     private function converterValorParaKg(float $valor, string $um, float $kgPorUm): float
     {
         $umNormalizada = mb_strtoupper(trim($um), 'UTF-8');

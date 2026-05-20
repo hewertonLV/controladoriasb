@@ -60,8 +60,8 @@
             <div class="col-md-6 col-lg-3">
                 <label class="form-label">UM</label>
                 <select name="entrada_um_nacional" class="form-select">
-                    @foreach (FrutaUmIcms::cases() as $um)
-                        <option value="{{ $um->value }}" @selected(old('entrada_um_nacional', $icmsLinha['entrada_um_nacional'] ?? FrutaUmIcms::KG->value) === $um->value)>{{ $um->value }}</option>
+                    @foreach (FrutaUmIcms::valoresEntrada() as $umValor)
+                        <option value="{{ $umValor }}" @selected(old('entrada_um_nacional', $icmsLinha['entrada_um_nacional'] ?? FrutaUmIcms::KG->value) === $umValor)>{{ $umValor }}</option>
                     @endforeach
                 </select>
             </div>
@@ -75,13 +75,13 @@
             <div class="col-md-6 col-lg-3">
                 <label class="form-label">UM</label>
                 <select name="entrada_um_externo" class="form-select">
-                    @foreach (FrutaUmIcms::cases() as $um)
-                        <option value="{{ $um->value }}" @selected(old('entrada_um_externo', $icmsLinha['entrada_um_externo'] ?? FrutaUmIcms::KG->value) === $um->value)>{{ $um->value }}</option>
+                    @foreach (FrutaUmIcms::valoresEntrada() as $umValor)
+                        <option value="{{ $umValor }}" @selected(old('entrada_um_externo', $icmsLinha['entrada_um_externo'] ?? FrutaUmIcms::KG->value) === $umValor)>{{ $umValor }}</option>
                     @endforeach
                 </select>
             </div>
             <div class="col-md-6 col-lg-3">
-                <label class="form-label">Venda importada</label>
+                <label class="form-label">Venda fora do estado (%)</label>
                 <input type="text" inputmode="decimal" name="saida_importada"
                        value="{{ old('saida_importada', $icmsLinha['saida_importada'] ?? '0.00') }}"
                        class="form-control @error('saida_importada') is-invalid @enderror">
@@ -90,13 +90,13 @@
             <div class="col-md-6 col-lg-3">
                 <label class="form-label">UM</label>
                 <select name="saida_um_importada" class="form-select">
-                    @foreach (FrutaUmIcms::cases() as $um)
-                        <option value="{{ $um->value }}" @selected(old('saida_um_importada', $icmsLinha['saida_um_importada'] ?? FrutaUmIcms::KG->value) === $um->value)>{{ $um->value }}</option>
+                    @foreach (FrutaUmIcms::valoresSaida() as $umValor)
+                        <option value="{{ $umValor }}" @selected(old('saida_um_importada', $icmsLinha['saida_um_importada'] ?? FrutaUmIcms::PCT->value) === $umValor)>{{ $umValor }}</option>
                     @endforeach
                 </select>
             </div>
             <div class="col-md-6 col-lg-3">
-                <label class="form-label">Venda nacional</label>
+                <label class="form-label">Venda dentro do estado (%)</label>
                 <input type="text" inputmode="decimal" name="saida_nacional"
                        value="{{ old('saida_nacional', $icmsLinha['saida_nacional'] ?? '0.00') }}"
                        class="form-control @error('saida_nacional') is-invalid @enderror">
@@ -105,8 +105,8 @@
             <div class="col-md-6 col-lg-3">
                 <label class="form-label">UM</label>
                 <select name="saida_um_nacional" class="form-select">
-                    @foreach (FrutaUmIcms::cases() as $um)
-                        <option value="{{ $um->value }}" @selected(old('saida_um_nacional', $icmsLinha['saida_um_nacional'] ?? FrutaUmIcms::KG->value) === $um->value)>{{ $um->value }}</option>
+                    @foreach (FrutaUmIcms::valoresSaida() as $umValor)
+                        <option value="{{ $umValor }}" @selected(old('saida_um_nacional', $icmsLinha['saida_um_nacional'] ?? FrutaUmIcms::PCT->value) === $umValor)>{{ $umValor }}</option>
                     @endforeach
                 </select>
             </div>
