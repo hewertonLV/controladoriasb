@@ -1,9 +1,9 @@
 services:
-  facigam:
+  controladoriasb:
     build: .
-    image: facigam-app:latest
+    image: controladoriasb-app:latest
     restart: unless-stopped
-    container_name: facigam-app
+    container_name: controladoriasb-app
     environment:
       TZ: America/Sao_Paulo
     ports:
@@ -12,7 +12,7 @@ services:
       - ./:/var/www/html
       - ./docker/php/conf.d/99-uploads.ini:/usr/local/etc/php/conf.d/99-uploads.ini:ro
     networks:
-      - facigam-network
+      - controladoriasb-network
     depends_on:
       - mysql
 
@@ -23,9 +23,9 @@ services:
   # ------------------------------------------------------------------
   worker-importacao:
     build: .
-    image: facigam-app:latest
+    image: controladoriasb-app:latest
     restart: unless-stopped
-    container_name: facigam-worker-importacao
+    container_name: controladoriasb-worker-importacao
     environment:
       TZ: America/Sao_Paulo
     # Formato em lista (exec): `php` vira PID 1 — SIGTERM do Docker chega direto ao
@@ -46,10 +46,10 @@ services:
       - ./:/var/www/html
       - ./docker/php/conf.d/99-uploads.ini:/usr/local/etc/php/conf.d/99-uploads.ini:ro
     networks:
-      - facigam-network
+      - controladoriasb-network
     depends_on:
       - mysql
-      - facigam
+      - controladoriasb
     stop_signal: SIGTERM
     # Teto após SIGTERM: deve ser ≥ `--timeout` do worker para job longo terminar com segurança.
     stop_grace_period: 930s
@@ -59,11 +59,35 @@ services:
   # PDFs grandes consomem CPU/memória; manter fila isolada evita que
   # relatórios bloqueiem importações de Empresas.
   # ------------------------------------------------------------------
+  # ------------------------------------------------------------------
+  # Agendador Laravel (backup diário do MySQL às 01:00, filas, etc.)
+  # ------------------------------------------------------------------
+  scheduler:
+    build: .
+    image: controladoriasb-app:latest
+    restart: unless-stopped
+    container_name: controladoriasb-scheduler
+    environment:
+      TZ: America/Sao_Paulo
+    command:
+      - php
+      - artisan
+      - schedule:work
+    working_dir: /var/www/html
+    volumes:
+      - ./:/var/www/html
+      - ./docker/php/conf.d/99-uploads.ini:/usr/local/etc/php/conf.d/99-uploads.ini:ro
+    networks:
+      - controladoriasb-network
+    depends_on:
+      - mysql
+      - controladoriasb
+
   worker-exportacao:
     build: .
-    image: facigam-app:latest
+    image: controladoriasb-app:latest
     restart: unless-stopped
-    container_name: facigam-worker-exportacao
+    container_name: controladoriasb-worker-exportacao
     environment:
       TZ: America/Sao_Paulo
     command:
@@ -80,17 +104,17 @@ services:
       - ./:/var/www/html
       - ./docker/php/conf.d/99-uploads.ini:/usr/local/etc/php/conf.d/99-uploads.ini:ro
     networks:
-      - facigam-network
+      - controladoriasb-network
     depends_on:
       - mysql
-      - facigam
+      - controladoriasb
     stop_signal: SIGTERM
     stop_grace_period: 930s
 
   mysql:
     image: mysql:8.0
     restart: unless-stopped
-    container_name: facigam-mysql
+    container_name: controladoriasb-mysql
     command: --default-time-zone=-03:00
     ports:
       - '44433:3306'
@@ -98,27 +122,27 @@ services:
       MYSQL_ROOT_PASSWORD: ${DB_PASSWORD}
       MYSQL_DATABASE: ${DB_DATABASE}
     volumes:
-      - facigam_mysql_data:/var/lib/mysql
+      - controladoriasb_mysql_data:/var/lib/mysql
     networks:
-      - facigam-network
+      - controladoriasb-network
 
   phpmyadmin:
     image: phpmyadmin/phpmyadmin
     restart: unless-stopped
-    container_name: facigam-phpmyadmin
+    container_name: controladoriasb-phpmyadmin
     ports:
       - '44434:80'
     environment:
       PMA_HOST: mysql
       UPLOAD_LIMIT: 50M
     networks:
-      - facigam-network
+      - controladoriasb-network
     depends_on:
       - mysql
 
 networks:
-  facigam-network:
+  controladoriasb-network:
     driver: bridge
 
 volumes:
-  facigam_mysql_data:
+  controladoriasb_mysql_data:

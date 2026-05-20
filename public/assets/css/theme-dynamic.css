@@ -3,62 +3,62 @@
  * Loaded after Highdmin compiled CSS so we can keep vendor/template files intact.
  */
 :root {
-  --facigam-primary: #02c0ce;
-  --facigam-primary-rgb: 2, 192, 206;
-  --facigam-primary-hover: #02aeba;
-  --facigam-primary-active: #02b2bf;
-  --facigam-primary-soft: #d9f6f8;
-  --facigam-primary-border: #9ae6eb;
-  --facigam-primary-text-emphasis: #02a3af;
-  --facigam-primary-contrast: #ffffff;
-  --facigam-primary-focus-ring: rgba(2, 192, 206, 0.25);
+  --controladoriasb-primary: #02c0ce;
+  --controladoriasb-primary-rgb: 2, 192, 206;
+  --controladoriasb-primary-hover: #02aeba;
+  --controladoriasb-primary-active: #02b2bf;
+  --controladoriasb-primary-soft: #d9f6f8;
+  --controladoriasb-primary-border: #9ae6eb;
+  --controladoriasb-primary-text-emphasis: #02a3af;
+  --controladoriasb-primary-contrast: #ffffff;
+  --controladoriasb-primary-focus-ring: rgba(2, 192, 206, 0.25);
 
-  --bs-primary: var(--facigam-primary);
-  --bs-primary-rgb: var(--facigam-primary-rgb);
-  --bs-link-color: var(--facigam-primary);
-  --bs-link-hover-color: var(--facigam-primary-hover);
-  --bs-primary-bg-subtle: var(--facigam-primary-soft);
-  --bs-primary-border-subtle: var(--facigam-primary-border);
+  --bs-primary: var(--controladoriasb-primary);
+  --bs-primary-rgb: var(--controladoriasb-primary-rgb);
+  --bs-link-color: var(--controladoriasb-primary);
+  --bs-link-hover-color: var(--controladoriasb-primary-hover);
+  --bs-primary-bg-subtle: var(--controladoriasb-primary-soft);
+  --bs-primary-border-subtle: var(--controladoriasb-primary-border);
 
-  --highdmin-blue: var(--facigam-primary);
-  --highdmin-primary: var(--facigam-primary);
-  --highdmin-primary-rgb: var(--facigam-primary-rgb);
-  --highdmin-primary-text-emphasis: var(--facigam-primary-text-emphasis);
-  --highdmin-primary-bg-subtle: var(--facigam-primary-soft);
-  --highdmin-primary-border-subtle: var(--facigam-primary-border);
-  --highdmin-link-color: var(--facigam-primary);
-  --highdmin-link-hover-color: var(--facigam-primary-hover);
-  --highdmin-focus-ring-color: var(--facigam-primary-focus-ring);
+  --highdmin-blue: var(--controladoriasb-primary);
+  --highdmin-primary: var(--controladoriasb-primary);
+  --highdmin-primary-rgb: var(--controladoriasb-primary-rgb);
+  --highdmin-primary-text-emphasis: var(--controladoriasb-primary-text-emphasis);
+  --highdmin-primary-bg-subtle: var(--controladoriasb-primary-soft);
+  --highdmin-primary-border-subtle: var(--controladoriasb-primary-border);
+  --highdmin-link-color: var(--controladoriasb-primary);
+  --highdmin-link-hover-color: var(--controladoriasb-primary-hover);
+  --highdmin-focus-ring-color: var(--controladoriasb-primary-focus-ring);
 }
 
 :root[data-bs-theme=dark] {
-  --highdmin-primary-text-emphasis: var(--facigam-primary-dark-text-emphasis, var(--facigam-primary-soft));
-  --highdmin-primary-bg-subtle: var(--facigam-primary-dark-soft, rgba(var(--facigam-primary-rgb), 0.2));
-  --highdmin-primary-border-subtle: var(--facigam-primary-dark-border, var(--facigam-primary-active));
-  --highdmin-link-color: var(--facigam-primary-dark-text-emphasis, var(--facigam-primary-soft));
-  --highdmin-link-hover-color: var(--facigam-primary-soft);
+  --highdmin-primary-text-emphasis: var(--controladoriasb-primary-dark-text-emphasis, var(--controladoriasb-primary-soft));
+  --highdmin-primary-bg-subtle: var(--controladoriasb-primary-dark-soft, rgba(var(--controladoriasb-primary-rgb), 0.2));
+  --highdmin-primary-border-subtle: var(--controladoriasb-primary-dark-border, var(--controladoriasb-primary-active));
+  --highdmin-link-color: var(--controladoriasb-primary-dark-text-emphasis, var(--controladoriasb-primary-soft));
+  --highdmin-link-hover-color: var(--controladoriasb-primary-soft);
 }
 
 :root[data-menu-color=light] {
-  --highdmin-menu-item-hover-color: var(--facigam-primary);
-  --highdmin-menu-item-hover-bg: rgba(var(--facigam-primary-rgb), 0.1);
-  --highdmin-menu-item-active-color: var(--facigam-primary);
+  --highdmin-menu-item-hover-color: var(--controladoriasb-primary);
+  --highdmin-menu-item-hover-bg: rgba(var(--controladoriasb-primary-rgb), 0.1);
+  --highdmin-menu-item-active-color: var(--controladoriasb-primary);
 }
 
 :root[data-menu-color=brand] {
-  --highdmin-menu-bg: var(--facigam-primary);
+  --highdmin-menu-bg: var(--controladoriasb-primary);
   --highdmin-menu-item-color: rgba(255, 255, 255, 0.82);
-  --highdmin-menu-item-hover-color: var(--facigam-primary-contrast);
+  --highdmin-menu-item-hover-color: var(--controladoriasb-primary-contrast);
   --highdmin-menu-item-hover-bg: rgba(255, 255, 255, 0.12);
-  --highdmin-menu-item-active-color: var(--facigam-primary-contrast);
+  --highdmin-menu-item-active-color: var(--controladoriasb-primary-contrast);
 }
 
 :root[data-topbar-color=light] {
-  --highdmin-topbar-item-hover-color: var(--facigam-primary);
+  --highdmin-topbar-item-hover-color: var(--controladoriasb-primary);
 }
 
 :root[data-topbar-color=brand] {
-  --highdmin-topbar-bg: var(--facigam-primary);
+  --highdmin-topbar-bg: var(--controladoriasb-primary);
 }
 
 html[data-sidenav-size=condensed]:not([data-layout=topnav]) .page-content {
@@ -67,138 +67,138 @@ html[data-sidenav-size=condensed]:not([data-layout=topnav]) .page-content {
 
 a,
 .link-primary {
-  color: var(--facigam-primary);
+  color: var(--controladoriasb-primary);
 }
 
 a:hover,
 .link-primary:hover,
 .link-primary:focus {
-  color: var(--facigam-primary-hover);
+  color: var(--controladoriasb-primary-hover);
 }
 
 .text-primary {
-  color: rgba(var(--facigam-primary-rgb), var(--highdmin-text-opacity, 1)) !important;
+  color: rgba(var(--controladoriasb-primary-rgb), var(--highdmin-text-opacity, 1)) !important;
 }
 
 .bg-primary {
-  background-color: rgba(var(--facigam-primary-rgb), var(--highdmin-bg-opacity, 1)) !important;
+  background-color: rgba(var(--controladoriasb-primary-rgb), var(--highdmin-bg-opacity, 1)) !important;
 }
 
 .bg-primary-subtle {
-  background-color: var(--facigam-primary-soft) !important;
+  background-color: var(--controladoriasb-primary-soft) !important;
 }
 
 .border-primary {
-  border-color: rgba(var(--facigam-primary-rgb), var(--highdmin-border-opacity, 1)) !important;
+  border-color: rgba(var(--controladoriasb-primary-rgb), var(--highdmin-border-opacity, 1)) !important;
 }
 
 .btn-primary {
-  --highdmin-btn-color: var(--facigam-primary-contrast);
-  --highdmin-btn-bg: var(--facigam-primary);
-  --highdmin-btn-border-color: var(--facigam-primary);
-  --highdmin-btn-hover-color: var(--facigam-primary-contrast);
-  --highdmin-btn-hover-bg: var(--facigam-primary-hover);
-  --highdmin-btn-hover-border-color: var(--facigam-primary-hover);
-  --highdmin-btn-focus-shadow-rgb: var(--facigam-primary-rgb);
-  --highdmin-btn-active-color: var(--facigam-primary-contrast);
-  --highdmin-btn-active-bg: var(--facigam-primary-active);
-  --highdmin-btn-active-border-color: var(--facigam-primary-active);
-  --highdmin-btn-disabled-color: var(--facigam-primary-contrast);
-  --highdmin-btn-disabled-bg: var(--facigam-primary);
-  --highdmin-btn-disabled-border-color: var(--facigam-primary);
+  --highdmin-btn-color: var(--controladoriasb-primary-contrast);
+  --highdmin-btn-bg: var(--controladoriasb-primary);
+  --highdmin-btn-border-color: var(--controladoriasb-primary);
+  --highdmin-btn-hover-color: var(--controladoriasb-primary-contrast);
+  --highdmin-btn-hover-bg: var(--controladoriasb-primary-hover);
+  --highdmin-btn-hover-border-color: var(--controladoriasb-primary-hover);
+  --highdmin-btn-focus-shadow-rgb: var(--controladoriasb-primary-rgb);
+  --highdmin-btn-active-color: var(--controladoriasb-primary-contrast);
+  --highdmin-btn-active-bg: var(--controladoriasb-primary-active);
+  --highdmin-btn-active-border-color: var(--controladoriasb-primary-active);
+  --highdmin-btn-disabled-color: var(--controladoriasb-primary-contrast);
+  --highdmin-btn-disabled-bg: var(--controladoriasb-primary);
+  --highdmin-btn-disabled-border-color: var(--controladoriasb-primary);
 }
 
 .btn-outline-primary {
-  --highdmin-btn-color: var(--facigam-primary);
-  --highdmin-btn-border-color: var(--facigam-primary);
-  --highdmin-btn-hover-color: var(--facigam-primary-contrast);
-  --highdmin-btn-hover-bg: var(--facigam-primary);
-  --highdmin-btn-hover-border-color: var(--facigam-primary);
-  --highdmin-btn-focus-shadow-rgb: var(--facigam-primary-rgb);
-  --highdmin-btn-active-color: var(--facigam-primary-contrast);
-  --highdmin-btn-active-bg: var(--facigam-primary-active);
-  --highdmin-btn-active-border-color: var(--facigam-primary-active);
-  --highdmin-btn-disabled-color: var(--facigam-primary);
-  --highdmin-btn-disabled-border-color: var(--facigam-primary);
+  --highdmin-btn-color: var(--controladoriasb-primary);
+  --highdmin-btn-border-color: var(--controladoriasb-primary);
+  --highdmin-btn-hover-color: var(--controladoriasb-primary-contrast);
+  --highdmin-btn-hover-bg: var(--controladoriasb-primary);
+  --highdmin-btn-hover-border-color: var(--controladoriasb-primary);
+  --highdmin-btn-focus-shadow-rgb: var(--controladoriasb-primary-rgb);
+  --highdmin-btn-active-color: var(--controladoriasb-primary-contrast);
+  --highdmin-btn-active-bg: var(--controladoriasb-primary-active);
+  --highdmin-btn-active-border-color: var(--controladoriasb-primary-active);
+  --highdmin-btn-disabled-color: var(--controladoriasb-primary);
+  --highdmin-btn-disabled-border-color: var(--controladoriasb-primary);
 }
 
 .btn-soft-primary {
-  --highdmin-btn-color: var(--facigam-primary);
-  --highdmin-btn-bg: var(--facigam-primary-soft);
-  --highdmin-btn-border-color: var(--facigam-primary-soft);
-  --highdmin-btn-hover-color: var(--facigam-primary-contrast);
-  --highdmin-btn-hover-bg: var(--facigam-primary);
-  --highdmin-btn-hover-border-color: var(--facigam-primary);
-  --highdmin-btn-active-color: var(--facigam-primary-contrast);
-  --highdmin-btn-active-bg: var(--facigam-primary-active);
-  --highdmin-btn-active-border-color: var(--facigam-primary-active);
+  --highdmin-btn-color: var(--controladoriasb-primary);
+  --highdmin-btn-bg: var(--controladoriasb-primary-soft);
+  --highdmin-btn-border-color: var(--controladoriasb-primary-soft);
+  --highdmin-btn-hover-color: var(--controladoriasb-primary-contrast);
+  --highdmin-btn-hover-bg: var(--controladoriasb-primary);
+  --highdmin-btn-hover-border-color: var(--controladoriasb-primary);
+  --highdmin-btn-active-color: var(--controladoriasb-primary-contrast);
+  --highdmin-btn-active-bg: var(--controladoriasb-primary-active);
+  --highdmin-btn-active-border-color: var(--controladoriasb-primary-active);
 }
 
 .form-control:focus,
 .form-select:focus,
 .form-check-input:focus {
-  border-color: var(--facigam-primary-border);
-  box-shadow: 0 0 0 0.2rem var(--facigam-primary-focus-ring);
+  border-color: var(--controladoriasb-primary-border);
+  box-shadow: 0 0 0 0.2rem var(--controladoriasb-primary-focus-ring);
 }
 
 .form-check-input:checked,
 .form-check-input[type=checkbox]:indeterminate {
-  background-color: var(--facigam-primary);
-  border-color: var(--facigam-primary);
+  background-color: var(--controladoriasb-primary);
+  border-color: var(--controladoriasb-primary);
 }
 
 .form-switch .form-check-input:checked {
-  background-color: var(--facigam-primary);
-  border-color: var(--facigam-primary);
+  background-color: var(--controladoriasb-primary);
+  border-color: var(--controladoriasb-primary);
 }
 
 .nav-pills {
-  --highdmin-nav-pills-link-active-bg: var(--facigam-primary);
+  --highdmin-nav-pills-link-active-bg: var(--controladoriasb-primary);
 }
 
 .nav-tabs .nav-link.active,
 .nav-tabs .nav-item.show .nav-link,
 .nav-bordered .nav-link.active,
 .nav-bordered .nav-item.show .nav-link {
-  color: var(--facigam-primary);
-  border-color: var(--facigam-primary);
+  color: var(--controladoriasb-primary);
+  border-color: var(--controladoriasb-primary);
 }
 
 .pagination {
-  --highdmin-pagination-active-bg: var(--facigam-primary);
-  --highdmin-pagination-active-border-color: var(--facigam-primary);
-  --highdmin-pagination-focus-box-shadow: 0 0 0 0.2rem var(--facigam-primary-focus-ring);
+  --highdmin-pagination-active-bg: var(--controladoriasb-primary);
+  --highdmin-pagination-active-border-color: var(--controladoriasb-primary);
+  --highdmin-pagination-focus-box-shadow: 0 0 0 0.2rem var(--controladoriasb-primary-focus-ring);
 }
 
 .page-link {
-  color: var(--facigam-primary);
+  color: var(--controladoriasb-primary);
 }
 
 .page-link:hover,
 .page-link:focus {
-  color: var(--facigam-primary-hover);
+  color: var(--controladoriasb-primary-hover);
 }
 
 .dropdown-item.active,
 .dropdown-item:active,
 .list-group-item.active {
-  color: var(--facigam-primary-contrast);
-  background-color: var(--facigam-primary);
-  border-color: var(--facigam-primary);
+  color: var(--controladoriasb-primary-contrast);
+  background-color: var(--controladoriasb-primary);
+  border-color: var(--controladoriasb-primary);
 }
 
 .progress-bar {
-  background-color: var(--facigam-primary);
+  background-color: var(--controladoriasb-primary);
 }
 
 .badge-soft-primary {
-  color: var(--facigam-primary);
-  background-color: rgba(var(--facigam-primary-rgb), 0.15);
+  color: var(--controladoriasb-primary);
+  background-color: rgba(var(--controladoriasb-primary-rgb), 0.15);
 }
 
 .badge-outline-primary {
-  color: var(--facigam-primary);
-  border-color: var(--facigam-primary);
+  color: var(--controladoriasb-primary);
+  border-color: var(--controladoriasb-primary);
 }
 
 .side-nav .side-nav-link:hover,
@@ -241,7 +241,7 @@ a:hover,
 .spinner-grow.text-primary,
 .card-portlets-loader,
 .preloader .spinner-border {
-  color: var(--facigam-primary) !important;
+  color: var(--controladoriasb-primary) !important;
   border-color: currentColor;
   border-right-color: transparent;
 }
@@ -250,19 +250,19 @@ a:hover,
 .page-loader,
 .sweet-alert .sa-icon.sa-custom,
 .swal2-loader {
-  border-color: var(--facigam-primary) transparent var(--facigam-primary) transparent;
+  border-color: var(--controladoriasb-primary) transparent var(--controladoriasb-primary) transparent;
 }
 
 .card-radio .form-check-input:checked + .form-check-label,
 .card-radio .form-check-input:focus + .form-check-label,
 .theme-palette-option.active,
 .theme-palette-option:focus {
-  border-color: var(--facigam-primary) !important;
-  box-shadow: 0 0 0 0.15rem var(--facigam-primary-focus-ring);
+  border-color: var(--controladoriasb-primary) !important;
+  box-shadow: 0 0 0 0.15rem var(--controladoriasb-primary-focus-ring);
 }
 
 .theme-primary-preview {
   background:
-    linear-gradient(135deg, var(--facigam-primary), var(--facigam-primary-active));
-  color: var(--facigam-primary-contrast);
+    linear-gradient(135deg, var(--controladoriasb-primary), var(--controladoriasb-primary-active));
+  color: var(--controladoriasb-primary-contrast);
 }

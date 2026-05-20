@@ -28,14 +28,48 @@ Sistema interno (Laravel 13 + MySQL + Highdmin/Bootstrap) integrado ao ERP CIGAM
 # A partir da raiz do repositório (pasta acima de backend/)
 docker compose up -d
 
-# Dentro do container "facigam"
-docker compose exec facigam composer install
-docker compose exec facigam php artisan key:generate
-docker compose exec facigam php artisan migrate --seed
-docker compose exec facigam php artisan optimize:clear
+# Dentro do container "controladoriasb"
+docker compose exec controladoriasb composer install
+docker compose exec controladoriasb php artisan key:generate
+docker compose exec controladoriasb php artisan migrate --seed
+docker compose exec controladoriasb php artisan optimize:clear
+
+# Agendador (backup MySQL diário às 01:00 — America/Sao_Paulo)
+docker compose up -d scheduler
 ```
 
 Acesse http://localhost:44432 e entre com `hewerton@sitiobarreiras.com.br` / `casa1234`.
+
+### Backup automático do banco
+
+Todo dia à **1h da manhã** (horário de Brasília), o comando `db:backup` gera um dump completo
+em `storage/app/backups/database/` (arquivo `.sql.gz`). Configuração no `.env`:
+
+| Variável | Padrão | Descrição |
+|----------|--------|-----------|
+| `BACKUP_ENABLED` | `true` | Liga/desliga o agendamento |
+| `BACKUP_DAILY_AT` | `01:00` | Horário do backup |
+| `BACKUP_RETENTION_DAYS` | `14` | Dias para manter arquivos antigos |
+| `BACKUP_PATH` | `backups/database` | Pasta dentro de `storage/app/` |
+
+```bash
+# Backup manual imediato (dentro do container)
+docker compose exec controladoriasb php artisan db:backup
+
+# Alternativa no host (sem mysqldump local — usa o container mysql)
+./scripts/backup/mysql-dump.sh
+
+# Ver agendamento
+docker compose exec controladoriasb php artisan schedule:list
+
+# Logs do job agendado
+tail -f storage/logs/backup.log
+```
+
+O serviço `scheduler` no `docker-compose.yml` executa `php artisan schedule:work` e dispara o
+backup no horário configurado. Após alterar o `Dockerfile` (cliente MySQL), reconstrua a imagem:
+
+`docker compose up -d --build controladoriasb scheduler`
 
 ## Testes automatizados
 
@@ -61,8 +95,8 @@ php artisan test --filter=Empresa
 php artisan test tests/Feature/Admin/Empresas/EmpresaCadastroTest.php
 
 # Dentro do Docker
-docker compose exec facigam php artisan test
-docker compose exec facigam php artisan test --filter=Empresa
+docker compose exec controladoriasb php artisan test
+docker compose exec controladoriasb php artisan test --filter=Empresa
 ```
 
 Os testes do módulo Empresas cobrem cadastro, edição, listagem, pesquisa,
@@ -199,7 +233,7 @@ Em desenvolvimento, o worker pode rodar em foreground enquanto você testa:
 php artisan queue:work --queue=empresas-importacao,unidades-negocio-importacao,empresas-exportacao,default --sleep=1 --tries=1 --timeout=900
 
 # dentro do Docker
-docker compose exec facigam php artisan queue:work --queue=empresas-importacao,unidades-negocio-importacao,empresas-exportacao,default --sleep=1 --tries=1 --timeout=900
+docker compose exec controladoriasb php artisan queue:work --queue=empresas-importacao,unidades-negocio-importacao,empresas-exportacao,default --sleep=1 --tries=1 --timeout=900
 ```
 
 > Para produção, **use Supervisor com workers separados** (Linux bare-metal/VM) ou os serviços `worker-importacao` e `worker-exportacao` do `docker-compose.yml` (Docker em produção).
@@ -278,9 +312,9 @@ O `docker-compose.yml` inclui dois serviços dedicados que reusam a mesma imagem
 ```yaml
 worker-importacao:
   build: .
-  image: facigam-app:latest
+  image: controladoriasb-app:latest
   restart: unless-stopped
-  container_name: facigam-worker-importacao
+  container_name: controladoriasb-worker-importacao
   command:
     - php
     - artisan
@@ -294,9 +328,9 @@ worker-importacao:
   stop_grace_period: 930s
 
 worker-exportacao:
-  image: facigam-app:latest
+  image: controladoriasb-app:latest
   restart: unless-stopped
-  container_name: facigam-worker-exportacao
+  container_name: controladoriasb-worker-exportacao
   command:
     - php
     - artisan
@@ -391,7 +425,7 @@ docker compose restart worker-importacao worker-exportacao                      
 A partir da segunda release em diante, o roteiro típico é:
 
 ```bash
-cd /var/www/facigam
+cd /var/www/controladoriasb
 
 # 1. Atualizar código
 git pull --rebase

@@ -26,7 +26,7 @@ sudo apt install supervisor -y
 sudo cp docs/deploy/supervisor/laravel-worker-*.conf /etc/supervisor/conf.d/
 
 # Ajuste os caminhos absolutos no arquivo (directory / command) antes do passo
-# abaixo. Por padrão estão em /var/www/facigam.
+# abaixo. Por padrão estão em /var/www/controladoriasb.
 sudoedit /etc/supervisor/conf.d/laravel-worker-importacao.conf
 sudoedit /etc/supervisor/conf.d/laravel-worker-exportacao.conf
 

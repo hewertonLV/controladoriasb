@@ -18,11 +18,11 @@ Atualizar textos de marca do sistema para `SB - CONTROLADORIA`.
 1. **Atualizar configuração** — alterar `APP_NAME` local e exemplos para `SB - CONTROLADORIA`.
 2. **Atualizar telas** — substituir menções visíveis ao nome antigo nas views.
 3. **Atualizar documentação** — trocar menções de marca em README e documento mestre, preservando identificadores técnicos.
-4. **Verificar ocorrências** — buscar remanescentes de `facigam` e revisar se são técnicas ou pendentes.
+4. **Verificar ocorrências** — buscar remanescentes de `controladoriasb` e revisar se são técnicas ou pendentes.
 
 ## Critério de conclusão
 
-As telas e documentos gerais não exibem mais `facigam` como nome do sistema.
+As telas e documentos gerais não exibem mais `controladoriasb` como nome do sistema.
 Ocorrências remanescentes devem estar restritas a referências técnicas ou legadas.
 
 ## Riscos

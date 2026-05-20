@@ -143,7 +143,7 @@ Frontend / template:
 
 Infraestrutura:
 
-- **Docker** + **docker-compose** com 4 serviços: `facigam` (app),
+- **Docker** + **docker-compose** com 4 serviços: `controladoriasb` (app),
   `worker-importacao`, `worker-exportacao`, `mysql`, `phpmyadmin`.
 - **Supervisor** documentado para produção bare-metal/VM
   (`laravel-worker-importacao.conf` e `laravel-worker-exportacao.conf`).
@@ -942,7 +942,7 @@ e fica documentado apenas no código e no README.
 Local / dev (em foreground):
 
 ```bash
-docker compose exec facigam \
+docker compose exec controladoriasb \
   php artisan queue:work \
   --queue=empresas-importacao,unidades-negocio-importacao,empresas-exportacao,default \
   --sleep=1 --tries=1 --timeout=900
@@ -994,27 +994,27 @@ sudo supervisorctl restart laravel-worker-importacao:* laravel-worker-exportacao
 
 ### 13.1. Serviços (`docker-compose.yml`)
 
-- **facigam** (`facigam-app`)
-  - Imagem: `facigam-app:latest` (build da raiz).
+- **controladoriasb** (`controladoriasb-app`)
+  - Imagem: `controladoriasb-app:latest` (build da raiz).
   - Porta exposta: `44432:80`.
   - Monta o código (`./:/var/www/html`) e `docker/php/conf.d/99-uploads.ini`.
-- **worker-importacao** (`facigam-worker-importacao`)
+- **worker-importacao** (`controladoriasb-worker-importacao`)
   - Mesma imagem; `queue:work` (não `queue:listen`) em **forma de lista** no YAML para
     `php` ser PID 1 e receber **SIGTERM** direto do Docker (encerramento mais previsível
     do que `command: >` com shell).
   - `--queue=empresas-importacao,unidades-negocio-importacao`, `--sleep=1`,
     `--tries=1`, `--timeout=900`, `--max-time=3600`.
   - `stop_signal: SIGTERM`, `stop_grace_period: 930s` (≥ timeout do job + margem).
-- **worker-exportacao** (`facigam-worker-exportacao`)
+- **worker-exportacao** (`controladoriasb-worker-exportacao`)
   - Igual ao anterior, fila `empresas-exportacao`; mesmos `stop_signal` / `stop_grace_period` / `--sleep=1`.
-- **mysql** (`facigam-mysql`)
+- **mysql** (`controladoriasb-mysql`)
   - `mysql:8.0`, porta `44433:3306`.
   - Variáveis: `MYSQL_ROOT_PASSWORD`, `MYSQL_DATABASE` lidas do `.env`.
-  - Volume nomeado `facigam_mysql_data`.
-- **phpmyadmin** (`facigam-phpmyadmin`)
+  - Volume nomeado `controladoriasb_mysql_data`.
+- **phpmyadmin** (`controladoriasb-phpmyadmin`)
   - Porta `44434:80`, `PMA_HOST=mysql`.
 
-Network única: `facigam-network`.
+Network única: `controladoriasb-network`.
 
 ### 13.2. Comandos úteis
 
@@ -1023,15 +1023,15 @@ Network única: `facigam-network`.
 docker compose up -d
 
 # entrar no container do app
-docker compose exec facigam bash
+docker compose exec controladoriasb bash
 
 # rodar Artisan
-docker compose exec facigam php artisan migrate --force
-docker compose exec facigam php artisan db:seed
-docker compose exec facigam php artisan optimize:clear
-docker compose exec facigam php artisan view:clear
-docker compose exec facigam php artisan queue:restart
-docker compose exec facigam php artisan test
+docker compose exec controladoriasb php artisan migrate --force
+docker compose exec controladoriasb php artisan db:seed
+docker compose exec controladoriasb php artisan optimize:clear
+docker compose exec controladoriasb php artisan view:clear
+docker compose exec controladoriasb php artisan queue:restart
+docker compose exec controladoriasb php artisan test
 
 # logs dos workers
 docker compose logs -f worker-importacao
@@ -1168,13 +1168,13 @@ exportação assíncrona com `Storage::fake('local')`, autorização
 
 ```bash
 # tudo
-docker compose exec -T facigam php artisan test
+docker compose exec -T controladoriasb php artisan test
 
 # uma suite
-docker compose exec -T facigam php artisan test --filter=EmpresaExportacaoTest
+docker compose exec -T controladoriasb php artisan test --filter=EmpresaExportacaoTest
 
 # por nome de teste
-docker compose exec -T facigam php artisan test --filter=test_endpoint_de_status_retorna_payload_para_ui
+docker compose exec -T controladoriasb php artisan test --filter=test_endpoint_de_status_retorna_payload_para_ui
 ```
 
 ### 17.4. Convenção para novos testes

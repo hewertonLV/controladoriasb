@@ -53,8 +53,8 @@ Exemplo:
 ```ini
 [program:laravel-worker-imports]
 process_name=%(program_name)s_%(process_num)02d
-command=php /var/www/facigam/artisan queue:work --queue=imports,default --sleep=3 --tries=3 --timeout=300 --max-time=3600
-directory=/var/www/facigam
+command=php /var/www/controladoriasb/artisan queue:work --queue=imports,default --sleep=3 --tries=3 --timeout=300 --max-time=3600
+directory=/var/www/controladoriasb
 user=www-data
 autostart=true
 autorestart=true

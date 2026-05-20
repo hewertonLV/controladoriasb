@@ -5,6 +5,7 @@ ENV TZ=America/Sao_Paulo
 RUN a2enmod rewrite headers \
     && apt-get update \
     && apt-get install -y --no-install-recommends \
+        default-mysql-client \
         libzip-dev zlib1g-dev libpng-dev libjpeg62-turbo-dev libfreetype6-dev \
         libonig-dev libxml2-dev libicu-dev \
     && docker-php-ext-configure gd --with-freetype --with-jpeg \
