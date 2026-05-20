@@ -10,8 +10,11 @@
 
 # ---- Ambiente / segredos ----------------------------------------------------
 .env
+.env.backup
+.env.production
 .env.*
 !.env.example
+!.env.testing
 !.env.testing.example
 auth.json
 
