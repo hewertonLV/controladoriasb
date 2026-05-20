@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\FrutaProcedencia;
 use App\Support\TextoCadastro;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -15,6 +16,7 @@ use Illuminate\Support\Carbon;
  * @property string $nome
  * @property string $unidade_medicao
  * @property string $kg_por_unidade_medicao
+ * @property string $procedencia
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
  */
@@ -33,6 +35,7 @@ class Fruta extends Model
         'nome',
         'unidade_medicao',
         'kg_por_unidade_medicao',
+        'procedencia',
     ];
 
     /**
@@ -73,11 +76,26 @@ class Fruta extends Model
     }
 
     /**
-     * @return HasMany<FrutaIcms, $this>
+     * @return HasMany<FrutaIcmsAliquota, $this>
      */
-    public function icms(): HasMany
+    public function icmsAliquotas(): HasMany
     {
-        return $this->hasMany(FrutaIcms::class, 'fruta_id');
+        return $this->hasMany(FrutaIcmsAliquota::class, 'fruta_id');
+    }
+
+    public function procedenciaEnum(): FrutaProcedencia
+    {
+        $valor = mb_strtoupper(trim((string) ($this->procedencia ?? '')), 'UTF-8');
+
+        return FrutaProcedencia::tryFrom($valor) ?? FrutaProcedencia::NACIONAL;
+    }
+
+    protected function setProcedenciaAttribute(mixed $value): void
+    {
+        $normalizado = mb_strtoupper(trim((string) ($value === null ? FrutaProcedencia::NACIONAL->value : $value)), 'UTF-8');
+        $this->attributes['procedencia'] = in_array($normalizado, FrutaProcedencia::values(), true)
+            ? $normalizado
+            : FrutaProcedencia::NACIONAL->value;
     }
 
     /**

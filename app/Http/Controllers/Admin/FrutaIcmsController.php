@@ -2,16 +2,16 @@
 
 namespace App\Http\Controllers\Admin;
 
-use App\Enums\FrutaIcmsOperacao;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Admin\Frutas\StoreFrutaIcmsRequest;
 use App\Http\Requests\Admin\Frutas\UpdateFrutaIcmsRequest;
 use App\Models\Estado;
 use App\Models\Fruta;
-use App\Models\FrutaIcms;
 use App\Models\FrutaIcmsHistorico;
 use App\Queries\FrutaIcmsQuery;
+use App\Services\Frutas\FrutaIcmsAliquotaResolver;
 use App\Services\Frutas\FrutaIcmsSyncService;
+use App\Support\Frutas\FrutaIcmsLinhaFormulario;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -22,24 +22,30 @@ class FrutaIcmsController extends Controller
     public function __construct(
         private readonly FrutaIcmsQuery $icmsQuery,
         private readonly FrutaIcmsSyncService $icmsSync,
+        private readonly FrutaIcmsAliquotaResolver $resolver,
     ) {}
 
     public function index(Request $request): View
     {
         $filtros = $this->icmsQuery->filtrosFromRequest($request);
-        $registros = $this->icmsQuery
-            ->aplicarFiltros($this->icmsQuery->listagemBase(), $filtros)
-            ->get();
+        $registros = $this->icmsQuery->listagemAgrupada($filtros);
 
-        $saidas = FrutaIcms::query()
-            ->where('operacao', FrutaIcmsOperacao::SAIDA)
-            ->whereIn('fruta_id', $registros->pluck('fruta_id')->unique()->all() ?: [0])
-            ->get()
-            ->keyBy(fn (FrutaIcms $s) => $s->fruta_id.'-'.$s->id_estado);
+        $linhas = [];
+        foreach ($registros as $item) {
+            $fruta = $item->fruta;
+            $estado = $item->estado;
+            if ($fruta === null || $estado === null) {
+                continue;
+            }
+            $linhas[] = [
+                'fruta' => $fruta,
+                'estado' => $estado,
+                'valores' => $this->resolver->mapaParaFormulario($fruta, $estado->id),
+            ];
+        }
 
         return view('admin.frutas.icms.index', [
-            'registros' => $registros,
-            'saidas' => $saidas,
+            'linhas' => $linhas,
             'filtros' => $filtros,
         ]);
     }
@@ -49,7 +55,7 @@ class FrutaIcmsController extends Controller
         return view('admin.frutas.icms.create', [
             'frutas' => Fruta::query()->orderBy('nome')->get(['id', 'id_cigam', 'nome']),
             'estados' => Estado::query()->orderBy('nome')->get(),
-            'icmsLinha' => $this->icmsLinhaVazia(),
+            'icmsLinha' => FrutaIcmsLinhaFormulario::vazia(),
         ]);
     }
 
@@ -79,8 +85,8 @@ class FrutaIcmsController extends Controller
 
     public function edit(Fruta $fruta, Estado $estado): View
     {
-        $fruta->load('icms.estado');
-        $linha = $this->icmsSync->mapaParaFormulario($fruta)[$estado->id] ?? $this->icmsLinhaVazia();
+        $fruta->load('icmsAliquotas.estado');
+        $linha = $this->resolver->mapaParaFormulario($fruta, $estado->id);
 
         $historicos = FrutaIcmsHistorico::query()
             ->where('fruta_id', $fruta->id)
@@ -112,22 +118,5 @@ class FrutaIcmsController extends Controller
         return redirect()
             ->route('admin.frutas.icms.index')
             ->with('success', "ICMS de {$fruta->nome} ({$estado->abreviacao}) atualizado com sucesso.");
-    }
-
-    /**
-     * @return array<string, string>
-     */
-    private function icmsLinhaVazia(): array
-    {
-        return [
-            'entrada_nacional' => '0.00',
-            'entrada_um_nacional' => 'KG',
-            'entrada_externo' => '0.00',
-            'entrada_um_externo' => 'KG',
-            'saida_importada' => '0.00',
-            'saida_um_importada' => 'KG',
-            'saida_nacional' => '0.00',
-            'saida_um_nacional' => 'KG',
-        ];
     }
 }

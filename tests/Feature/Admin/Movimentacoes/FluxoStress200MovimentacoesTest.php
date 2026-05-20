@@ -25,6 +25,7 @@ use App\Models\MovimentacaoHistorico;
 use App\Models\StatusMovimentacao;
 use App\Models\UnidadeNegocio;
 use App\Services\Frutas\FrutaIcmsSyncService;
+use App\Support\Frutas\FrutaIcmsLinhaFormulario;
 use App\Services\UnidadesNegocio\HistoricoCustoOperacionalUnidadeNegocioService;
 use Database\Seeders\CategoriaDescarteSeeder;
 use Database\Seeders\CategoriaMovimentacaoSeeder;
@@ -98,10 +99,8 @@ class FluxoStress200MovimentacoesTest extends TestCase
                 foreach ($this->cenario['frutas'] as $fruta) {
                     app(FrutaIcmsSyncService::class)->sync($fruta, [
                         Estado::ID_CEARA => [
-                            'entrada_nacional' => 2,
-                            'entrada_externo' => 0,
-                            'entrada_um' => FrutaUmIcms::KG->value,
-                            'saida_venda' => '12.00',
+                            FrutaIcmsLinhaFormulario::ENTRADA_NACIONAL_KG => '5.00',
+                            FrutaIcmsLinhaFormulario::SAIDA_NACIONAL_DENTRO_PCT => '12.00',
                         ],
                     ]);
                 }
@@ -356,9 +355,7 @@ class FluxoStress200MovimentacoesTest extends TestCase
     private function criarFruta(string $nome, int $kgPorUm): Fruta
     {
         return Fruta::factory()->comIcmsCeara([
-            'entrada_nacional' => 1,
-            'entrada_externo' => 0,
-            'entrada_um' => FrutaUmIcms::KG->value,
+            FrutaIcmsLinhaFormulario::ENTRADA_NACIONAL_KG => '1.00',
         ])->create([
             'nome' => $nome,
             'kg_por_unidade_medicao' => $kgPorUm,

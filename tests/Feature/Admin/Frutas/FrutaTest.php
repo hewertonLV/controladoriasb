@@ -2,11 +2,14 @@
 
 namespace Tests\Feature\Admin\Frutas;
 
-use App\Enums\FrutaUmIcms;
+use App\Enums\FrutaIcmsOperacao;
+use App\Enums\FrutaProcedencia;
 use App\Enums\FrutaUnidadeMedicao;
 use App\Enums\Permissions;
 use App\Models\Estado;
 use App\Models\Fruta;
+use App\Models\FrutaIcmsAliquota;
+use App\Support\Frutas\FrutaIcmsLinhaFormulario;
 
 class FrutaTest extends FrutaTestCase
 {
@@ -145,14 +148,10 @@ class FrutaTest extends FrutaTestCase
                 'kg_por_unidade_medicao' => '20',
                 'icms' => [
                     Estado::ID_CEARA => [
-                        'entrada_externo' => '1.00',
-                        'entrada_um_externo' => FrutaUmIcms::UM->value,
-                        'entrada_nacional' => '2.00',
-                        'entrada_um_nacional' => FrutaUmIcms::UM->value,
-                        'saida_importada' => '5.00',
-                        'saida_um_importada' => FrutaUmIcms::KG->value,
-                        'saida_nacional' => '18.00',
-                        'saida_um_nacional' => FrutaUmIcms::KG->value,
+                        FrutaIcmsLinhaFormulario::ENTRADA_NACIONAL_KG => '2.00',
+                        FrutaIcmsLinhaFormulario::ENTRADA_INTERNACIONAL_KG => '1.00',
+                        FrutaIcmsLinhaFormulario::SAIDA_NACIONAL_DENTRO_PCT => '18.00',
+                        FrutaIcmsLinhaFormulario::SAIDA_NACIONAL_FORA_PCT => '5.00',
                     ],
                 ],
             ]))
@@ -164,8 +163,13 @@ class FrutaTest extends FrutaTestCase
         $this->assertSame('DEPOIS', $fruta->nome);
         $this->assertSame(FrutaUnidadeMedicao::SACO->value, $fruta->unidade_medicao);
         $this->assertSame('20.00', $fruta->kg_por_unidade_medicao);
-        $icmsEntrada = $fruta->icms()->where('id_estado', Estado::ID_CEARA)->where('operacao', 'ENTRADA')->first();
+        $icmsEntrada = FrutaIcmsAliquota::query()
+            ->where('fruta_id', $fruta->id)
+            ->where('id_estado', Estado::ID_CEARA)
+            ->where('operacao', FrutaIcmsOperacao::ENTRADA)
+            ->where('procedencia', FrutaProcedencia::NACIONAL)
+            ->first();
         $this->assertNotNull($icmsEntrada);
-        $this->assertSame(FrutaUmIcms::UM->value, $icmsEntrada->um_icms_nacional);
+        $this->assertSame('2.0000', (string) $icmsEntrada->valor);
     }
 }

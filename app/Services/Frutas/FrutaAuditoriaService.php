@@ -5,6 +5,7 @@ namespace App\Services\Frutas;
 use App\Models\Fruta;
 use App\Models\FrutaHistorico;
 use App\Models\User;
+use App\Support\Frutas\FrutaIcmsLinhaFormulario;
 
 class FrutaAuditoriaService
 {
@@ -13,7 +14,12 @@ class FrutaAuditoriaService
         'nome',
         'unidade_medicao',
         'kg_por_unidade_medicao',
+        'procedencia',
     ];
+
+    public function __construct(
+        private readonly FrutaIcmsAliquotaResolver $resolver,
+    ) {}
 
     public function registrarCriacao(Fruta $fruta, ?User $user, string $origem): FrutaHistorico
     {
@@ -70,24 +76,13 @@ class FrutaAuditoriaService
      */
     public function snapshot(Fruta $fruta): array
     {
-        $fruta->loadMissing(['icms.estado']);
+        $fruta->loadMissing(['icmsAliquotas.estado']);
 
         $icms = [];
-        foreach ($fruta->icms as $registro) {
-            $uf = $registro->estado?->abreviacao ?? (string) $registro->id_estado;
-            $chave = $uf.'_'.$registro->operacao->value;
-            $icms[$chave] = [
-                'estado' => $registro->estado?->nome,
-                'operacao' => $registro->operacao->value,
-                'icms_externo' => $this->formatDecimal($registro->icms_externo),
-                'um_icms_externo' => (string) $registro->um_icms_externo,
-                'icms_nacional' => $this->formatDecimal($registro->icms_nacional),
-                'um_icms_nacional' => (string) $registro->um_icms_nacional,
-                'icms_venda_importada' => $this->formatDecimal($registro->icms_venda_importada),
-                'um_icms_venda_importada' => (string) $registro->um_icms_venda_importada,
-                'icms_venda_nacional' => $this->formatDecimal($registro->icms_venda_nacional),
-                'um_icms_venda_nacional' => (string) $registro->um_icms_venda_nacional,
-            ];
+        foreach ($fruta->icmsAliquotas->groupBy('id_estado') as $idEstado => $grupo) {
+            $estado = $grupo->first()?->estado;
+            $uf = $estado?->abreviacao ?? (string) $idEstado;
+            $icms[$uf] = $this->resolver->mapaParaFormulario($fruta, (int) $idEstado);
         }
 
         ksort($icms);
@@ -97,6 +92,7 @@ class FrutaAuditoriaService
             'nome' => $fruta->nome,
             'unidade_medicao' => $fruta->unidade_medicao,
             'kg_por_unidade_medicao' => $this->formatKg($fruta->kg_por_unidade_medicao),
+            'procedencia' => $fruta->procedencia,
             'icms_por_estado' => $icms,
         ];
     }
@@ -133,21 +129,25 @@ class FrutaAuditoriaService
 
         $icmsAntes = $antes['icms_por_estado'] ?? [];
         $icmsDepois = $depois['icms_por_estado'] ?? [];
+        $ufs = array_unique(array_merge(array_keys($icmsAntes), array_keys($icmsDepois)));
+        sort($ufs);
 
-        if ($icmsAntes !== $icmsDepois) {
-            $alteracoes[] = [
-                'campo' => 'icms_por_estado',
-                'antes' => $icmsAntes,
-                'depois' => $icmsDepois,
-            ];
+        foreach ($ufs as $uf) {
+            $linhaAntes = $icmsAntes[$uf] ?? FrutaIcmsLinhaFormulario::vazia();
+            $linhaDepois = $icmsDepois[$uf] ?? FrutaIcmsLinhaFormulario::vazia();
+
+            foreach (FrutaIcmsLinhaFormulario::chaves() as $chave) {
+                if (($linhaAntes[$chave] ?? '') !== ($linhaDepois[$chave] ?? '')) {
+                    $alteracoes[] = [
+                        'campo' => "icms.{$uf}.{$chave}",
+                        'antes' => $linhaAntes[$chave] ?? '',
+                        'depois' => $linhaDepois[$chave] ?? '',
+                    ];
+                }
+            }
         }
 
         return $alteracoes;
-    }
-
-    private function formatDecimal(mixed $value): string
-    {
-        return number_format(max(0, (float) $value), 2, '.', '');
     }
 
     private function formatKg(mixed $value): string

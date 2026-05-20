@@ -4,6 +4,7 @@ namespace App\Services\Frutas;
 
 use App\Models\Fruta;
 use App\Models\FrutaIcmsImportacao;
+use App\Support\Frutas\FrutaIcmsLinhaFormulario;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use PhpOffice\PhpSpreadsheet\Cell\Coordinate;
@@ -17,14 +18,12 @@ class FrutaIcmsImportacaoProcessor
     public const MAX_LINHAS_UTEIS = 5000;
 
     private const COMPARABLE_FIELDS = [
-        'compra_nacional',
-        'um_compra_nacional',
-        'compra_exterior',
-        'um_compra_exterior',
-        'venda_importada',
-        'um_venda_importada',
-        'venda_nacional',
-        'um_venda_nacional',
+        FrutaIcmsLinhaFormulario::ENTRADA_NACIONAL_KG,
+        FrutaIcmsLinhaFormulario::ENTRADA_INTERNACIONAL_KG,
+        FrutaIcmsLinhaFormulario::SAIDA_NACIONAL_DENTRO_PCT,
+        FrutaIcmsLinhaFormulario::SAIDA_NACIONAL_FORA_PCT,
+        FrutaIcmsLinhaFormulario::SAIDA_INTERNACIONAL_DENTRO_PCT,
+        FrutaIcmsLinhaFormulario::SAIDA_INTERNACIONAL_FORA_PCT,
     ];
 
     public function __construct(
@@ -69,7 +68,7 @@ class FrutaIcmsImportacaoProcessor
 
         for ($r = 2; $r <= $highestRow; $r++) {
             $dadosBrutos = [];
-            for ($col = 1; $col <= 10; $col++) {
+            for ($col = 1; $col <= 11; $col++) {
                 $dadosBrutos[] = $sheet->getCell(Coordinate::stringFromColumnIndex($col).$r)->getCalculatedValue();
             }
 
@@ -210,16 +209,14 @@ class FrutaIcmsImportacaoProcessor
      */
     private function dadosComparaveis(array $dados): array
     {
-        return [
-            'compra_nacional' => number_format(max(0, (float) ($dados['compra_nacional'] ?? 0)), 2, '.', ''),
-            'um_compra_nacional' => (string) ($dados['um_compra_nacional'] ?? 'KG'),
-            'compra_exterior' => number_format(max(0, (float) ($dados['compra_exterior'] ?? 0)), 2, '.', ''),
-            'um_compra_exterior' => (string) ($dados['um_compra_exterior'] ?? 'KG'),
-            'venda_importada' => number_format(max(0, (float) ($dados['venda_importada'] ?? 0)), 2, '.', ''),
-            'um_venda_importada' => (string) ($dados['um_venda_importada'] ?? 'KG'),
-            'venda_nacional' => number_format(max(0, (float) ($dados['venda_nacional'] ?? 0)), 2, '.', ''),
-            'um_venda_nacional' => (string) ($dados['um_venda_nacional'] ?? 'KG'),
-        ];
+        $dados = FrutaIcmsLinhaFormulario::normalizarChavesLegadas($dados);
+        $comparaveis = [];
+
+        foreach (self::COMPARABLE_FIELDS as $campo) {
+            $comparaveis[$campo] = number_format(max(0, (float) ($dados[$campo] ?? 0)), 2, '.', '');
+        }
+
+        return $comparaveis;
     }
 
     /**

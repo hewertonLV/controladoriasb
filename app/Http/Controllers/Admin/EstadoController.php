@@ -15,7 +15,11 @@ class EstadoController extends Controller
     {
         $estados = Estado::query()
             ->withTrashed()
-            ->withCount(['unidadesNegocio', 'fornecedores', 'frutasIcms'])
+            ->withCount([
+                'unidadesNegocio',
+                'fornecedores',
+                'frutasIcmsAliquotas as frutas_icms_count' => fn ($query) => $query->selectRaw('count(distinct fruta_id)'),
+            ])
             ->orderBy('nome')
             ->orderBy('id')
             ->get();

@@ -28,7 +28,7 @@ class FrutaController extends Controller
     {
         $filtros = $this->frutaQuery->filtrosFromRequest($request);
         $frutas = $this->frutaQuery->aplicarFiltros(
-            Fruta::query()->withCount('icms'),
+            Fruta::query()->withCount('icmsAliquotas'),
             $filtros,
         )->get();
 
@@ -54,7 +54,7 @@ class FrutaController extends Controller
         $fruta = DB::transaction(function () use ($request, $user) {
             $fruta = Fruta::create($request->validatedFruta());
             $this->icmsSync->sync($fruta, $request->validatedIcms());
-            $fruta->load('icms.estado');
+            $fruta->load('icmsAliquotas.estado');
 
             $this->auditoria->registrarCriacao(
                 $fruta,
@@ -72,7 +72,7 @@ class FrutaController extends Controller
 
     public function edit(Fruta $fruta): View
     {
-        $fruta->load('icms.estado');
+        $fruta->load('icmsAliquotas.estado');
 
         return view('admin.frutas.edit', [
             'fruta' => $fruta,
@@ -90,7 +90,7 @@ class FrutaController extends Controller
 
             $fruta->update($request->validatedFruta());
             $this->icmsSync->sync($fruta, $request->validatedIcms());
-            $fruta->load('icms.estado');
+            $fruta->load('icmsAliquotas.estado');
 
             $depois = $this->auditoria->snapshot($fruta);
 

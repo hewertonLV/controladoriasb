@@ -10,22 +10,27 @@
                 <tr>
                     <th>Data</th>
                     <th>Origem</th>
-                    <th>Entrada nacional</th>
-                    <th>Entrada exterior</th>
-                    <th>Saída importada</th>
-                    <th>Saída nacional</th>
+                    <th>Entr. nac. kg</th>
+                    <th>Entr. intl. kg</th>
+                    <th>V. nac. dentro %</th>
+                    <th>V. nac. fora %</th>
+                    <th>V. intl. dentro %</th>
+                    <th>V. intl. fora %</th>
                     <th>Vigente</th>
                 </tr>
             </thead>
             <tbody>
                 @foreach($historicos as $historico)
+                    @php($a = $historico->aliquotasArray())
                     <tr>
                         <td>{{ $historico->created_at?->format('d/m/Y H:i') }}</td>
                         <td>{{ $historico->origem }}</td>
-                        <td>{{ number_format((float) $historico->entrada_nacional, 2, ',', '.') }} {{ $historico->um_icms_nacional }}</td>
-                        <td>{{ number_format((float) $historico->entrada_externo, 2, ',', '.') }} {{ $historico->um_icms_externo }}</td>
-                        <td>{{ number_format((float) $historico->saida_importada, 2, ',', '.') }} {{ $historico->um_icms_venda_importada }}</td>
-                        <td>{{ number_format((float) $historico->saida_nacional, 2, ',', '.') }} {{ $historico->um_icms_venda_nacional }}</td>
+                        <td>{{ number_format((float) $a['entrada_nacional_kg'], 2, ',', '.') }}</td>
+                        <td>{{ number_format((float) $a['entrada_internacional_kg'], 2, ',', '.') }}</td>
+                        <td>{{ number_format((float) $a['saida_nacional_dentro_pct'], 2, ',', '.') }}</td>
+                        <td>{{ number_format((float) $a['saida_nacional_fora_pct'], 2, ',', '.') }}</td>
+                        <td>{{ number_format((float) $a['saida_internacional_dentro_pct'], 2, ',', '.') }}</td>
+                        <td>{{ number_format((float) $a['saida_internacional_fora_pct'], 2, ',', '.') }}</td>
                         <td>
                             @if($historico->status_position)
                                 <span class="badge bg-success-subtle text-success">Sim</span>
@@ -39,4 +44,3 @@
         </table>
     </div>
 @endif
-

@@ -16,6 +16,7 @@ use App\Models\HistoricoCOUnNg;
 use App\Models\Movimentacao;
 use App\Models\UnidadeNegocio;
 use App\Services\Frutas\FrutaIcmsSyncService;
+use App\Support\Frutas\FrutaIcmsLinhaFormulario;
 use App\Services\Movimentacoes\MovimentacaoAuditoriaService;
 use Database\Seeders\CategoriaDescarteSeeder;
 use Database\Seeders\CategoriaMovimentacaoSeeder;
@@ -43,10 +44,8 @@ class MovimentacaoCamposHistoricosEstruturaisTest extends TestCase
 
         app(FrutaIcmsSyncService::class)->sync($cenario['fruta'], [
             Estado::ID_CEARA => [
-                'entrada_nacional' => '100.00',
-                'entrada_externo' => '0.00',
-                'entrada_um_nacional' => FrutaUmIcms::KG->value,
-                'saida_nacional' => '12.00',
+                FrutaIcmsLinhaFormulario::ENTRADA_NACIONAL_KG => '100.00',
+                FrutaIcmsLinhaFormulario::SAIDA_NACIONAL_DENTRO_PCT => '12.00',
             ],
         ]);
 
@@ -69,10 +68,8 @@ class MovimentacaoCamposHistoricosEstruturaisTest extends TestCase
 
         app(FrutaIcmsSyncService::class)->sync($cenario['fruta'], [
             Estado::ID_CEARA => [
-                'entrada_nacional' => '100.00',
-                'entrada_externo' => '0.00',
-                'entrada_um_nacional' => FrutaUmIcms::KG->value,
-                'saida_nacional' => '12.00',
+                FrutaIcmsLinhaFormulario::ENTRADA_NACIONAL_KG => '100.00',
+                FrutaIcmsLinhaFormulario::SAIDA_NACIONAL_DENTRO_PCT => '12.00',
             ],
         ]);
 
@@ -195,9 +192,7 @@ class MovimentacaoCamposHistoricosEstruturaisTest extends TestCase
             'empresa_fornecedor' => $fornecedor->registroCorporativo()->firstOrFail(),
             'empresa_unidade' => $unidade->registroCorporativo()->firstOrFail(),
             'fruta' => Fruta::factory()->comIcmsCeara([
-                'entrada_nacional' => '20.00',
-                'entrada_externo' => '0.00',
-                'entrada_um' => FrutaUmIcms::KG->value,
+                FrutaIcmsLinhaFormulario::ENTRADA_NACIONAL_KG => '20.00',
             ])->create([
                 'kg_por_unidade_medicao' => 10,
             ]),

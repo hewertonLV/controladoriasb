@@ -390,11 +390,17 @@
 
         function renderIcmsResumo(d) {
             if (!d) return '—';
+            const entNac = d.entrada_nacional_kg ?? d.compra_nacional ?? '0';
+            const entInt = d.entrada_internacional_kg ?? d.compra_exterior ?? '0';
+            const vdNac = d.saida_nacional_dentro_pct ?? d.venda_nacional ?? '0';
+            const vfNac = d.saida_nacional_fora_pct ?? d.venda_importada ?? '0';
+            const vdInt = d.saida_internacional_dentro_pct ?? vdNac;
+            const vfInt = d.saida_internacional_fora_pct ?? vfNac;
             return [
-                fmtKg(d.compra_nacional) + ' ' + escapeHtml(d.um_compra_nacional || ''),
-                fmtKg(d.compra_exterior) + ' ' + escapeHtml(d.um_compra_exterior || ''),
-                fmtKg(d.venda_importada) + ' ' + escapeHtml(d.um_venda_importada || ''),
-                fmtKg(d.venda_nacional) + ' ' + escapeHtml(d.um_venda_nacional || ''),
+                'Ent.N ' + fmtKg(entNac) + ' kg',
+                'Ent.I ' + fmtKg(entInt) + ' kg',
+                'V.Nac ' + fmtKg(vdNac) + '/' + fmtKg(vfNac) + '%',
+                'V.Intl ' + fmtKg(vdInt) + '/' + fmtKg(vfInt) + '%',
             ].join(' · ');
         }
         function renderNovas(lista) {

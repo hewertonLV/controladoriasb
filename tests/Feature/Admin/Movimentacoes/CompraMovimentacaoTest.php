@@ -20,6 +20,7 @@ use App\Models\MovimentacaoEstoque;
 use App\Models\MovimentacaoHistorico;
 use App\Models\UnidadeNegocio;
 use App\Services\Frutas\FrutaIcmsSyncService;
+use App\Support\Frutas\FrutaIcmsLinhaFormulario;
 use Database\Seeders\CategoriaMovimentacaoSeeder;
 use Database\Seeders\EstadoSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -64,9 +65,8 @@ class CompraMovimentacaoTest extends TestCase
         ]);
 
         $fruta = Fruta::factory()->comIcmsCeara([
-            'entrada_nacional' => '2.00',
-            'entrada_externo' => '1.00',
-            'entrada_um' => FrutaUmIcms::KG->value,
+            FrutaIcmsLinhaFormulario::ENTRADA_NACIONAL_KG => '2.00',
+            FrutaIcmsLinhaFormulario::ENTRADA_INTERNACIONAL_KG => '1.00',
         ])->create([
             'kg_por_unidade_medicao' => '10.00',
         ]);
@@ -288,8 +288,8 @@ class CompraMovimentacaoTest extends TestCase
         $this->assertSame(MovimentacaoStatusRegistro::ATIVO->value, $novaPrimeira->status_registro);
         $this->assertSame((int) $primeira->numero_compra, (int) $novaPrimeira->numero_compra);
         $this->assertSame('1500.00', (string) $novaPrimeira->valor_nf_total);
-        $this->assertSame('36.00', (string) $novaPrimeira->preco_medio_fruta_kg);
-        $this->assertSame('26.00', (string) $segunda->preco_medio_fruta_kg);
+        $this->assertSame('35.00', (string) $novaPrimeira->preco_medio_fruta_kg);
+        $this->assertSame('25.00', (string) $segunda->preco_medio_fruta_kg);
         $this->assertSame('100.00', (string) $segunda->saldo_estoque_fruta_kg);
 
         $meNovaPrimeira = MovimentacaoEstoque::query()->where('movimentacao_id', $novaPrimeira->id)->firstOrFail();
@@ -305,8 +305,8 @@ class CompraMovimentacaoTest extends TestCase
             ->firstOrFail();
 
         $this->assertSame('100.00', (string) $estoque->qtd_fruta_kg);
-        $this->assertSame('31.00', (string) $estoque->preco_medio_kg);
-        $this->assertSame('3100.00', (string) $estoque->valor_total_acumulado);
+        $this->assertSame('30.00', (string) $estoque->preco_medio_kg);
+        $this->assertSame('3000.00', (string) $estoque->valor_total_acumulado);
         $this->assertSame(1, MovimentacaoEstoque::query()->where('id_unidade_negocio', $unidade->id)->where('id_fruta', $fruta->id)->where('status_ultima_posicao', true)->count());
     }
 
@@ -332,7 +332,7 @@ class CompraMovimentacaoTest extends TestCase
 
         $compra = Movimentacao::query()->firstOrFail();
         $this->assertSame('1.00', (string) $compra->valor_custo_operacional);
-        $this->assertSame('3.00', (string) $compra->icms_convertido_kg);
+        $this->assertSame('2.00', (string) $compra->icms_convertido_kg);
 
         HistoricoCOUnNg::query()
             ->where('id_unidade_negocio', $unidade->id)
@@ -360,8 +360,8 @@ class CompraMovimentacaoTest extends TestCase
         $nova = Movimentacao::query()->findOrFail((int) $compra->substituida_por_id);
 
         $this->assertSame('1.00', (string) $nova->valor_custo_operacional);
-        $this->assertSame('3.00', (string) $nova->icms_convertido_kg);
-        $this->assertSame('38.00', (string) $nova->preco_medio_fruta_kg);
+        $this->assertSame('2.00', (string) $nova->icms_convertido_kg);
+        $this->assertSame('37.00', (string) $nova->preco_medio_fruta_kg);
     }
 
     public function test_consulta_e_update_por_id_substituido_resolvem_versao_ativa(): void

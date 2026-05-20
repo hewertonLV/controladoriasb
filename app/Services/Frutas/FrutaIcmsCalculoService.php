@@ -2,18 +2,19 @@
 
 namespace App\Services\Frutas;
 
-use App\Enums\FrutaIcmsOperacao;
+use App\Enums\EstadoIcmsCobraEm;
+use App\Enums\FrutaIcmsEscopoVenda;
+use App\Enums\FrutaProcedencia;
 use App\Models\Cliente;
 use App\Models\Fornecedor;
 use App\Models\Fruta;
-use App\Models\FrutaIcms;
 use App\Models\UnidadeNegocio;
 use DateTimeInterface;
 
 class FrutaIcmsCalculoService
 {
     public function __construct(
-        private readonly FrutaIcmsHistoricoService $historicoService,
+        private readonly FrutaIcmsAliquotaResolver $resolver,
     ) {}
 
     public function calcularEntradaPorKg(
@@ -29,18 +30,22 @@ class FrutaIcmsCalculoService
             return '0.00';
         }
 
-        $config = $this->resolverConfigEntrada($fruta, (int) $unidadeDestino->id_estado, $dataReferencia);
+        $procedencia = $fruta->procedenciaEnum();
+        $config = $this->resolver->buscarEntradaPorKg(
+            $fruta,
+            (int) $unidadeDestino->id_estado,
+            $procedencia,
+            $dataReferencia,
+        );
 
         if ($config === null) {
             return '0.00';
         }
 
-        return $config->converterParaIcmsPorKg($fruta->kg_por_unidade_medicao);
+        return number_format($config->valorPorKgEntrada(), 2, '.', '');
     }
 
     /**
-     * ICMS na venda (ex.: Pernambuco): percentual sobre o valor da NF.
-     *
      * @return array{
      *     valor_icms_total: string,
      *     valor_icms_kg: string,
@@ -65,12 +70,7 @@ class FrutaIcmsCalculoService
         ];
 
         $unidadeFaturamento->loadMissing('estado');
-        if (! $this->deveAplicarIcmsSaida($unidadeFaturamento)) {
-            return $zerado;
-        }
-
-        $config = $this->resolverConfigSaida($fruta, (int) $unidadeFaturamento->id_estado, $dataReferencia);
-        if ($config === null) {
+        if ($unidadeFaturamento->estado?->icms_cobra_em !== EstadoIcmsCobraEm::SAIDA->value) {
             return $zerado;
         }
 
@@ -79,8 +79,20 @@ class FrutaIcmsCalculoService
             return $zerado;
         }
 
-        $dentroDoEstado = $this->vendaDentroDoEstadoFaturamento($unidadeFaturamento, $cliente);
-        $total = (float) $config->calcularIcmsSaidaSobreValor($valorVenda, $dentroDoEstado);
+        $escopo = $this->escopoVenda($unidadeFaturamento, $cliente);
+        $config = $this->resolver->buscarSaidaPercentual(
+            $fruta,
+            (int) $unidadeFaturamento->id_estado,
+            $fruta->procedenciaEnum(),
+            $escopo,
+            $dataReferencia,
+        );
+
+        if ($config === null) {
+            return $zerado;
+        }
+
+        $total = (float) $config->calcularIcmsSaidaSobreValor($valorVenda);
 
         return [
             'valor_icms_total' => number_format($total, 2, '.', ''),
@@ -90,44 +102,17 @@ class FrutaIcmsCalculoService
         ];
     }
 
-    private function resolverConfigEntrada(
-        Fruta $fruta,
-        int $idEstado,
-        ?DateTimeInterface $dataReferencia,
-    ): ?FrutaIcms {
-        if ($dataReferencia !== null) {
-            $historico = $this->historicoService->vigenteNaData($fruta->id, $idEstado, $dataReferencia);
+    private function escopoVenda(UnidadeNegocio $unidadeFaturamento, Cliente $cliente): FrutaIcmsEscopoVenda
+    {
+        $cliente->loadMissing('unidadeNegocio');
+        $idEstadoFaturamento = (int) $unidadeFaturamento->id_estado;
+        $idEstadoCliente = (int) ($cliente->unidadeNegocio?->id_estado ?? 0);
 
-            if ($historico !== null) {
-                return $historico->comoConfigEntrada();
-            }
+        if ($idEstadoCliente > 0 && $idEstadoCliente === $idEstadoFaturamento) {
+            return FrutaIcmsEscopoVenda::DENTRO_ESTADO;
         }
 
-        return FrutaIcms::query()
-            ->where('fruta_id', $fruta->id)
-            ->where('id_estado', $idEstado)
-            ->where('operacao', FrutaIcmsOperacao::ENTRADA)
-            ->first();
-    }
-
-    private function resolverConfigSaida(
-        Fruta $fruta,
-        int $idEstado,
-        ?DateTimeInterface $dataReferencia,
-    ): ?FrutaIcms {
-        if ($dataReferencia !== null) {
-            $historico = $this->historicoService->vigenteNaData($fruta->id, $idEstado, $dataReferencia);
-
-            if ($historico !== null) {
-                return $historico->comoConfigSaida();
-            }
-        }
-
-        return FrutaIcms::query()
-            ->where('fruta_id', $fruta->id)
-            ->where('id_estado', $idEstado)
-            ->where('operacao', FrutaIcmsOperacao::SAIDA)
-            ->first();
+        return FrutaIcmsEscopoVenda::FORA_ESTADO;
     }
 
     private function deveAplicarIcmsEntrada(
@@ -136,11 +121,15 @@ class FrutaIcmsCalculoService
         ?UnidadeNegocio $unidadeOrigem,
     ): bool {
         $unidadeDestino->loadMissing('estado');
-        $nomeDestino = $unidadeDestino->estado?->nome ?? '';
+
+        if ($unidadeDestino->estado?->icms_cobra_em !== EstadoIcmsCobraEm::ENTRADA->value) {
+            return false;
+        }
 
         if ($unidadeOrigem !== null) {
             $unidadeOrigem->loadMissing('estado');
             $nomeOrigem = $unidadeOrigem->estado?->nome ?? '';
+            $nomeDestino = $unidadeDestino->estado?->nome ?? '';
 
             return $nomeOrigem !== 'CEARA' && $nomeDestino === 'CEARA';
         }
@@ -148,24 +137,11 @@ class FrutaIcmsCalculoService
         if ($fornecedor !== null) {
             $fornecedor->loadMissing('estado');
             $nomeFornecedor = $fornecedor->estado?->nome ?? '';
+            $nomeDestino = $unidadeDestino->estado?->nome ?? '';
 
             return $nomeDestino === 'CEARA' && $nomeFornecedor !== 'CEARA';
         }
 
         return false;
-    }
-
-    private function deveAplicarIcmsSaida(UnidadeNegocio $unidadeFaturamento): bool
-    {
-        return $unidadeFaturamento->estado?->cobraIcmsNaSaida() ?? false;
-    }
-
-    private function vendaDentroDoEstadoFaturamento(UnidadeNegocio $unidadeFaturamento, Cliente $cliente): bool
-    {
-        $cliente->loadMissing('unidadeNegocio.estado');
-        $idEstadoFaturamento = (int) $unidadeFaturamento->id_estado;
-        $idEstadoCliente = (int) ($cliente->unidadeNegocio?->id_estado ?? 0);
-
-        return $idEstadoCliente > 0 && $idEstadoCliente === $idEstadoFaturamento;
     }
 }

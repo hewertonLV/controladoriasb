@@ -1,4 +1,5 @@
 @php
+    use App\Enums\FrutaProcedencia;
     use App\Enums\FrutaUnidadeMedicao;
     /** @var \App\Models\Fruta $fruta */
 @endphp
@@ -57,6 +58,24 @@
                 @error('unidade_medicao')
                     <div class="invalid-feedback">{{ $message }}</div>
                 @enderror
+            </div>
+            <div class="col-md-6">
+                <label for="procedencia" class="form-label">Procedência <span class="text-danger">*</span></label>
+                <select id="procedencia"
+                        name="procedencia"
+                        class="form-select @error('procedencia') is-invalid @enderror"
+                        required>
+                    @foreach (FrutaProcedencia::cases() as $proc)
+                        <option value="{{ $proc->value }}"
+                            @selected(old('procedencia', $fruta->procedencia ?? FrutaProcedencia::NACIONAL->value) === $proc->value)>
+                            {{ $proc->value }}
+                        </option>
+                    @endforeach
+                </select>
+                @error('procedencia')
+                    <div class="invalid-feedback">{{ $message }}</div>
+                @enderror
+                <small class="text-muted">Define qual alíquota de venda (nacional ou internacional) será usada no cálculo.</small>
             </div>
             <div class="col-md-6">
                 <label for="kg_por_unidade_medicao" class="form-label">Kg por unidade de medição <span class="text-danger">*</span></label>

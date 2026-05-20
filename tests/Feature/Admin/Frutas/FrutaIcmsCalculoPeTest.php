@@ -2,14 +2,19 @@
 
 namespace Tests\Feature\Admin\Frutas;
 
-use App\Enums\FrutaUmIcms;
+use App\Enums\FrutaIcmsEscopoVenda;
+use App\Enums\FrutaIcmsOperacao;
+use App\Enums\FrutaIcmsTipoValor;
+use App\Enums\FrutaProcedencia;
 use App\Models\Cliente;
 use App\Models\Estado;
 use App\Models\Fornecedor;
 use App\Models\Fruta;
+use App\Models\FrutaIcmsAliquota;
 use App\Models\UnidadeNegocio;
 use App\Services\Frutas\FrutaIcmsCalculoService;
 use App\Services\Frutas\FrutaIcmsSyncService;
+use App\Support\Frutas\FrutaIcmsLinhaFormulario;
 use Database\Seeders\EstadoSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -24,14 +29,13 @@ class FrutaIcmsCalculoPeTest extends TestCase
         $this->seed(EstadoSeeder::class);
     }
 
-    public function test_entrada_ce_usa_valor_fixo_por_kg(): void
+    public function test_entrada_ce_usa_valor_fixo_por_kg_internacional(): void
     {
         $fornecedor = Fornecedor::factory()->create(['id_estado' => Estado::ID_PERNAMBUCO]);
         $unidade = UnidadeNegocio::factory()->create(['id_estado' => Estado::ID_CEARA]);
-        $fruta = Fruta::factory()->comIcmsCeara([
-            'entrada_nacional' => '0.00',
-            'entrada_externo' => '0.26',
-            'entrada_um_externo' => FrutaUmIcms::KG->value,
+        $fruta = Fruta::factory()->internacional()->comIcmsCeara([
+            FrutaIcmsLinhaFormulario::ENTRADA_NACIONAL_KG => '0.00',
+            FrutaIcmsLinhaFormulario::ENTRADA_INTERNACIONAL_KG => '0.26',
         ])->create(['kg_por_unidade_medicao' => 10]);
 
         $icmsKg = app(FrutaIcmsCalculoService::class)->calcularEntradaPorKg($fruta, $unidade, $fornecedor);
@@ -39,7 +43,7 @@ class FrutaIcmsCalculoPeTest extends TestCase
         $this->assertSame('0.26', $icmsKg);
     }
 
-    public function test_saida_pe_percentual_dentro_e_fora_do_estado(): void
+    public function test_saida_pe_percentual_dentro_e_fora_do_estado_nacional(): void
     {
         $unidadePe = UnidadeNegocio::factory()->create(['id_estado' => Estado::ID_PERNAMBUCO]);
         $unidadeCe = UnidadeNegocio::factory()->create(['id_estado' => Estado::ID_CEARA]);
@@ -74,20 +78,72 @@ class FrutaIcmsCalculoPeTest extends TestCase
         $this->assertSame('12.00', $fora['valor_icms_um']);
     }
 
-    public function test_sync_pe_forca_um_pct_quando_ha_aliquota(): void
+    public function test_saida_pe_fruta_internacional_usa_aliquotas_internacionais_distintas(): void
+    {
+        $unidadePe = UnidadeNegocio::factory()->create(['id_estado' => Estado::ID_PERNAMBUCO]);
+        $unidadeCe = UnidadeNegocio::factory()->create(['id_estado' => Estado::ID_CEARA]);
+        $clienteDentro = Cliente::factory()->create(['id_unidade_negocio' => $unidadePe->id]);
+        $clienteFora = Cliente::factory()->create(['id_unidade_negocio' => $unidadeCe->id]);
+
+        $fruta = Fruta::factory()->internacional()->comIcmsPernambuco([
+            FrutaIcmsLinhaFormulario::SAIDA_NACIONAL_DENTRO_PCT => '20.50',
+            FrutaIcmsLinhaFormulario::SAIDA_NACIONAL_FORA_PCT => '12.00',
+            FrutaIcmsLinhaFormulario::SAIDA_INTERNACIONAL_DENTRO_PCT => '18.00',
+            FrutaIcmsLinhaFormulario::SAIDA_INTERNACIONAL_FORA_PCT => '10.00',
+        ])->create();
+
+        $calculo = app(FrutaIcmsCalculoService::class);
+
+        $dentro = $calculo->calcularSaidaSobreValorVenda(
+            $fruta,
+            $unidadePe,
+            $clienteDentro,
+            '1000.00',
+            100,
+            10,
+        );
+
+        $fora = $calculo->calcularSaidaSobreValorVenda(
+            $fruta,
+            $unidadePe,
+            $clienteFora,
+            '1000.00',
+            100,
+            10,
+        );
+
+        $this->assertSame('180.00', $dentro['valor_icms_total']);
+        $this->assertSame('100.00', $fora['valor_icms_total']);
+    }
+
+    public function test_sync_pe_persiste_quatro_aliquotas_percentuais(): void
     {
         $fruta = Fruta::factory()->create();
 
         app(FrutaIcmsSyncService::class)->syncEstado($fruta, Estado::ID_PERNAMBUCO, [
-            'saida_nacional' => '18.00',
-            'saida_um_nacional' => FrutaUmIcms::KG->value,
-            'saida_importada' => '10.00',
-            'saida_um_importada' => FrutaUmIcms::KG->value,
+            FrutaIcmsLinhaFormulario::SAIDA_NACIONAL_DENTRO_PCT => '18.00',
+            FrutaIcmsLinhaFormulario::SAIDA_INTERNACIONAL_FORA_PCT => '10.00',
         ]);
 
-        $saida = $fruta->icms()->where('id_estado', Estado::ID_PERNAMBUCO)->where('operacao', 'SAIDA')->firstOrFail();
+        $saidaNacDentro = FrutaIcmsAliquota::query()
+            ->where('fruta_id', $fruta->id)
+            ->where('id_estado', Estado::ID_PERNAMBUCO)
+            ->where('operacao', FrutaIcmsOperacao::SAIDA)
+            ->where('procedencia', FrutaProcedencia::NACIONAL)
+            ->where('escopo_venda', FrutaIcmsEscopoVenda::DENTRO_ESTADO)
+            ->firstOrFail();
 
-        $this->assertSame(FrutaUmIcms::PCT->value, $saida->um_icms_venda_nacional);
-        $this->assertSame(FrutaUmIcms::PCT->value, $saida->um_icms_venda_importada);
+        $saidaIntFora = FrutaIcmsAliquota::query()
+            ->where('fruta_id', $fruta->id)
+            ->where('id_estado', Estado::ID_PERNAMBUCO)
+            ->where('operacao', FrutaIcmsOperacao::SAIDA)
+            ->where('procedencia', FrutaProcedencia::INTERNACIONAL)
+            ->where('escopo_venda', FrutaIcmsEscopoVenda::FORA_ESTADO)
+            ->firstOrFail();
+
+        $this->assertSame(FrutaIcmsTipoValor::PERCENTUAL, $saidaNacDentro->tipo_valor);
+        $this->assertSame(FrutaIcmsTipoValor::PERCENTUAL, $saidaIntFora->tipo_valor);
+        $this->assertSame('18.0000', (string) $saidaNacDentro->valor);
+        $this->assertSame('10.0000', (string) $saidaIntFora->valor);
     }
 }

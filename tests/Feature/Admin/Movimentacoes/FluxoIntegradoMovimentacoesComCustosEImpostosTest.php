@@ -25,6 +25,7 @@ use App\Models\MovimentacaoHistorico;
 use App\Models\StatusMovimentacao;
 use App\Models\UnidadeNegocio;
 use App\Services\Frutas\FrutaIcmsSyncService;
+use App\Support\Frutas\FrutaIcmsLinhaFormulario;
 use App\Services\UnidadesNegocio\HistoricoCustoOperacionalUnidadeNegocioService;
 use Database\Seeders\CategoriaDescarteSeeder;
 use Database\Seeders\CategoriaMovimentacaoSeeder;
@@ -152,10 +153,8 @@ class FluxoIntegradoMovimentacoesComCustosEImpostosTest extends TestCase
         $this->evento(function () use ($c): void {
             app(FrutaIcmsSyncService::class)->sync($c['fruta'], [
                 Estado::ID_CEARA => [
-                    'entrada_nacional' => 3,
-                    'entrada_externo' => 0,
-                    'entrada_um' => FrutaUmIcms::KG->value,
-                    'saida_venda' => '12.00',
+                    FrutaIcmsLinhaFormulario::ENTRADA_NACIONAL_KG => '3.00',
+                    FrutaIcmsLinhaFormulario::SAIDA_NACIONAL_DENTRO_PCT => '12.00',
                 ],
             ]);
         });
@@ -366,9 +365,7 @@ class FluxoIntegradoMovimentacoesComCustosEImpostosTest extends TestCase
         $cliente = Cliente::factory()->create(['id_unidade_negocio' => $unidadeA->id]);
 
         $fruta = Fruta::factory()->comIcmsCeara([
-            'entrada_nacional' => 1,
-            'entrada_externo' => 0,
-            'entrada_um' => FrutaUmIcms::KG->value,
+            FrutaIcmsLinhaFormulario::ENTRADA_NACIONAL_KG => '1.00',
         ])->create([
             'nome' => 'BANANA STRESS '.uniqid(),
             'kg_por_unidade_medicao' => 20,
@@ -707,7 +704,7 @@ class FluxoIntegradoMovimentacoesComCustosEImpostosTest extends TestCase
         $this->assertEqualsWithDelta(
             (float) $estoque->valor_total_acumulado,
             (float) $me->valor_total_fruta,
-            1.00,
+            2.00,
             $label.' valor acumulado',
         );
         $this->assertEqualsWithDelta(

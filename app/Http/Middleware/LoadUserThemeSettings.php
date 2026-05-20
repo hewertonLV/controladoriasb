@@ -23,17 +23,23 @@ class LoadUserThemeSettings
         RequestDebugContext::milestone('theme_middleware_start');
 
         $sessionUserId = $request->session()->get('theme_settings_user_id');
-        $hasCachedTheme = $request->session()->has('theme_settings')
-            && (int) $sessionUserId === (int) $user->getKey();
+        $belongsToCurrentUser = (int) $sessionUserId === (int) $user->getKey();
+        $user->refresh();
+        $settingsFromDatabase = $user->themeSettings();
+        $sessionSettings = $request->session()->get('theme_settings');
+        $sessionIsCurrent = $belongsToCurrentUser
+            && is_array($sessionSettings)
+            && $sessionSettings === $settingsFromDatabase;
 
-        if ($hasCachedTheme) {
+        if ($sessionIsCurrent) {
             RequestDebugContext::milestone('theme_session_hit');
         } else {
-            $user->refresh();
-            $request->session()->put('theme_settings', $user->themeSettings());
+            $request->session()->put('theme_settings', $settingsFromDatabase);
             $request->session()->put('theme_settings_user_id', $user->getKey());
             RequestDebugContext::milestone('theme_user_refresh', [
-                'reason' => $sessionUserId === null ? 'no_session' : 'user_mismatch',
+                'reason' => ! $belongsToCurrentUser
+                    ? ($sessionUserId === null ? 'no_session' : 'user_mismatch')
+                    : 'stale_session',
             ]);
         }
 

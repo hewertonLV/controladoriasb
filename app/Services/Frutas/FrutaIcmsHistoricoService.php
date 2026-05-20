@@ -5,6 +5,7 @@ namespace App\Services\Frutas;
 use App\Models\Fruta;
 use App\Models\FrutaIcmsHistorico;
 use App\Models\User;
+use App\Support\Frutas\FrutaIcmsLinhaFormulario;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 
@@ -44,14 +45,7 @@ class FrutaIcmsHistoricoService
                 'id_estado' => $idEstado,
                 'user_id' => $user?->id,
                 'origem' => $origem,
-                'entrada_nacional' => $snapshot->entrada_nacional,
-                'um_icms_nacional' => $snapshot->um_icms_nacional,
-                'entrada_externo' => $snapshot->entrada_externo,
-                'um_icms_externo' => $snapshot->um_icms_externo,
-                'saida_importada' => $snapshot->saida_importada,
-                'um_icms_venda_importada' => $snapshot->um_icms_venda_importada,
-                'saida_nacional' => $snapshot->saida_nacional,
-                'um_icms_venda_nacional' => $snapshot->um_icms_venda_nacional,
+                'aliquotas' => $snapshot->aliquotas,
                 'status_position' => true,
                 'created_at' => now(),
             ]);
@@ -70,21 +64,6 @@ class FrutaIcmsHistoricoService
 
     private function snapshotsIguais(FrutaIcmsHistorico $a, FrutaIcmsHistorico $b): bool
     {
-        foreach ([
-            'entrada_nacional',
-            'um_icms_nacional',
-            'entrada_externo',
-            'um_icms_externo',
-            'saida_importada',
-            'um_icms_venda_importada',
-            'saida_nacional',
-            'um_icms_venda_nacional',
-        ] as $campo) {
-            if ((string) $a->{$campo} !== (string) $b->{$campo}) {
-                return false;
-            }
-        }
-
-        return true;
+        return $a->aliquotasArray() === $b->aliquotasArray();
     }
 }

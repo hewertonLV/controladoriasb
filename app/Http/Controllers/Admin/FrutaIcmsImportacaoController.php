@@ -158,7 +158,7 @@ class FrutaIcmsImportacaoController extends Controller
         $erros = [];
 
         try {
-            DB::transaction(function () use ($rowIds, $index, &$aplicadas, &$ignoradas, &$erros): void {
+            DB::transaction(function () use ($rowIds, $index, &$aplicadas, &$ignoradas, &$erros, $request): void {
                 foreach ($rowIds as $rowId) {
                     $item = $index[$rowId] ?? null;
                     if ($item === null) {

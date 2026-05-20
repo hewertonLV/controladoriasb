@@ -2,12 +2,15 @@
 
 namespace Tests\Feature\Admin\Frutas;
 
-use App\Enums\FrutaUmIcms;
+use App\Enums\FrutaIcmsOperacao;
+use App\Enums\FrutaIcmsTipoValor;
+use App\Enums\FrutaProcedencia;
 use App\Enums\Permissions;
 use App\Models\Estado;
 use App\Models\Fruta;
-use App\Models\FrutaIcms;
+use App\Models\FrutaIcmsAliquota;
 use App\Services\Frutas\FrutaIcmsSyncService;
+use App\Support\Frutas\FrutaIcmsLinhaFormulario;
 use Database\Seeders\EstadoSeeder;
 
 class FrutaIcmsTest extends FrutaTestCase
@@ -33,7 +36,7 @@ class FrutaIcmsTest extends FrutaTestCase
         $fruta = Fruta::factory()->create();
         $idEstado = Estado::ID_PERNAMBUCO;
 
-        FrutaIcms::query()
+        FrutaIcmsAliquota::query()
             ->where('fruta_id', $fruta->id)
             ->where('id_estado', $idEstado)
             ->delete();
@@ -42,65 +45,66 @@ class FrutaIcmsTest extends FrutaTestCase
             ->post(route('admin.frutas.icms.store'), [
                 'fruta_id' => $fruta->id,
                 'id_estado' => $idEstado,
-                'entrada_nacional' => '1,50',
-                'entrada_um_nacional' => FrutaUmIcms::KG->value,
-                'entrada_externo' => '0,50',
-                'entrada_um_externo' => FrutaUmIcms::KG->value,
-                'saida_importada' => '3,00',
-                'saida_um_importada' => FrutaUmIcms::KG->value,
-                'saida_nacional' => '7,00',
-                'saida_um_nacional' => FrutaUmIcms::KG->value,
+                FrutaIcmsLinhaFormulario::ENTRADA_NACIONAL_KG => '1,50',
+                FrutaIcmsLinhaFormulario::ENTRADA_INTERNACIONAL_KG => '0,50',
+                FrutaIcmsLinhaFormulario::SAIDA_NACIONAL_DENTRO_PCT => '7,00',
+                FrutaIcmsLinhaFormulario::SAIDA_NACIONAL_FORA_PCT => '3,00',
+                FrutaIcmsLinhaFormulario::SAIDA_INTERNACIONAL_DENTRO_PCT => '6,00',
+                FrutaIcmsLinhaFormulario::SAIDA_INTERNACIONAL_FORA_PCT => '2,50',
             ])
             ->assertRedirect(route('admin.frutas.icms.index'))
             ->assertSessionHas('success');
 
-        $entrada = FrutaIcms::query()
+        $entradaNac = FrutaIcmsAliquota::query()
             ->where('fruta_id', $fruta->id)
             ->where('id_estado', $idEstado)
-            ->where('operacao', 'ENTRADA')
+            ->where('operacao', FrutaIcmsOperacao::ENTRADA)
+            ->where('procedencia', FrutaProcedencia::NACIONAL)
             ->first();
 
-        $this->assertNotNull($entrada);
-        $this->assertSame('1.50', (string) $entrada->icms_nacional);
+        $this->assertNotNull($entradaNac);
+        $this->assertSame(FrutaIcmsTipoValor::VALOR_POR_KG, $entradaNac->tipo_valor);
+        $this->assertSame('1.5000', (string) $entradaNac->valor);
 
-        $saida = FrutaIcms::query()
+        $saidaNacDentro = FrutaIcmsAliquota::query()
             ->where('fruta_id', $fruta->id)
             ->where('id_estado', $idEstado)
-            ->where('operacao', 'SAIDA')
+            ->where('operacao', FrutaIcmsOperacao::SAIDA)
+            ->where('procedencia', FrutaProcedencia::NACIONAL)
+            ->where('escopo_venda', 'DENTRO_ESTADO')
             ->first();
 
-        $this->assertNotNull($saida);
-        $this->assertSame('7.00', (string) $saida->icms_venda_nacional);
+        $this->assertNotNull($saidaNacDentro);
+        $this->assertSame(FrutaIcmsTipoValor::PERCENTUAL, $saidaNacDentro->tipo_valor);
+        $this->assertSame('7.0000', (string) $saidaNacDentro->valor);
     }
 
     public function test_editar_icms_atualiza_valores(): void
     {
         $fruta = Fruta::factory()->create();
         app(FrutaIcmsSyncService::class)->syncEstado($fruta, Estado::ID_CEARA, [
-            'entrada_nacional' => '1.00',
-            'saida_nacional' => '5.00',
+            FrutaIcmsLinhaFormulario::ENTRADA_NACIONAL_KG => '1.00',
+            FrutaIcmsLinhaFormulario::SAIDA_NACIONAL_DENTRO_PCT => '5.00',
         ]);
 
         $this->actingAs($this->userWithPermissions([Permissions::FRUTAS_ICMS_EDITAR]))
             ->put(route('admin.frutas.icms.update', [$fruta, Estado::ID_CEARA]), [
-                'entrada_nacional' => '9,00',
-                'entrada_um_nacional' => FrutaUmIcms::UM->value,
-                'entrada_externo' => '0,00',
-                'entrada_um_externo' => FrutaUmIcms::KG->value,
-                'saida_importada' => '0,00',
-                'saida_um_importada' => FrutaUmIcms::KG->value,
-                'saida_nacional' => '12,00',
-                'saida_um_nacional' => FrutaUmIcms::KG->value,
+                FrutaIcmsLinhaFormulario::ENTRADA_NACIONAL_KG => '9,00',
+                FrutaIcmsLinhaFormulario::ENTRADA_INTERNACIONAL_KG => '0,00',
+                FrutaIcmsLinhaFormulario::SAIDA_NACIONAL_DENTRO_PCT => '12,00',
+                FrutaIcmsLinhaFormulario::SAIDA_NACIONAL_FORA_PCT => '0,00',
+                FrutaIcmsLinhaFormulario::SAIDA_INTERNACIONAL_DENTRO_PCT => '0,00',
+                FrutaIcmsLinhaFormulario::SAIDA_INTERNACIONAL_FORA_PCT => '0,00',
             ])
             ->assertRedirect(route('admin.frutas.icms.index'));
 
-        $entrada = FrutaIcms::query()
+        $entrada = FrutaIcmsAliquota::query()
             ->where('fruta_id', $fruta->id)
             ->where('id_estado', Estado::ID_CEARA)
-            ->where('operacao', 'ENTRADA')
+            ->where('operacao', FrutaIcmsOperacao::ENTRADA)
+            ->where('procedencia', FrutaProcedencia::NACIONAL)
             ->first();
 
-        $this->assertSame('9.00', (string) $entrada->icms_nacional);
-        $this->assertSame(FrutaUmIcms::UM->value, $entrada->um_icms_nacional);
+        $this->assertSame('9.0000', (string) $entrada->valor);
     }
 }

@@ -2,7 +2,6 @@
 
 namespace Tests\Feature\Admin\Frutas;
 
-use App\Enums\FrutaUmIcms;
 use App\Models\Estado;
 use App\Models\Fornecedor;
 use App\Models\Fruta;
@@ -10,6 +9,7 @@ use App\Models\FrutaIcmsHistorico;
 use App\Models\UnidadeNegocio;
 use App\Services\Frutas\FrutaIcmsCalculoService;
 use App\Services\Frutas\FrutaIcmsSyncService;
+use App\Support\Frutas\FrutaIcmsLinhaFormulario;
 use Database\Seeders\EstadoSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
@@ -28,18 +28,13 @@ class FrutaIcmsHistoricoTest extends TestCase
     public function test_sync_registra_historico_quando_icms_altera(): void
     {
         $fruta = Fruta::factory()->comIcmsCeara([
-            'entrada_nacional' => '20.00',
-            'entrada_externo' => '0.00',
-            'entrada_um' => FrutaUmIcms::KG->value,
+            FrutaIcmsLinhaFormulario::ENTRADA_NACIONAL_KG => '20.00',
         ])->create();
 
         $antes = FrutaIcmsHistorico::query()->where('fruta_id', $fruta->id)->count();
 
         app(FrutaIcmsSyncService::class)->syncEstado($fruta, Estado::ID_CEARA, [
-            'entrada_nacional' => '50.00',
-            'entrada_externo' => '0.00',
-            'entrada_um_nacional' => FrutaUmIcms::KG->value,
-            'saida_nacional' => '0.00',
+            FrutaIcmsLinhaFormulario::ENTRADA_NACIONAL_KG => '50.00',
         ]);
 
         $this->assertGreaterThan($antes, FrutaIcmsHistorico::query()->where('fruta_id', $fruta->id)->count());
@@ -51,7 +46,10 @@ class FrutaIcmsHistoricoTest extends TestCase
             ->first();
 
         $this->assertNotNull($vigente);
-        $this->assertSame('50.00', number_format((float) $vigente->entrada_nacional, 2, '.', ''));
+        $this->assertSame(
+            '50.00',
+            $vigente->aliquotasArray()[FrutaIcmsLinhaFormulario::ENTRADA_NACIONAL_KG],
+        );
     }
 
     public function test_calculo_usa_icms_vigente_na_data_referencia(): void
@@ -62,9 +60,7 @@ class FrutaIcmsHistoricoTest extends TestCase
             'id_estado' => Estado::ID_CEARA,
         ]);
         $fruta = Fruta::factory()->comIcmsCeara([
-            'entrada_nacional' => '20.00',
-            'entrada_externo' => '0.00',
-            'entrada_um' => FrutaUmIcms::KG->value,
+            FrutaIcmsLinhaFormulario::ENTRADA_NACIONAL_KG => '20.00',
         ])->create(['kg_por_unidade_medicao' => 10]);
 
         $historicoAntigo = FrutaIcmsHistorico::query()
@@ -75,9 +71,7 @@ class FrutaIcmsHistoricoTest extends TestCase
         $historicoAntigo->update(['created_at' => Carbon::parse('2026-01-01 10:00:00')]);
 
         app(FrutaIcmsSyncService::class)->syncEstado($fruta, Estado::ID_CEARA, [
-            'entrada_nacional' => '100.00',
-            'entrada_externo' => '0.00',
-            'entrada_um_nacional' => FrutaUmIcms::KG->value,
+            FrutaIcmsLinhaFormulario::ENTRADA_NACIONAL_KG => '100.00',
         ]);
 
         $calculo = app(FrutaIcmsCalculoService::class);

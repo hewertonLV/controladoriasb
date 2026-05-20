@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\EstadoIcmsCobraEm;
 use App\Support\TextoCadastro;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -16,6 +17,7 @@ use Illuminate\Validation\ValidationException;
  * @property string $nome
  * @property string $abreviacao
  * @property string|null $descricao
+ * @property string $icms_cobra_em
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
  */
@@ -40,6 +42,7 @@ class Estado extends Model
         'nome',
         'abreviacao',
         'descricao',
+        'icms_cobra_em',
     ];
 
     /**
@@ -177,25 +180,25 @@ class Estado extends Model
     {
         return $this->unidadesNegocio()->exists()
             || $this->fornecedores()->exists()
-            || $this->frutasIcms()->exists();
+            || $this->frutasIcmsAliquotas()->exists();
     }
 
     public function cobraIcmsNaEntrada(): bool
     {
-        return $this->id === self::ID_CEARA;
+        return $this->icms_cobra_em === EstadoIcmsCobraEm::ENTRADA->value;
     }
 
     public function cobraIcmsNaSaida(): bool
     {
-        return $this->id === self::ID_PERNAMBUCO;
+        return $this->icms_cobra_em === EstadoIcmsCobraEm::SAIDA->value;
     }
 
     /**
-     * @return HasMany<FrutaIcms, $this>
+     * @return HasMany<FrutaIcmsAliquota, $this>
      */
-    public function frutasIcms(): HasMany
+    public function frutasIcmsAliquotas(): HasMany
     {
-        return $this->hasMany(FrutaIcms::class, 'id_estado');
+        return $this->hasMany(FrutaIcmsAliquota::class, 'id_estado');
     }
 
     /**

@@ -2,11 +2,12 @@
 
 namespace Database\Factories;
 
-use App\Enums\FrutaUmIcms;
+use App\Enums\FrutaProcedencia;
 use App\Enums\FrutaUnidadeMedicao;
 use App\Models\Estado;
 use App\Models\Fruta;
 use App\Services\Frutas\FrutaIcmsSyncService;
+use App\Support\Frutas\FrutaIcmsLinhaFormulario;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**
@@ -23,22 +24,25 @@ class FrutaFactory extends Factory
             'nome' => mb_strtoupper($this->faker->unique()->words(2, true), 'UTF-8'),
             'unidade_medicao' => $this->faker->randomElement(FrutaUnidadeMedicao::values()),
             'kg_por_unidade_medicao' => $this->faker->randomFloat(2, 1, 50),
+            'procedencia' => FrutaProcedencia::NACIONAL->value,
         ];
     }
 
     public function configure(): static
     {
         return $this->afterCreating(function (Fruta $fruta): void {
+            if ($fruta->icmsAliquotas()->exists()) {
+                return;
+            }
+
             app(FrutaIcmsSyncService::class)->sync($fruta, [
                 Estado::ID_CEARA => [
-                    'entrada_externo' => '1.00',
-                    'entrada_um_externo' => FrutaUmIcms::KG->value,
-                    'entrada_nacional' => '2.00',
-                    'entrada_um_nacional' => FrutaUmIcms::KG->value,
-                    'saida_importada' => '5.00',
-                    'saida_um_importada' => FrutaUmIcms::PCT->value,
-                    'saida_nacional' => '12.00',
-                    'saida_um_nacional' => FrutaUmIcms::PCT->value,
+                    FrutaIcmsLinhaFormulario::ENTRADA_NACIONAL_KG => '2.00',
+                    FrutaIcmsLinhaFormulario::ENTRADA_INTERNACIONAL_KG => '1.00',
+                    FrutaIcmsLinhaFormulario::SAIDA_NACIONAL_DENTRO_PCT => '12.00',
+                    FrutaIcmsLinhaFormulario::SAIDA_NACIONAL_FORA_PCT => '5.00',
+                    FrutaIcmsLinhaFormulario::SAIDA_INTERNACIONAL_DENTRO_PCT => '10.00',
+                    FrutaIcmsLinhaFormulario::SAIDA_INTERNACIONAL_FORA_PCT => '4.00',
                 ],
             ]);
         });
@@ -52,14 +56,12 @@ class FrutaFactory extends Factory
         return $this->afterCreating(function (Fruta $fruta) use ($icmsCeara): void {
             app(FrutaIcmsSyncService::class)->sync($fruta, [
                 Estado::ID_CEARA => array_replace([
-                    'entrada_externo' => '1.00',
-                    'entrada_um_externo' => FrutaUmIcms::KG->value,
-                    'entrada_nacional' => '2.00',
-                    'entrada_um_nacional' => FrutaUmIcms::KG->value,
-                    'saida_importada' => '5.00',
-                    'saida_um_importada' => FrutaUmIcms::PCT->value,
-                    'saida_nacional' => '12.00',
-                    'saida_um_nacional' => FrutaUmIcms::PCT->value,
+                    FrutaIcmsLinhaFormulario::ENTRADA_NACIONAL_KG => '2.00',
+                    FrutaIcmsLinhaFormulario::ENTRADA_INTERNACIONAL_KG => '1.00',
+                    FrutaIcmsLinhaFormulario::SAIDA_NACIONAL_DENTRO_PCT => '12.00',
+                    FrutaIcmsLinhaFormulario::SAIDA_NACIONAL_FORA_PCT => '5.00',
+                    FrutaIcmsLinhaFormulario::SAIDA_INTERNACIONAL_DENTRO_PCT => '10.00',
+                    FrutaIcmsLinhaFormulario::SAIDA_INTERNACIONAL_FORA_PCT => '4.00',
                 ], $icmsCeara),
             ]);
         });
@@ -73,16 +75,21 @@ class FrutaFactory extends Factory
         return $this->afterCreating(function (Fruta $fruta) use ($icmsPe): void {
             app(FrutaIcmsSyncService::class)->sync($fruta, [
                 Estado::ID_PERNAMBUCO => array_replace([
-                    'entrada_externo' => '0.00',
-                    'entrada_um_externo' => FrutaUmIcms::KG->value,
-                    'entrada_nacional' => '0.00',
-                    'entrada_um_nacional' => FrutaUmIcms::KG->value,
-                    'saida_importada' => '12.00',
-                    'saida_um_importada' => FrutaUmIcms::PCT->value,
-                    'saida_nacional' => '20.50',
-                    'saida_um_nacional' => FrutaUmIcms::PCT->value,
+                    FrutaIcmsLinhaFormulario::ENTRADA_NACIONAL_KG => '0.00',
+                    FrutaIcmsLinhaFormulario::ENTRADA_INTERNACIONAL_KG => '0.00',
+                    FrutaIcmsLinhaFormulario::SAIDA_NACIONAL_DENTRO_PCT => '20.50',
+                    FrutaIcmsLinhaFormulario::SAIDA_NACIONAL_FORA_PCT => '12.00',
+                    FrutaIcmsLinhaFormulario::SAIDA_INTERNACIONAL_DENTRO_PCT => '18.00',
+                    FrutaIcmsLinhaFormulario::SAIDA_INTERNACIONAL_FORA_PCT => '10.00',
                 ], $icmsPe),
             ]);
         });
+    }
+
+    public function internacional(): static
+    {
+        return $this->state(fn () => [
+            'procedencia' => FrutaProcedencia::INTERNACIONAL->value,
+        ]);
     }
 }

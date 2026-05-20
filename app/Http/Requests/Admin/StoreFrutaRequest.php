@@ -2,8 +2,9 @@
 
 namespace App\Http\Requests\Admin;
 
-use App\Enums\FrutaUmIcms;
+use App\Enums\FrutaProcedencia;
 use App\Enums\FrutaUnidadeMedicao;
+use App\Support\Frutas\FrutaIcmsLinhaFormulario;
 use App\Support\TextoCadastro;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
@@ -33,14 +34,13 @@ class StoreFrutaRequest extends FormRequest
             'nome' => 'nome',
             'unidade_medicao' => 'unidade de medição',
             'kg_por_unidade_medicao' => 'kg por unidade de medição',
-            'icms.*.entrada_nacional' => 'ICMS compra nacional',
-            'icms.*.entrada_um_nacional' => 'UM ICMS compra nacional',
-            'icms.*.entrada_externo' => 'ICMS compra exterior',
-            'icms.*.entrada_um_externo' => 'UM ICMS compra exterior',
-            'icms.*.saida_importada' => 'ICMS venda fora do estado',
-            'icms.*.saida_um_importada' => 'UM ICMS venda fora do estado',
-            'icms.*.saida_nacional' => 'ICMS venda dentro do estado',
-            'icms.*.saida_um_nacional' => 'UM ICMS venda dentro do estado',
+            'procedencia' => 'procedência da fruta',
+            'icms.*.entrada_nacional_kg' => 'ICMS entrada nacional (R$/kg)',
+            'icms.*.entrada_internacional_kg' => 'ICMS entrada internacional (R$/kg)',
+            'icms.*.saida_nacional_dentro_pct' => 'ICMS venda nacional dentro (%)',
+            'icms.*.saida_nacional_fora_pct' => 'ICMS venda nacional fora (%)',
+            'icms.*.saida_internacional_dentro_pct' => 'ICMS venda internacional dentro (%)',
+            'icms.*.saida_internacional_fora_pct' => 'ICMS venda internacional fora (%)',
         ];
     }
 
@@ -64,6 +64,7 @@ class StoreFrutaRequest extends FormRequest
             'nome',
             'unidade_medicao',
             'kg_por_unidade_medicao',
+            'procedencia',
         ]);
     }
 
@@ -84,30 +85,10 @@ class StoreFrutaRequest extends FormRequest
                 if (! is_array($linha)) {
                     continue;
                 }
-                $icms[$idEstado]['entrada_nacional'] = TextoCadastro::normalizarValorMonetarioBrasileiro(
-                    $linha['entrada_nacional'] ?? 0,
-                );
-                $icms[$idEstado]['entrada_um_nacional'] = TextoCadastro::normalizarMaiusculas(
-                    (string) ($linha['entrada_um_nacional'] ?? FrutaUmIcms::KG->value),
-                );
-                $icms[$idEstado]['entrada_externo'] = TextoCadastro::normalizarValorMonetarioBrasileiro(
-                    $linha['entrada_externo'] ?? 0,
-                );
-                $icms[$idEstado]['entrada_um_externo'] = TextoCadastro::normalizarMaiusculas(
-                    (string) ($linha['entrada_um_externo'] ?? FrutaUmIcms::KG->value),
-                );
-                $icms[$idEstado]['saida_importada'] = TextoCadastro::normalizarValorMonetarioBrasileiro(
-                    $linha['saida_importada'] ?? 0,
-                );
-                $icms[$idEstado]['saida_um_importada'] = TextoCadastro::normalizarMaiusculas(
-                    (string) ($linha['saida_um_importada'] ?? FrutaUmIcms::KG->value),
-                );
-                $icms[$idEstado]['saida_nacional'] = TextoCadastro::normalizarValorMonetarioBrasileiro(
-                    $linha['saida_nacional'] ?? 0,
-                );
-                $icms[$idEstado]['saida_um_nacional'] = TextoCadastro::normalizarMaiusculas(
-                    (string) ($linha['saida_um_nacional'] ?? FrutaUmIcms::KG->value),
-                );
+                $linha = FrutaIcmsLinhaFormulario::normalizarChavesLegadas($linha);
+                foreach (FrutaIcmsLinhaFormulario::chaves() as $chave) {
+                    $icms[$idEstado][$chave] = TextoCadastro::normalizarValorMonetarioBrasileiro($linha[$chave] ?? 0);
+                }
             }
         }
 
@@ -116,6 +97,7 @@ class StoreFrutaRequest extends FormRequest
             'nome' => trim((string) $this->input('nome')),
             'unidade_medicao' => mb_strtoupper(trim((string) $this->input('unidade_medicao', '')), 'UTF-8'),
             'kg_por_unidade_medicao' => $this->input('kg_por_unidade_medicao', 0),
+            'procedencia' => mb_strtoupper(trim((string) $this->input('procedencia', FrutaProcedencia::NACIONAL->value)), 'UTF-8'),
             'icms' => $icms,
         ]);
     }
@@ -135,6 +117,7 @@ class StoreFrutaRequest extends FormRequest
             'nome' => ['required', 'string', 'max:255'],
             'unidade_medicao' => ['required', 'string', Rule::in(FrutaUnidadeMedicao::values())],
             'kg_por_unidade_medicao' => ['required', 'numeric', 'min:0'],
+            'procedencia' => ['required', 'string', Rule::in(FrutaProcedencia::values())],
         ];
     }
 
@@ -143,16 +126,14 @@ class StoreFrutaRequest extends FormRequest
      */
     private function regrasIcms(): array
     {
-        return [
+        $regras = [
             'icms' => ['required', 'array'],
-            'icms.*.entrada_nacional' => ['nullable', 'numeric', 'min:0', 'decimal:0,2'],
-            'icms.*.entrada_um_nacional' => ['nullable', 'string', Rule::in(FrutaUmIcms::values())],
-            'icms.*.entrada_externo' => ['nullable', 'numeric', 'min:0', 'decimal:0,2'],
-            'icms.*.entrada_um_externo' => ['nullable', 'string', Rule::in(FrutaUmIcms::values())],
-            'icms.*.saida_importada' => ['nullable', 'numeric', 'min:0', 'decimal:0,2'],
-            'icms.*.saida_um_importada' => ['nullable', 'string', Rule::in(FrutaUmIcms::values())],
-            'icms.*.saida_nacional' => ['nullable', 'numeric', 'min:0', 'decimal:0,2'],
-            'icms.*.saida_um_nacional' => ['nullable', 'string', Rule::in(FrutaUmIcms::values())],
         ];
+
+        foreach (FrutaIcmsLinhaFormulario::chaves() as $chave) {
+            $regras['icms.*.'.$chave] = ['nullable', 'numeric', 'min:0', 'decimal:0,2'];
+        }
+
+        return $regras;
     }
 }

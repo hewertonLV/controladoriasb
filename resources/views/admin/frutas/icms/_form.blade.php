@@ -1,5 +1,5 @@
 @php
-    use App\Enums\FrutaUmIcms;
+    use App\Support\Frutas\FrutaIcmsLinhaFormulario;
     /** @var array<string, string> $icmsLinha */
     $editando = isset($fruta) && isset($estado);
 @endphp
@@ -36,6 +36,7 @@
                 <span class="text-muted">Fruta:</span>
                 <span class="fw-semibold">{{ $fruta->nome }}</span>
                 <code class="ms-1">{{ $fruta->id_cigam }}</code>
+                <span class="badge bg-light text-muted ms-1">{{ $fruta->procedencia }}</span>
                 <span class="text-muted ms-3">Estado:</span>
                 <span class="fw-semibold">{{ $estado->nome }}</span>
                 <span class="badge bg-light text-muted">{{ $estado->abreviacao }}</span>
@@ -46,70 +47,37 @@
 
 <div class="card mt-3">
     <div class="card-header">
-        <h5 class="header-title mb-0">Valores de ICMS</h5>
+        <h5 class="header-title mb-0">Alíquotas</h5>
     </div>
     <div class="card-body">
         <div class="row g-3">
-            <div class="col-md-6 col-lg-3">
-                <label class="form-label">Compra nacional</label>
-                <input type="text" inputmode="decimal" name="entrada_nacional"
-                       value="{{ old('entrada_nacional', $icmsLinha['entrada_nacional'] ?? '0.00') }}"
-                       class="form-control @error('entrada_nacional') is-invalid @enderror">
-                @error('entrada_nacional')<div class="invalid-feedback">{{ $message }}</div>@enderror
+            <div class="col-12"><h6 class="text-muted mb-0">Entrada (R$/kg)</h6></div>
+            <div class="col-md-6">
+                <label class="form-label">Nacional</label>
+                <input type="text" inputmode="decimal" name="{{ FrutaIcmsLinhaFormulario::ENTRADA_NACIONAL_KG }}"
+                       value="{{ old(FrutaIcmsLinhaFormulario::ENTRADA_NACIONAL_KG, $icmsLinha[FrutaIcmsLinhaFormulario::ENTRADA_NACIONAL_KG] ?? '0.00') }}"
+                       class="form-control">
             </div>
-            <div class="col-md-6 col-lg-3">
-                <label class="form-label">UM</label>
-                <select name="entrada_um_nacional" class="form-select">
-                    @foreach (FrutaUmIcms::valoresEntrada() as $umValor)
-                        <option value="{{ $umValor }}" @selected(old('entrada_um_nacional', $icmsLinha['entrada_um_nacional'] ?? FrutaUmIcms::KG->value) === $umValor)>{{ $umValor }}</option>
-                    @endforeach
-                </select>
+            <div class="col-md-6">
+                <label class="form-label">Internacional</label>
+                <input type="text" inputmode="decimal" name="{{ FrutaIcmsLinhaFormulario::ENTRADA_INTERNACIONAL_KG }}"
+                       value="{{ old(FrutaIcmsLinhaFormulario::ENTRADA_INTERNACIONAL_KG, $icmsLinha[FrutaIcmsLinhaFormulario::ENTRADA_INTERNACIONAL_KG] ?? '0.00') }}"
+                       class="form-control">
             </div>
-            <div class="col-md-6 col-lg-3">
-                <label class="form-label">Compra exterior</label>
-                <input type="text" inputmode="decimal" name="entrada_externo"
-                       value="{{ old('entrada_externo', $icmsLinha['entrada_externo'] ?? '0.00') }}"
-                       class="form-control @error('entrada_externo') is-invalid @enderror">
-                @error('entrada_externo')<div class="invalid-feedback">{{ $message }}</div>@enderror
-            </div>
-            <div class="col-md-6 col-lg-3">
-                <label class="form-label">UM</label>
-                <select name="entrada_um_externo" class="form-select">
-                    @foreach (FrutaUmIcms::valoresEntrada() as $umValor)
-                        <option value="{{ $umValor }}" @selected(old('entrada_um_externo', $icmsLinha['entrada_um_externo'] ?? FrutaUmIcms::KG->value) === $umValor)>{{ $umValor }}</option>
-                    @endforeach
-                </select>
-            </div>
-            <div class="col-md-6 col-lg-3">
-                <label class="form-label">Venda fora do estado (%)</label>
-                <input type="text" inputmode="decimal" name="saida_importada"
-                       value="{{ old('saida_importada', $icmsLinha['saida_importada'] ?? '0.00') }}"
-                       class="form-control @error('saida_importada') is-invalid @enderror">
-                @error('saida_importada')<div class="invalid-feedback">{{ $message }}</div>@enderror
-            </div>
-            <div class="col-md-6 col-lg-3">
-                <label class="form-label">UM</label>
-                <select name="saida_um_importada" class="form-select">
-                    @foreach (FrutaUmIcms::valoresSaida() as $umValor)
-                        <option value="{{ $umValor }}" @selected(old('saida_um_importada', $icmsLinha['saida_um_importada'] ?? FrutaUmIcms::PCT->value) === $umValor)>{{ $umValor }}</option>
-                    @endforeach
-                </select>
-            </div>
-            <div class="col-md-6 col-lg-3">
-                <label class="form-label">Venda dentro do estado (%)</label>
-                <input type="text" inputmode="decimal" name="saida_nacional"
-                       value="{{ old('saida_nacional', $icmsLinha['saida_nacional'] ?? '0.00') }}"
-                       class="form-control @error('saida_nacional') is-invalid @enderror">
-                @error('saida_nacional')<div class="invalid-feedback">{{ $message }}</div>@enderror
-            </div>
-            <div class="col-md-6 col-lg-3">
-                <label class="form-label">UM</label>
-                <select name="saida_um_nacional" class="form-select">
-                    @foreach (FrutaUmIcms::valoresSaida() as $umValor)
-                        <option value="{{ $umValor }}" @selected(old('saida_um_nacional', $icmsLinha['saida_um_nacional'] ?? FrutaUmIcms::PCT->value) === $umValor)>{{ $umValor }}</option>
-                    @endforeach
-                </select>
-            </div>
+            <div class="col-12 mt-2"><h6 class="text-muted mb-0">Venda (%)</h6></div>
+            @foreach ([
+                FrutaIcmsLinhaFormulario::SAIDA_NACIONAL_DENTRO_PCT => 'Nacional — dentro do estado',
+                FrutaIcmsLinhaFormulario::SAIDA_NACIONAL_FORA_PCT => 'Nacional — fora do estado',
+                FrutaIcmsLinhaFormulario::SAIDA_INTERNACIONAL_DENTRO_PCT => 'Internacional — dentro do estado',
+                FrutaIcmsLinhaFormulario::SAIDA_INTERNACIONAL_FORA_PCT => 'Internacional — fora do estado',
+            ] as $chave => $rotulo)
+                <div class="col-md-6">
+                    <label class="form-label">{{ $rotulo }}</label>
+                    <input type="text" inputmode="decimal" name="{{ $chave }}"
+                           value="{{ old($chave, $icmsLinha[$chave] ?? '0.00') }}"
+                           class="form-control">
+                </div>
+            @endforeach
         </div>
     </div>
 </div>

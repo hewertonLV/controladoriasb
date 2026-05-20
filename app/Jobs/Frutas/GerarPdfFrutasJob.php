@@ -56,7 +56,7 @@ class GerarPdfFrutasJob implements ShouldQueue
             $query = $frutaQuery->aplicarFiltros(
                 Fruta::query()
                     ->select(['id', 'id_cigam', 'nome', 'unidade_medicao', 'kg_por_unidade_medicao'])
-                    ->with('icms'),
+                    ->with('icmsAliquotas.estado'),
                 $filtros,
             );
             $total = (clone $query)->toBase()->count();

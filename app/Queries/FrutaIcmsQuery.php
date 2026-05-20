@@ -2,10 +2,10 @@
 
 namespace App\Queries;
 
-use App\Enums\FrutaIcmsOperacao;
-use App\Models\FrutaIcms;
+use App\Models\FrutaIcmsAliquota;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 
 class FrutaIcmsQuery
 {
@@ -20,13 +20,16 @@ class FrutaIcmsQuery
     }
 
     /**
-     * @param  Builder<FrutaIcms>  $query
-     * @param  array{search?: string}  $filtros
-     * @return Builder<FrutaIcms>
+     * @return Collection<int, object{fruta_id: int, id_estado: int, fruta: mixed, estado: mixed}>
      */
-    public function aplicarFiltros(Builder $query, array $filtros): Builder
+    public function listagemAgrupada(array $filtros = []): Collection
     {
         $search = trim((string) ($filtros['search'] ?? ''));
+
+        $query = FrutaIcmsAliquota::query()
+            ->select('fruta_id', 'id_estado')
+            ->distinct()
+            ->with(['fruta', 'estado']);
 
         if ($search !== '') {
             $query->where(function (Builder $q) use ($search): void {
@@ -41,20 +44,9 @@ class FrutaIcmsQuery
         }
 
         return $query
-            ->join('frutas', 'frutas.id', '=', 'fruta_icms.fruta_id')
-            ->join('estados', 'estados.id', '=', 'fruta_icms.id_estado')
-            ->orderBy('frutas.nome')
-            ->orderBy('estados.nome')
-            ->select('fruta_icms.*');
-    }
-
-    /**
-     * @return Builder<FrutaIcms>
-     */
-    public function listagemBase(): Builder
-    {
-        return FrutaIcms::query()
-            ->where('fruta_icms.operacao', FrutaIcmsOperacao::ENTRADA)
-            ->with(['fruta', 'estado']);
+            ->get()
+            ->unique(fn (FrutaIcmsAliquota $a) => $a->fruta_id.'-'.$a->id_estado)
+            ->sortBy(fn (FrutaIcmsAliquota $a) => ($a->fruta?->nome ?? '').'|'.($a->estado?->nome ?? ''))
+            ->values();
     }
 }

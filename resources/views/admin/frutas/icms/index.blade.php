@@ -8,7 +8,7 @@
 
     <x-admin.datatable
         title="ICMS de Frutas"
-        subtitle="Valores de ICMS por fruta e estado (compra nacional/externa e venda importada/nacional)."
+        subtitle="Alíquotas por fruta e estado: entrada R$/kg e venda % (nacional/internacional × dentro/fora)."
         table-id="frutas-icms-datatable"
         root-id="frutas-icms-table-root"
         print-title="ICMS de Frutas"
@@ -32,9 +32,6 @@
             @endcan
         </x-slot:actions>
 
-        @include('admin.frutas.icms._table', [
-            'registros' => $registros,
-            'saidas' => $saidas,
-        ])
+        @include('admin.frutas.icms._table', ['linhas' => $linhas])
     </x-admin.datatable>
 @endsection

@@ -28,6 +28,8 @@
 
     <script src="{{ asset('assets/js/vendor.min.js') }}"></script>
     <script src="{{ asset('assets/js/password-toggle.js') }}"></script>
+    <script src="{{ asset('assets/js/form-submit-guard.js') }}"></script>
+    <script src="{{ asset('assets/js/interaction-resilience.js') }}"></script>
     @stack('scripts')
 </body>
 

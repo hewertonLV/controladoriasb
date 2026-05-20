@@ -5,22 +5,25 @@ namespace App\Services\Frutas;
 use App\Enums\FrutaUmIcms;
 use App\Models\Estado;
 use App\Models\Fruta;
+use App\Support\Frutas\FrutaIcmsLinhaFormulario;
 use App\Support\TextoCadastro;
 
 /**
- * Layout da planilha de ICMS (linha 1 = cabeçalho):
- *   A → fruta (ID CIGAM ou nome)
- *   B → estado (ID, sigla ou nome)
- *   C/D → ICMS compra nacional + UM
- *   E/F → ICMS compra exterior + UM
- *   G/H → ICMS venda fora do estado + UM (PCT em PE)
- *   I/J → ICMS venda dentro do estado + UM (PCT em PE)
+ * Layout preferencial (A–H, ADR-0027):
+ *   C entrada nacional (R$/kg)
+ *   D entrada internacional (R$/kg)
+ *   E venda nacional dentro (%)
+ *   F venda nacional fora (%)
+ *   G venda internacional dentro (%)
+ *   H venda internacional fora (%)
+ *
+ * Layout legado (A–J + K opcional, ADR-0014/0026): converte UM de compra para R$/kg quando possível.
  */
 class FrutaIcmsPlanilhaNormalizer
 {
-    public function __construct(
-        private readonly FrutaIcmsValidacaoService $validacaoService,
-    ) {}
+    private const TIPO_PCT = 'PCT';
+
+    private const TIPO_REAL = 'REAL';
 
     /**
      * @param  list<mixed>  $row
@@ -29,18 +32,8 @@ class FrutaIcmsPlanilhaNormalizer
     public function normalize(array $row): array
     {
         $erros = [];
-
         $frutaRef = $this->trimString($row[0] ?? null);
         $estadoRef = $this->trimString($row[1] ?? null);
-
-        $compraNacional = $this->valorMonetario($row[2] ?? null, '0');
-        $umCompraNacional = $this->valorUm($row[3] ?? null);
-        $compraExterior = $this->valorMonetario($row[4] ?? null, '0');
-        $umCompraExterior = $this->valorUm($row[5] ?? null);
-        $vendaImportada = $this->valorMonetario($row[6] ?? null, '0');
-        $umVendaImportada = $this->valorUm($row[7] ?? null);
-        $vendaNacional = $this->valorMonetario($row[8] ?? null, '0');
-        $umVendaNacional = $this->valorUm($row[9] ?? null);
 
         if ($frutaRef === '') {
             $erros[] = 'Fruta (coluna A: ID CIGAM ou nome) é obrigatória.';
@@ -48,24 +41,6 @@ class FrutaIcmsPlanilhaNormalizer
 
         if ($estadoRef === '') {
             $erros[] = 'Estado (coluna B) é obrigatório.';
-        }
-
-        foreach ([
-            'UM compra nacional (D)' => $umCompraNacional,
-            'UM compra exterior (F)' => $umCompraExterior,
-        ] as $rotulo => $um) {
-            if (! in_array($um, FrutaUmIcms::valoresEntrada(), true)) {
-                $erros[] = "{$rotulo} inválida. Use KG ou UM.";
-            }
-        }
-
-        foreach ([
-            'UM venda fora do estado (H)' => $umVendaImportada,
-            'UM venda dentro do estado (J)' => $umVendaNacional,
-        ] as $rotulo => $um) {
-            if (! in_array($um, FrutaUmIcms::valoresSaida(), true)) {
-                $erros[] = "{$rotulo} inválida. Use KG, UM ou PCT.";
-            }
         }
 
         $fruta = $frutaRef !== '' ? $this->resolverFruta($frutaRef) : null;
@@ -78,42 +53,195 @@ class FrutaIcmsPlanilhaNormalizer
             $erros[] = "Estado não encontrado: {$estadoRef}.";
         }
 
-        if ($idEstado !== null) {
-            $linhaNormalizada = $this->validacaoService->normalizarLinha($idEstado, [
-                'entrada_nacional' => $compraNacional,
-                'entrada_um_nacional' => $umCompraNacional,
-                'entrada_externo' => $compraExterior,
-                'entrada_um_externo' => $umCompraExterior,
-                'saida_importada' => $vendaImportada,
-                'saida_um_importada' => $umVendaImportada,
-                'saida_nacional' => $vendaNacional,
-                'saida_um_nacional' => $umVendaNacional,
-            ]);
-            $umCompraNacional = $linhaNormalizada['entrada_um_nacional'];
-            $umCompraExterior = $linhaNormalizada['entrada_um_externo'];
-            $umVendaImportada = $linhaNormalizada['saida_um_importada'];
-            $umVendaNacional = $linhaNormalizada['saida_um_nacional'];
+        $legado = $this->ehLayoutLegadoComUm($row);
+        $linha = $legado ? $this->layoutLegado($row) : $this->layoutNovo($row);
+
+        if ($legado) {
+            $erros = array_merge($erros, $this->validarLayoutLegado($linha, $row));
+            $linha = $this->aplicarColunaK($linha, $row);
         }
 
+        $aliases = $legado ? $this->aliasesLegado($linha) : [];
+        $linha = $this->converterEntradaUmParaKg($linha, $fruta);
+
+        $dados = array_merge([
+            'fruta_id' => $fruta?->id,
+            'fruta_ref' => $frutaRef,
+            'fruta_nome' => $fruta?->nome,
+            'fruta_id_cigam' => $fruta?->id_cigam,
+            'id_estado' => $idEstado,
+            'estado_ref' => $estadoRef,
+        ], $linha, $aliases);
+
+        return ['dados' => $dados, 'erros' => $erros];
+    }
+
+    /**
+     * @param  list<mixed>  $row
+     */
+    private function ehLayoutLegadoComUm(array $row): bool
+    {
+        foreach ([3, 5, 7, 9] as $indiceUm) {
+            $valor = mb_strtoupper(trim((string) ($row[$indiceUm] ?? '')), 'UTF-8');
+            if ($valor !== '' && in_array($valor, FrutaUmIcms::values(), true)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * @param  list<mixed>  $row
+     * @return array<string, string>
+     */
+    private function layoutNovo(array $row): array
+    {
         return [
-            'dados' => [
-                'fruta_id' => $fruta?->id,
-                'fruta_ref' => $frutaRef,
-                'fruta_nome' => $fruta?->nome,
-                'fruta_id_cigam' => $fruta?->id_cigam,
-                'id_estado' => $idEstado,
-                'estado_ref' => $estadoRef,
-                'compra_nacional' => $compraNacional,
-                'um_compra_nacional' => $umCompraNacional,
-                'compra_exterior' => $compraExterior,
-                'um_compra_exterior' => $umCompraExterior,
-                'venda_importada' => $vendaImportada,
-                'um_venda_importada' => $umVendaImportada,
-                'venda_nacional' => $vendaNacional,
-                'um_venda_nacional' => $umVendaNacional,
-            ],
-            'erros' => $erros,
+            FrutaIcmsLinhaFormulario::ENTRADA_NACIONAL_KG => $this->valorMonetario($row[2] ?? null, '0'),
+            FrutaIcmsLinhaFormulario::ENTRADA_INTERNACIONAL_KG => $this->valorMonetario($row[3] ?? null, '0'),
+            FrutaIcmsLinhaFormulario::SAIDA_NACIONAL_DENTRO_PCT => $this->valorMonetario($row[4] ?? null, '0'),
+            FrutaIcmsLinhaFormulario::SAIDA_NACIONAL_FORA_PCT => $this->valorMonetario($row[5] ?? null, '0'),
+            FrutaIcmsLinhaFormulario::SAIDA_INTERNACIONAL_DENTRO_PCT => $this->valorMonetario($row[6] ?? null, '0'),
+            FrutaIcmsLinhaFormulario::SAIDA_INTERNACIONAL_FORA_PCT => $this->valorMonetario($row[7] ?? null, '0'),
         ];
+    }
+
+    /**
+     * @param  list<mixed>  $row
+     * @return array<string, string>
+     */
+    private function layoutLegado(array $row): array
+    {
+        $colG = $this->valorMonetario($row[6] ?? null, '0');
+        $colI = $this->valorMonetario($row[8] ?? null, '0');
+
+        return [
+            FrutaIcmsLinhaFormulario::ENTRADA_NACIONAL_KG => $this->valorMonetario($row[2] ?? null, '0'),
+            FrutaIcmsLinhaFormulario::ENTRADA_INTERNACIONAL_KG => $this->valorMonetario($row[4] ?? null, '0'),
+            FrutaIcmsLinhaFormulario::SAIDA_NACIONAL_DENTRO_PCT => $colG,
+            FrutaIcmsLinhaFormulario::SAIDA_NACIONAL_FORA_PCT => $colI,
+            FrutaIcmsLinhaFormulario::SAIDA_INTERNACIONAL_DENTRO_PCT => $colG,
+            FrutaIcmsLinhaFormulario::SAIDA_INTERNACIONAL_FORA_PCT => $colI,
+            '_um_compra_nacional' => $this->valorUm($row[3] ?? null),
+            '_um_compra_exterior' => $this->valorUm($row[5] ?? null),
+            '_um_venda_fora' => $this->valorUm($row[7] ?? null),
+            '_um_venda_dentro' => $this->valorUm($row[9] ?? null),
+        ];
+    }
+
+    /**
+     * @param  array<string, string>  $linha
+     * @param  list<mixed>  $row
+     * @return list<string>
+     */
+    private function validarLayoutLegado(array $linha, array $row): array
+    {
+        $erros = [];
+
+        foreach ([
+            'UM compra nacional (D)' => $linha['_um_compra_nacional'] ?? FrutaUmIcms::KG->value,
+            'UM compra exterior (F)' => $linha['_um_compra_exterior'] ?? FrutaUmIcms::KG->value,
+        ] as $rotulo => $um) {
+            if (! in_array($um, FrutaUmIcms::valoresEntrada(), true)) {
+                $erros[] = "{$rotulo} inválida. Use KG ou UM.";
+            }
+        }
+
+        foreach ([
+            'UM venda fora do estado (H)' => $linha['_um_venda_fora'] ?? FrutaUmIcms::KG->value,
+            'UM venda dentro do estado (J)' => $linha['_um_venda_dentro'] ?? FrutaUmIcms::KG->value,
+        ] as $rotulo => $um) {
+            if (! in_array($um, FrutaUmIcms::valoresSaida(), true)) {
+                $erros[] = "{$rotulo} inválida. Use KG, UM ou PCT.";
+            }
+        }
+
+        if (array_key_exists(10, $row)) {
+            $tipoK = mb_strtoupper(trim((string) $row[10]), 'UTF-8');
+            if ($tipoK !== '' && ! in_array($tipoK, [self::TIPO_PCT, self::TIPO_REAL], true)) {
+                $erros[] = 'coluna K (tipo de estado) inválida. Use REAL ou PCT.';
+            }
+        }
+
+        return $erros;
+    }
+
+    /**
+     * @param  array<string, string>  $linha
+     * @param  list<mixed>  $row
+     * @return array<string, string>
+     */
+    private function aplicarColunaK(array $linha, array $row): array
+    {
+        if (! array_key_exists(10, $row)) {
+            return $linha;
+        }
+
+        $tipoK = mb_strtoupper(trim((string) $row[10]), 'UTF-8');
+
+        if ($tipoK === self::TIPO_PCT) {
+            $linha['_um_venda_fora'] = FrutaUmIcms::PCT->value;
+            $linha['_um_venda_dentro'] = FrutaUmIcms::PCT->value;
+        }
+
+        return $linha;
+    }
+
+    /**
+     * @param  array<string, string>  $linha
+     * @return array<string, string>
+     */
+    private function aliasesLegado(array $linha): array
+    {
+        return [
+            'compra_nacional' => $linha[FrutaIcmsLinhaFormulario::ENTRADA_NACIONAL_KG] ?? '0.00',
+            'um_compra_nacional' => $linha['_um_compra_nacional'] ?? FrutaUmIcms::KG->value,
+            'compra_exterior' => $linha[FrutaIcmsLinhaFormulario::ENTRADA_INTERNACIONAL_KG] ?? '0.00',
+            'um_compra_exterior' => $linha['_um_compra_exterior'] ?? FrutaUmIcms::KG->value,
+            'venda_nacional' => $linha[FrutaIcmsLinhaFormulario::SAIDA_NACIONAL_DENTRO_PCT] ?? '0.00',
+            'um_venda_nacional' => $linha['_um_venda_dentro'] ?? FrutaUmIcms::KG->value,
+            'venda_importada' => $linha[FrutaIcmsLinhaFormulario::SAIDA_NACIONAL_FORA_PCT] ?? '0.00',
+            'um_venda_importada' => $linha['_um_venda_fora'] ?? FrutaUmIcms::KG->value,
+        ];
+    }
+
+    /**
+     * @param  array<string, string>  $linha
+     * @return array<string, string>
+     */
+    private function converterEntradaUmParaKg(array $linha, ?Fruta $fruta): array
+    {
+        if ($fruta === null) {
+            unset(
+                $linha['_um_compra_nacional'],
+                $linha['_um_compra_exterior'],
+                $linha['_um_venda_fora'],
+                $linha['_um_venda_dentro'],
+            );
+
+            return $linha;
+        }
+
+        $kgPorUm = max(0.0001, (float) $fruta->kg_por_unidade_medicao);
+
+        foreach ([
+            FrutaIcmsLinhaFormulario::ENTRADA_NACIONAL_KG => '_um_compra_nacional',
+            FrutaIcmsLinhaFormulario::ENTRADA_INTERNACIONAL_KG => '_um_compra_exterior',
+        ] as $chaveValor => $chaveUm) {
+            $um = mb_strtoupper(trim((string) ($linha[$chaveUm] ?? FrutaUmIcms::KG->value)), 'UTF-8');
+            $valor = (float) ($linha[$chaveValor] ?? 0);
+
+            if ($um === FrutaUmIcms::UM->value) {
+                $linha[$chaveValor] = number_format(round($valor / $kgPorUm, 4), 2, '.', '');
+            }
+
+            unset($linha[$chaveUm]);
+        }
+
+        unset($linha['_um_venda_fora'], $linha['_um_venda_dentro']);
+
+        return $linha;
     }
 
     private function resolverFruta(string $ref): ?Fruta
@@ -127,9 +255,7 @@ class FrutaIcmsPlanilhaNormalizer
             }
         }
 
-        $nome = mb_strtoupper(trim($ref), 'UTF-8');
-
-        return Fruta::query()->where('nome', $nome)->first();
+        return Fruta::query()->where('nome', mb_strtoupper(trim($ref), 'UTF-8'))->first();
     }
 
     private function resolverEstado(string $ref): ?int
@@ -143,21 +269,15 @@ class FrutaIcmsPlanilhaNormalizer
 
         $texto = mb_strtoupper(TextoCadastro::removerAcentos($ref), 'UTF-8');
 
-        $estado = Estado::query()
+        return Estado::query()
             ->whereRaw('UPPER(abreviacao) = ?', [$texto])
             ->orWhereRaw('UPPER(nome) = ?', [$texto])
-            ->first();
-
-        return $estado?->id;
+            ->first()?->id;
     }
 
     private function trimString(mixed $value): string
     {
-        if ($value === null) {
-            return '';
-        }
-
-        return trim((string) $value);
+        return $value === null ? '' : trim((string) $value);
     }
 
     private function valorMonetario(mixed $value, string $padrao): string

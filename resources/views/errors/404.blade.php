@@ -5,7 +5,7 @@
 @section('content')
     @php
         $homeUrl = auth()->check() ? route('dashboard') : route('login');
-        $homeLabel = auth()->check() ? 'Voltar ao início' : 'Voltar ao início';
+        $homeLabel = auth()->check() ? 'Voltar ao início' : 'Ir para o login';
     @endphp
 
     <div class="mb-3">
