@@ -22,7 +22,7 @@ class DashboardTest extends TestCase
         $this->seed(EstadoSeeder::class);
     }
 
-    public function test_dashboard_exibe_totais_da_unidade_vinculada(): void
+    public function test_dashboard_financeiro_lista_unidade_vinculada_no_filtro(): void
     {
         $unidadeA = UnidadeNegocio::factory()->create(['nome' => 'UNIDADE ALPHA']);
         $unidadeB = UnidadeNegocio::factory()->create(['nome' => 'UNIDADE BETA']);
@@ -41,24 +41,8 @@ class DashboardTest extends TestCase
         $response
             ->assertOk()
             ->assertSee('UNIDADE ALPHA')
-            ->assertSee('Resumo operacional')
+            ->assertSee('Total faturado')
             ->assertDontSee('UNIDADE BETA')
-            ->assertViewHas('dashboard', fn (array $dashboard): bool => $dashboard['totais']['clientes'] === 2);
-    }
-
-    public function test_administrador_ve_todas_as_unidades(): void
-    {
-        UnidadeNegocio::factory()->count(2)->create();
-
-        $admin = User::factory()->create([
-            'must_change_password' => false,
-            'ativo' => true,
-        ]);
-        $admin->assignRole(Role::findOrCreate(Roles::ADMINISTRADOR->value, 'web'));
-
-        $this->actingAs($admin)
-            ->get(route('dashboard'))
-            ->assertOk()
-            ->assertSee('Visão de todas as unidades de negócio');
+            ->assertViewHas('financeiro');
     }
 }

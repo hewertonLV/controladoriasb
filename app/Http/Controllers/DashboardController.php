@@ -2,15 +2,18 @@
 
 namespace App\Http\Controllers;
 
-use App\Services\Dashboard\DashboardStatsService;
+use App\Http\Requests\DashboardIndexRequest;
+use App\Services\Dashboard\DashboardFinanceiroService;
 use Illuminate\View\View;
 
 class DashboardController extends Controller
 {
-    public function index(DashboardStatsService $dashboard): View
+    public function index(DashboardIndexRequest $request, DashboardFinanceiroService $financeiro): View
     {
+        $user = $request->user();
+
         return view('dashboard', [
-            'dashboard' => $dashboard->forUser(auth()->user()),
+            'financeiro' => $financeiro->forUser($user, $request->unidadeIdsFiltro()),
         ]);
     }
 }

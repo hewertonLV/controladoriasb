@@ -40,6 +40,7 @@ use App\Http\Controllers\Admin\Movimentacoes\DoacaoMovimentacaoController;
 use App\Http\Controllers\Admin\Movimentacoes\RecebimentoTransferenciaController;
 use App\Http\Controllers\Admin\Movimentacoes\TransferenciaMovimentacaoController;
 use App\Http\Controllers\Admin\Movimentacoes\VendaMovimentacaoController;
+use App\Http\Controllers\Admin\Relatorios\RentabilidadeLojaController;
 use App\Http\Controllers\Admin\PracaController;
 use App\Http\Controllers\Admin\PracaExportacaoController;
 use App\Http\Controllers\Admin\PracaImportacaoController;
@@ -1046,6 +1047,12 @@ Route::middleware(['auth', 'verified', 'user.active', 'password.changed'])->grou
             Route::get('/{movimentacaoConversao}', [ConversaoEmbalagemMovimentacaoController::class, 'show'])
                 ->middleware('permission:movimentacoes.conversoes-embalagem.visualizar')
                 ->name('show');
+        });
+
+        Route::prefix('relatorios')->name('relatorios.')->group(function () {
+            Route::get('/rentabilidade-loja', RentabilidadeLojaController::class)
+                ->middleware('permission:relatorios.rentabilidade-loja.visualizar')
+                ->name('rentabilidade-loja.index');
         });
 
         Route::prefix('grupos-permissoes')->name('grupos-permissoes.')->group(function () {

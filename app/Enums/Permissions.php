@@ -246,6 +246,8 @@ final class Permissions
 
     public const MOVIMENTACOES_CONVERSOES_EMBALAGEM_CRIAR = 'movimentacoes.conversoes-embalagem.criar';
 
+    public const RELATORIOS_RENTABILIDADE_LOJA_VISUALIZAR = 'relatorios.rentabilidade-loja.visualizar';
+
     public const GRUPOS_VISUALIZAR = 'grupos.visualizar';
 
     public const GRUPOS_CRIAR = 'grupos.criar';
@@ -451,6 +453,9 @@ final class Permissions
             'Movimentações — Conversão de Embalagem' => [
                 self::MOVIMENTACOES_CONVERSOES_EMBALAGEM_VISUALIZAR,
                 self::MOVIMENTACOES_CONVERSOES_EMBALAGEM_CRIAR,
+            ],
+            'Relatórios' => [
+                self::RELATORIOS_RENTABILIDADE_LOJA_VISUALIZAR,
             ],
         ];
     }

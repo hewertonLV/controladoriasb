@@ -391,6 +391,17 @@
                 </li>
             @endcanany
 
+            @can('relatorios.rentabilidade-loja.visualizar')
+                <li class="side-nav-title mt-2">Relatórios</li>
+                <li class="side-nav-item">
+                    <a href="{{ route('admin.relatorios.rentabilidade-loja.index') }}"
+                       class="side-nav-link {{ request()->routeIs('admin.relatorios.rentabilidade-loja.*') ? 'active' : '' }}">
+                        <span class="menu-icon"><i class="ri-line-chart-line"></i></span>
+                        <span class="menu-text">Rentabilidade por loja</span>
+                    </a>
+                </li>
+            @endcan
+
             @canany(['usuarios.visualizar', 'grupos-permissoes.visualizar'])
                 <li class="side-nav-title mt-2">Administração</li>
 

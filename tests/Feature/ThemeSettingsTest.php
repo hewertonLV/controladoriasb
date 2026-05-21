@@ -102,7 +102,9 @@ class ThemeSettingsTest extends TestCase
 
     public function test_guest_layout_uses_default_theme_settings(): void
     {
-        $this->view('dashboard')
+        $this->view('dashboard', [
+            'financeiro' => app(\App\Services\Dashboard\DashboardFinanceiroService::class)->vazio(),
+        ])
             ->assertSee('data-bs-theme="light"', false)
             ->assertSee('data-layout-mode="fluid"', false)
             ->assertSee('data-theme-settings-source="guest"', false);
