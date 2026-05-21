@@ -104,6 +104,8 @@ class ThemeSettingsTest extends TestCase
     {
         $this->view('dashboard', [
             'financeiro' => app(\App\Services\Dashboard\DashboardFinanceiroService::class)->vazio(),
+            'mesAtual' => now()->format('Y-m'),
+            'dadosUrl' => '',
         ])
             ->assertSee('data-bs-theme="light"', false)
             ->assertSee('data-layout-mode="fluid"', false)
@@ -144,6 +146,8 @@ class ThemeSettingsTest extends TestCase
         $this->assertStringContainsString('input.checked = isSelected', $persistenceScript);
         $this->assertStringContainsString("card.classList.toggle('active', isSelected)", $persistenceScript);
         $this->assertStringContainsString('new MutationObserver', $persistenceScript);
+        $this->assertStringContainsString("getElementById('light-dark-mode')", $persistenceScript);
+        $this->assertStringContainsString('window.saveThemeSettings = saveSettings', $persistenceScript);
         $this->assertStringContainsString('event.isTrusted', $persistenceScript);
         $this->assertStringContainsString('requestAnimationFrame', $persistenceScript);
         $this->assertStringContainsString('html[data-sidenav-size=condensed]:not([data-layout=topnav]) .page-content', $dynamicThemeCss);

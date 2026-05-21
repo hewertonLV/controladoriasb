@@ -266,4 +266,18 @@
     document.getElementById('reset-layout')?.addEventListener('click', () => {
         window.setTimeout(saveSettings, 0);
     });
+
+    window.saveThemeSettings = saveSettings;
+
+    document.getElementById('light-dark-mode')?.addEventListener('click', () => {
+        window.setTimeout(() => {
+            const theme = html.getAttribute('data-bs-theme');
+
+            if (!theme) {
+                return;
+            }
+
+            saveSettings({ 'data-bs-theme': theme });
+        }, 0);
+    });
 })();

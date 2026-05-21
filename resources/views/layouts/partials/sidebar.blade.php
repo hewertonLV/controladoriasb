@@ -72,6 +72,16 @@
                 </a>
             </li>
 
+            @can(App\Enums\Permissions::OLHO_DE_DEUS_VISUALIZAR)
+                <li class="side-nav-item">
+                    <a href="{{ route('olho-de-deus.index') }}"
+                       class="side-nav-link {{ request()->routeIs('olho-de-deus.*') ? 'active' : '' }}">
+                        <span class="menu-icon"><i class="ri-eye-line"></i></span>
+                        <span class="menu-text"> Olho de Deus </span>
+                    </a>
+                </li>
+            @endcan
+
             <li class="side-nav-item">
                 <a href="{{ route('profile.edit') }}" class="side-nav-link {{ request()->routeIs('profile.*') ? 'active' : '' }}">
                     <span class="menu-icon"><i class="ri-user-line"></i></span>

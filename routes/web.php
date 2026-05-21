@@ -40,10 +40,10 @@ use App\Http\Controllers\Admin\Movimentacoes\DoacaoMovimentacaoController;
 use App\Http\Controllers\Admin\Movimentacoes\RecebimentoTransferenciaController;
 use App\Http\Controllers\Admin\Movimentacoes\TransferenciaMovimentacaoController;
 use App\Http\Controllers\Admin\Movimentacoes\VendaMovimentacaoController;
-use App\Http\Controllers\Admin\Relatorios\RentabilidadeLojaController;
 use App\Http\Controllers\Admin\PracaController;
 use App\Http\Controllers\Admin\PracaExportacaoController;
 use App\Http\Controllers\Admin\PracaImportacaoController;
+use App\Http\Controllers\Admin\Relatorios\RentabilidadeLojaController;
 use App\Http\Controllers\Admin\UnidadeNegocioController;
 use App\Http\Controllers\Admin\UnidadeNegocioExportacaoController;
 use App\Http\Controllers\Admin\UnidadeNegocioImportacaoController;
@@ -54,6 +54,7 @@ use App\Http\Controllers\Admin\VeiculoImportacaoController;
 use App\Http\Controllers\Auth\ForcePasswordChangeController;
 use App\Http\Controllers\ClientErrorController;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\OlhoDeDeusController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\RequestDebugClientReportController;
 use App\Http\Controllers\ThemeSettingsController;
@@ -91,6 +92,17 @@ Route::middleware(['auth', 'verified', 'user.active', 'password.changed'])->grou
         ->name('theme-settings.update');
 
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
+    Route::get('/dashboard/dados', [DashboardController::class, 'dados'])->name('dashboard.dados');
+
+    Route::middleware(['permission:olho-de-deus.visualizar'])
+        ->prefix('olho-de-deus')
+        ->name('olho-de-deus.')
+        ->group(function (): void {
+            Route::get('/', [OlhoDeDeusController::class, 'index'])->name('index');
+            Route::get('/poll', [OlhoDeDeusController::class, 'poll'])
+                ->middleware('throttle:'.config('olho_de_deus.poll_max_per_minute', 4).',1')
+                ->name('poll');
+        });
 
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');

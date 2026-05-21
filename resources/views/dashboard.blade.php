@@ -5,99 +5,62 @@
 
 @section('content')
     @php
-        $fmtReais = static fn (float $v): string => 'R$ '.number_format($v, 2, ',', '.');
-        $fmtKg = static fn (float $v): string => number_format($v, 2, ',', '.').' kg';
-        $fmtPercentual = static function (?float $v): string {
-            if ($v === null) {
-                return '—';
-            }
-
-            return number_format($v, 2, ',', '.').'%';
-        };
-        $clsValor = static function (float $v): string {
-            if ($v > 0) {
-                return 'text-success';
-            }
-            if ($v < 0) {
-                return 'text-danger';
-            }
-
-            return 'text-muted';
-        };
-
         $cards = [
-            [
-                'key' => 'faturado',
-                'label' => 'Total faturado',
-                'icone' => 'ri-money-dollar-circle-line',
-                'cor' => 'primary',
-            ],
-            [
-                'key' => 'devolucao',
-                'label' => 'Total devoluções',
-                'icone' => 'ri-arrow-go-back-line',
-                'cor' => 'warning',
-            ],
-            [
-                'key' => 'liquido',
-                'label' => 'Total líquido',
-                'icone' => 'ri-scales-3-line',
-                'cor' => 'info',
-            ],
-            [
-                'key' => 'rentabilidade',
-                'label' => 'Total rentabilidade',
-                'icone' => 'ri-line-chart-line',
-                'cor' => 'success',
-            ],
-            [
-                'key' => 'descartado',
-                'label' => 'Fruta descartada',
-                'icone' => 'ri-delete-bin-line',
-                'cor' => 'danger',
-            ],
-            [
-                'key' => 'doado',
-                'label' => 'Total doado',
-                'icone' => 'ri-gift-line',
-                'cor' => 'secondary',
-            ],
+            ['key' => 'faturado', 'label' => 'Total faturado', 'icone' => 'ri-money-dollar-circle-line', 'cor' => 'primary'],
+            ['key' => 'devolucao', 'label' => 'Total devoluções', 'icone' => 'ri-arrow-go-back-line', 'cor' => 'warning'],
+            ['key' => 'liquido', 'label' => 'Total líquido', 'icone' => 'ri-scales-3-line', 'cor' => 'info'],
+            ['key' => 'rentabilidade', 'label' => 'Total rentabilidade', 'icone' => 'ri-line-chart-line', 'cor' => 'success'],
+            ['key' => 'descartado', 'label' => 'Fruta descartada', 'icone' => 'ri-delete-bin-line', 'cor' => 'danger'],
+            ['key' => 'doado', 'label' => 'Total doado', 'icone' => 'ri-gift-line', 'cor' => 'secondary'],
         ];
     @endphp
 
     <div class="card mb-3">
         <div class="card-body">
-            <form method="GET" action="{{ route('dashboard') }}" class="row g-3 align-items-end">
-                <div class="col-lg-8">
-                    <label for="unidades" class="form-label">Unidades de negócio</label>
-                    <select name="unidades[]" id="unidades" class="form-select" multiple size="4">
-                        @foreach ($financeiro['unidades_disponiveis'] as $unidade)
-                            <option value="{{ $unidade['id'] }}"
-                                @selected(in_array($unidade['id'], $financeiro['filtro_unidades'], true))>
+            <div class="row g-3 align-items-end mb-3">
+                @include('layouts.partials.dashboard-filtro-mes', [
+                    'mesAtual' => $mesAtual,
+                    'inputId' => 'dashboard-mes',
+                    'botaoId' => 'dashboard-buscar-mes',
+                ])
+            </div>
+
+            <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-2">
+                <label class="form-label fw-semibold mb-0">Unidades de negócio</label>
+                <span class="badge bg-light text-muted" id="dashboard-filtro-status"></span>
+            </div>
+
+            @if (count($financeiro['unidades_disponiveis']) === 0)
+                <p class="text-muted mb-0">Nenhuma unidade disponível para o seu usuário.</p>
+            @else
+                <div class="d-flex flex-wrap gap-3" id="dashboard-unidades-switches">
+                    @foreach ($financeiro['unidades_disponiveis'] as $unidade)
+                        <div class="form-check form-switch mb-0">
+                            <input type="checkbox"
+                                   class="form-check-input dashboard-unidade-switch"
+                                   role="switch"
+                                   id="dashboard-unidade-{{ $unidade['id'] }}"
+                                   value="{{ $unidade['id'] }}"
+                                   @checked(in_array($unidade['id'], $financeiro['filtro_unidades'], true))>
+                            <label class="form-check-label" for="dashboard-unidade-{{ $unidade['id'] }}">
                                 {{ $unidade['nome'] }}
-                            </option>
-                        @endforeach
-                    </select>
-                    <div class="form-text">
-                        Nenhuma selecionada = todas as unidades permitidas ao seu usuário.
-                        Segure Ctrl (ou Cmd) para selecionar mais de uma.
-                    </div>
+                            </label>
+                        </div>
+                    @endforeach
                 </div>
-                <div class="col-lg-4">
-                    <button type="submit" class="btn btn-primary w-100">
-                        <i class="ri-filter-3-line me-1"></i> Aplicar filtro
-                    </button>
-                    <a href="{{ route('dashboard') }}" class="btn btn-light w-100 mt-2">Limpar filtro</a>
-                </div>
-            </form>
+                <p class="text-muted small mb-0 mt-2">
+                    Desative uma unidade para removê-la dos totais. A dashboard atualiza automaticamente.
+                </p>
+            @endif
+
             <p class="text-muted small mb-0 mt-2">
                 <i class="ri-calendar-line me-1"></i>
-                Período: {{ $financeiro['periodo']['label'] }}
+                Período: <span id="dashboard-periodo-label">{{ $financeiro['periodo']['label'] }}</span>
             </p>
         </div>
     </div>
 
-    <div class="row row-cols-xxl-3 row-cols-lg-2 row-cols-1 g-3 mb-4">
+    <div class="row row-cols-xxl-3 row-cols-lg-2 row-cols-1 g-3 mb-4" id="dashboard-cards">
         @foreach ($cards as $card)
             @php
                 $dados = $financeiro['cards'][$card['key']];
@@ -108,13 +71,25 @@
                         <div class="d-flex align-items-center gap-2 justify-content-between">
                             <div>
                                 <h5 class="text-muted fs-13 fw-bold text-uppercase mb-2">{{ $card['label'] }}</h5>
-                                <h3 class="my-1 fw-bold {{ $clsValor($dados['reais']) }}">{{ $fmtReais($dados['reais']) }}</h3>
+                                <h3 class="my-1 fw-bold dashboard-card-reais {{ $dados['reais'] > 0 ? 'text-success' : ($dados['reais'] < 0 ? 'text-danger' : 'text-muted') }}"
+                                    data-card="{{ $card['key'] }}"
+                                    data-metric="reais">
+                                    R$ {{ number_format($dados['reais'], 2, ',', '.') }}
+                                </h3>
                                 <p class="mb-0 text-muted">
-                                    <span class="text-nowrap">{{ $fmtKg($dados['kg']) }}</span>
+                                    <span class="text-nowrap dashboard-card-kg" data-card="{{ $card['key'] }}" data-metric="kg">
+                                        {{ number_format($dados['kg'], 2, ',', '.') }} kg
+                                    </span>
                                     @if ($card['key'] === 'rentabilidade')
                                         <span class="mx-1">·</span>
-                                        <span class="text-nowrap fw-semibold {{ $clsValor($dados['reais']) }}">
-                                            {{ $fmtPercentual($dados['percentual'] ?? null) }}
+                                        <span class="text-nowrap fw-semibold dashboard-card-pct"
+                                              data-card="{{ $card['key'] }}"
+                                              data-metric="percentual">
+                                            @if ($dados['percentual'] === null)
+                                                —
+                                            @else
+                                                {{ number_format($dados['percentual'], 2, ',', '.') }}%
+                                            @endif
                                         </span>
                                     @endif
                                 </p>
@@ -138,8 +113,11 @@
                     <h4 class="header-title mb-0">Movimentação diária do mês</h4>
                     <p class="text-muted mb-0 small">Faturado, doado e descartado (R$) e volume vendido (kg), do dia 01 até hoje.</p>
                 </div>
-                <div class="card-body px-2 pt-0">
+                <div class="card-body px-2 pt-0 position-relative">
                     <div id="dashboard-financeiro-diario" class="apex-charts" data-colors="#0acf97,#777edd,#fa5c7c,#45bbe0"></div>
+                    <div id="dashboard-chart-loading-diario" class="dashboard-chart-loading d-none">
+                        <div class="spinner-border spinner-border-sm text-primary" role="status"></div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -149,18 +127,62 @@
                     <h4 class="header-title mb-0">Rentabilidade</h4>
                     <p class="text-muted mb-0 small">Composição do resultado (vendas + devoluções) no período.</p>
                 </div>
-                <div class="card-body px-2 pt-0">
+                <div class="card-body px-2 pt-0 position-relative">
                     <div id="dashboard-financeiro-pizza" class="apex-charts" data-colors="#0acf97,#fa5c7c,#777edd"></div>
+                    <div id="dashboard-chart-loading-pizza" class="dashboard-chart-loading d-none">
+                        <div class="spinner-border spinner-border-sm text-primary" role="status"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-3 mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h4 class="header-title mb-0">Rentabilidade por unidade de negócio</h4>
+                    <p class="text-muted mb-0 small">Resultado (R$) e margem (%) de cada unidade ativa no filtro.</p>
+                </div>
+                <div class="card-body px-2 pt-0 position-relative">
+                    <div id="dashboard-financeiro-rentabilidade-unidades" class="apex-charts" data-colors="#0acf97,#777edd"></div>
+                    <div id="dashboard-chart-loading-rentabilidade-unidades" class="dashboard-chart-loading d-none">
+                        <div class="spinner-border spinner-border-sm text-primary" role="status"></div>
+                    </div>
                 </div>
             </div>
         </div>
     </div>
 @endsection
 
+@push('styles')
+    <style>
+        .dashboard-chart-loading {
+            position: absolute;
+            inset: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: rgba(255, 255, 255, 0.65);
+            z-index: 2;
+        }
+        html[data-bs-theme="dark"] .dashboard-chart-loading {
+            background: rgba(0, 0, 0, 0.35);
+        }
+        #dashboard-cards.opacity-50 {
+            opacity: 0.55;
+            transition: opacity 0.2s ease;
+        }
+    </style>
+@endpush
+
 @push('scripts')
     <script src="{{ asset('assets/vendor/apexcharts/apexcharts.min.js') }}"></script>
     <script>
         window.dashboardFinanceiro = @json($financeiro);
+        window.dashboardFinanceiroConfig = {
+            dadosUrl: @json($dadosUrl),
+        };
     </script>
     <script src="{{ asset('assets/js/pages/dashboard-financeiro.js') }}"></script>
 @endpush

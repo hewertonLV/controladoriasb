@@ -248,6 +248,8 @@ final class Permissions
 
     public const RELATORIOS_RENTABILIDADE_LOJA_VISUALIZAR = 'relatorios.rentabilidade-loja.visualizar';
 
+    public const OLHO_DE_DEUS_VISUALIZAR = 'olho-de-deus.visualizar';
+
     public const GRUPOS_VISUALIZAR = 'grupos.visualizar';
 
     public const GRUPOS_CRIAR = 'grupos.criar';
@@ -456,6 +458,9 @@ final class Permissions
             ],
             'Relatórios' => [
                 self::RELATORIOS_RENTABILIDADE_LOJA_VISUALIZAR,
+            ],
+            'Olho de Deus' => [
+                self::OLHO_DE_DEUS_VISUALIZAR,
             ],
         ];
     }

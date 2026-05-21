@@ -21,7 +21,9 @@ class DashboardIndexRequest extends FormRequest
     {
         return [
             'unidades' => ['nullable', 'array'],
-            'unidades.*' => ['integer', 'exists:unidades_negocio,id'],
+            'unidades.*' => ['nullable', 'integer', 'exists:unidades_negocio,id'],
+            'sem_unidades' => ['nullable', 'boolean'],
+            'mes' => ['nullable', 'date_format:Y-m'],
         ];
     }
 
@@ -50,15 +52,30 @@ class DashboardIndexRequest extends FormRequest
     }
 
     /**
-     * @return list<int>|null
+     * @return list<int>|null null na carga inicial (sem parâmetro na URL); array vazio = nenhuma unidade ativa
      */
     public function unidadeIdsFiltro(): ?array
     {
-        $unidades = $this->input('unidades');
-        if (! is_array($unidades) || $unidades === []) {
+        if (! $this->has('unidades') && ! $this->boolean('sem_unidades')) {
             return null;
         }
 
-        return array_values(array_map('intval', $unidades));
+        if ($this->boolean('sem_unidades')) {
+            return [];
+        }
+
+        $unidades = array_values(array_filter(
+            array_map(static fn ($id): int => (int) $id, (array) $this->input('unidades', [])),
+            static fn (int $id): bool => $id > 0,
+        ));
+
+        return $unidades;
+    }
+
+    public function mesReferencia(): ?string
+    {
+        $mes = $this->input('mes');
+
+        return is_string($mes) && $mes !== '' ? $mes : null;
     }
 }

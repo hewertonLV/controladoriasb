@@ -4,7 +4,6 @@ namespace Tests\Feature\Dashboard;
 
 use App\Enums\CategoriaMovimentacaoTipo;
 use App\Enums\FreteStatusSituacao;
-use App\Enums\Permissions;
 use App\Enums\Roles;
 use App\Enums\TipoDevolucao;
 use App\Models\Cliente;
@@ -81,6 +80,35 @@ class DashboardFinanceiroTest extends TestCase
 
         $soA = $service->forUser($user, [$cA['unidade']->id]);
         $this->assertSame(200.0, $soA['cards']['faturado']['reais']);
+
+        $graficoTodas = $todas['grafico_rentabilidade_unidades'];
+        $this->assertCount(2, $graficoTodas['categorias']);
+        $this->assertContains('UNIDADE B', $graficoTodas['categorias']);
+        $this->assertContains('UNIDADE A', $graficoTodas['categorias']);
+        $this->assertSame(750.0, max($graficoTodas['reais']));
+        $this->assertSame(100.0, min($graficoTodas['reais']));
+    }
+
+    public function test_grafico_rentabilidade_unidades_na_resposta_json(): void
+    {
+        $this->seedBase();
+        $c = $this->cenarioBase();
+        $this->registrarCompra($c, '10', '500,00');
+        $this->registrarVenda($c, '4', '800,00');
+
+        $user = User::factory()->create([
+            'must_change_password' => false,
+            'ativo' => true,
+        ]);
+        $user->unidadesNegocio()->sync([$c['unidade']->id]);
+
+        $this->actingAs($user)
+            ->getJson(route('dashboard.dados', ['mes' => now()->format('Y-m')]))
+            ->assertOk()
+            ->assertJsonPath('grafico_rentabilidade_unidades.categorias.0', $c['unidade']->nome)
+            ->assertJson(fn (\Illuminate\Testing\Fluent\AssertableJson $json) => $json
+                ->where('grafico_rentabilidade_unidades.reais.0', 600)
+                ->etc());
     }
 
     public function test_administrador_ve_todas_unidades_no_filtro(): void
@@ -97,7 +125,55 @@ class DashboardFinanceiroTest extends TestCase
         $this->actingAs($admin)
             ->get(route('dashboard'))
             ->assertOk()
-            ->assertSee('Unidades de negócio');
+            ->assertSee('Unidades de negócio')
+            ->assertSee('form-switch', false);
+    }
+
+    public function test_endpoint_dados_atualiza_filtro_sem_refresh(): void
+    {
+        $this->seedBase();
+        $cA = $this->cenarioBase('UNIDADE A');
+        $cB = $this->cenarioBase('UNIDADE B');
+
+        $this->registrarVenda($cA, '2', '200,00');
+        $this->registrarVenda($cB, '5', '1000,00');
+
+        $user = User::factory()->create([
+            'must_change_password' => false,
+            'ativo' => true,
+        ]);
+        $user->unidadesNegocio()->sync([$cA['unidade']->id, $cB['unidade']->id]);
+
+        $this->actingAs($user)
+            ->getJson(route('dashboard.dados', ['unidades' => [$cA['unidade']->id]]))
+            ->assertOk()
+            ->assertJsonPath('cards.faturado.reais', 200);
+
+        $this->actingAs($user)
+            ->getJson(route('dashboard.dados', ['sem_unidades' => 1]))
+            ->assertOk()
+            ->assertJsonPath('cards.faturado.reais', 0);
+    }
+
+    public function test_filtro_por_mes_via_endpoint_dados(): void
+    {
+        $this->seedBase();
+        $c = $this->cenarioBase();
+        $this->registrarVenda($c, '3', '300,00');
+
+        $user = User::factory()->create([
+            'must_change_password' => false,
+            'ativo' => true,
+        ]);
+        $user->unidadesNegocio()->sync([$c['unidade']->id]);
+
+        $mes = now()->format('Y-m');
+
+        $this->actingAs($user)
+            ->getJson(route('dashboard.dados', ['mes' => $mes, 'unidades' => [$c['unidade']->id]]))
+            ->assertOk()
+            ->assertJsonPath('cards.faturado.reais', 300)
+            ->assertJsonPath('periodo.mes', $mes);
     }
 
     public function test_filtro_unidade_nao_permitida_retorna_erro_validacao(): void
