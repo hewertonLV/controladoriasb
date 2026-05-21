@@ -106,6 +106,7 @@ class ThemeSettingsTest extends TestCase
             'financeiro' => app(\App\Services\Dashboard\DashboardFinanceiroService::class)->vazio(),
             'mesAtual' => now()->format('Y-m'),
             'dadosUrl' => '',
+            'pollIntervalMs' => (int) config('dashboard_financeiro.poll_interval_ms', 45_000),
         ])
             ->assertSee('data-bs-theme="light"', false)
             ->assertSee('data-layout-mode="fluid"', false)

@@ -193,7 +193,7 @@
         window.dashboardFinanceiro = @json($financeiro);
         window.dashboardFinanceiroConfig = {
             dadosUrl: @json($dadosUrl),
-            pollIntervalMs: @json($pollIntervalMs),
+            pollIntervalMs: @json($pollIntervalMs ?? config('dashboard_financeiro.poll_interval_ms', 45000)),
         };
     </script>
     <script src="{{ asset('assets/js/pages/dashboard-financeiro.js') }}"></script>
