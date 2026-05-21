@@ -78,7 +78,7 @@ pipeline {
         }
 
         // MySQL sobe via depends_on/healthcheck do compose (app aguarda healthy).
-        // Testes PHPUnit usam SQLite em memória (phpunit.xml) — sem migrate:fresh no CI.
+        // Testes PHPUnit usam SQLite em memória (phpunit.xml); migrate+seed validam MySQL e seeders idempotentes.
 
         stage('Instalar dependências PHP') {
             steps {
@@ -102,6 +102,19 @@ pipeline {
                     docker compose exec -T $APP_SERVICE php artisan cache:clear
                     docker compose exec -T $APP_SERVICE php artisan route:clear
                     docker compose exec -T $APP_SERVICE php artisan view:clear
+                '''
+            }
+        }
+
+        stage('Migrar e rodar seeders') {
+            steps {
+                sh '''
+                    set -e
+                    unset COMPOSE_PROJECT_NAME || true
+                    export COMPOSE_PROJECT_NAME="${COMPOSE_PROJECT_NAME:-controladoria_sb_jenkins}"
+
+                    docker compose exec -T $APP_SERVICE php artisan migrate --force
+                    docker compose exec -T $APP_SERVICE php artisan db:seed --force
                 '''
             }
         }

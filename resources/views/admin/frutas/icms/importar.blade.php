@@ -10,10 +10,13 @@
                 <h4 class="header-title mb-0">Importação de ICMS por planilha Excel</h4>
                 <p class="text-muted mb-0">
                     Layout fixo (linha 1 = cabeçalho). A fruta deve já existir no cadastro.
-                    <code>A</code> ID CIGAM ou nome · <code>B</code> Estado (ID, sigla ou nome) ·
-                    <code>C/D</code> ICMS compra nacional + UM · <code>E/F</code> compra exterior + UM ·
-                    <code>G/H</code> venda fora do estado + UM · <code>I/J</code> venda dentro do estado + UM.
-                    Compra: KG ou UM. Venda em PE: use <code>PCT</code> para percentual.
+                    Modelo com exemplos: <code>planilhas/icms_importacao_modelo.xlsx</code>
+                    (aba <code>Importacao_11_col</code>).
+                    <code>A</code> ID CIGAM · <code>B</code> Estado ·
+                    <code>C/D</code> compra nacional + UM · <code>E/F</code> compra exterior + UM ·
+                    <code>G/H</code> venda fora + UM · <code>I/J</code> venda dentro + UM ·
+                    <code>K</code> tipo do estado (<code>REAL</code> ou <code>PCT</code>).
+                    Compra: só <code>KG</code> ou <code>UM</code>. PE (venda): <code>PCT</code> em H/J ou <code>K=PCT</code>.
                 </p>
             </div>
             <a href="{{ route('admin.frutas.icms.index') }}" class="btn btn-light">
