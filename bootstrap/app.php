@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Middleware\UseRequestRootUrl;
 use App\Http\Middleware\EnsurePasswordWasChanged;
 use App\Http\Middleware\EnsureUserIsActive;
 use App\Http\Middleware\FinishRequestDebug;
@@ -28,6 +29,7 @@ return Application::configure(basePath: dirname(__DIR__))
         ]);
 
         $middleware->web(prepend: [
+            UseRequestRootUrl::class,
             StartRequestDebug::class,
         ]);
 
