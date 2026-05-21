@@ -6,6 +6,7 @@ use App\Models\Estoque;
 use App\Models\EstoqueImportacao;
 use App\Models\Fruta;
 use App\Models\UnidadeNegocio;
+use App\Support\Estoques\EstoqueImportacaoPosicaoDerivador;
 use App\Support\TextoCadastro;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
@@ -15,7 +16,7 @@ use PhpOffice\PhpSpreadsheet\Spreadsheet;
 /**
  * Preview de importação de posição consolidada de estoques.
  *
- * Colunas: A id_cigam unidade · B id_cigam fruta · C qtd_fruta_kg · D preco_medio_kg
+ * Colunas: A id_cigam unidade · B id_cigam fruta · C qtd_fruta_um · D preço total (R$)
  */
 class EstoqueImportacaoProcessor
 {
@@ -213,15 +214,24 @@ class EstoqueImportacaoProcessor
 
     /**
      * @param  list<mixed>  $dadosBrutos
-     * @return array{dados: array{id_cigam_unidade: string, id_cigam_unidade_original: string, id_cigam_fruta: string, qtd_fruta_kg: string, preco_medio_kg: string}, erros: list<string>}
+     * @return array{
+     *     dados: array{
+     *         id_cigam_unidade: string,
+     *         id_cigam_unidade_original: string,
+     *         id_cigam_fruta: string,
+     *         qtd_fruta_um: string,
+     *         valor_total: string
+     *     },
+     *     erros: list<string>
+     * }
      */
     private function normalizeRow(array $dadosBrutos): array
     {
         $idUnOriginal = trim((string) ($dadosBrutos[0] ?? ''));
         $idUn = TextoCadastro::normalizarIdCigam($idUnOriginal);
         $idFr = TextoCadastro::normalizarIdCigam((string) ($dadosBrutos[1] ?? ''));
-        $qtdRaw = trim((string) ($dadosBrutos[2] ?? '0'));
-        $precoRaw = trim((string) ($dadosBrutos[3] ?? '0'));
+        $qtdUmRaw = trim((string) ($dadosBrutos[2] ?? '0'));
+        $valorTotalRaw = trim((string) ($dadosBrutos[3] ?? '0'));
 
         $erros = [];
 
@@ -237,19 +247,39 @@ class EstoqueImportacaoProcessor
             $erros[] = 'ID CIGAM da fruta deve ter até 6 dígitos numéricos.';
         }
 
-        $qtd = max(0, round((float) str_replace(',', '.', $qtdRaw), 2));
-        $preco = max(0, round((float) str_replace(',', '.', $precoRaw), 2));
+        $qtdUm = max(0, round((float) str_replace(',', '.', $qtdUmRaw), 2));
+        $valorTotal = max(0, round((float) str_replace(',', '.', $valorTotalRaw), 2));
+
+        if ($qtdUm <= 0 && $valorTotal > 0) {
+            $erros[] = 'Preço total (coluna D) exige quantidade na UM (coluna C) maior que zero.';
+        }
 
         return [
             'dados' => [
                 'id_cigam_unidade' => $idUn,
                 'id_cigam_unidade_original' => $idUnOriginal,
                 'id_cigam_fruta' => $idFr,
-                'qtd_fruta_kg' => number_format($qtd, 2, '.', ''),
-                'preco_medio_kg' => number_format($preco, 2, '.', ''),
+                'qtd_fruta_um' => number_format($qtdUm, 2, '.', ''),
+                'valor_total' => number_format($valorTotal, 2, '.', ''),
             ],
             'erros' => $erros,
         ];
+    }
+
+    /**
+     * @param  array<string, string>  $dados
+     * @return array<string, string>
+     */
+    private function enrichComPosicaoDerivada(array $dados, Fruta $fruta): array
+    {
+        return array_merge(
+            $dados,
+            EstoqueImportacaoPosicaoDerivador::derivar(
+                (float) $fruta->kg_por_unidade_medicao,
+                (float) $dados['qtd_fruta_um'],
+                (float) $dados['valor_total'],
+            ),
+        );
     }
 
     private function mensagemAmigavel(\Throwable $e): string
@@ -364,6 +394,8 @@ class EstoqueImportacaoProcessor
                 continue;
             }
 
+            $dadosEnriquecidos = $this->enrichComPosicaoDerivada($dados, $fruta);
+
             $k = $unidade->id.'_'.$fruta->id;
             $existente = $estoques->get($k);
 
@@ -374,18 +406,18 @@ class EstoqueImportacaoProcessor
                     'id_unidade_negocio' => $unidade->id,
                     'id_fruta' => $fruta->id,
                     'chave' => $idUnCigam.'|'.$idFrCigam,
-                    'dados' => $dados,
+                    'dados' => $dadosEnriquecidos,
                 ];
 
                 continue;
             }
 
-            $qAtual = number_format((float) $existente->qtd_fruta_kg, 2, '.', '');
-            $pAtual = number_format((float) $existente->preco_medio_kg, 2, '.', '');
-            $qNovo = $dados['qtd_fruta_kg'];
-            $pNovo = $dados['preco_medio_kg'];
+            $umAtual = number_format((float) $existente->qtd_fruta_um, 2, '.', '');
+            $valorAtual = number_format((float) $existente->valor_total_acumulado, 2, '.', '');
+            $umNovo = $dadosEnriquecidos['qtd_fruta_um'];
+            $valorNovo = $dadosEnriquecidos['valor_total'];
 
-            if ($qAtual === $qNovo && $pAtual === $pNovo) {
+            if ($umAtual === $umNovo && $valorAtual === $valorNovo) {
                 $semAlteracoes[] = [
                     'row_id' => $rowId,
                     'linha' => $linha,
@@ -398,11 +430,11 @@ class EstoqueImportacaoProcessor
             }
 
             $camposAlterados = [];
-            if ($qAtual !== $qNovo) {
-                $camposAlterados[] = ['campo' => 'qtd_fruta_kg', 'atual' => $qAtual, 'novo' => $qNovo];
+            if ($umAtual !== $umNovo) {
+                $camposAlterados[] = ['campo' => 'qtd_fruta_um', 'atual' => $umAtual, 'novo' => $umNovo];
             }
-            if ($pAtual !== $pNovo) {
-                $camposAlterados[] = ['campo' => 'preco_medio_kg', 'atual' => $pAtual, 'novo' => $pNovo];
+            if ($valorAtual !== $valorNovo) {
+                $camposAlterados[] = ['campo' => 'valor_total', 'atual' => $valorAtual, 'novo' => $valorNovo];
             }
 
             $atualizacoes[] = [
@@ -414,13 +446,12 @@ class EstoqueImportacaoProcessor
                 'chave' => $idUnCigam.'|'.$idFrCigam,
                 'nome' => $idUnCigam.'|'.$idFrCigam,
                 'dados_atuais' => [
-                    'qtd_fruta_kg' => $qAtual,
-                    'preco_medio_kg' => $pAtual,
+                    'qtd_fruta_um' => $umAtual,
+                    'valor_total' => $valorAtual,
+                    'qtd_fruta_kg' => number_format((float) $existente->qtd_fruta_kg, 2, '.', ''),
+                    'preco_medio_kg' => number_format((float) $existente->preco_medio_kg, 2, '.', ''),
                 ],
-                'dados_novos' => [
-                    'qtd_fruta_kg' => $qNovo,
-                    'preco_medio_kg' => $pNovo,
-                ],
+                'dados_novos' => $dadosEnriquecidos,
                 'campos_alterados' => $camposAlterados,
             ];
         }

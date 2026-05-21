@@ -40,7 +40,7 @@ final class OlhoDeDeusAlertaService
         }
 
         $alertas = [];
-        $limite = (int) config('olho_de_deus.max_alertas_por_poll', 50);
+        $limite = (int) config('olho_de_fabio.max_alertas_por_poll', 50);
 
         foreach ($movimentacoes as $movimentacao) {
             foreach ($this->detectar($movimentacao, $user, $periodo) as $alerta) {
@@ -54,7 +54,7 @@ final class OlhoDeDeusAlertaService
 
         return [
             'server_time' => now()->toIso8601String(),
-            'proximo_poll_ms' => (int) config('olho_de_deus.poll_interval_ms', 45_000),
+            'proximo_poll_ms' => (int) config('olho_de_fabio.poll_interval_ms', 45_000),
             'periodo' => $periodo->toArray(),
             'alertas' => $alertas,
         ];
@@ -98,7 +98,7 @@ final class OlhoDeDeusAlertaService
         $precoVendaUm = (float) $venda->valor_nf_um;
         $freteKg = (float) $venda->valor_frete_kg;
         $resultado = (float) $venda->resultado_movimentacao;
-        $limiteFrete = (float) config('olho_de_deus.frete_kg_maximo', 0.50);
+        $limiteFrete = (float) config('olho_de_fabio.frete_kg_maximo', 0.50);
 
         if ($precoVendaKg > 0 && $precoMedioKg > 0 && $precoVendaKg < $precoMedioKg) {
             $alertas[] = $this->montarAlerta(
@@ -251,7 +251,7 @@ final class OlhoDeDeusAlertaService
     private function detectarFrete(Movimentacao $movimentacao): array
     {
         $freteKg = (float) $movimentacao->valor_frete_kg;
-        $limiteFrete = (float) config('olho_de_deus.frete_kg_maximo', 0.50);
+        $limiteFrete = (float) config('olho_de_fabio.frete_kg_maximo', 0.50);
 
         if ($freteKg <= $limiteFrete) {
             return [];
@@ -278,7 +278,7 @@ final class OlhoDeDeusAlertaService
     private function detectarPerdaOperacional(Movimentacao $movimentacao, OlhoDeDeusAlertaTipo $tipo): array
     {
         $valor = (float) $movimentacao->valor_total_movimentacao;
-        $minimo = (float) config('olho_de_deus.perda_descarte_min_reais', 500);
+        $minimo = (float) config('olho_de_fabio.perda_descarte_min_reais', 500);
 
         if ($valor < $minimo) {
             return [];
@@ -306,7 +306,7 @@ final class OlhoDeDeusAlertaService
      */
     private function movimentacoesRecentes(User $user, Carbon $since, Carbon $inicioPeriodo, Carbon $fimPeriodo): array
     {
-        $limite = (int) config('olho_de_deus.max_movimentacoes_por_poll', 25);
+        $limite = (int) config('olho_de_fabio.max_movimentacoes_por_poll', 25);
 
         $query = $this->queryMovimentacoesNoPeriodo($user, $inicioPeriodo, $fimPeriodo)
             ->where(function (Builder $q) use ($since): void {
@@ -325,7 +325,7 @@ final class OlhoDeDeusAlertaService
      */
     private function movimentacoesNoPeriodo(User $user, Carbon $inicioPeriodo, Carbon $fimPeriodo): array
     {
-        $limite = (int) config('olho_de_deus.max_movimentacoes_carga_inicial', 100);
+        $limite = (int) config('olho_de_fabio.max_movimentacoes_carga_inicial', 100);
 
         return $this->queryMovimentacoesNoPeriodo($user, $inicioPeriodo, $fimPeriodo)
             ->orderByDesc('data_movimentacao')

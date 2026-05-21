@@ -72,12 +72,12 @@
                 </a>
             </li>
 
-            @can(App\Enums\Permissions::OLHO_DE_DEUS_VISUALIZAR)
+            @can(App\Enums\Permissions::OLHO_DE_FABIO_VISUALIZAR)
                 <li class="side-nav-item">
-                    <a href="{{ route('olho-de-deus.index') }}"
-                       class="side-nav-link {{ request()->routeIs('olho-de-deus.*') ? 'active' : '' }}">
+                    <a href="{{ route('olho-de-fabio.index') }}"
+                       class="side-nav-link {{ request()->routeIs('olho-de-fabio.*') ? 'active' : '' }}">
                         <span class="menu-icon"><i class="ri-eye-line"></i></span>
-                        <span class="menu-text"> Olho de Deus </span>
+                        <span class="menu-text"> Olho de Fabio </span>
                     </a>
                 </li>
             @endcan

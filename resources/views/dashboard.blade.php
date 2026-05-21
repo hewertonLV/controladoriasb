@@ -27,7 +27,18 @@
 
             <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-2">
                 <label class="form-label fw-semibold mb-0">Unidades de negócio</label>
-                <span class="badge bg-light text-muted" id="dashboard-filtro-status"></span>
+                <div class="d-flex align-items-center gap-2">
+                    <span class="badge bg-light text-muted" id="dashboard-filtro-status"></span>
+                    <span class="badge bg-secondary-subtle text-secondary" id="dashboard-monitor-status">
+                        <i class="ri-loader-4-line me-1"></i> Iniciando…
+                    </span>
+                    <button type="button" class="btn btn-sm btn-light" id="dashboard-pausar" title="Pausar atualização">
+                        <i class="ri-pause-line"></i>
+                    </button>
+                    <button type="button" class="btn btn-sm btn-light d-none" id="dashboard-retomar" title="Retomar">
+                        <i class="ri-play-line"></i>
+                    </button>
+                </div>
             </div>
 
             @if (count($financeiro['unidades_disponiveis']) === 0)
@@ -49,7 +60,7 @@
                     @endforeach
                 </div>
                 <p class="text-muted small mb-0 mt-2">
-                    Desative uma unidade para removê-la dos totais. A dashboard atualiza automaticamente.
+                    Desative uma unidade para removê-la dos totais. Os dados atualizam em tempo real enquanto esta página estiver aberta e visível.
                 </p>
             @endif
 
@@ -182,6 +193,7 @@
         window.dashboardFinanceiro = @json($financeiro);
         window.dashboardFinanceiroConfig = {
             dadosUrl: @json($dadosUrl),
+            pollIntervalMs: @json($pollIntervalMs),
         };
     </script>
     <script src="{{ asset('assets/js/pages/dashboard-financeiro.js') }}"></script>

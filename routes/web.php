@@ -92,15 +92,22 @@ Route::middleware(['auth', 'verified', 'user.active', 'password.changed'])->grou
         ->name('theme-settings.update');
 
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
-    Route::get('/dashboard/dados', [DashboardController::class, 'dados'])->name('dashboard.dados');
+    Route::get('/dashboard/dados', [DashboardController::class, 'dados'])
+        ->middleware('throttle:'.config('dashboard_financeiro.poll_max_per_minute', 4).',1')
+        ->name('dashboard.dados');
 
-    Route::middleware(['permission:olho-de-deus.visualizar'])
-        ->prefix('olho-de-deus')
-        ->name('olho-de-deus.')
+    Route::redirect('/olho-de-deus', '/olho-de-fabio', 301);
+    Route::redirect('/olho-de-deus/poll', '/olho-de-fabio/poll', 301);
+    Route::redirect('/olho-no-gado', '/olho-de-fabio', 301);
+    Route::redirect('/olho-no-gado/poll', '/olho-de-fabio/poll', 301);
+
+    Route::middleware(['permission:olho-de-fabio.visualizar'])
+        ->prefix('olho-de-fabio')
+        ->name('olho-de-fabio.')
         ->group(function (): void {
             Route::get('/', [OlhoDeDeusController::class, 'index'])->name('index');
             Route::get('/poll', [OlhoDeDeusController::class, 'poll'])
-                ->middleware('throttle:'.config('olho_de_deus.poll_max_per_minute', 4).',1')
+                ->middleware('throttle:'.config('olho_de_fabio.poll_max_per_minute', 4).',1')
                 ->name('poll');
         });
 

@@ -47,7 +47,7 @@ class OlhoDeDeusTest extends TestCase
         ]);
 
         $this->actingAs($user)
-            ->get(route('olho-de-deus.index'))
+            ->get(route('olho-de-fabio.index'))
             ->assertForbidden();
     }
 
@@ -81,7 +81,7 @@ class OlhoDeDeusTest extends TestCase
         ]);
 
         $response = $this->actingAs($user)
-            ->getJson(route('olho-de-deus.poll', [
+            ->getJson(route('olho-de-fabio.poll', [
                 'mes' => now()->format('Y-m'),
                 'carga_inicial' => 1,
             ]));
@@ -106,16 +106,16 @@ class OlhoDeDeusTest extends TestCase
         $this->actingAs($user);
 
         for ($i = 0; $i < 5; $i++) {
-            $this->getJson(route('olho-de-deus.poll'));
+            $this->getJson(route('olho-de-fabio.poll'));
         }
 
-        $this->getJson(route('olho-de-deus.poll'))
+        $this->getJson(route('olho-de-fabio.poll'))
             ->assertStatus(429);
     }
 
     private function usuarioOlhoDeDeus(): User
     {
-        $user = $this->userWithPermissions([Permissions::OLHO_DE_DEUS_VISUALIZAR]);
+        $user = $this->userWithPermissions([Permissions::OLHO_DE_FABIO_VISUALIZAR]);
         $user->assignRole(Role::findOrCreate(Roles::ADMINISTRADOR->value, 'web'));
 
         return $user;

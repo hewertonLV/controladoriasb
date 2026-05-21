@@ -11,9 +11,9 @@ class OlhoDeDeusController extends Controller
 {
     public function index(): View
     {
-        return view('dashboard.olho-de-deus', [
-            'pollIntervalMs' => (int) config('olho_de_deus.poll_interval_ms', 45_000),
-            'pollUrl' => route('olho-de-deus.poll'),
+        return view('dashboard.olho-de-fabio', [
+            'pollIntervalMs' => (int) config('olho_de_fabio.poll_interval_ms', 45_000),
+            'pollUrl' => route('olho-de-fabio.poll'),
             'mesAtual' => now()->format('Y-m'),
         ]);
     }

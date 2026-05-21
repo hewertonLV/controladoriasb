@@ -7,17 +7,24 @@
     var chartPizza = null;
     var chartRentabilidadeUnidades = null;
     var debounceTimer = null;
+    var pollTimer = null;
     var emRequisicao = false;
+    var pausado = false;
+    var monitoramentoAtivo = false;
 
     var diarioEl = document.querySelector('#dashboard-financeiro-diario');
     var pizzaEl = document.querySelector('#dashboard-financeiro-pizza');
     var rentabilidadeUnidadesEl = document.querySelector('#dashboard-financeiro-rentabilidade-unidades');
     var statusEl = document.getElementById('dashboard-filtro-status');
+    var monitorStatusEl = document.getElementById('dashboard-monitor-status');
     var periodoEl = document.getElementById('dashboard-periodo-label');
     var cardsEl = document.getElementById('dashboard-cards');
     var loadingDiario = document.getElementById('dashboard-chart-loading-diario');
     var loadingPizza = document.getElementById('dashboard-chart-loading-pizza');
     var loadingRentabilidadeUnidades = document.getElementById('dashboard-chart-loading-rentabilidade-unidades');
+    var btnPausar = document.getElementById('dashboard-pausar');
+    var btnRetomar = document.getElementById('dashboard-retomar');
+    var btnBuscarMes = document.getElementById('dashboard-buscar-mes');
 
     function fmtReais(valor) {
         return 'R$ ' + Number(valor).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -51,12 +58,20 @@
             });
     }
 
-    function setStatus(texto, tipo) {
+    function setStatusUnidades(texto, tipo) {
         if (!statusEl) {
             return;
         }
         statusEl.textContent = texto;
         statusEl.className = 'badge ' + (tipo || 'bg-light text-muted');
+    }
+
+    function setStatusMonitor(html, tipo) {
+        if (!monitorStatusEl) {
+            return;
+        }
+        monitorStatusEl.className = 'badge ' + (tipo || 'bg-secondary-subtle text-secondary');
+        monitorStatusEl.innerHTML = html;
     }
 
     function setLoading(ativo) {
@@ -323,7 +338,24 @@
         chartRentabilidadeUnidades.render();
     }
 
+    function atualizarStatusUnidades(data) {
+        var qtd = (data.filtro_unidades || []).length;
+        var total = (data.unidades_disponiveis || []).length;
+        setStatusUnidades(
+            qtd + ' de ' + total + ' unidade(s) ativa(s)',
+            qtd > 0 ? 'bg-primary-subtle text-primary' : 'bg-warning-subtle text-warning'
+        );
+    }
+
     function aplicarPayload(data) {
+        if (!data) {
+            return;
+        }
+
+        if (data.proximo_poll_ms !== undefined) {
+            delete data.proximo_poll_ms;
+        }
+
         payload = data;
         window.dashboardFinanceiro = data;
 
@@ -335,10 +367,7 @@
         renderGraficoDiario(data.grafico_diario || {});
         renderGraficoPizza(data.pizza_rentabilidade || []);
         renderGraficoRentabilidadeUnidades(data.grafico_rentabilidade_unidades || {});
-
-        var qtd = (data.filtro_unidades || []).length;
-        var total = (data.unidades_disponiveis || []).length;
-        setStatus(qtd + ' de ' + total + ' unidade(s) ativa(s)', qtd > 0 ? 'bg-primary-subtle text-primary' : 'bg-warning-subtle text-warning');
+        atualizarStatusUnidades(data);
     }
 
     function mesSelecionado() {
@@ -346,15 +375,11 @@
         return input && input.value ? input.value : new Date().toISOString().slice(0, 7);
     }
 
-    function buscarDados() {
-        if (!config.dadosUrl || emRequisicao) {
-            return;
-        }
-
-        var selecionadas = unidadesSelecionadas();
+    function montarUrlDados() {
         var url = new URL(config.dadosUrl, window.location.origin);
         url.searchParams.set('mes', mesSelecionado());
 
+        var selecionadas = unidadesSelecionadas();
         if (selecionadas.length === 0) {
             url.searchParams.set('sem_unidades', '1');
         } else {
@@ -363,11 +388,28 @@
             });
         }
 
+        return url;
+    }
+
+    function agendar(ms) {
+        if (pollTimer) {
+            window.clearTimeout(pollTimer);
+        }
+        pollTimer = window.setTimeout(function () {
+            executarAtualizacao(false);
+        }, ms);
+    }
+
+    function executarAtualizacao(imediato) {
+        if (!config.dadosUrl || pausado || emRequisicao || document.hidden) {
+            return;
+        }
+
         emRequisicao = true;
         setLoading(true);
-        setStatus('Atualizando…', 'bg-info-subtle text-info');
+        setStatusMonitor('<i class="ri-loader-4-line me-1"></i> Atualizando…', 'bg-info-subtle text-info');
 
-        fetch(url.toString(), {
+        fetch(montarUrlDados().toString(), {
             method: 'GET',
             headers: {
                 Accept: 'application/json',
@@ -382,10 +424,19 @@
                 return response.json();
             })
             .then(function (data) {
+                var intervalo = data.proximo_poll_ms || config.pollIntervalMs || 45000;
                 aplicarPayload(data);
+                if (monitoramentoAtivo && !pausado) {
+                    setStatusMonitor('<i class="ri-refresh-line me-1"></i> Monitorando', 'bg-success-subtle text-success');
+                    agendar(intervalo);
+                }
             })
-            .catch(function () {
-                setStatus('Erro ao atualizar', 'bg-danger-subtle text-danger');
+            .catch(function (error) {
+                console.warn('[Dashboard financeira]', error);
+                setStatusMonitor('<i class="ri-error-warning-line me-1"></i> Erro na consulta', 'bg-danger-subtle text-danger');
+                if (monitoramentoAtivo && !pausado) {
+                    agendar((config.pollIntervalMs || 45000) * 2);
+                }
             })
             .finally(function () {
                 emRequisicao = false;
@@ -393,27 +444,118 @@
             });
     }
 
-    function agendarAtualizacao() {
+    function iniciarMonitoramento(imediato) {
+        if (!config.dadosUrl) {
+            return;
+        }
+
+        monitoramentoAtivo = true;
+        pausado = false;
+        if (btnPausar) {
+            btnPausar.classList.remove('d-none');
+        }
+        if (btnRetomar) {
+            btnRetomar.classList.add('d-none');
+        }
+
+        if (pollTimer) {
+            window.clearTimeout(pollTimer);
+            pollTimer = null;
+        }
+
+        if (imediato) {
+            executarAtualizacao(true);
+        } else {
+            var intervalo = config.pollIntervalMs || 45000;
+            setStatusMonitor('<i class="ri-refresh-line me-1"></i> Monitorando', 'bg-success-subtle text-success');
+            agendar(intervalo);
+        }
+    }
+
+    function pausar() {
+        pausado = true;
+        if (pollTimer) {
+            window.clearTimeout(pollTimer);
+            pollTimer = null;
+        }
+        if (btnPausar) {
+            btnPausar.classList.add('d-none');
+        }
+        if (btnRetomar) {
+            btnRetomar.classList.remove('d-none');
+        }
+        setStatusMonitor('<i class="ri-pause-circle-line me-1"></i> Pausado', 'bg-secondary-subtle text-secondary');
+    }
+
+    function retomar() {
+        pausado = false;
+        if (btnPausar) {
+            btnPausar.classList.remove('d-none');
+        }
+        if (btnRetomar) {
+            btnRetomar.classList.add('d-none');
+        }
+        if (monitoramentoAtivo) {
+            executarAtualizacao(true);
+        }
+    }
+
+    function agendarAtualizacaoFiltro() {
         if (debounceTimer) {
             window.clearTimeout(debounceTimer);
         }
-        debounceTimer = window.setTimeout(buscarDados, 350);
+        debounceTimer = window.setTimeout(function () {
+            if (monitoramentoAtivo && !pausado) {
+                executarAtualizacao(true);
+            }
+        }, 350);
     }
 
     function initSwitches() {
         document.querySelectorAll('.dashboard-unidade-switch').forEach(function (input) {
-            input.addEventListener('change', agendarAtualizacao);
+            input.addEventListener('change', agendarAtualizacaoFiltro);
         });
     }
 
-    var btnBuscar = document.getElementById('dashboard-buscar-mes');
-    if (btnBuscar) {
-        btnBuscar.addEventListener('click', buscarDados);
+    if (btnBuscarMes) {
+        btnBuscarMes.addEventListener('click', function () {
+            iniciarMonitoramento(true);
+        });
     }
+
+    if (btnPausar) {
+        btnPausar.addEventListener('click', pausar);
+    }
+
+    if (btnRetomar) {
+        btnRetomar.addEventListener('click', retomar);
+    }
+
+    document.addEventListener('visibilitychange', function () {
+        if (document.hidden) {
+            if (pollTimer) {
+                window.clearTimeout(pollTimer);
+                pollTimer = null;
+            }
+            setStatusMonitor('<i class="ri-eye-off-line me-1"></i> Aba em segundo plano', 'bg-secondary-subtle text-secondary');
+        } else if (!pausado && monitoramentoAtivo) {
+            executarAtualizacao(true);
+        }
+    });
+
+    window.addEventListener('beforeunload', function () {
+        if (pollTimer) {
+            window.clearTimeout(pollTimer);
+        }
+    });
 
     if (payload) {
         aplicarPayload(payload);
     }
 
     initSwitches();
+
+    if (config.dadosUrl) {
+        iniciarMonitoramento(false);
+    }
 })();

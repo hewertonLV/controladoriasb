@@ -1,21 +1,21 @@
 (function () {
     'use strict';
 
-    const config = window.__OLHO_DE_DEUS__;
+    const config = window.__OLHO_DE_FABIO__;
     if (!config?.pollUrl) {
         return;
     }
 
-    const lista = document.getElementById('olho-de-deus-lista');
-    const vazio = document.getElementById('olho-de-deus-vazio');
-    const totalEl = document.getElementById('olho-de-deus-total');
-    const statusEl = document.getElementById('olho-de-deus-status');
-    const periodoEl = document.getElementById('olho-de-deus-periodo-label');
-    const btnPausar = document.getElementById('olho-de-deus-pausar');
-    const btnRetomar = document.getElementById('olho-de-deus-retomar');
-    const btnLimpar = document.getElementById('olho-de-deus-limpar');
-    const btnBuscar = document.getElementById('olho-de-deus-buscar');
-    const inputMes = document.getElementById('olho-de-deus-mes');
+    const lista = document.getElementById('olho-de-fabio-lista');
+    const vazio = document.getElementById('olho-de-fabio-vazio');
+    const totalEl = document.getElementById('olho-de-fabio-total');
+    const statusEl = document.getElementById('olho-de-fabio-status');
+    const periodoEl = document.getElementById('olho-de-fabio-periodo-label');
+    const btnPausar = document.getElementById('olho-de-fabio-pausar');
+    const btnRetomar = document.getElementById('olho-de-fabio-retomar');
+    const btnLimpar = document.getElementById('olho-de-fabio-limpar');
+    const btnBuscar = document.getElementById('olho-de-fabio-buscar');
+    const inputMes = document.getElementById('olho-de-fabio-mes');
 
     const vistos = new Set();
     const alertasNaTela = [];
@@ -153,7 +153,7 @@
             setStatus('<i class="ri-eye-line me-1"></i> Monitorando', 'bg-success-subtle text-success');
             agendar(intervalo);
         } catch (error) {
-            console.warn('[Olho de Deus]', error);
+            console.warn('[Olho de Fabio]', error);
             setStatus('<i class="ri-error-warning-line me-1"></i> Erro na consulta', 'bg-danger-subtle text-danger');
             agendar(config.pollIntervalMs * 2);
         } finally {

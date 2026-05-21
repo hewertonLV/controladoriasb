@@ -147,7 +147,8 @@ class DashboardFinanceiroTest extends TestCase
         $this->actingAs($user)
             ->getJson(route('dashboard.dados', ['unidades' => [$cA['unidade']->id]]))
             ->assertOk()
-            ->assertJsonPath('cards.faturado.reais', 200);
+            ->assertJsonPath('cards.faturado.reais', 200)
+            ->assertJsonStructure(['proximo_poll_ms']);
 
         $this->actingAs($user)
             ->getJson(route('dashboard.dados', ['sem_unidades' => 1]))

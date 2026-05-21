@@ -11,7 +11,8 @@
                 <p class="text-muted mb-0">
                     Posição inicial por loja (unidade) e fruta. Layout fixo — linha 1 é cabeçalho:
                     <code>A</code> ID CIGAM unidade · <code>B</code> ID CIGAM fruta ·
-                    <code>C</code> Qtd (kg) · <code>D</code> Preço médio (R$/kg).
+                    <code>C</code> Qtd (unidade de medição) · <code>D</code> Preço total (R$).
+                    O sistema calcula kg, preço médio e valor acumulado com base no cadastro da fruta.
                     Uma planilha pode trazer várias unidades; após a análise, confirme as linhas desejadas.
                 </p>
                 <p class="text-muted mb-0 small mt-1">
@@ -126,7 +127,7 @@
                                 </th>
                                 <th>Linha</th>
                                 <th>Unidade / Fruta</th>
-                                <th>Qtd (kg) · Preço médio</th>
+                                <th>Qtd (UM) · Preço total</th>
                             </tr>
                         </thead>
                         <tbody id="tbody-novas"></tbody>
@@ -162,25 +163,6 @@
             </div>
         </div>
 
-        <div class="card mb-3 d-none" id="card-sem-alteracoes">
-            <div class="card-header">
-                <h5 class="header-title mb-0">
-                    <i class="ri-checkbox-circle-line text-muted me-1"></i>
-                    Sem alterações <span class="badge bg-secondary-subtle text-secondary ms-1" id="count-sem-alteracoes">0</span>
-                </h5>
-            </div>
-            <div class="card-body p-0">
-                <div class="table-responsive">
-                    <table class="table table-sm table-centered mb-0">
-                        <thead class="bg-light bg-opacity-50">
-                            <tr>
-                                <th>Linha</th>
-                                <th>Unidade / Fruta</th>
-                    </table>
-                </div>
-            </div>
-        </div>
-
         <div class="card mb-3 d-none" id="card-erros">
             <div class="card-header">
                 <h5 class="header-title mb-0">
@@ -194,11 +176,33 @@
                         <thead class="bg-light bg-opacity-50">
                             <tr>
                                 <th>Linha</th>
-                                <th>Nome</th>
-                                <th>Erros</th>
+                                <th>Unidade · Fruta</th>
+                                <th>Motivo(s)</th>
                             </tr>
                         </thead>
                         <tbody id="tbody-erros"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <div class="card mb-3 d-none" id="card-sem-alteracoes">
+            <div class="card-header">
+                <h5 class="header-title mb-0">
+                    <i class="ri-checkbox-circle-line text-muted me-1"></i>
+                    Sem alterações <span class="badge bg-secondary-subtle text-secondary ms-1" id="count-sem-alteracoes">0</span>
+                </h5>
+            </div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-sm table-centered mb-0">
+                        <thead class="bg-light bg-opacity-50">
+                            <tr>
+                                <th>Linha</th>
+                                <th>Unidade · Fruta</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tbody-sem-alteracoes"></tbody>
                     </table>
                 </div>
             </div>
@@ -310,7 +314,9 @@
         }
         function fmtCampoValor(campo, v) {
             if (campo === 'cnpj_cpf') return fmtDoc(v);
-            if (campo === 'qtd_fruta_kg' || campo === 'preco_medio_kg') return escapeHtml(String(v));
+            if (campo === 'qtd_fruta_um' || campo === 'valor_total' || campo === 'qtd_fruta_kg' || campo === 'preco_medio_kg') {
+                return escapeHtml(String(v));
+            }
             if (v === null || v === undefined || v === '') return '—';
             return escapeHtml(v);
         }
@@ -377,7 +383,40 @@
             }
         }
 
+        function resumoPosicao(d) {
+            const um = escapeHtml(d.qtd_fruta_um);
+            const total = escapeHtml(d.valor_total);
+            const kg = escapeHtml(d.qtd_fruta_kg || '0');
+            const precoKg = escapeHtml(d.preco_medio_kg || '0');
+            return `${um} UM · R$ ${total} total<br><span class="text-muted">→ ${kg} kg · R$ ${precoKg}/kg</span>`;
+        }
+
+        function rotuloUnidadeFruta(item) {
+            const d = item.dados || {};
+            const un = d.id_cigam_unidade || d.id_cigam_unidade_original;
+            const fr = d.id_cigam_fruta;
+            if (un || fr) {
+                return 'Un. <code>' + escapeHtml(un || '—') + '</code> · Fruta <code>' + escapeHtml(fr || '—') + '</code>';
+            }
+            const chave = item.chave || item.nome;
+            if (chave && chave !== '|') {
+                return '<code>' + escapeHtml(chave) + '</code>';
+            }
+            return '—';
+        }
+
+        function formatarErrosLinha(item) {
+            const lista = item.erros || [];
+            if (!Array.isArray(lista) || lista.length === 0) {
+                return '<span class="text-muted">Erro não detalhado.</span>';
+            }
+            return '<ul class="mb-0 ps-3 text-danger small">' +
+                lista.map(e => '<li>' + escapeHtml(e) + '</li>').join('') +
+                '</ul>';
+        }
+
         function renderNovas(lista) {
+            if (!tbodyNovas) return;
             tbodyNovas.innerHTML = '';
             countNovas.textContent = lista.length;
             lista.forEach(item => {
@@ -387,7 +426,7 @@
                     <td><input type="checkbox" class="form-check-input chk-nova" data-row="${item.row_id}" checked></td>
                     <td>${item.linha}</td>
                     <td><code>${escapeHtml(item.chave)}</code></td>
-                    <td class="small">${escapeHtml(d.qtd_fruta_kg)} kg · R$ ${escapeHtml(d.preco_medio_kg)}/kg</td>
+                    <td class="small">${resumoPosicao(d)}</td>
                 `;
                 tbodyNovas.appendChild(tr);
             });
@@ -395,6 +434,7 @@
         }
 
         function renderAtualizacoes(lista) {
+            if (!tbodyAtual) return;
             tbodyAtual.innerHTML = '';
             countAtual.textContent = lista.length;
             lista.forEach(item => {
@@ -411,7 +451,7 @@
                     <td><input type="checkbox" class="form-check-input chk-atual" data-row="${item.row_id}" checked></td>
                     <td>${item.linha}</td>
                     <td><code>${escapeHtml(item.chave)}</code></td>
-                    <td class="small">${escapeHtml(item.dados_atuais.qtd_fruta_kg)} kg · R$ ${escapeHtml(item.dados_atuais.preco_medio_kg)}/kg</td>
+                    <td class="small">${resumoPosicao(item.dados_atuais)}</td>
                     <td>${diffs}</td>
                 `;
                 tbodyAtual.appendChild(tr);
@@ -420,6 +460,7 @@
         }
 
         function renderSemAlteracoes(lista) {
+            if (!tbodySem) return;
             tbodySem.innerHTML = '';
             countSem.textContent = lista.length;
             cardSem.classList.toggle('d-none', lista.length === 0);
@@ -434,16 +475,18 @@
         }
 
         function renderErros(lista) {
+            if (!tbodyErros) return;
             tbodyErros.innerHTML = '';
             countErros.textContent = lista.length;
-            cardErros.classList.toggle('d-none', lista.length === 0);
+            if (cardErros) {
+                cardErros.classList.toggle('d-none', lista.length === 0);
+            }
             lista.forEach(item => {
-                const erros = (item.erros || []).map(e => `<li>${escapeHtml(e)}</li>`).join('');
                 const tr = document.createElement('tr');
                 tr.innerHTML = `
-                    <td>${item.linha}</td>
-                    <td><code>${escapeHtml(item.chave || item.nome || '—')}</code></td>
-                    <td><ul class="mb-0 ps-3 text-danger small">${erros}</ul></td>
+                    <td class="text-nowrap">${item.linha ?? '—'}</td>
+                    <td class="small">${rotuloUnidadeFruta(item)}</td>
+                    <td>${formatarErrosLinha(item)}</td>
                 `;
                 tbodyErros.appendChild(tr);
             });
@@ -475,17 +518,29 @@
                     sem_alteracoes: data.sem_alteracoes || [],
                     erros: data.erros || [],
                 };
+                renderErros(preview.erros);
                 renderNovas(preview.novas);
                 renderAtualizacoes(preview.atualizacoes);
                 renderSemAlteracoes(preview.sem_alteracoes);
-                renderErros(preview.erros);
                 resultado.classList.remove('d-none');
                 atualizarResumoSelecao();
-                if (preview.novas.length === 0 && preview.atualizacoes.length === 0) {
+
+                if (preview.erros.length > 0) {
+                    const nErros = preview.erros.length;
+                    showAlerta(
+                        'warning',
+                        '<strong>' + nErros + '</strong> linha(s) com erro na planilha. ' +
+                        'Confira a tabela <em>Erros</em> abaixo — cada linha lista o motivo (unidade/fruta não encontrada, quantidade inválida, etc.).'
+                    );
+                    if (cardErros) {
+                        cardErros.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    }
+                } else if (preview.novas.length === 0 && preview.atualizacoes.length === 0) {
                     showAlerta('info', 'A planilha não trouxe novas linhas nem alterações para estoques existentes.');
                 }
             } catch (err) {
-                showAlerta('danger', 'Falha de comunicação ao buscar resultado: ' + escapeHtml(err.message));
+                console.error('[Importar estoques]', err);
+                showAlerta('danger', 'Falha ao exibir o resultado da análise: ' + escapeHtml(err.message));
             }
         }
 
