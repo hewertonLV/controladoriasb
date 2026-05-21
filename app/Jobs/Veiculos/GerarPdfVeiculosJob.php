@@ -13,7 +13,7 @@ use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Storage;
+use App\Support\PrivateStorage;
 use Throwable;
 
 class GerarPdfVeiculosJob implements ShouldQueue
@@ -98,7 +98,7 @@ class GerarPdfVeiculosJob implements ShouldQueue
                     'isFontSubsettingEnabled' => true,
                 ]);
 
-            Storage::disk('local')->put($arquivoPath, $pdf->output());
+            PrivateStorage::put($arquivoPath, $pdf->output());
 
             $exportacao->forceFill([
                 'status' => VeiculoExportacao::STATUS_CONCLUIDO,

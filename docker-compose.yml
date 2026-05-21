@@ -25,6 +25,7 @@ services:
     build: .
     image: controladoriasb-app:latest
     restart: unless-stopped
+    user: www-data
     environment:
       TZ: America/Sao_Paulo
     # Formato em lista (exec): `php` vira PID 1 — SIGTERM do Docker chega direto ao
@@ -67,6 +68,7 @@ services:
     build: .
     image: controladoriasb-app:latest
     restart: unless-stopped
+    user: www-data
     environment:
       TZ: America/Sao_Paulo
     command:
@@ -89,6 +91,7 @@ services:
     build: .
     image: controladoriasb-app:latest
     restart: unless-stopped
+    user: www-data
     environment:
       TZ: America/Sao_Paulo
     command:
