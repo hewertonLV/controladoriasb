@@ -27,6 +27,14 @@
             ['targets' => [0, 1, 2, 3, 4], 'className' => 'text-nowrap'],
         ]"
     >
+        <x-slot:actions>
+            @can('estoques.importar')
+                <a href="{{ route('admin.estoques.importar') }}" class="btn btn-soft-success">
+                    <i class="ri-file-excel-2-line me-1"></i> Importar estoque inicial
+                </a>
+            @endcan
+        </x-slot:actions>
+
         @include('admin.estoques._unidades_table', [
             'unidades' => $unidades,
         ])

@@ -15,8 +15,8 @@
             <input name="numero_nf" class="form-control" required value="{{ old('numero_nf', $movimentacao->vendaNota->numero_nf ?? '') }}">
         </div>
         <div class="col-md-3">
-            <label class="form-label">Origem física</label>
-            <select name="id_empresa_origem" class="form-select" required data-venda-origem data-search-select data-placeholder="Selecione ou pesquise a origem física">
+            <label class="form-label">Origem física <span class="text-danger">*</span></label>
+            <select name="id_empresa_origem" id="id_empresa_origem" class="form-select" required data-venda-origem data-search-select data-placeholder="Selecione ou pesquise a origem física">
                 <option value="">Selecione</option>
                 @foreach ($opcoes['empresas_origem'] as $empresa)
                     <option value="{{ $empresa->id }}" data-is-hub="{{ $empresa->entidade?->is_hub ? '1' : '0' }}" @selected((int) old('id_empresa_origem', $movimentacao->id_empresa_origem ?? 0) === $empresa->id)>
@@ -24,6 +24,7 @@
                     </option>
                 @endforeach
             </select>
+            <small class="text-muted">Unidade de onde sai o estoque. As frutas dos itens dependem deste campo — não do cliente.</small>
         </div>
         <div class="col-md-3">
             <label class="form-label">Cliente destino</label>
@@ -114,6 +115,7 @@
                 <i class="ri-add-line me-1"></i> Adicionar fruta
             </button>
         </div>
+        <p class="small mb-2 text-muted" data-venda-fruta-aviso role="status">Escolha a <strong>origem física</strong> para liberar as frutas com estoque nessa unidade.</p>
         <div data-items-container="venda">
             @foreach ($itens as $i => $item)
                 <div class="row g-3 mb-2" data-item-row>
@@ -189,51 +191,98 @@
         const origem = document.querySelector('[data-venda-origem]');
         const wrapper = document.querySelector('[data-venda-faturamento-wrapper]');
         const faturamento = document.querySelector('[data-venda-faturamento]');
+        const avisoFruta = document.querySelector('[data-venda-fruta-aviso]');
 
-        if (!origem || !wrapper || !faturamento) {
-            return;
-        }
-
-        const atualizarFaturamento = () => {
-            const selecionada = origem.options[origem.selectedIndex];
-            const origemEhHub = selecionada?.dataset?.isHub === '1';
-
-            wrapper.classList.toggle('d-none', !origemEhHub);
-            faturamento.required = origemEhHub;
-            faturamento.disabled = !origemEhHub;
-
-            if (!origemEhHub) {
-                faturamento.value = '';
+        const reinitFrutaSelect = (select) => {
+            if (!window.jQuery || !select) {
+                return;
             }
 
-            window.AdminSearchSelect?.refresh(faturamento);
+            const $select = window.jQuery(select);
+
+            if ($select.hasClass('select2-hidden-accessible')) {
+                $select.select2('destroy');
+            }
+
+            window.AdminSearchSelect?.init(select);
         };
 
-        origem.addEventListener('change', atualizarFaturamento);
-        atualizarFaturamento();
-
         const filtrarFrutasPorOrigem = () => {
-            const origemId = origem.value;
+            if (!origem) {
+                return;
+            }
+
+            const origemId = String(origem.value || '').trim();
+            let temFrutaDisponivel = false;
 
             document.querySelectorAll('[data-fruta-select]').forEach((select) => {
                 select.querySelectorAll('option').forEach((option) => {
-                    if (!option.value) return;
+                    if (!option.value) {
+                        return;
+                    }
 
-                    const permitido = origemId !== '' && (option.dataset.estoqueOrigens || '').split(',').includes(origemId);
+                    const origens = (option.dataset.estoqueOrigens || '')
+                        .split(',')
+                        .map((id) => id.trim())
+                        .filter((id) => id !== '');
+                    const permitido = origemId !== '' && origens.includes(origemId);
                     option.hidden = !permitido;
                     option.disabled = !permitido;
+
+                    if (permitido) {
+                        temFrutaDisponivel = true;
+                    }
                 });
 
                 if (select.selectedOptions.length && select.selectedOptions[0].disabled) {
                     select.value = '';
                 }
 
-                window.AdminSearchSelect?.refresh(select);
+                reinitFrutaSelect(select);
             });
+
+            if (!avisoFruta) {
+                return;
+            }
+
+            if (origemId === '') {
+                avisoFruta.className = 'small mb-2 text-muted';
+                avisoFruta.innerHTML = 'Escolha a <strong>origem física</strong> (não o cliente) para liberar as frutas com estoque nessa unidade.';
+            } else if (!temFrutaDisponivel) {
+                avisoFruta.className = 'small mb-2 text-danger';
+                avisoFruta.textContent = 'Nenhuma fruta com estoque nesta origem física. Verifique o estoque da unidade ou selecione outra origem.';
+            } else {
+                avisoFruta.className = 'small mb-2 text-success';
+                avisoFruta.textContent = 'Frutas liberadas para a origem física selecionada.';
+            }
         };
 
-        origem.addEventListener('change', filtrarFrutasPorOrigem);
-        filtrarFrutasPorOrigem();
+        const onOrigemAlterada = () => {
+            if (wrapper && faturamento) {
+                const selecionada = origem.options[origem.selectedIndex];
+                const origemEhHub = selecionada?.dataset?.isHub === '1';
+
+                wrapper.classList.toggle('d-none', !origemEhHub);
+                faturamento.required = origemEhHub;
+                faturamento.disabled = !origemEhHub;
+
+                if (!origemEhHub) {
+                    faturamento.value = '';
+                }
+
+                window.AdminSearchSelect?.refresh(faturamento);
+            }
+
+            filtrarFrutasPorOrigem();
+        };
+
+        if (origem) {
+            origem.addEventListener('change', onOrigemAlterada);
+
+            if (window.jQuery?.fn?.select2) {
+                window.jQuery(origem).on('change.select2.vendaOrigem', onOrigemAlterada);
+            }
+        }
 
         const container = document.querySelector('[data-items-container="venda"]');
         const addButton = document.querySelector('[data-add-item="venda"]');
@@ -274,5 +323,8 @@
         });
 
         refreshRemoveButtons();
+
+        // Select2 do layout inicia depois deste script; refiltra após init e se origem já veio do old().
+        setTimeout(onOrigemAlterada, 0);
     });
 </script>

@@ -100,6 +100,7 @@ npm-debug.log*
 # Bloqueio defensivo: o storage privado já não sobe, mas se alguém colocar
 # uma planilha real na raiz por engano, ela não vai parar no repositório.
 *.xlsx
+!planilhas/estoques_importacao.xlsx
 *.xls
 *.csv
 *.ods
@@ -112,4 +113,5 @@ npm-debug.log*
 Homestead.json
 Homestead.yaml
 *.~lock*
-planilhas/
+planilhas/*
+!planilhas/estoques_importacao.xlsx

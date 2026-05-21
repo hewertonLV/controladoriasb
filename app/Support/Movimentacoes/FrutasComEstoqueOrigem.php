@@ -6,6 +6,7 @@ use App\Models\Empresa;
 use App\Models\Estoque;
 use App\Models\Fruta;
 use App\Models\UnidadeNegocio;
+use App\Services\Empresas\EmpresaRegistryService;
 use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 
 class FrutasComEstoqueOrigem
@@ -15,6 +16,8 @@ class FrutasComEstoqueOrigem
      */
     public static function listar(): EloquentCollection
     {
+        self::garantirEmpresasParaUnidadesComEstoquePositivo();
+
         $empresaIdsPorFruta = Estoque::query()
             ->select('estoques.id_fruta', 'empresas.id as id_empresa')
             ->join('unidades_negocio', 'unidades_negocio.id', '=', 'estoques.id_unidade_negocio')
@@ -42,6 +45,42 @@ class FrutasComEstoqueOrigem
             ->each(function (Fruta $fruta) use ($empresaIdsPorFruta): void {
                 $fruta->setAttribute('estoque_origem_empresa_ids', $empresaIdsPorFruta->get($fruta->id, []));
             });
+    }
+
+    private static function garantirEmpresasParaUnidadesComEstoquePositivo(): void
+    {
+        $unidadeIds = Estoque::query()
+            ->where(function ($query): void {
+                $query->where('qtd_fruta_um', '>', 0)
+                    ->orWhere('qtd_fruta_kg', '>', 0);
+            })
+            ->distinct()
+            ->pluck('id_unidade_negocio')
+            ->map(fn ($id): int => (int) $id)
+            ->all();
+
+        if ($unidadeIds === []) {
+            return;
+        }
+
+        $unidadesComEmpresa = Empresa::query()
+            ->where('entidade_type', UnidadeNegocio::class)
+            ->whereIn('entidade_id', $unidadeIds)
+            ->pluck('entidade_id')
+            ->map(fn ($id): int => (int) $id)
+            ->all();
+
+        $semEmpresa = array_values(array_diff($unidadeIds, $unidadesComEmpresa));
+
+        if ($semEmpresa === []) {
+            return;
+        }
+
+        $registry = app(EmpresaRegistryService::class);
+
+        foreach (UnidadeNegocio::query()->whereIn('id', $semEmpresa)->get() as $unidade) {
+            $registry->garantirRegistro($unidade, auth()->user());
+        }
     }
 
     /**

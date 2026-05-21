@@ -9,10 +9,14 @@
             <div class="me-auto">
                 <h4 class="header-title mb-0">Importação por planilha Excel</h4>
                 <p class="text-muted mb-0">
-                    Layout fixo (linha 1 é cabeçalho e pode ter qualquer texto):
+                    Posição inicial por loja (unidade) e fruta. Layout fixo — linha 1 é cabeçalho:
                     <code>A</code> ID CIGAM unidade · <code>B</code> ID CIGAM fruta ·
-                    <code>C</code> Qtd (kg) · <code>D</code> Preço médio (kg)
-            </p>
+                    <code>C</code> Qtd (kg) · <code>D</code> Preço médio (R$/kg).
+                    Uma planilha pode trazer várias unidades; após a análise, confirme as linhas desejadas.
+                </p>
+                <p class="text-muted mb-0 small mt-1">
+                    Modelo: <code>planilhas/estoques_importacao.xlsx</code> (exemplo na linha 2).
+                </p>
             </div>
             <a href="{{ route('admin.estoques.index') }}" class="btn btn-light">
                 <i class="ri-arrow-left-line me-1"></i> Voltar para Estoques

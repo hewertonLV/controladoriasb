@@ -23,20 +23,76 @@ class ReplayLinhaTempoEstoqueService
 {
     public function reprocessarUnidadeFruta(int $idUnidadeNegocio, int $idFruta): void
     {
+        $empresaId = $this->empresaIdDaUnidade($idUnidadeNegocio);
+        $eventos = $this->eventos($empresaId, $idFruta);
+        $primeiroEvento = $eventos->first();
+        $baselineId = $primeiroEvento !== null
+            ? (int) ($primeiroEvento['movimentacao']->id_movimentacao_estoque_old ?? 0)
+            : 0;
+
+        $this->executarReplay($idUnidadeNegocio, $idFruta, $eventos, $baselineId);
+    }
+
+    /**
+     * Recompõe estoque após cancelamento administrativo de saída (ex.: venda).
+     * Movimentações posteriores à saída cancelada permanecem; a saída deixa de participar do cálculo.
+     */
+    public function reprocessarUnidadeFrutaAposCancelamentoSaida(int $idUnidadeNegocio, int $idFruta, Movimentacao $saidaCancelada): void
+    {
+        $empresaId = $this->empresaIdDaUnidade($idUnidadeNegocio);
+        $todosEventos = $this->eventos($empresaId, $idFruta);
+        $chaveCancelada = $this->chaveOrdenacao($saidaCancelada);
+
+        $eventosPosteriores = $todosEventos
+            ->filter(fn (array $evento): bool => $this->chaveOrdenacao($evento['movimentacao']) > $chaveCancelada)
+            ->values();
+
+        if ($eventosPosteriores->isEmpty()) {
+            $this->reprocessarUnidadeFruta($idUnidadeNegocio, $idFruta);
+
+            return;
+        }
+
+        $somenteEntradasPosteriores = $eventosPosteriores->every(
+            static fn (array $evento): bool => $evento['tipo'] === 'entrada',
+        );
+
+        $baselineId = $somenteEntradasPosteriores
+            ? (int) ($saidaCancelada->id_movimentacao_estoque_new ?? 0)
+            : (int) ($saidaCancelada->id_movimentacao_estoque_old ?? 0);
+
+        $this->executarReplay(
+            $idUnidadeNegocio,
+            $idFruta,
+            $eventosPosteriores,
+            $baselineId,
+            $somenteEntradasPosteriores,
+        );
+    }
+
+    /**
+     * @param  Collection<int, array{tipo: 'entrada'|'saida', movimentacao: Movimentacao}>  $eventos
+     */
+    private function executarReplay(
+        int $idUnidadeNegocio,
+        int $idFruta,
+        Collection $eventos,
+        int $baselineId,
+        bool $baselineExato = false,
+    ): void
+    {
         $fruta = Fruta::query()->findOrFail($idFruta);
         $kgPorUm = (float) $fruta->kg_por_unidade_medicao;
         if ($kgPorUm <= 0) {
             throw new InvalidArgumentException('Fruta com kg por unidade inválido.');
         }
 
-        $empresaId = $this->empresaIdDaUnidade($idUnidadeNegocio);
         $estoque = Estoque::query()
             ->where('id_unidade_negocio', $idUnidadeNegocio)
             ->where('id_fruta', $idFruta)
             ->lockForUpdate()
             ->firstOrFail();
 
-        $eventos = $this->eventos($empresaId, $idFruta);
         $ids = $eventos->map(static fn (array $e): int => (int) $e['movimentacao']->id)->sort()->values()->all();
         if ($ids !== []) {
             Movimentacao::query()->whereIn('id', $ids)->orderBy('id')->lockForUpdate()->get();
@@ -47,12 +103,18 @@ class ReplayLinhaTempoEstoqueService
             ->where('id_fruta', $idFruta)
             ->update(['status_ultima_posicao' => false]);
 
-        $primeiroEvento = $eventos->first();
-        $baselineId = $primeiroEvento !== null
-            ? (int) ($primeiroEvento['movimentacao']->id_movimentacao_estoque_old ?? 0)
-            : 0;
+        $baseline = $baselineExato && $baselineId > 0
+            ? MovimentacaoEstoque::query()
+                ->whereKey($baselineId)
+                ->where('id_unidade_negocio', $idUnidadeNegocio)
+                ->where('id_fruta', $idFruta)
+                ->lockForUpdate()
+                ->first()
+            : null;
 
-        $baseline = $this->resolverBaselinePorId($baselineId, $idUnidadeNegocio, $idFruta);
+        if ($baseline === null) {
+            $baseline = $this->resolverBaselinePorId($baselineId, $idUnidadeNegocio, $idFruta);
+        }
 
         if ($baseline === null) {
             $baseline = MovimentacaoEstoque::query()
@@ -134,6 +196,19 @@ class ReplayLinhaTempoEstoqueService
             'preco_medio_um' => number_format($precoMedioUm, 2, '.', ''),
             'valor_total_acumulado' => number_format($valorAcumulado, 2, '.', ''),
         ])->save();
+    }
+
+    /**
+     * @return array{0: string, 1: int, 2: int, 3: int}
+     */
+    private function chaveOrdenacao(Movimentacao $movimentacao): array
+    {
+        return [
+            (string) $movimentacao->data_movimentacao,
+            (int) ($movimentacao->movimentacao_origem_id ?? $movimentacao->id),
+            (int) $movimentacao->versao,
+            (int) $movimentacao->id,
+        ];
     }
 
     /**
@@ -232,17 +307,7 @@ class ReplayLinhaTempoEstoqueService
             ->concat($saidasVenda)
             ->concat($saidasTransferencia)
             ->concat($saidasConversao)
-            ->sortBy(static function (array $evento): array {
-                /** @var Movimentacao $m */
-                $m = $evento['movimentacao'];
-
-                return [
-                    (string) $m->data_movimentacao,
-                    (int) ($m->movimentacao_origem_id ?? $m->id),
-                    (int) $m->versao,
-                    (int) $m->id,
-                ];
-            })
+            ->sortBy(fn (array $evento): array => $this->chaveOrdenacao($evento['movimentacao']))
             ->values();
     }
 

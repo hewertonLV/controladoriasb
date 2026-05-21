@@ -5,12 +5,14 @@ namespace Tests\Feature\Admin\Movimentacoes;
 use App\Enums\FreteStatusSituacao;
 use App\Enums\Permissions;
 use App\Models\Cliente;
+use App\Models\Empresa;
 use App\Models\Estado;
 use App\Models\Estoque;
 use App\Models\Fornecedor;
 use App\Models\Frete;
 use App\Models\Fruta;
 use App\Models\UnidadeNegocio;
+use App\Support\Movimentacoes\FrutasComEstoqueOrigem;
 use Database\Seeders\CategoriaDescarteSeeder;
 use Database\Seeders\CategoriaMovimentacaoSeeder;
 use Database\Seeders\EstadoSeeder;
@@ -54,6 +56,7 @@ class FrutasEstoqueOrigemSelectTest extends TestCase
         ];
 
         foreach ($rotas as [$rota, $permissao]) {
+            $assertVenda = str_contains($rota, 'vendas');
             $html = $this->actingAs($this->userWithPermissions([$permissao]))
                 ->get($rota)
                 ->assertOk()
@@ -66,7 +69,51 @@ class FrutasEstoqueOrigemSelectTest extends TestCase
                 sprintf('value="%d" data-estoque-origens="%d"', $banana->id, $origemComBanana->registroCorporativo()->firstOrFail()->id),
                 (string) $html,
             );
+
+            if ($assertVenda) {
+                $this->assertStringContainsString('origem física', strtolower((string) $html));
+                $this->assertStringContainsString('não do cliente', strtolower((string) $html));
+            }
         }
+    }
+
+    public function test_listar_vincula_empresa_quando_unidade_com_estoque_nao_tem_registro_corporativo(): void
+    {
+        $this->seedBase();
+
+        $unidade = UnidadeNegocio::factory()->create([
+            'nome' => 'UNIDADE SEM EMPRESA ESTOQUE',
+            'possui_estoque' => true,
+            'id_estado' => Estado::ID_CEARA,
+        ]);
+        Empresa::query()
+            ->where('entidade_type', UnidadeNegocio::class)
+            ->where('entidade_id', $unidade->id)
+            ->forceDelete();
+
+        $fruta = Fruta::factory()->create([
+            'nome' => 'FRUTA EMPRESA LAZY',
+            'kg_por_unidade_medicao' => 10,
+        ]);
+        Estoque::factory()->create([
+            'id_unidade_negocio' => $unidade->id,
+            'id_fruta' => $fruta->id,
+            'qtd_fruta_um' => '2.00',
+            'qtd_fruta_kg' => '20.00',
+            'preco_medio_um' => '10.00',
+            'preco_medio_kg' => '1.00',
+            'valor_total_acumulado' => '20.00',
+        ]);
+
+        $frutas = FrutasComEstoqueOrigem::listar();
+
+        $this->assertCount(1, $frutas);
+        $empresa = Empresa::query()
+            ->where('entidade_type', UnidadeNegocio::class)
+            ->where('entidade_id', $unidade->id)
+            ->first();
+        $this->assertNotNull($empresa);
+        $this->assertContains($empresa->id, $frutas->first()->estoque_origem_empresa_ids);
     }
 
     public function test_compra_continua_listando_frutas_mesmo_sem_estoque_de_origem(): void

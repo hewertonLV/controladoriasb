@@ -188,6 +188,53 @@ class VendaMovimentacaoTest extends TestCase
         $this->assertSame('60.00', (string) $venda->valor_icms_um);
     }
 
+    public function test_cancelamento_venda_restitui_estoque_quando_nao_ha_movimentacao_posterior(): void
+    {
+        $this->seedBase();
+        $c = $this->cenarioBase();
+
+        $this->registrarCompra($c, '10', '500,00');
+        $venda = $this->registrarVenda($c, '2', '300,00');
+
+        $this->assertEstoque($c['unidade'], $c['fruta'], '80.00', '8.00', '5.00', '50.00', '400.00');
+
+        $this->cancelarVendaAdmin($venda);
+
+        $this->assertEstoque($c['unidade'], $c['fruta'], '100.00', '10.00', '5.00', '50.00', '500.00');
+    }
+
+    public function test_cancelamento_venda_com_compra_posterior_nao_infla_estoque(): void
+    {
+        $this->seedBase();
+        $c = $this->cenarioBase();
+
+        $this->registrarCompra($c, '10', '500,00');
+        $venda = $this->registrarVenda($c, '2', '300,00');
+        $this->registrarCompra($c, '3', '150,00');
+
+        $this->assertEstoque($c['unidade'], $c['fruta'], '110.00', '11.00', '5.00', '50.00', '550.00');
+
+        $this->cancelarVendaAdmin($venda);
+
+        $this->assertEstoque($c['unidade'], $c['fruta'], '110.00', '11.00', '5.00', '50.00', '550.00');
+    }
+
+    public function test_cancelamento_venda_com_venda_posterior_recompoe_estoque(): void
+    {
+        $this->seedBase();
+        $c = $this->cenarioBase();
+
+        $this->registrarCompra($c, '10', '500,00');
+        $venda1 = $this->registrarVenda($c, '2', '300,00');
+        $this->registrarVenda($c, '1', '150,00');
+
+        $this->assertEstoque($c['unidade'], $c['fruta'], '70.00', '7.00', '5.00', '50.00', '350.00');
+
+        $this->cancelarVendaAdmin($venda1);
+
+        $this->assertEstoque($c['unidade'], $c['fruta'], '90.00', '9.00', '5.00', '50.00', '450.00');
+    }
+
     public function test_cancelamento_individual_de_item_da_venda_nao_cancela_demais_frutas(): void
     {
         $this->seedBase();

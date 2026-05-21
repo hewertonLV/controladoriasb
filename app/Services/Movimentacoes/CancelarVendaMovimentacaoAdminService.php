@@ -84,8 +84,6 @@ final class CancelarVendaMovimentacaoAdminService
                     $fretes[(int) $mov->id_frete] = (int) $mov->id_frete;
                 }
 
-                $this->vendaMovimentacao->estornarVendaNoEstoqueOrigem($mov);
-
                 $mov->forceFill([
                     'status_registro' => MovimentacaoStatusRegistro::CANCELADO->value,
                     'cancelada_por' => $user->id,
