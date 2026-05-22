@@ -7,6 +7,7 @@ use App\Enums\FreteStatusSituacao;
 use App\Enums\Roles;
 use App\Enums\TipoDevolucao;
 use App\Models\Cliente;
+use App\Models\Estoque;
 use App\Models\Estado;
 use App\Models\Fornecedor;
 use App\Models\Frete;
@@ -292,8 +293,29 @@ class DashboardFinanceiroTest extends TestCase
     /**
      * @param  array<string, mixed>  $cenario
      */
+    private function garantirEstoqueOrigem(array $cenario, string $qtdMinima = '100'): void
+    {
+        $temEstoque = Estoque::query()
+            ->where('id_unidade_negocio', $cenario['unidade']->id)
+            ->where('id_fruta', $cenario['fruta']->id)
+            ->where(function ($query): void {
+                $query->where('qtd_fruta_um', '>', 0)
+                    ->orWhere('qtd_fruta_kg', '>', 0);
+            })
+            ->exists();
+
+        if (! $temEstoque) {
+            $this->registrarCompra($cenario, $qtdMinima, '1000,00');
+        }
+    }
+
+    /**
+     * @param  array<string, mixed>  $cenario
+     */
     private function registrarVenda(array $cenario, string $qtdUm, string $valorNfTotal): Movimentacao
     {
+        $this->garantirEstoqueOrigem($cenario);
+
         $this->actingAs($this->movimentacoesVendasUsuario())->postJson(route('admin.movimentacoes.vendas.store'), [
             'numero_nf' => 'NF-VENDA-'.uniqid(),
             'id_empresa_origem' => $cenario['empresa_unidade']->id,
