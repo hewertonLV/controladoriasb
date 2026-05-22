@@ -934,6 +934,10 @@ Route::middleware(['auth', 'verified', 'user.active', 'password.changed'])->grou
                 ->middleware('permission:movimentacoes.transferencias.receber')
                 ->name('recebimento.store');
 
+            Route::post('/{transferenciaOrigem}/vincular-frete', [TransferenciaMovimentacaoController::class, 'vincularFrete'])
+                ->middleware('permission:movimentacoes.transferencias.editar')
+                ->name('vincular-frete');
+
             Route::post('/{transferenciaOrigem}/reenviar', [TransferenciaMovimentacaoController::class, 'reenviar'])
                 ->middleware('permission:movimentacoes.transferencias.reenviar')
                 ->name('reenviar');

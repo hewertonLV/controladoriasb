@@ -214,6 +214,8 @@ final class Permissions
 
     public const MOVIMENTACOES_TRANSFERENCIAS_IMPORTAR_CONFIRMAR = 'movimentacoes.transferencias.importar-confirmar';
 
+    public const MOVIMENTACOES_TRANSFERENCIAS_EDITAR = 'movimentacoes.transferencias.editar';
+
     public const MOVIMENTACOES_DOACOES_VISUALIZAR = 'movimentacoes.doacoes.visualizar';
 
     public const MOVIMENTACOES_DOACOES_CRIAR = 'movimentacoes.doacoes.criar';
@@ -429,6 +431,7 @@ final class Permissions
                 self::MOVIMENTACOES_TRANSFERENCIAS_CRIAR,
                 self::MOVIMENTACOES_TRANSFERENCIAS_IMPORTAR,
                 self::MOVIMENTACOES_TRANSFERENCIAS_IMPORTAR_CONFIRMAR,
+                self::MOVIMENTACOES_TRANSFERENCIAS_EDITAR,
                 self::MOVIMENTACOES_TRANSFERENCIAS_RECEBER,
                 self::MOVIMENTACOES_TRANSFERENCIAS_REENVIAR,
                 self::MOVIMENTACOES_TRANSFERENCIAS_CANCELAR,

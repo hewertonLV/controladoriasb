@@ -4,7 +4,9 @@
 
     $anchor = $saida->transferencia_origem_id;
     $pendente = ($entrada->status_transferencia ?? '') === StatusTransferenciaOperacional::PENDENTE_RECEBIMENTO->value;
+    $conforme = ($entrada->status_transferencia ?? '') === StatusTransferenciaOperacional::RECEBIDA_CONFORME->value;
     $divergente = ($entrada->status_transferencia ?? '') === StatusTransferenciaOperacional::RECEBIDA_DIVERGENTE->value;
+    $podeVincularFrete = $pendente || $conforme;
 @endphp
 
 @extends('layouts.app')
@@ -62,6 +64,53 @@
             </div>
         </div>
     </div>
+
+    @if ($podeVincularFrete)
+        @can('movimentacoes.transferencias.editar')
+            <div class="card mt-3">
+                <div class="card-header">
+                    <h5 class="mb-0">Frete da transferência</h5>
+                </div>
+                <div class="card-body">
+                    <p class="text-muted small mb-3">
+                        Vincule ou altere o frete mesmo após o recebimento conforme.
+                        O sistema recalcula o rateio no frete e, quando já recebida conforme,
+                        reprocessa os lançamentos posteriores de estoque no destino.
+                    </p>
+                    <p class="mb-3 small">
+                        <strong>Frete atual:</strong>
+                        {{ $saida->frete?->nome ?? 'Sem frete' }}
+                        @if ($saida->frete)
+                            — R$ {{ number_format((float) $saida->frete->valor, 2, ',', '.') }}
+                            · rateio R$ {{ number_format((float) $saida->valor_frete_rateio, 2, ',', '.') }}
+                        @endif
+                    </p>
+                    <form method="POST"
+                          action="{{ route('admin.movimentacoes.transferencias.vincular-frete', ['transferenciaOrigem' => $anchor]) }}"
+                          class="row g-3 align-items-end">
+                        @csrf
+                        <div class="col-md-8">
+                            <label for="id_frete_vincular" class="form-label">Frete (ABERTO)</label>
+                            <select name="id_frete" id="id_frete_vincular" class="form-select @error('id_frete') is-invalid @enderror" data-search-select data-placeholder="Selecione ou pesquise o frete">
+                                <option value="">Sem frete</option>
+                                @foreach ($fretes ?? [] as $frete)
+                                    <option value="{{ $frete->id }}" @selected((string) old('id_frete', $saida->id_frete) === (string) $frete->id)>
+                                        {{ $frete->nome }} — R$ {{ number_format((float) $frete->valor, 2, ',', '.') }}
+                                    </option>
+                                @endforeach
+                            </select>
+                            @error('id_frete')<div class="invalid-feedback d-block">{{ $message }}</div>@enderror
+                        </div>
+                        <div class="col-md-4 d-grid">
+                            <button type="submit" class="btn btn-primary">
+                                <i class="ri-truck-line me-1"></i> Atualizar frete
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        @endcan
+    @endif
 
     @if ($pendente)
         @can('movimentacoes.transferencias.receber')

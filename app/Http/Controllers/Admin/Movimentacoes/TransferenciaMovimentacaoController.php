@@ -5,12 +5,16 @@ namespace App\Http\Controllers\Admin\Movimentacoes;
 use App\Actions\Movimentacoes\Transferencia\CancelarTransferenciaAction;
 use App\Actions\Movimentacoes\Transferencia\CriarTransferenciaMovimentacaoAction;
 use App\Actions\Movimentacoes\Transferencia\ReenviarTransferenciaAction;
+use App\Actions\Movimentacoes\Transferencia\VincularFreteTransferenciaAction;
 use App\Enums\CategoriaMovimentacaoTipo;
 use App\Enums\MovimentacaoStatusRegistro;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Admin\Movimentacoes\CancelarTransferenciaRequest;
 use App\Http\Requests\Admin\Movimentacoes\ReenviarTransferenciaRequest;
+use App\Http\Requests\Admin\Movimentacoes\VincularFreteTransferenciaRequest;
 use App\Http\Requests\Admin\Movimentacoes\StoreTransferenciaMovimentacaoRequest;
+use App\Enums\FreteStatusSituacao;
+use App\Models\Frete;
 use App\Models\Movimentacao;
 use App\Models\StatusMovimentacao;
 use App\Services\Movimentacoes\TransferenciaMovimentacaoService;
@@ -102,7 +106,41 @@ class TransferenciaMovimentacaoController extends Controller
         return view('admin.movimentacoes.transferencias.show', [
             'saida' => $saida,
             'entrada' => $entrada,
+            'fretes' => Frete::query()
+                ->where('status_situacao', FreteStatusSituacao::ABERTA->value)
+                ->orderBy('nome')
+                ->get(),
         ]);
+    }
+
+    public function vincularFrete(
+        VincularFreteTransferenciaRequest $request,
+        Movimentacao $transferenciaOrigem,
+        VincularFreteTransferenciaAction $vincular,
+    ): JsonResponse|RedirectResponse {
+        $anchor = (int) $transferenciaOrigem->transferencia_origem_id;
+
+        try {
+            $vincular($request, $anchor);
+        } catch (InvalidArgumentException $e) {
+            if ($request->expectsJson()) {
+                throw ValidationException::withMessages([
+                    'id_frete' => $e->getMessage(),
+                ]);
+            }
+
+            return back()
+                ->withInput()
+                ->withErrors(['id_frete' => $e->getMessage()]);
+        }
+
+        if ($request->expectsJson()) {
+            return response()->json(['message' => 'Frete atualizado e lançamentos recalculados.']);
+        }
+
+        return redirect()
+            ->route('admin.movimentacoes.transferencias.show', ['transferenciaOrigem' => $anchor])
+            ->with('success', 'Frete atualizado. Rateio e estoque do destino foram recalculados quando aplicável.');
     }
 
     public function reenviar(

@@ -290,6 +290,68 @@ class TransferenciaMovimentacaoTest extends TestCase
         $this->assertSame('0.00', (string) $saida->valor_frete_rateio);
     }
 
+    public function test_vincular_frete_apos_recebimento_conforme_recalcula_entrada_e_estoque_destino(): void
+    {
+        $this->seedCategoriasEEstados();
+
+        [$empresaOrigem, $empresaDestino, , $unidadeDestino, $fruta] = $this->criarCenarioTransferencia();
+        $frete = Frete::factory()->create(['valor' => '100.00']);
+        $user = $this->userWithPermissions([
+            Permissions::MOVIMENTACOES_TRANSFERENCIAS_CRIAR,
+            Permissions::MOVIMENTACOES_TRANSFERENCIAS_RECEBER,
+            Permissions::MOVIMENTACOES_TRANSFERENCIAS_EDITAR,
+        ]);
+
+        $this->actingAs($user)->post(route('admin.movimentacoes.transferencias.store'), [
+            'id_empresa_origem' => $empresaOrigem->id,
+            'id_empresa_destino' => $empresaDestino->id,
+            'id_fruta' => $fruta->id,
+            'qtd_fruta_um' => '10',
+        ])->assertRedirect();
+
+        $saida = Movimentacao::query()
+            ->where('status_movimentacao_id', StatusMovimentacao::ID_SAIDA)
+            ->where('categoria_movimentacao_id', CategoriaMovimentacaoTipo::Transferencia->value)
+            ->firstOrFail();
+        $anchor = (int) $saida->transferencia_origem_id;
+
+        $this->actingAs($user)->post(
+            route('admin.movimentacoes.transferencias.recebimento.store', ['transferenciaOrigem' => $anchor]),
+            [
+                'status_recebimento' => StatusRecebimentoTransferencia::CONFORME->value,
+                'qtd_recebida_um' => '10',
+            ],
+        )->assertRedirect();
+
+        $entradaAntes = Movimentacao::query()
+            ->where('status_movimentacao_id', StatusMovimentacao::ID_ENTRADA)
+            ->where('transferencia_origem_id', $anchor)
+            ->where('status_registro', MovimentacaoStatusRegistro::ATIVO->value)
+            ->firstOrFail();
+
+        $precoEntradaAntes = (float) $entradaAntes->preco_medio_fruta_kg;
+
+        $this->actingAs($user)->post(
+            route('admin.movimentacoes.transferencias.vincular-frete', ['transferenciaOrigem' => $anchor]),
+            ['id_frete' => $frete->id],
+        )->assertRedirect();
+
+        $saida->refresh();
+        $entrada = $entradaAntes->fresh();
+
+        $this->assertSame($frete->id, (int) $saida->id_frete);
+        $this->assertSame($frete->id, (int) $entrada->id_frete);
+        $this->assertGreaterThan(0.0, (float) $saida->valor_frete_rateio);
+        $this->assertGreaterThan($precoEntradaAntes, (float) $entrada->preco_medio_fruta_kg);
+
+        $estoqueDestino = Estoque::query()
+            ->where('id_unidade_negocio', $unidadeDestino->id)
+            ->where('id_fruta', $fruta->id)
+            ->firstOrFail();
+
+        $this->assertGreaterThan(0.0, (float) $estoqueDestino->preco_medio_kg);
+    }
+
     public function test_recebimento_conforme_entra_no_estoque_destino(): void
     {
         $this->seedCategoriasEEstados();

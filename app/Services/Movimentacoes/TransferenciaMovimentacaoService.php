@@ -34,6 +34,7 @@ final class TransferenciaMovimentacaoService
 {
     public function __construct(
         private readonly ReconciliacaoTransferenciaService $reconciliacao,
+        private readonly ReplayLinhaTempoEstoqueService $replayLinhaTempoEstoque,
     ) {}
 
     /**
@@ -179,6 +180,73 @@ final class TransferenciaMovimentacaoService
             ])->saveQuietly();
 
             return ['saida' => $saidaNova->fresh(), 'entrada' => $entradaNova->fresh()];
+        });
+    }
+
+    /**
+     * Vincula, altera ou remove frete em transferência pendente ou recebida conforme.
+     * Recalcula rateio do(s) frete(s) afetado(s) e reprocessa estoque do destino quando já recebida conforme (ADR-0003).
+     *
+     * @param  array{id_frete?:int|null}  $input
+     */
+    public function vincularFrete(int $transferenciaOrigemId, array $input): void
+    {
+        DB::transaction(function () use ($transferenciaOrigemId, $input): void {
+            ['saida' => $saida, 'entrada' => $entrada] = $this->obterParAtivoPorTransferenciaOrigemId($transferenciaOrigemId);
+
+            $statusAtual = (string) $entrada->status_transferencia;
+            $statusPermitidos = [
+                StatusTransferenciaOperacional::PENDENTE_RECEBIMENTO->value,
+                StatusTransferenciaOperacional::RECEBIDA_CONFORME->value,
+            ];
+
+            if (! in_array($statusAtual, $statusPermitidos, true)) {
+                throw new InvalidArgumentException(
+                    'Vincular frete só é permitido para transferência pendente de recebimento ou recebida conforme.',
+                );
+            }
+
+            $freteAntigoId = $saida->id_frete !== null ? (int) $saida->id_frete : null;
+            $idFreteNovo = isset($input['id_frete']) && $input['id_frete'] !== null && (int) $input['id_frete'] > 0
+                ? (int) $input['id_frete']
+                : null;
+
+            if ($freteAntigoId === $idFreteNovo) {
+                return;
+            }
+
+            $freteNovo = $this->resolverFreteOpcional($idFreteNovo);
+
+            $saida->forceFill(['id_frete' => $freteNovo?->id]);
+            $entrada->forceFill(['id_frete' => $freteNovo?->id]);
+            $saida->saveQuietly();
+            $entrada->saveQuietly();
+
+            $saida = $saida->fresh();
+            $entrada = $entrada->fresh();
+
+            $idsFreteRecalc = array_values(array_unique(array_filter([
+                $freteAntigoId,
+                $freteNovo?->id,
+            ])));
+
+            foreach ($idsFreteRecalc as $idFrete) {
+                $this->reconciliacao->recalcularRateioFreteParaTransferencias($idFrete);
+            }
+
+            if ($freteNovo === null) {
+                $this->aplicarFreteZeroNoPar($saida, $entrada);
+
+                if ($statusAtual === StatusTransferenciaOperacional::RECEBIDA_CONFORME->value) {
+                    $unidadeDestino = $this->unidadeDaEmpresa(
+                        Empresa::query()->findOrFail((int) $entrada->id_empresa_destino),
+                    );
+                    $this->replayLinhaTempoEstoque->reprocessarUnidadeFruta(
+                        $unidadeDestino->id,
+                        (int) $entrada->id_fruta,
+                    );
+                }
+            }
         });
     }
 
@@ -552,6 +620,39 @@ final class TransferenciaMovimentacaoService
                 sprintf('Empresa «%d» deve ser do tipo %s.', $empresa->id, $tipo->rotulo()),
             );
         }
+    }
+
+    private function aplicarFreteZeroNoPar(Movimentacao $saida, Movimentacao $entrada): void
+    {
+        $fruta = Fruta::query()->findOrFail((int) $entrada->id_fruta);
+        $kgPorUm = (float) $fruta->kg_por_unidade_medicao;
+        $precoEntradaKg = round(
+            (float) $saida->preco_medio_fruta_kg
+            + (float) $entrada->valor_custo_operacional
+            + (float) $entrada->icms_convertido_kg,
+            2,
+        );
+        $precoEntradaUm = round($precoEntradaKg * $kgPorUm, 2);
+        $valorEntradaTotal = round($precoEntradaKg * (float) $entrada->qtd_fruta_kg, 2);
+        $qtdUm = (float) $entrada->qtd_fruta_um;
+
+        $saida->forceFill([
+            'valor_frete_kg' => '0.00',
+            'valor_frete_rateio' => '0.00',
+            'valor_frete_um' => '0.00',
+        ])->saveQuietly();
+
+        $entrada->forceFill([
+            'valor_nf_total' => number_format($valorEntradaTotal, 2, '.', ''),
+            'valor_nf_kg' => number_format($precoEntradaKg, 2, '.', ''),
+            'valor_nf_um' => number_format($qtdUm > 0 ? $valorEntradaTotal / $qtdUm : 0, 2, '.', ''),
+            'valor_frete_kg' => '0.00',
+            'valor_frete_rateio' => '0.00',
+            'valor_frete_um' => '0.00',
+            'preco_medio_fruta_kg' => number_format($precoEntradaKg, 2, '.', ''),
+            'preco_medio_fruta_um' => number_format($precoEntradaUm, 2, '.', ''),
+            'valor_total_movimentacao' => number_format($valorEntradaTotal, 2, '.', ''),
+        ])->saveQuietly();
     }
 
     private function resolverFreteOpcional(?int $idFrete): ?Frete
