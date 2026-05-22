@@ -2,9 +2,9 @@
 
 namespace App\Http\Middleware;
 
+use App\Support\DynamicAppUrl;
 use Closure;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\URL;
 use Symfony\Component\HttpFoundation\Response;
 
 /**
@@ -16,7 +16,7 @@ class UseRequestRootUrl
     public function handle(Request $request, Closure $next): Response
     {
         if ($request->getHost() !== '') {
-            URL::forceRootUrl($request->getSchemeAndHttpHost());
+            DynamicAppUrl::apply($request);
         }
 
         return $next($request);

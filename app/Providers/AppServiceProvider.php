@@ -29,6 +29,7 @@ use App\Services\Movimentacoes\ReplayEstoqueDoacaoService;
 use App\Services\Movimentacoes\ReplayEstoqueTransferenciaService;
 use App\Services\Dashboard\DashboardStatsService;
 use App\Services\Movimentacoes\ReplayEstoqueVendaService;
+use App\Support\DynamicAppUrl;
 use Illuminate\Pagination\Paginator;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Route;
@@ -49,6 +50,8 @@ class AppServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
+        DynamicAppUrl::apply();
+
         // O projeto usa o tema Highdmin (Bootstrap 5). O paginator padrão
         // do Laravel renderiza markup Tailwind (com SVGs grandes para
         // anterior/próximo), que fica desalinhado. Aqui forçamos o template

@@ -22,6 +22,12 @@ Sistema interno (Laravel 13 + MySQL + Highdmin/Bootstrap) integrado ao ERP CIGAM
 | MySQL | `44433` |
 | phpMyAdmin | `44434` |
 
+### URL da aplicação (`APP_URL`)
+
+Deixe `APP_URL` **vazio** no `.env`. A aplicação usa automaticamente o endereço que você
+digitar no navegador (IP ou hostname + porta). Não é necessário alterar código ao mudar o IP
+do servidor. Só preencha `APP_URL` se precisar forçar um domínio fixo (ex.: HTTPS público).
+
 ## Ambiente de desenvolvimento
 
 ```bash

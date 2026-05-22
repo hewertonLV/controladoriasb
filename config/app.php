@@ -52,7 +52,8 @@ return [
     |
     */
 
-    'url' => env('APP_URL', 'http://localhost'),
+    // Vazio = DynamicAppUrl detecta host da requisição ou IPv4 local + APP_PORT.
+    'url' => env('APP_URL') ?: 'http://localhost',
 
     /*
     |--------------------------------------------------------------------------
