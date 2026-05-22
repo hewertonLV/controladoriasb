@@ -1,4 +1,5 @@
 @php
+    use App\Enums\FrutaUnidadeMedicao;
     /** @var \Illuminate\Support\Collection<int, \App\Models\Fruta>|\Illuminate\Database\Eloquent\Collection<int, \App\Models\Fruta> $frutas */
     $linhas = $frutas;
 @endphp
@@ -24,7 +25,10 @@
                     </td>
                     <td><span class="fw-semibold">{{ $fruta->nome }}</span></td>
                     <td>{{ $fruta->unidade_medicao }}</td>
-                    <td data-order="{{ (float) $fruta->kg_por_unidade_medicao }}">{{ number_format((float) $fruta->kg_por_unidade_medicao, 2, ',', '.') }}</td>
+                    @php
+                        $casasKg = FrutaUnidadeMedicao::tryFrom((string) $fruta->unidade_medicao)?->casasDecimaisKg() ?? 2;
+                    @endphp
+                    <td data-order="{{ (float) $fruta->kg_por_unidade_medicao }}">{{ number_format((float) $fruta->kg_por_unidade_medicao, $casasKg, ',', '.') }}</td>
                     <td>
                         <span class="badge bg-light text-muted">{{ (int) ($fruta->icms_count ?? 0) }} registro(s)</span>
                         <span class="text-muted small d-block">Por estado</span>

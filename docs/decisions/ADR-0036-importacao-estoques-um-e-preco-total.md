@@ -27,6 +27,8 @@ O sistema deriva antes de gravar:
 
 Preview compara posição existente por UM e valor total acumulado.
 
+Quantidade na UM pode ser **negativa, zero ou positiva** na importação; ver ADR-0045.
+
 ## Alternativas consideradas
 
 - Manter kg e R$/kg na planilha — rejeitado; não reflete como a operação lança o estoque inicial.

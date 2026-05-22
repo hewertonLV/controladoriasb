@@ -33,6 +33,34 @@ class EstoqueMovimentacaoTest extends TestCase
         $this->assertSame('250.00', (string) $estoque->valor_total_acumulado);
     }
 
+    public function test_definir_posicao_absoluta_zerada(): void
+    {
+        $unidade = UnidadeNegocio::factory()->create(['possui_estoque' => true]);
+        $fruta = Fruta::factory()->create(['kg_por_unidade_medicao' => '10.00']);
+
+        $service = app(EstoqueMovimentacaoService::class);
+        $service->definirPosicaoAbsoluta($unidade, $fruta, '0', '0');
+
+        $estoque = $unidade->estoques()->where('id_fruta', $fruta->id)->firstOrFail();
+        $this->assertSame('0.00', (string) $estoque->qtd_fruta_kg);
+        $this->assertSame('0.00', (string) $estoque->qtd_fruta_um);
+        $this->assertSame('0.00', (string) $estoque->valor_total_acumulado);
+    }
+
+    public function test_definir_posicao_absoluta_negativa(): void
+    {
+        $unidade = UnidadeNegocio::factory()->create(['possui_estoque' => true]);
+        $fruta = Fruta::factory()->create(['kg_por_unidade_medicao' => '10.00']);
+
+        $service = app(EstoqueMovimentacaoService::class);
+        $service->definirPosicaoAbsoluta($unidade, $fruta, '-20', '5');
+
+        $estoque = $unidade->estoques()->where('id_fruta', $fruta->id)->firstOrFail();
+        $this->assertSame('-20.00', (string) $estoque->qtd_fruta_kg);
+        $this->assertSame('-2.00', (string) $estoque->qtd_fruta_um);
+        $this->assertSame('-100.00', (string) $estoque->valor_total_acumulado);
+    }
+
     public function test_movimentar_requer_permissao(): void
     {
         $unidade = UnidadeNegocio::factory()->create(['possui_estoque' => true]);

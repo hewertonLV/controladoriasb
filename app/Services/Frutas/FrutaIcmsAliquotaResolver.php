@@ -70,6 +70,10 @@ class FrutaIcmsAliquotaResolver
      */
     public function mapaParaFormulario(Fruta $fruta, int $idEstado): array
     {
+        if ($fruta->id === null) {
+            return FrutaIcmsLinhaFormulario::vazia();
+        }
+
         $linha = FrutaIcmsLinhaFormulario::vazia();
         $aliquotas = $this->listarPorFrutaEstado($fruta->id, $idEstado);
 

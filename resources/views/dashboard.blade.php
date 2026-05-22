@@ -18,10 +18,10 @@
     <div class="card mb-3">
         <div class="card-body">
             <div class="row g-3 align-items-end mb-3">
-                @include('layouts.partials.dashboard-filtro-mes', [
+                @include('layouts.partials.dashboard-filtro-periodo', [
                     'mesAtual' => $mesAtual,
-                    'inputId' => 'dashboard-mes',
-                    'botaoId' => 'dashboard-buscar-mes',
+                    'diaAtual' => $diaAtual,
+                    'periodoTipoInicial' => $periodoTipoInicial,
                 ])
             </div>
 

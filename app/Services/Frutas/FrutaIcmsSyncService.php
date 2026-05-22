@@ -73,7 +73,9 @@ class FrutaIcmsSyncService
      */
     public function mapaParaFormulario(Fruta $fruta): array
     {
-        $fruta->loadMissing('icmsAliquotas');
+        if ($fruta->id !== null) {
+            $fruta->loadMissing('icmsAliquotas');
+        }
 
         $mapa = [];
         $resolver = app(FrutaIcmsAliquotaResolver::class);

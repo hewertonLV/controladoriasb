@@ -36,10 +36,13 @@ use App\Http\Controllers\Admin\Movimentacoes\CompraMovimentacaoController;
 use App\Http\Controllers\Admin\Movimentacoes\ConversaoEmbalagemMovimentacaoController;
 use App\Http\Controllers\Admin\Movimentacoes\DescarteMovimentacaoController;
 use App\Http\Controllers\Admin\Movimentacoes\DevolucaoMovimentacaoController;
+use App\Http\Controllers\Admin\Movimentacoes\CancelarEntradaEstoqueMovimentacaoAdminController;
 use App\Http\Controllers\Admin\Movimentacoes\DoacaoMovimentacaoController;
+use App\Http\Controllers\Admin\Movimentacoes\EntradaEstoqueMovimentacaoController;
 use App\Http\Controllers\Admin\Movimentacoes\RecebimentoTransferenciaController;
 use App\Http\Controllers\Admin\Movimentacoes\TransferenciaImportacaoController;
 use App\Http\Controllers\Admin\Movimentacoes\TransferenciaMovimentacaoController;
+use App\Http\Controllers\Admin\Movimentacoes\VendaImportacaoController;
 use App\Http\Controllers\Admin\Movimentacoes\VendaMovimentacaoController;
 use App\Http\Controllers\Admin\PracaController;
 use App\Http\Controllers\Admin\PracaExportacaoController;
@@ -981,6 +984,28 @@ Route::middleware(['auth', 'verified', 'user.active', 'password.changed'])->grou
                 ->name('cancelar-admin');
         });
 
+        Route::prefix('movimentacoes/entradas-estoque')->name('movimentacoes.entradas-estoque.')->group(function () {
+            Route::get('/', [EntradaEstoqueMovimentacaoController::class, 'index'])
+                ->middleware('permission:movimentacoes.entradas-estoque.visualizar')
+                ->name('index');
+
+            Route::get('/criar', [EntradaEstoqueMovimentacaoController::class, 'create'])
+                ->middleware('permission:movimentacoes.entradas-estoque.criar')
+                ->name('create');
+
+            Route::post('/', [EntradaEstoqueMovimentacaoController::class, 'store'])
+                ->middleware('permission:movimentacoes.entradas-estoque.criar')
+                ->name('store');
+
+            Route::get('/{movimentacaoEntradaEstoque}', [EntradaEstoqueMovimentacaoController::class, 'show'])
+                ->middleware('permission:movimentacoes.entradas-estoque.visualizar')
+                ->name('show');
+
+            Route::post('/{movimentacaoEntradaEstoque}/cancelar-admin', CancelarEntradaEstoqueMovimentacaoAdminController::class)
+                ->middleware('role_or_permission:Administrador|movimentacoes.entradas-estoque.cancelar-admin')
+                ->name('cancelar-admin');
+        });
+
         Route::prefix('movimentacoes/descartes')->name('movimentacoes.descartes.')->group(function () {
             Route::get('/', [DescarteMovimentacaoController::class, 'index'])
                 ->middleware('permission:movimentacoes.descartes.visualizar')
@@ -1015,6 +1040,26 @@ Route::middleware(['auth', 'verified', 'user.active', 'password.changed'])->grou
             Route::get('/', [VendaMovimentacaoController::class, 'index'])
                 ->middleware('permission:movimentacoes.vendas.visualizar')
                 ->name('index');
+
+            Route::get('/importar', [VendaImportacaoController::class, 'importar'])
+                ->middleware('permission:movimentacoes.vendas.importar')
+                ->name('importar');
+
+            Route::post('/importar/iniciar', [VendaImportacaoController::class, 'iniciar'])
+                ->middleware('permission:movimentacoes.vendas.importar')
+                ->name('importar.iniciar');
+
+            Route::get('/importar/{importacao:uuid}/status', [VendaImportacaoController::class, 'status'])
+                ->middleware('permission:movimentacoes.vendas.importar')
+                ->name('importar.status');
+
+            Route::get('/importar/{importacao:uuid}/resultado', [VendaImportacaoController::class, 'resultado'])
+                ->middleware('permission:movimentacoes.vendas.importar')
+                ->name('importar.resultado');
+
+            Route::post('/importar/{importacao:uuid}/confirmar', [VendaImportacaoController::class, 'confirmar'])
+                ->middleware('permission:movimentacoes.vendas.importar-confirmar')
+                ->name('importar.confirmar');
 
             Route::get('/criar', [VendaMovimentacaoController::class, 'create'])
                 ->middleware('permission:movimentacoes.vendas.criar')

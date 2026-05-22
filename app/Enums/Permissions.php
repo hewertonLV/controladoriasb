@@ -224,6 +224,12 @@ final class Permissions
 
     public const MOVIMENTACOES_DOACOES_CANCELAR_ADMIN = 'movimentacoes.doacoes.cancelar-admin';
 
+    public const MOVIMENTACOES_ENTRADAS_ESTOQUE_VISUALIZAR = 'movimentacoes.entradas-estoque.visualizar';
+
+    public const MOVIMENTACOES_ENTRADAS_ESTOQUE_CRIAR = 'movimentacoes.entradas-estoque.criar';
+
+    public const MOVIMENTACOES_ENTRADAS_ESTOQUE_CANCELAR_ADMIN = 'movimentacoes.entradas-estoque.cancelar-admin';
+
     public const MOVIMENTACOES_DESCARTES_VISUALIZAR = 'movimentacoes.descartes.visualizar';
 
     public const MOVIMENTACOES_DESCARTES_CRIAR = 'movimentacoes.descartes.criar';
@@ -239,6 +245,10 @@ final class Permissions
     public const MOVIMENTACOES_VENDAS_EDITAR = 'movimentacoes.vendas.editar';
 
     public const MOVIMENTACOES_VENDAS_CANCELAR_ADMIN = 'movimentacoes.vendas.cancelar-admin';
+
+    public const MOVIMENTACOES_VENDAS_IMPORTAR = 'movimentacoes.vendas.importar';
+
+    public const MOVIMENTACOES_VENDAS_IMPORTAR_CONFIRMAR = 'movimentacoes.vendas.importar-confirmar';
 
     public const MOVIMENTACOES_DEVOLUCOES_VISUALIZAR = 'movimentacoes.devolucoes.visualizar';
 
@@ -443,6 +453,11 @@ final class Permissions
                 self::MOVIMENTACOES_DOACOES_EDITAR,
                 self::MOVIMENTACOES_DOACOES_CANCELAR_ADMIN,
             ],
+            'Movimentações — Entrada de estoque' => [
+                self::MOVIMENTACOES_ENTRADAS_ESTOQUE_VISUALIZAR,
+                self::MOVIMENTACOES_ENTRADAS_ESTOQUE_CRIAR,
+                self::MOVIMENTACOES_ENTRADAS_ESTOQUE_CANCELAR_ADMIN,
+            ],
             'Movimentações — Descarte' => [
                 self::MOVIMENTACOES_DESCARTES_VISUALIZAR,
                 self::MOVIMENTACOES_DESCARTES_CRIAR,
@@ -454,6 +469,8 @@ final class Permissions
                 self::MOVIMENTACOES_VENDAS_CRIAR,
                 self::MOVIMENTACOES_VENDAS_EDITAR,
                 self::MOVIMENTACOES_VENDAS_CANCELAR_ADMIN,
+                self::MOVIMENTACOES_VENDAS_IMPORTAR,
+                self::MOVIMENTACOES_VENDAS_IMPORTAR_CONFIRMAR,
             ],
             'Movimentações — Devolução' => [
                 self::MOVIMENTACOES_DEVOLUCOES_VISUALIZAR,

@@ -62,6 +62,11 @@ final class UnidadeNegocioAccessService
         return $this->canAccess($user, $origemId);
     }
 
+    public function canEntradaEstoque(User $user, int $unidadeId): bool
+    {
+        return $this->canAccess($user, $unidadeId);
+    }
+
     public function canVenda(User $user, int $origemId): bool
     {
         return $this->canAccess($user, $origemId);

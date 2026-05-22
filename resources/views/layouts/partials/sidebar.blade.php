@@ -248,6 +248,8 @@
                 'movimentacoes.transferencias.criar',
                 'movimentacoes.doacoes.visualizar',
                 'movimentacoes.doacoes.criar',
+                'movimentacoes.entradas-estoque.visualizar',
+                'movimentacoes.entradas-estoque.criar',
                 'movimentacoes.descartes.visualizar',
                 'movimentacoes.descartes.criar',
                 'movimentacoes.vendas.visualizar',
@@ -262,14 +264,14 @@
                 <li class="side-nav-item">
                     <a data-bs-toggle="collapse"
                        href="#sidebarMovimentacoes"
-                       aria-expanded="{{ request()->routeIs('admin.movimentacoes.compras.*') || request()->routeIs('admin.movimentacoes.transferencias.*') || request()->routeIs('admin.movimentacoes.doacoes.*') || request()->routeIs('admin.movimentacoes.descartes.*') || request()->routeIs('admin.movimentacoes.vendas.*') || request()->routeIs('admin.movimentacoes.devolucoes.*') || request()->routeIs('admin.movimentacoes.conversoes-embalagem.*') ? 'true' : 'false' }}"
+                       aria-expanded="{{ request()->routeIs('admin.movimentacoes.compras.*') || request()->routeIs('admin.movimentacoes.transferencias.*') || request()->routeIs('admin.movimentacoes.entradas-estoque.*') || request()->routeIs('admin.movimentacoes.doacoes.*') || request()->routeIs('admin.movimentacoes.descartes.*') || request()->routeIs('admin.movimentacoes.vendas.*') || request()->routeIs('admin.movimentacoes.devolucoes.*') || request()->routeIs('admin.movimentacoes.conversoes-embalagem.*') ? 'true' : 'false' }}"
                        aria-controls="sidebarMovimentacoes"
-                       class="side-nav-link {{ request()->routeIs('admin.movimentacoes.compras.*') || request()->routeIs('admin.movimentacoes.transferencias.*') || request()->routeIs('admin.movimentacoes.doacoes.*') || request()->routeIs('admin.movimentacoes.descartes.*') || request()->routeIs('admin.movimentacoes.vendas.*') || request()->routeIs('admin.movimentacoes.devolucoes.*') || request()->routeIs('admin.movimentacoes.conversoes-embalagem.*') ? '' : 'collapsed' }}">
+                       class="side-nav-link {{ request()->routeIs('admin.movimentacoes.compras.*') || request()->routeIs('admin.movimentacoes.transferencias.*') || request()->routeIs('admin.movimentacoes.entradas-estoque.*') || request()->routeIs('admin.movimentacoes.doacoes.*') || request()->routeIs('admin.movimentacoes.descartes.*') || request()->routeIs('admin.movimentacoes.vendas.*') || request()->routeIs('admin.movimentacoes.devolucoes.*') || request()->routeIs('admin.movimentacoes.conversoes-embalagem.*') ? '' : 'collapsed' }}">
                         <span class="menu-icon"><i class="ri-exchange-funds-line"></i></span>
                         <span class="menu-text"> Movimentações </span>
                         <span class="menu-arrow"></span>
                     </a>
-                    <div class="collapse {{ request()->routeIs('admin.movimentacoes.compras.*') || request()->routeIs('admin.movimentacoes.transferencias.*') || request()->routeIs('admin.movimentacoes.doacoes.*') || request()->routeIs('admin.movimentacoes.descartes.*') || request()->routeIs('admin.movimentacoes.vendas.*') || request()->routeIs('admin.movimentacoes.devolucoes.*') || request()->routeIs('admin.movimentacoes.conversoes-embalagem.*') ? 'show' : '' }}" id="sidebarMovimentacoes">
+                    <div class="collapse {{ request()->routeIs('admin.movimentacoes.compras.*') || request()->routeIs('admin.movimentacoes.transferencias.*') || request()->routeIs('admin.movimentacoes.entradas-estoque.*') || request()->routeIs('admin.movimentacoes.doacoes.*') || request()->routeIs('admin.movimentacoes.descartes.*') || request()->routeIs('admin.movimentacoes.vendas.*') || request()->routeIs('admin.movimentacoes.devolucoes.*') || request()->routeIs('admin.movimentacoes.conversoes-embalagem.*') ? 'show' : '' }}" id="sidebarMovimentacoes">
                         <ul class="sub-menu">
                             @can('movimentacoes.compras.visualizar')
                                 <li class="side-nav-item">
@@ -302,6 +304,24 @@
                                         <a href="{{ route('admin.movimentacoes.transferencias.create') }}"
                                            class="side-nav-link {{ request()->routeIs('admin.movimentacoes.transferencias.*') ? 'active' : '' }}">
                                             <span class="menu-text">Transferência</span>
+                                        </a>
+                                    </li>
+                                @endcan
+                            @endcan
+
+                            @can('movimentacoes.entradas-estoque.visualizar')
+                                <li class="side-nav-item">
+                                    <a href="{{ route('admin.movimentacoes.entradas-estoque.index') }}"
+                                       class="side-nav-link {{ request()->routeIs('admin.movimentacoes.entradas-estoque.*') ? 'active' : '' }}">
+                                        <span class="menu-text">Entrada de estoque</span>
+                                    </a>
+                                </li>
+                            @else
+                                @can('movimentacoes.entradas-estoque.criar')
+                                    <li class="side-nav-item">
+                                        <a href="{{ route('admin.movimentacoes.entradas-estoque.create') }}"
+                                           class="side-nav-link {{ request()->routeIs('admin.movimentacoes.entradas-estoque.*') ? 'active' : '' }}">
+                                            <span class="menu-text">Entrada de estoque</span>
                                         </a>
                                     </li>
                                 @endcan

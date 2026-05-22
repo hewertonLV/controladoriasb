@@ -141,6 +141,44 @@ final class MovimentacaoAuditoriaService
      * @param  array<string, mixed>|null  $meAntes
      * @param  array<string, mixed>|null  $meDepois
      */
+    /**
+     * @param  array<string, mixed>|null  $meAntes
+     * @param  array<string, mixed>|null  $meDepois
+     */
+    public function registrarRegistroEntradaEstoque(
+        Movimentacao $movimentacao,
+        ?User $user,
+        array $estoqueAntes,
+        array $estoqueDepois,
+        ?array $meAntes,
+        ?array $meDepois,
+    ): MovimentacaoHistorico {
+        $raizId = $movimentacao->idCadeiaRaiz();
+
+        return MovimentacaoHistorico::query()->create([
+            'movimentacao_cadeia_raiz_id' => $raizId,
+            'movimentacao_antes_id' => $movimentacao->id,
+            'movimentacao_depois_id' => $movimentacao->id,
+            'user_id' => $user?->id,
+            'origem' => MovimentacaoHistorico::ORIGEM_ENTRADA_ESTOQUE,
+            'acao' => MovimentacaoHistorico::ACAO_REGISTRO_ENTRADA_ESTOQUE,
+            'motivo' => null,
+            'dados_antes' => [
+                'estoque' => $estoqueAntes,
+                'movimentacao_estoque' => $meAntes,
+            ],
+            'dados_depois' => [
+                'movimentacao' => $this->snapshotVersao($movimentacao),
+                'estoque' => $estoqueDepois,
+                'movimentacao_estoque' => $meDepois,
+            ],
+        ]);
+    }
+
+    /**
+     * @param  array<string, mixed>|null  $meAntes
+     * @param  array<string, mixed>|null  $meDepois
+     */
     public function registrarRegistroDescarte(
         Movimentacao $movimentacao,
         ?User $user,

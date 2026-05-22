@@ -230,10 +230,15 @@ class EstoqueImportacaoProcessor
         $idUnOriginal = trim((string) ($dadosBrutos[0] ?? ''));
         $idUn = TextoCadastro::normalizarIdCigam($idUnOriginal);
         $idFr = TextoCadastro::normalizarIdCigam((string) ($dadosBrutos[1] ?? ''));
-        $qtdUmRaw = trim((string) ($dadosBrutos[2] ?? '0'));
-        $valorTotalRaw = trim((string) ($dadosBrutos[3] ?? '0'));
-
         $erros = [];
+
+        $qtdNormalizada = $this->normalizarDecimalPlanilha($dadosBrutos[2] ?? null, 'Quantidade na UM (coluna C)');
+        $erros = array_merge($erros, $qtdNormalizada['erros']);
+        $qtdUm = $qtdNormalizada['valor'];
+
+        $valorNormalizado = $this->normalizarDecimalPlanilha($dadosBrutos[3] ?? null, 'Preço total (coluna D)');
+        $erros = array_merge($erros, $valorNormalizado['erros']);
+        $valorTotal = $valorNormalizado['valor'];
 
         if ($idUn === '') {
             $erros[] = 'ID CIGAM da unidade (coluna A) é obrigatório.';
@@ -247,11 +252,8 @@ class EstoqueImportacaoProcessor
             $erros[] = 'ID CIGAM da fruta deve ter até 6 dígitos numéricos.';
         }
 
-        $qtdUm = max(0, round((float) str_replace(',', '.', $qtdUmRaw), 2));
-        $valorTotal = max(0, round((float) str_replace(',', '.', $valorTotalRaw), 2));
-
-        if ($qtdUm <= 0 && $valorTotal > 0) {
-            $erros[] = 'Preço total (coluna D) exige quantidade na UM (coluna C) maior que zero.';
+        if (abs($qtdUm) < 0.005 && abs($valorTotal) >= 0.005) {
+            $erros[] = 'Preço total (coluna D) exige quantidade na UM (coluna C) diferente de zero quando há valor informado.';
         }
 
         return [
@@ -525,5 +527,28 @@ class EstoqueImportacaoProcessor
         }
 
         return true;
+    }
+
+    /**
+     * @return array{valor: float, erros: list<string>}
+     */
+    private function normalizarDecimalPlanilha(mixed $raw, string $rotuloColuna): array
+    {
+        $texto = trim((string) ($raw ?? ''));
+
+        if ($texto === '') {
+            return ['valor' => 0.0, 'erros' => []];
+        }
+
+        $normalizado = str_replace(',', '.', $texto);
+
+        if (! is_numeric($normalizado)) {
+            return [
+                'valor' => 0.0,
+                'erros' => ["{$rotuloColuna} deve ser numérica."],
+            ];
+        }
+
+        return ['valor' => round((float) $normalizado, 2), 'erros' => []];
     }
 }

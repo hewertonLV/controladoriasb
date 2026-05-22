@@ -17,6 +17,8 @@ enum CategoriaMovimentacaoTipo: int
     case Devolucao = CategoriaMovimentacao::ID_DEVOLUCAO;
     case ConversaoEmbalagem = CategoriaMovimentacao::ID_CONVERSAO_EMBALAGEM;
 
+    case EntradaEstoque = CategoriaMovimentacao::ID_ENTRADA_ESTOQUE;
+
     public function nomeLegivel(): string
     {
         return match ($this) {
@@ -27,6 +29,7 @@ enum CategoriaMovimentacaoTipo: int
             self::Descarte => 'Descarte',
             self::Devolucao => 'Devolução',
             self::ConversaoEmbalagem => 'Conversão de embalagem',
+            self::EntradaEstoque => 'Entrada de estoque',
         };
     }
 }

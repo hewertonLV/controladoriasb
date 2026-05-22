@@ -11,7 +11,7 @@
                 <p class="text-muted mb-0">
                     Posição inicial por loja (unidade) e fruta. Layout fixo — linha 1 é cabeçalho:
                     <code>A</code> ID CIGAM unidade · <code>B</code> ID CIGAM fruta ·
-                    <code>C</code> Qtd (unidade de medição) · <code>D</code> Preço total (R$).
+                    <code>C</code> Qtd (unidade de medição — pode ser <strong>negativa, zero ou positiva</strong>) · <code>D</code> Preço total (R$, também aceita negativo).
                     O sistema calcula kg, preço médio e valor acumulado com base no cadastro da fruta.
                     Uma planilha pode trazer várias unidades; após a análise, confirme as linhas desejadas.
                 </p>

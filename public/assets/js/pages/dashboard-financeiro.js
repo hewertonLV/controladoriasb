@@ -9,8 +9,10 @@
     var debounceTimer = null;
     var pollTimer = null;
     var emRequisicao = false;
+    var atualizacaoFiltroPendente = false;
     var pausado = false;
     var monitoramentoAtivo = false;
+    var ultimoPizzaFatias = null;
 
     var diarioEl = document.querySelector('#dashboard-financeiro-diario');
     var pizzaEl = document.querySelector('#dashboard-financeiro-pizza');
@@ -25,6 +27,9 @@
     var btnPausar = document.getElementById('dashboard-pausar');
     var btnRetomar = document.getElementById('dashboard-retomar');
     var btnBuscarMes = document.getElementById('dashboard-buscar-mes');
+    var periodoTipoEl = document.getElementById('dashboard-periodo-tipo');
+    var wrapMesEl = document.getElementById('dashboard-periodo-mes-wrap');
+    var wrapDiaEl = document.getElementById('dashboard-periodo-dia-wrap');
 
     function fmtReais(valor) {
         return 'R$ ' + Number(valor).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -171,8 +176,8 @@
         };
 
         if (chartDiario) {
+            chartDiario.updateSeries(options.series);
             chartDiario.updateOptions({
-                series: options.series,
                 xaxis: options.xaxis,
             });
             return;
@@ -213,16 +218,23 @@
             },
         };
 
+        if (chartPizza && ultimoPizzaFatias !== series.length) {
+            chartPizza.destroy();
+            chartPizza = null;
+        }
+
         if (chartPizza) {
+            chartPizza.updateSeries(options.series);
             chartPizza.updateOptions({
-                series: options.series,
                 labels: options.labels,
             });
+            ultimoPizzaFatias = series.length;
             return;
         }
 
         chartPizza = new ApexCharts(pizzaEl, options);
         chartPizza.render();
+        ultimoPizzaFatias = series.length;
     }
 
     function renderGraficoRentabilidadeUnidades(grafico) {
@@ -327,8 +339,8 @@
         };
 
         if (chartRentabilidadeUnidades) {
+            chartRentabilidadeUnidades.updateSeries(options.series);
             chartRentabilidadeUnidades.updateOptions({
-                series: options.series,
                 xaxis: options.xaxis,
             });
             return;
@@ -370,14 +382,38 @@
         atualizarStatusUnidades(data);
     }
 
+    function periodoTipoSelecionado() {
+        return periodoTipoEl && periodoTipoEl.value === 'dia' ? 'dia' : 'mes';
+    }
+
     function mesSelecionado() {
         var input = document.getElementById('dashboard-mes');
         return input && input.value ? input.value : new Date().toISOString().slice(0, 7);
     }
 
+    function diaSelecionado() {
+        var input = document.getElementById('dashboard-dia');
+        return input && input.value ? input.value : new Date().toISOString().slice(0, 10);
+    }
+
+    function sincronizarCamposPeriodo() {
+        var isDia = periodoTipoSelecionado() === 'dia';
+        if (wrapMesEl) {
+            wrapMesEl.classList.toggle('d-none', isDia);
+        }
+        if (wrapDiaEl) {
+            wrapDiaEl.classList.toggle('d-none', !isDia);
+        }
+    }
+
     function montarUrlDados() {
         var url = new URL(config.dadosUrl, window.location.origin);
-        url.searchParams.set('mes', mesSelecionado());
+
+        if (periodoTipoSelecionado() === 'dia') {
+            url.searchParams.set('dia', diaSelecionado());
+        } else {
+            url.searchParams.set('mes', mesSelecionado());
+        }
 
         var selecionadas = unidadesSelecionadas();
         if (selecionadas.length === 0) {
@@ -400,8 +436,22 @@
         }, ms);
     }
 
-    function executarAtualizacao(imediato) {
-        if (!config.dadosUrl || pausado || emRequisicao || document.hidden) {
+    function executarAtualizacao(imediato, opcoes) {
+        opcoes = opcoes || {};
+        var porFiltro = !!opcoes.porFiltro;
+
+        if (!config.dadosUrl || document.hidden) {
+            return;
+        }
+
+        if (!porFiltro && pausado) {
+            return;
+        }
+
+        if (emRequisicao) {
+            if (porFiltro) {
+                atualizacaoFiltroPendente = true;
+            }
             return;
         }
 
@@ -441,6 +491,11 @@
             .finally(function () {
                 emRequisicao = false;
                 setLoading(false);
+
+                if (atualizacaoFiltroPendente) {
+                    atualizacaoFiltroPendente = false;
+                    executarAtualizacao(true, { porFiltro: true });
+                }
             });
     }
 
@@ -505,9 +560,7 @@
             window.clearTimeout(debounceTimer);
         }
         debounceTimer = window.setTimeout(function () {
-            if (monitoramentoAtivo && !pausado) {
-                executarAtualizacao(true);
-            }
+            executarAtualizacao(true, { porFiltro: true });
         }, 350);
     }
 
@@ -515,6 +568,13 @@
         document.querySelectorAll('.dashboard-unidade-switch').forEach(function (input) {
             input.addEventListener('change', agendarAtualizacaoFiltro);
         });
+    }
+
+    function initPeriodo() {
+        sincronizarCamposPeriodo();
+        if (periodoTipoEl) {
+            periodoTipoEl.addEventListener('change', sincronizarCamposPeriodo);
+        }
     }
 
     if (btnBuscarMes) {
@@ -554,6 +614,7 @@
     }
 
     initSwitches();
+    initPeriodo();
 
     if (config.dadosUrl) {
         iniciarMonitoramento(false);

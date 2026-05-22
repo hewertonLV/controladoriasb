@@ -40,6 +40,8 @@ class MovimentacaoHistorico extends Model
 
     public const ACAO_REGISTRO_CONVERSAO_EMBALAGEM = 'REGISTRO_CONVERSAO_EMBALAGEM';
 
+    public const ACAO_REGISTRO_ENTRADA_ESTOQUE = 'REGISTRO_ENTRADA_ESTOQUE';
+
     public const ORIGEM_VERSIONAMENTO = 'versionamento';
 
     public const ORIGEM_CANCELAMENTO_ADMIN = 'cancelamento_admin';
@@ -53,6 +55,8 @@ class MovimentacaoHistorico extends Model
     public const ORIGEM_DEVOLUCAO = 'devolucao';
 
     public const ORIGEM_CONVERSAO_EMBALAGEM = 'conversao_embalagem';
+
+    public const ORIGEM_ENTRADA_ESTOQUE = 'entrada_estoque';
 
     public $timestamps = false;
 

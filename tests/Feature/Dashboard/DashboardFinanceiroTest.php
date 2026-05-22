@@ -154,6 +154,49 @@ class DashboardFinanceiroTest extends TestCase
             ->getJson(route('dashboard.dados', ['sem_unidades' => 1]))
             ->assertOk()
             ->assertJsonPath('cards.faturado.reais', 0);
+
+        $this->actingAs($user)
+            ->getJson(route('dashboard.dados', ['unidades' => [$cA['unidade']->id, $cB['unidade']->id]]))
+            ->assertOk()
+            ->assertJsonPath('cards.faturado.reais', 1200);
+    }
+
+    public function test_filtro_por_dia_via_endpoint_dados(): void
+    {
+        $this->seedBase();
+        $c = $this->cenarioBase();
+        $venda = $this->registrarVenda($c, '2', '250,00');
+        $venda->update(['data_movimentacao' => now()->startOfDay()]);
+
+        $ontem = now()->subDay();
+        $vendaOntem = $this->registrarVenda($c, '1', '100,00');
+        $vendaOntem->update(['data_movimentacao' => $ontem->copy()->startOfDay()]);
+
+        $user = User::factory()->create([
+            'must_change_password' => false,
+            'ativo' => true,
+        ]);
+        $user->unidadesNegocio()->sync([$c['unidade']->id]);
+
+        $hoje = now()->format('Y-m-d');
+
+        $this->actingAs($user)
+            ->getJson(route('dashboard.dados', [
+                'dia' => $hoje,
+                'unidades' => [$c['unidade']->id],
+            ]))
+            ->assertOk()
+            ->assertJsonPath('cards.faturado.reais', 250)
+            ->assertJsonPath('periodo.tipo', 'dia')
+            ->assertJsonPath('periodo.dia', $hoje);
+
+        $this->actingAs($user)
+            ->getJson(route('dashboard.dados', [
+                'dia' => $ontem->format('Y-m-d'),
+                'unidades' => [$c['unidade']->id],
+            ]))
+            ->assertOk()
+            ->assertJsonPath('cards.faturado.reais', 100);
     }
 
     public function test_filtro_por_mes_via_endpoint_dados(): void

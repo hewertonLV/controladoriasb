@@ -34,6 +34,8 @@ class CategoriaMovimentacao extends Model
 
     public const ID_CONVERSAO_EMBALAGEM = 7;
 
+    public const ID_ENTRADA_ESTOQUE = 8;
+
     protected $table = 'categorias_movimentacao';
 
     public static function idPorNome(string $nome): int

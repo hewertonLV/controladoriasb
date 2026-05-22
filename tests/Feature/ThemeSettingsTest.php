@@ -105,6 +105,8 @@ class ThemeSettingsTest extends TestCase
         $this->view('dashboard', [
             'financeiro' => app(\App\Services\Dashboard\DashboardFinanceiroService::class)->vazio(),
             'mesAtual' => now()->format('Y-m'),
+            'diaAtual' => now()->format('Y-m-d'),
+            'periodoTipoInicial' => 'mes',
             'dadosUrl' => '',
             'pollIntervalMs' => (int) config('dashboard_financeiro.poll_interval_ms', 45_000),
         ])

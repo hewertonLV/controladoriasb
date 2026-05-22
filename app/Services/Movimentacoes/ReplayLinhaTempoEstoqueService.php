@@ -224,6 +224,15 @@ class ReplayLinhaTempoEstoqueService
             ->get()
             ->map(static fn (Movimentacao $m): array => ['tipo' => 'entrada', 'movimentacao' => $m]);
 
+        $entradasProducao = Movimentacao::query()
+            ->vigentesParaCalculo()
+            ->where('categoria_movimentacao_id', CategoriaMovimentacaoTipo::EntradaEstoque->value)
+            ->where('status_movimentacao_id', StatusMovimentacao::ID_ENTRADA)
+            ->where('id_empresa_destino', $empresaId)
+            ->where('id_fruta', $idFruta)
+            ->get()
+            ->map(static fn (Movimentacao $m): array => ['tipo' => 'entrada', 'movimentacao' => $m]);
+
         $entradasTransferencia = Movimentacao::query()
             ->vigentesParaCalculo()
             ->where('categoria_movimentacao_id', CategoriaMovimentacaoTipo::Transferencia->value)
@@ -299,6 +308,7 @@ class ReplayLinhaTempoEstoqueService
             ->map(static fn (Movimentacao $m): array => ['tipo' => 'saida', 'movimentacao' => $m]);
 
         return $entradasCompra
+            ->concat($entradasProducao)
             ->concat($entradasTransferencia)
             ->concat($entradasDevolucao)
             ->concat($entradasConversao)

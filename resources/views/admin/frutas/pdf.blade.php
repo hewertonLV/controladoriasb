@@ -55,7 +55,10 @@
                     <td>{{ $fruta->nome }}</td>
                     <td>{{ $fruta->procedencia ?? 'NACIONAL' }}</td>
                     <td>{{ $fruta->unidade_medicao }}</td>
-                    <td>{{ number_format((float) $fruta->kg_por_unidade_medicao, 2, ',', '.') }}</td>
+                    @php
+                        $casasKgPdf = \App\Enums\FrutaUnidadeMedicao::tryFrom((string) $fruta->unidade_medicao)?->casasDecimaisKg() ?? 2;
+                    @endphp
+                    <td>{{ number_format((float) $fruta->kg_por_unidade_medicao, $casasKgPdf, ',', '.') }}</td>
                     <td>{{ number_format((float) ($icmsCe['entrada_nacional_kg'] ?? 0), 2, ',', '.') }}</td>
                     <td>{{ number_format((float) ($icmsCe['entrada_internacional_kg'] ?? 0), 2, ',', '.') }}</td>
                     <td>{{ number_format((float) ($icmsCe['saida_nacional_dentro_pct'] ?? 0), 2, ',', '.') }}</td>

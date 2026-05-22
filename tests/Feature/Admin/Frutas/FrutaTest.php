@@ -33,6 +33,16 @@ class FrutaTest extends FrutaTestCase
             ->assertOk();
     }
 
+    public function test_tela_criar_fruta_carrega_sem_erro(): void
+    {
+        $this->actingAs($this->userWithPermissions([Permissions::FRUTAS_CRIAR]))
+            ->get(route('admin.frutas.create'))
+            ->assertOk()
+            ->assertSee('Nova fruta', false)
+            ->assertSee('ICMS por estado', false)
+            ->assertSee('id="unidade_medicao"', false);
+    }
+
     public function test_listagem_usa_datatable_com_registros(): void
     {
         Fruta::factory()->create(['nome' => 'MANGA DATATABLE']);

@@ -120,6 +120,64 @@ class TransferenciaImportacaoTest extends TestCase
         ]);
     }
 
+    public function test_mesma_origem_destino_fruta_com_nf_diferente_nao_e_duplicada(): void
+    {
+        [$origem, $destino, $fruta] = $this->criarCenarioComEstoqueOrigem();
+
+        $path = 'transferencias/importacoes/nf-diferente.xlsx';
+        Storage::disk('local')->makeDirectory('transferencias/importacoes');
+        $this->criarPlanilha(Storage::disk('local')->path($path), [
+            ['CNPJ Origem', 'CNPJ Destino', 'ID CIGAM Fruta', 'Qtd UM', 'Número NF'],
+            [$origem->cpf_cnpj, $destino->cpf_cnpj, $fruta->id_cigam, '5', '2153'],
+            [$origem->cpf_cnpj, $destino->cpf_cnpj, $fruta->id_cigam, '5', '2164'],
+        ]);
+
+        $importacao = TransferenciaImportacao::create([
+            'uuid' => (string) \Illuminate\Support\Str::uuid(),
+            'user_id' => null,
+            'arquivo_original' => 'nf-diferente.xlsx',
+            'arquivo_path' => $path,
+            'status' => TransferenciaImportacao::STATUS_AGUARDANDO,
+        ]);
+
+        app(TransferenciaImportacaoProcessor::class)->processar($importacao->fresh());
+
+        $importacao->refresh();
+        $this->assertSame(0, $importacao->erros_count);
+        $this->assertCount(2, $importacao->resultado['novas'] ?? []);
+    }
+
+    public function test_linha_identica_em_todos_campos_e_duplicada(): void
+    {
+        [$origem, $destino, $fruta] = $this->criarCenarioComEstoqueOrigem();
+
+        $path = 'transferencias/importacoes/duplicada.xlsx';
+        Storage::disk('local')->makeDirectory('transferencias/importacoes');
+        $this->criarPlanilha(Storage::disk('local')->path($path), [
+            ['CNPJ Origem', 'CNPJ Destino', 'ID CIGAM Fruta', 'Qtd UM', 'Número NF'],
+            [$origem->cpf_cnpj, $destino->cpf_cnpj, $fruta->id_cigam, '3', '2164'],
+            [$origem->cpf_cnpj, $destino->cpf_cnpj, $fruta->id_cigam, '3', '2164'],
+        ]);
+
+        $importacao = TransferenciaImportacao::create([
+            'uuid' => (string) \Illuminate\Support\Str::uuid(),
+            'user_id' => null,
+            'arquivo_original' => 'duplicada.xlsx',
+            'arquivo_path' => $path,
+            'status' => TransferenciaImportacao::STATUS_AGUARDANDO,
+        ]);
+
+        app(TransferenciaImportacaoProcessor::class)->processar($importacao->fresh());
+
+        $importacao->refresh();
+        $this->assertCount(1, $importacao->resultado['novas'] ?? []);
+        $this->assertCount(1, $importacao->resultado['erros'] ?? []);
+        $this->assertStringContainsString(
+            'Linha duplicada na planilha',
+            $importacao->resultado['erros'][0]['erros'][0],
+        );
+    }
+
     public function test_tela_importar_exige_permissao(): void
     {
         $user = $this->userWithPermissions([

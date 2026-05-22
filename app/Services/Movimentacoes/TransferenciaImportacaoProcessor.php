@@ -115,11 +115,11 @@ class TransferenciaImportacaoProcessor
             $dados = $normalizado['dados'];
 
             if ($errosLinha === []) {
-                $parChave = $dados['cnpj_origem'].'|'.$dados['cnpj_destino'].'|'.$dados['id_cigam_fruta'];
-                if (isset($cnpjVistosPar[$parChave])) {
-                    $errosLinha[] = 'Combinação origem/destino/fruta duplicada na planilha (já aparece na linha '.$cnpjVistosPar[$parChave].').';
+                $chaveLinha = $this->chaveUnicidadePlanilha($dados);
+                if (isset($cnpjVistosPar[$chaveLinha])) {
+                    $errosLinha[] = 'Linha duplicada na planilha (mesma origem, destino, fruta, quantidade e NF da linha '.$cnpjVistosPar[$chaveLinha].').';
                 } else {
-                    $cnpjVistosPar[$parChave] = $r;
+                    $cnpjVistosPar[$chaveLinha] = $r;
                 }
             }
 
@@ -341,13 +341,15 @@ class TransferenciaImportacaoProcessor
             $erros[] = 'Número da NF pode ter no máximo 120 caracteres.';
         }
 
+        $nfNormalizada = mb_strtoupper($nf, 'UTF-8');
+
         return [
             'dados' => [
                 'cnpj_origem' => $cnpjOrigem,
                 'cnpj_destino' => $cnpjDestino,
                 'id_cigam_fruta' => $idCigam,
                 'qtd_fruta_um' => $qtdUm,
-                'numero_nf_origem' => $nf,
+                'numero_nf_origem' => $nfNormalizada,
                 'linha_planilha' => (string) $linhaPlanilha,
             ],
             'erros' => $erros,
@@ -371,6 +373,22 @@ class TransferenciaImportacaoProcessor
             ->where('entidade_type', UnidadeNegocio::class)
             ->where('entidade_id', $unidade->id)
             ->first();
+    }
+
+    /**
+     * Chave de unicidade na planilha: origem, destino, fruta, quantidade (UM) e NF.
+     *
+     * @param  array<string, string>  $dados
+     */
+    private function chaveUnicidadePlanilha(array $dados): string
+    {
+        return implode('|', [
+            $dados['cnpj_origem'] ?? '',
+            $dados['cnpj_destino'] ?? '',
+            $dados['id_cigam_fruta'] ?? '',
+            $dados['qtd_fruta_um'] ?? '',
+            $dados['numero_nf_origem'] ?? '',
+        ]);
     }
 
     /**

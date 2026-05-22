@@ -103,10 +103,6 @@ class EstoqueMovimentacaoService
         $novaQ = round((float) str_replace(',', '.', $qtdKg), 2);
         $novaP = round((float) str_replace(',', '.', $precoMedioKg), 2);
 
-        if ($novaQ < 0 || $novaP < 0) {
-            throw new \InvalidArgumentException('Quantidade e preço não podem ser negativos.');
-        }
-
         return DB::transaction(function () use ($unidade, $fruta, $novaQ, $novaP): MovimentacaoEstoque {
             $estoque = $this->resolverEstoqueComLock($unidade->id, $fruta->id);
             $kgPorUm = $this->kgPorUnidadeMedicaoSeguro($fruta);

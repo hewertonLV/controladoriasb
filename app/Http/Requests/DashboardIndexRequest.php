@@ -24,6 +24,7 @@ class DashboardIndexRequest extends FormRequest
             'unidades.*' => ['nullable', 'integer', 'exists:unidades_negocio,id'],
             'sem_unidades' => ['nullable', 'boolean'],
             'mes' => ['nullable', 'date_format:Y-m'],
+            'dia' => ['nullable', 'date_format:Y-m-d'],
         ];
     }
 
@@ -77,5 +78,12 @@ class DashboardIndexRequest extends FormRequest
         $mes = $this->input('mes');
 
         return is_string($mes) && $mes !== '' ? $mes : null;
+    }
+
+    public function diaReferencia(): ?string
+    {
+        $dia = $this->input('dia');
+
+        return is_string($dia) && $dia !== '' ? $dia : null;
     }
 }

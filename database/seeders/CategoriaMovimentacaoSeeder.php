@@ -24,6 +24,7 @@ class CategoriaMovimentacaoSeeder extends Seeder
             ['id' => 5, 'nome' => 'DESCARTE', 'created_at' => $now, 'updated_at' => $now],
             ['id' => 6, 'nome' => 'DEVOLUCAO', 'created_at' => $now, 'updated_at' => $now],
             ['id' => 7, 'nome' => 'CONVERSAO EMBALAGEM', 'created_at' => $now, 'updated_at' => $now],
+            ['id' => 8, 'nome' => 'ENTRADA ESTOQUE', 'created_at' => $now, 'updated_at' => $now],
         ];
 
         DB::transaction(function () use ($rows): void {

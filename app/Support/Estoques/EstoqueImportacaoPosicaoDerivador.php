@@ -20,11 +20,13 @@ final class EstoqueImportacaoPosicaoDerivador
     public static function derivar(float $kgPorUnidadeMedicao, float $qtdUm, float $valorTotal): array
     {
         $kgPorUm = max(0.0, round($kgPorUnidadeMedicao, 2));
-        $qtdUm = max(0.0, round($qtdUm, 2));
-        $valorTotal = max(0.0, round($valorTotal, 2));
+        $qtdUm = round($qtdUm, 2);
+        $valorTotal = round($valorTotal, 2);
 
         $qtdKg = round($qtdUm * $kgPorUm, 2);
-        $precoKg = $qtdKg > 0 ? round($valorTotal / $qtdKg, 2) : 0.0;
+        $precoKg = abs($qtdKg) >= 0.005
+            ? round($valorTotal / $qtdKg, 2)
+            : 0.0;
         $precoUm = round($precoKg * $kgPorUm, 2);
 
         return [

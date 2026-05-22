@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Enums\FrutaProcedencia;
+use App\Enums\FrutaUnidadeMedicao;
 use App\Support\TextoCadastro;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -71,8 +72,16 @@ class Fruta extends Model
 
     protected function setKgPorUnidadeMedicaoAttribute(mixed $value): void
     {
-        $kg = max(0, round((float) $value, 2));
-        $this->attributes['kg_por_unidade_medicao'] = number_format($kg, 2, '.', '');
+        $casas = $this->casasDecimaisKgPorUnidadeMedicao();
+        $kg = max(0, round((float) $value, $casas));
+        $this->attributes['kg_por_unidade_medicao'] = number_format($kg, $casas, '.', '');
+    }
+
+    public function casasDecimaisKgPorUnidadeMedicao(): int
+    {
+        $um = mb_strtoupper(trim((string) ($this->attributes['unidade_medicao'] ?? $this->unidade_medicao ?? '')), 'UTF-8');
+
+        return FrutaUnidadeMedicao::tryFrom($um)?->casasDecimaisKg() ?? 2;
     }
 
     /**

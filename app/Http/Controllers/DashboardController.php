@@ -14,11 +14,14 @@ class DashboardController extends Controller
         $user = $request->user();
         $filtro = $request->unidadeIdsFiltro() ?? $financeiro->unidadeIdsPadrao($user);
         $mes = $request->mesReferencia();
+        $dia = $request->diaReferencia();
 
         return view('dashboard', [
-            'financeiro' => $financeiro->forUser($user, $filtro, $mes),
+            'financeiro' => $financeiro->forUser($user, $filtro, $mes, $dia),
             'dadosUrl' => route('dashboard.dados'),
             'mesAtual' => $mes ?? now()->format('Y-m'),
+            'diaAtual' => $dia ?? now()->format('Y-m-d'),
+            'periodoTipoInicial' => $dia !== null ? 'dia' : 'mes',
             'pollIntervalMs' => (int) config('dashboard_financeiro.poll_interval_ms', 45_000),
         ]);
     }
@@ -33,7 +36,7 @@ class DashboardController extends Controller
         }
 
         return response()->json([
-            ...$financeiro->forUser($user, $filtro, $request->mesReferencia()),
+            ...$financeiro->forUser($user, $filtro, $request->mesReferencia(), $request->diaReferencia()),
             'proximo_poll_ms' => (int) config('dashboard_financeiro.poll_interval_ms', 45_000),
         ]);
     }

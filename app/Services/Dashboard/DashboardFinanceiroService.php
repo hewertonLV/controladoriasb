@@ -98,9 +98,9 @@ final class DashboardFinanceiroService
      *     pizza_rentabilidade: list<array{label: string, valor: float, valor_exibicao: float}>
      * }
      */
-    public function forUser(User $user, ?array $unidadeIdsFiltro = null, ?string $mes = null): array
+    public function forUser(User $user, ?array $unidadeIdsFiltro = null, ?string $mes = null, ?string $dia = null): array
     {
-        $periodo = DashboardPeriodo::resolver($mes);
+        $periodo = DashboardPeriodo::resolver($mes, $dia);
         $inicio = $periodo->inicio;
         $fim = $periodo->fim;
 
