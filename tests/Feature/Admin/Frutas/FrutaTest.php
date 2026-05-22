@@ -131,6 +131,66 @@ class FrutaTest extends FrutaTestCase
             ->assertSessionHasErrors('kg_por_unidade_medicao');
     }
 
+    public function test_cadastro_bdj_bandeja(): void
+    {
+        $this->actingAs($this->userWithPermissions([Permissions::FRUTAS_CRIAR]))
+            ->post(route('admin.frutas.store'), $this->frutaPayload([
+                'id_cigam' => '88',
+                'nome' => 'Morango Bandeja',
+                'unidade_medicao' => FrutaUnidadeMedicao::BDJ->value,
+                'kg_por_unidade_medicao' => '1.25',
+            ]))
+            ->assertRedirect(route('admin.frutas.index'))
+            ->assertSessionHas('success');
+
+        $this->assertDatabaseHas('frutas', [
+            'id_cigam' => '000088',
+            'nome' => 'MORANGO BANDEJA',
+            'unidade_medicao' => FrutaUnidadeMedicao::BDJ->value,
+            'kg_por_unidade_medicao' => '1.25',
+        ]);
+    }
+
+    public function test_cadastro_kg_persiste_kg_por_unidade_com_tres_casas(): void
+    {
+        $this->actingAs($this->userWithPermissions([Permissions::FRUTAS_CRIAR]))
+            ->post(route('admin.frutas.store'), $this->frutaPayload([
+                'id_cigam' => '99',
+                'nome' => 'Banana Kg',
+                'unidade_medicao' => FrutaUnidadeMedicao::KG->value,
+                'kg_por_unidade_medicao' => '1',
+            ]))
+            ->assertRedirect(route('admin.frutas.index'))
+            ->assertSessionHas('success');
+
+        $this->assertDatabaseHas('frutas', [
+            'id_cigam' => '000099',
+            'nome' => 'BANANA KG',
+            'unidade_medicao' => FrutaUnidadeMedicao::KG->value,
+            'kg_por_unidade_medicao' => '1.000',
+        ]);
+    }
+
+    public function test_cadastro_pct_persiste_kg_com_tres_casas_decimais(): void
+    {
+        $this->actingAs($this->userWithPermissions([Permissions::FRUTAS_CRIAR]))
+            ->post(route('admin.frutas.store'), $this->frutaPayload([
+                'id_cigam' => '77',
+                'nome' => 'Uva Pacote',
+                'unidade_medicao' => FrutaUnidadeMedicao::PCT->value,
+                'kg_por_unidade_medicao' => '0.35',
+            ]))
+            ->assertRedirect(route('admin.frutas.index'))
+            ->assertSessionHas('success');
+
+        $this->assertDatabaseHas('frutas', [
+            'id_cigam' => '000077',
+            'nome' => 'UVA PACOTE',
+            'unidade_medicao' => FrutaUnidadeMedicao::PCT->value,
+            'kg_por_unidade_medicao' => '0.350',
+        ]);
+    }
+
     public function test_edicao_atualiza_registro(): void
     {
         $fruta = Fruta::factory()->create([

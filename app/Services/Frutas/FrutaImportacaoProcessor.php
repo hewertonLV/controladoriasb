@@ -33,8 +33,8 @@ class FrutaImportacaoProcessor
     private const HEADER_ALIASES = [
         'id_cigam' => ['IDCIGAM', 'ID', 'CODIGO', 'CODIGOMATERIAL', 'CODMATERIAL', 'MATERIAL'],
         'nome' => ['NOME', 'DESCRICAO', 'DESCRICAOMAT', 'DESCRICAOMATERIAL'],
-        'unidade_medicao' => ['UNIDADE', 'UNIDADEMEDICAO', 'UNIDMEDIDA', 'UMMEDIDA', 'UNMEDIDA'],
-        'kg_por_unidade_medicao' => ['KG', 'KGPORUNIDADE', 'KGPORUNIDADEMEDICAO', 'PESO', 'PESOMAT'],
+        'unidade_medicao' => ['UNIDADE', 'UNIDADEMEDICAO', 'UNIDMEDIDA', 'UMMEDIDA', 'UNMEDIDA', 'UM', 'KG', 'QUILOGRAMA'],
+        'kg_por_unidade_medicao' => ['KGPORUNIDADE', 'KGPORUNIDADEMEDICAO', 'PESO', 'PESOMAT', 'PESOKG', 'KGPORUM'],
     ];
 
     public function __construct(private readonly FrutaPlanilhaNormalizer $normalizer) {}

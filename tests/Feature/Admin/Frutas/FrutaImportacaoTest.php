@@ -212,6 +212,50 @@ class FrutaImportacaoTest extends FrutaTestCase
         $this->assertSame('018574', $primeiraLinha['id_cigam']);
         $this->assertSame(FrutaUnidadeMedicao::CAIXA->value, $primeiraLinha['unidade_medicao']);
         $this->assertSame('14.00', $primeiraLinha['kg_por_unidade_medicao']);
+
+        $linhaUvaPct = collect($importacao->resultado['novas'] ?? [])
+            ->first(fn (array $item) => ($item['dados']['id_cigam'] ?? '') === '040003');
+
+        $this->assertNotNull($linhaUvaPct);
+        $this->assertSame(FrutaUnidadeMedicao::PCT->value, $linhaUvaPct['dados']['unidade_medicao']);
+        $this->assertSame('1.000', $linhaUvaPct['dados']['kg_por_unidade_medicao']);
+    }
+
+    public function test_job_importa_fruta_com_um_kg(): void
+    {
+        Storage::fake('local');
+
+        $spreadsheet = new Spreadsheet;
+        $sheet = $spreadsheet->getActiveSheet();
+        $sheet->fromArray(['ID CIGAM', 'Nome', 'KG', 'Kg por unidade'], null, 'A1');
+        $sheet->fromArray(['004297', 'FRUTA KG', 'KG', '1'], null, 'A2');
+
+        $tmp = tempnam(sys_get_temp_dir(), 'frutas-kg-');
+        (new Xlsx($spreadsheet))->save($tmp);
+        $spreadsheet->disconnectWorksheets();
+
+        $path = 'frutas/importacoes/teste-kg.xlsx';
+        Storage::disk('local')->put($path, file_get_contents($tmp));
+        @unlink($tmp);
+
+        $importacao = FrutaImportacao::create([
+            'uuid' => (string) Str::uuid(),
+            'user_id' => $this->frutasManager()->id,
+            'arquivo_original' => 'frutas-kg.xlsx',
+            'arquivo_path' => $path,
+            'status' => FrutaImportacao::STATUS_AGUARDANDO,
+        ]);
+
+        (new ProcessarPreviewImportacaoFrutasJob($importacao->id))
+            ->handle(app(FrutaImportacaoProcessor::class));
+
+        $importacao->refresh();
+
+        $this->assertSame(FrutaImportacao::STATUS_CONCLUIDO, $importacao->status);
+        $this->assertSame(0, $importacao->erros_count);
+        $this->assertCount(1, $importacao->resultado['novas'] ?? []);
+        $this->assertSame(FrutaUnidadeMedicao::KG->value, $importacao->resultado['novas'][0]['dados']['unidade_medicao']);
+        $this->assertSame('1.000', $importacao->resultado['novas'][0]['dados']['kg_por_unidade_medicao']);
     }
 
     public function test_job_ignora_id_cigam_repetido_com_dados_iguais_e_bloqueia_divergente(): void

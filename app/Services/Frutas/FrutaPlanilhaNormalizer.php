@@ -18,7 +18,15 @@ class FrutaPlanilhaNormalizer
         'CAIXA' => FrutaUnidadeMedicao::CAIXA->value,
         'CX' => FrutaUnidadeMedicao::CAIXA->value,
         'PACOTE' => FrutaUnidadeMedicao::PACOTE->value,
-        'PCT' => FrutaUnidadeMedicao::PACOTE->value,
+        'PCT' => FrutaUnidadeMedicao::PCT->value,
+        'BDJ' => FrutaUnidadeMedicao::BDJ->value,
+        'BANDEJA' => FrutaUnidadeMedicao::BDJ->value,
+        'KG' => FrutaUnidadeMedicao::KG->value,
+        'KGS' => FrutaUnidadeMedicao::KG->value,
+        'KILO' => FrutaUnidadeMedicao::KG->value,
+        'QUILO' => FrutaUnidadeMedicao::KG->value,
+        'QUILOGRAMA' => FrutaUnidadeMedicao::KG->value,
+        'QUILOS' => FrutaUnidadeMedicao::KG->value,
         'PC' => FrutaUnidadeMedicao::PACOTE->value,
         'UNIDADE' => FrutaUnidadeMedicao::UNIDADE->value,
         'UN' => FrutaUnidadeMedicao::UNIDADE->value,
@@ -40,7 +48,7 @@ class FrutaPlanilhaNormalizer
         );
         $nome = $this->trimString($row[1] ?? null);
         $unidadeMedicao = self::normalizarUnidadeMedicao($row[2] ?? null);
-        $kg = $this->normalizeKg($row[3] ?? null);
+        $kg = $this->normalizeKg($row[3] ?? null, $unidadeMedicao);
 
         if ($idCigam === '') {
             $erros[] = 'ID CIGAM (coluna A) é obrigatório.';
@@ -82,7 +90,7 @@ class FrutaPlanilhaNormalizer
         return trim((string) $value);
     }
 
-    private function normalizeKg(mixed $value): ?string
+    private function normalizeKg(mixed $value, string $unidadeMedicao = ''): ?string
     {
         if ($value === null || trim((string) $value) === '') {
             return null;
@@ -94,12 +102,15 @@ class FrutaPlanilhaNormalizer
             return null;
         }
 
-        return number_format(max(0, (float) $normalizado), 2, '.', '');
+        $casas = FrutaUnidadeMedicao::tryFrom($unidadeMedicao)?->casasDecimaisKg() ?? 2;
+
+        return number_format(max(0, (float) $normalizado), $casas, '.', '');
     }
 
     public static function normalizarUnidadeMedicao(mixed $value): string
     {
         $texto = mb_strtoupper(trim((string) ($value ?? '')), 'UTF-8');
+        $texto = preg_replace('/[^A-Z0-9]/', '', $texto) ?? '';
 
         return self::UNIDADE_MEDICAO_ALIASES[$texto] ?? $texto;
     }

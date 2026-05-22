@@ -51,7 +51,7 @@
                     @foreach (FrutaUnidadeMedicao::cases() as $unidade)
                         <option value="{{ $unidade->value }}"
                             @selected(old('unidade_medicao', $fruta->unidade_medicao) === $unidade->value)>
-                            {{ $unidade->value }}
+                            {{ $unidade->rotulo() }}
                         </option>
                     @endforeach
                 </select>
@@ -90,10 +90,45 @@
                 @error('kg_por_unidade_medicao')
                     <div class="invalid-feedback">{{ $message }}</div>
                 @enderror
+                <small id="kg_por_unidade_medicao_help" class="text-muted">
+                    Peso correspondente a uma unidade de medição, em quilogramas.
+                </small>
             </div>
         </div>
     </div>
 </div>
+
+<script>
+(function () {
+    const um = document.getElementById('unidade_medicao');
+    const kg = document.getElementById('kg_por_unidade_medicao');
+    const help = document.getElementById('kg_por_unidade_medicao_help');
+    const pct = @json(FrutaUnidadeMedicao::PCT->value);
+    const kgUm = @json(FrutaUnidadeMedicao::KG->value);
+
+    function syncKgPorUnidade() {
+        const isPct = um && um.value === pct;
+        const isKg = um && um.value === kgUm;
+        const tresCasas = isPct || isKg;
+        if (kg) {
+            kg.step = tresCasas ? '0.001' : '0.01';
+            kg.min = tresCasas ? '0.001' : '0';
+        }
+        if (help) {
+            if (isPct) {
+                help.textContent = 'Peso do pacote em kg (ex.: 0,500 para 500 g). Armazenado com até 3 casas decimais.';
+            } else if (isKg) {
+                help.textContent = 'Para UM KG use normalmente 1,000 (1 kg por unidade). Ajuste só se a unidade KG representar outro peso.';
+            } else {
+                help.textContent = 'Peso correspondente a uma unidade de medição, em quilogramas.';
+            }
+        }
+    }
+
+    um?.addEventListener('change', syncKgPorUnidade);
+    syncKgPorUnidade();
+})();
+</script>
 
 @include('admin.frutas._icms_estados', [
     'estados' => $estados,
