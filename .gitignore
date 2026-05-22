@@ -103,6 +103,7 @@ npm-debug.log*
 *.xlsx
 !planilhas/estoques_importacao.xlsx
 !planilhas/icms_importacao_modelo.xlsx
+!planilhas/transferencias_importacao.xlsx
 *.xls
 *.csv
 *.ods
@@ -118,3 +119,4 @@ Homestead.yaml
 planilhas/*
 !planilhas/estoques_importacao.xlsx
 !planilhas/icms_importacao_modelo.xlsx
+!planilhas/transferencias_importacao.xlsx

@@ -57,6 +57,7 @@ class FrutasEstoqueOrigemSelectTest extends TestCase
 
         foreach ($rotas as [$rota, $permissao]) {
             $assertVenda = str_contains($rota, 'vendas');
+            $assertTransferencia = str_contains($rota, 'transferencias');
             $html = $this->actingAs($this->userWithPermissions([$permissao]))
                 ->get($rota)
                 ->assertOk()
@@ -73,6 +74,13 @@ class FrutasEstoqueOrigemSelectTest extends TestCase
             if ($assertVenda) {
                 $this->assertStringContainsString('origem física', strtolower((string) $html));
                 $this->assertStringContainsString('não do cliente', strtolower((string) $html));
+                $this->assertStringContainsString('data-venda-origem', (string) $html);
+            }
+
+            if ($assertTransferencia) {
+                $this->assertStringContainsString('data-transferencia-origem', (string) $html);
+                $this->assertStringContainsString('data-transferencia-fruta-aviso', (string) $html);
+                $this->assertStringContainsString('change.select2.transferenciaOrigem', (string) $html);
             }
         }
     }

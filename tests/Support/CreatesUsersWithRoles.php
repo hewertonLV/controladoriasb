@@ -261,6 +261,8 @@ trait CreatesUsersWithRoles
         return $this->userWithPermissions(array_values(array_unique(array_merge([
             Permissions::MOVIMENTACOES_TRANSFERENCIAS_VISUALIZAR,
             Permissions::MOVIMENTACOES_TRANSFERENCIAS_CRIAR,
+            Permissions::MOVIMENTACOES_TRANSFERENCIAS_IMPORTAR,
+            Permissions::MOVIMENTACOES_TRANSFERENCIAS_IMPORTAR_CONFIRMAR,
             Permissions::MOVIMENTACOES_TRANSFERENCIAS_RECEBER,
             Permissions::MOVIMENTACOES_TRANSFERENCIAS_REENVIAR,
             Permissions::MOVIMENTACOES_TRANSFERENCIAS_CANCELAR,

@@ -210,6 +210,10 @@ final class Permissions
 
     public const MOVIMENTACOES_TRANSFERENCIAS_CANCELAR_ADMIN = 'movimentacoes.transferencias.cancelar-admin';
 
+    public const MOVIMENTACOES_TRANSFERENCIAS_IMPORTAR = 'movimentacoes.transferencias.importar';
+
+    public const MOVIMENTACOES_TRANSFERENCIAS_IMPORTAR_CONFIRMAR = 'movimentacoes.transferencias.importar-confirmar';
+
     public const MOVIMENTACOES_DOACOES_VISUALIZAR = 'movimentacoes.doacoes.visualizar';
 
     public const MOVIMENTACOES_DOACOES_CRIAR = 'movimentacoes.doacoes.criar';
@@ -423,6 +427,8 @@ final class Permissions
             'Movimentações — Transferência' => [
                 self::MOVIMENTACOES_TRANSFERENCIAS_VISUALIZAR,
                 self::MOVIMENTACOES_TRANSFERENCIAS_CRIAR,
+                self::MOVIMENTACOES_TRANSFERENCIAS_IMPORTAR,
+                self::MOVIMENTACOES_TRANSFERENCIAS_IMPORTAR_CONFIRMAR,
                 self::MOVIMENTACOES_TRANSFERENCIAS_RECEBER,
                 self::MOVIMENTACOES_TRANSFERENCIAS_REENVIAR,
                 self::MOVIMENTACOES_TRANSFERENCIAS_CANCELAR,

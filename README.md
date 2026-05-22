@@ -437,8 +437,10 @@ composer install --no-dev --optimize-autoloader
 npm ci
 npm run build
 
-# 4. Migrations e caches
+# 4. Migrations, seeders e caches
 php artisan migrate --force
+php artisan db:seed --class=Database\\Seeders\\PermissionSeeder --force
+php artisan db:seed --class=Database\\Seeders\\RoleSeeder --force
 php artisan optimize:clear
 php artisan config:cache
 php artisan route:cache

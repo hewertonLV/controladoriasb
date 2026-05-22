@@ -38,6 +38,7 @@ use App\Http\Controllers\Admin\Movimentacoes\DescarteMovimentacaoController;
 use App\Http\Controllers\Admin\Movimentacoes\DevolucaoMovimentacaoController;
 use App\Http\Controllers\Admin\Movimentacoes\DoacaoMovimentacaoController;
 use App\Http\Controllers\Admin\Movimentacoes\RecebimentoTransferenciaController;
+use App\Http\Controllers\Admin\Movimentacoes\TransferenciaImportacaoController;
 use App\Http\Controllers\Admin\Movimentacoes\TransferenciaMovimentacaoController;
 use App\Http\Controllers\Admin\Movimentacoes\VendaMovimentacaoController;
 use App\Http\Controllers\Admin\PracaController;
@@ -904,6 +905,26 @@ Route::middleware(['auth', 'verified', 'user.active', 'password.changed'])->grou
             Route::post('/', [TransferenciaMovimentacaoController::class, 'store'])
                 ->middleware('permission:movimentacoes.transferencias.criar')
                 ->name('store');
+
+            Route::get('/importar', [TransferenciaImportacaoController::class, 'importar'])
+                ->middleware('permission:movimentacoes.transferencias.importar')
+                ->name('importar');
+
+            Route::post('/importar/iniciar', [TransferenciaImportacaoController::class, 'iniciar'])
+                ->middleware('permission:movimentacoes.transferencias.importar')
+                ->name('importar.iniciar');
+
+            Route::get('/importar/{importacao:uuid}/status', [TransferenciaImportacaoController::class, 'status'])
+                ->middleware('permission:movimentacoes.transferencias.importar')
+                ->name('importar.status');
+
+            Route::get('/importar/{importacao:uuid}/resultado', [TransferenciaImportacaoController::class, 'resultado'])
+                ->middleware('permission:movimentacoes.transferencias.importar')
+                ->name('importar.resultado');
+
+            Route::post('/importar/{importacao:uuid}/confirmar', [TransferenciaImportacaoController::class, 'confirmar'])
+                ->middleware('permission:movimentacoes.transferencias.importar-confirmar')
+                ->name('importar.confirmar');
 
             Route::get('/{transferenciaOrigem}', [TransferenciaMovimentacaoController::class, 'show'])
                 ->middleware('permission:movimentacoes.transferencias.visualizar')

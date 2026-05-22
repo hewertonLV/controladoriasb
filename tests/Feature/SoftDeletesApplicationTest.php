@@ -41,6 +41,7 @@ use App\Models\PracaExportacao;
 use App\Models\PracaHistorico;
 use App\Models\PracaImportacao;
 use App\Models\StatusMovimentacao;
+use App\Models\TransferenciaImportacao;
 use App\Models\UnidadeNegocio;
 use App\Models\UnidadeNegocioExportacao;
 use App\Models\UnidadeNegocioHistorico;
@@ -116,6 +117,7 @@ class SoftDeletesApplicationTest extends TestCase
             'categorias_descarte',
             'estoques',
             'estoque_importacoes',
+            'transferencia_importacoes',
             'estoque_exportacoes',
             'movimentacoes',
             'movimentacoes_estoque',
@@ -144,6 +146,7 @@ class SoftDeletesApplicationTest extends TestCase
             Estoque::class,
             EstoqueExportacao::class,
             EstoqueImportacao::class,
+            TransferenciaImportacao::class,
             Fornecedor::class,
             FornecedorExportacao::class,
             FornecedorHistorico::class,

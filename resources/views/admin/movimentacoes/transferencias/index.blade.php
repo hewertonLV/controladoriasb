@@ -12,11 +12,18 @@
                 <h4 class="header-title mb-0">Transferências</h4>
                 <p class="text-muted mb-0 small">Saída na origem e entrada pendente no destino (versão ativa).</p>
             </div>
-            @can('movimentacoes.transferencias.criar')
-                <a href="{{ route('admin.movimentacoes.transferencias.create') }}" class="btn btn-primary btn-sm ms-auto">
-                    <i class="ri-add-line me-1"></i> Nova transferência
-                </a>
-            @endcan
+            <div class="ms-auto d-flex flex-wrap gap-2">
+                @can('movimentacoes.transferencias.importar')
+                    <a href="{{ route('admin.movimentacoes.transferencias.importar') }}" class="btn btn-soft-primary btn-sm">
+                        <i class="ri-file-excel-2-line me-1"></i> Importar transferências
+                    </a>
+                @endcan
+                @can('movimentacoes.transferencias.criar')
+                    <a href="{{ route('admin.movimentacoes.transferencias.create') }}" class="btn btn-primary btn-sm">
+                        <i class="ri-add-line me-1"></i> Nova transferência
+                    </a>
+                @endcan
+            </div>
         </div>
         <div class="card-body p-0">
             <div class="table-responsive">

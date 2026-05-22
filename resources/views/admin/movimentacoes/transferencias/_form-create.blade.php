@@ -10,7 +10,7 @@
 
     <div class="col-md-6">
         <label for="id_empresa_origem" class="form-label">Unidade de origem <span class="text-danger">*</span></label>
-        <select name="id_empresa_origem" id="id_empresa_origem" class="form-select @error('id_empresa_origem') is-invalid @enderror" data-search-select data-placeholder="Selecione ou pesquise a unidade de origem" required>
+        <select name="id_empresa_origem" id="id_empresa_origem" class="form-select @error('id_empresa_origem') is-invalid @enderror" data-transferencia-origem data-search-select data-placeholder="Selecione ou pesquise a unidade de origem" required>
             <option value="">Selecione…</option>
             @foreach ($empresas_origem as $empresa)
                 <option value="{{ $empresa->id }}" @selected((string) old('id_empresa_origem') === (string) $empresa->id)>
@@ -70,6 +70,9 @@
                 <i class="ri-add-line me-1"></i> Adicionar fruta
             </button>
         </div>
+        <p class="small mb-2 text-muted" data-transferencia-fruta-aviso role="status">
+            Escolha a <strong>unidade de origem</strong> para liberar as frutas com estoque nessa unidade.
+        </p>
         <div data-items-container="transferencia">
             @foreach ($itens as $i => $item)
                 <div class="row g-2 mb-2" data-item-row>
@@ -129,31 +132,93 @@
 
 <script>
     document.addEventListener('DOMContentLoaded', function () {
+        const origem = document.querySelector('[data-transferencia-origem]');
+        const avisoFruta = document.querySelector('[data-transferencia-fruta-aviso]');
         const container = document.querySelector('[data-items-container="transferencia"]');
         const addButton = document.querySelector('[data-add-item="transferencia"]');
         const template = document.getElementById('transferencia-item-template');
-        const origem = document.getElementById('id_empresa_origem');
-        if (!container || !addButton || !template || !origem) return;
+
+        const reinitFrutaSelect = (select) => {
+            if (!window.jQuery || !select) {
+                return;
+            }
+
+            const $select = window.jQuery(select);
+
+            if ($select.hasClass('select2-hidden-accessible')) {
+                $select.select2('destroy');
+            }
+
+            window.AdminSearchSelect?.init(select);
+        };
 
         const filtrarFrutasPorOrigem = () => {
-            const origemId = origem.value;
+            if (!origem || !container) {
+                return;
+            }
+
+            const origemId = String(origem.value || '').trim();
+            let temFrutaDisponivel = false;
 
             container.querySelectorAll('[data-fruta-select]').forEach((select) => {
                 select.querySelectorAll('option').forEach((option) => {
-                    if (!option.value) return;
+                    if (!option.value) {
+                        return;
+                    }
 
-                    const permitido = origemId !== '' && (option.dataset.estoqueOrigens || '').split(',').includes(origemId);
+                    const origens = (option.dataset.estoqueOrigens || '')
+                        .split(',')
+                        .map((id) => id.trim())
+                        .filter((id) => id !== '');
+                    const permitido = origemId !== '' && origens.includes(origemId);
                     option.hidden = !permitido;
                     option.disabled = !permitido;
+
+                    if (permitido) {
+                        temFrutaDisponivel = true;
+                    }
                 });
 
                 if (select.selectedOptions.length && select.selectedOptions[0].disabled) {
                     select.value = '';
                 }
 
-                window.AdminSearchSelect?.refresh(select);
+                reinitFrutaSelect(select);
             });
+
+            if (!avisoFruta) {
+                return;
+            }
+
+            if (origemId === '') {
+                avisoFruta.className = 'small mb-2 text-muted';
+                avisoFruta.innerHTML = 'Escolha a <strong>unidade de origem</strong> para liberar as frutas com estoque nessa unidade.';
+            } else if (!temFrutaDisponivel) {
+                avisoFruta.className = 'small mb-2 text-danger';
+                avisoFruta.textContent = 'Nenhuma fruta com estoque nesta origem. Verifique o estoque da unidade ou selecione outra origem.';
+            } else {
+                avisoFruta.className = 'small mb-2 text-success';
+                avisoFruta.textContent = 'Frutas liberadas para a origem selecionada.';
+            }
         };
+
+        const onOrigemAlterada = () => {
+            filtrarFrutasPorOrigem();
+        };
+
+        if (origem) {
+            origem.addEventListener('change', onOrigemAlterada);
+
+            if (window.jQuery?.fn?.select2) {
+                window.jQuery(origem).on('change.select2.transferenciaOrigem', onOrigemAlterada);
+            }
+        }
+
+        if (!container || !addButton || !template) {
+            setTimeout(onOrigemAlterada, 0);
+
+            return;
+        }
 
         const refreshRemoveButtons = () => {
             container.querySelectorAll('[data-remove-item]').forEach((button) => {
@@ -165,12 +230,16 @@
             const index = container.querySelectorAll('[data-item-row]').length;
             container.insertAdjacentHTML('beforeend', template.innerHTML.replaceAll('__INDEX__', String(index)));
             filtrarFrutasPorOrigem();
-            window.AdminSearchSelect?.init(container.lastElementChild);
+            if (container.lastElementChild) {
+                window.AdminSearchSelect?.init(container.lastElementChild);
+            }
             refreshRemoveButtons();
         });
 
         container.addEventListener('click', (event) => {
-            if (!event.target.matches('[data-remove-item]')) return;
+            if (!event.target.matches('[data-remove-item]')) {
+                return;
+            }
             const row = event.target.closest('[data-item-row]');
             if (row) {
                 window.AdminSearchSelect?.destroy(row);
@@ -179,8 +248,9 @@
             refreshRemoveButtons();
         });
 
-        origem.addEventListener('change', filtrarFrutasPorOrigem);
-        filtrarFrutasPorOrigem();
         refreshRemoveButtons();
+
+        // Select2 do layout inicia depois deste script; refiltra após init e se origem já veio do old().
+        setTimeout(onOrigemAlterada, 0);
     });
 </script>
