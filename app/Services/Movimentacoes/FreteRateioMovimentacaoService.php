@@ -277,7 +277,13 @@ final class FreteRateioMovimentacaoService
             'valor_frete_kg' => number_format($valorFreteKg, 2, '.', ''),
             'valor_frete_rateio' => number_format($rateio, 2, '.', ''),
             'valor_frete_um' => number_format($freteUm, 2, '.', ''),
-            'resultado_movimentacao' => number_format(round((float) $movimentacao->valor_nf_total - (float) $movimentacao->valor_custo_saida - $rateio, 2), 2, '.', ''),
+            'resultado_movimentacao' => number_format(round(
+                (float) $movimentacao->valor_nf_total
+                - (float) $movimentacao->valor_custo_saida
+                - round((float) $movimentacao->valor_custo_operacional * (float) $movimentacao->qtd_fruta_kg, 2)
+                - $rateio,
+                2
+            ), 2, '.', ''),
         ])->saveQuietly();
     }
 

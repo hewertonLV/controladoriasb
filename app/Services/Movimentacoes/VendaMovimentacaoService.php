@@ -12,6 +12,7 @@ use App\Models\Empresa;
 use App\Models\Estoque;
 use App\Models\Frete;
 use App\Models\Fruta;
+use App\Models\HistoricoCOUnNg;
 use App\Models\Movimentacao;
 use App\Models\MovimentacaoEstoque;
 use App\Models\StatusMovimentacao;
@@ -42,19 +43,29 @@ final class VendaMovimentacaoService
      *     empresas_origem: Collection<int, Empresa>,
      *     empresas_destino_cliente: Collection<int, Empresa>,
      *     unidades_faturamento: Collection<int, UnidadeNegocio>,
+     *     unidades_hub: Collection<int, UnidadeNegocio>,
      *     frutas: Collection<int, Fruta>,
+     *     frutas_catalogo: list<array{id: int, nome: string, origens: list<int>}>,
      *     fretes: Collection<int, Frete>,
      * }
      */
     public function opcoesFormularioVenda(): array
     {
+        $frutas = FrutasComEstoqueOrigem::listar();
+
         return [
             'empresas_origem' => Empresa::query()->where('entidade_type', UnidadeNegocio::class)->with('entidade')->get()
                 ->filter(fn (Empresa $e): bool => app(UnidadeNegocioAccessService::class)->canAccess(auth()->user(), (int) $e->entidade->id))
                 ->sortBy(fn (Empresa $e): string => mb_strtolower($e->nomeExibicao()))->values(),
             'empresas_destino_cliente' => Empresa::query()->where('entidade_type', Cliente::class)->with('entidade')->get()->sortBy(fn (Empresa $e): string => mb_strtolower($e->nomeExibicao()))->values(),
             'unidades_faturamento' => UnidadeNegocio::query()->where('is_hub', false)->orderBy('nome')->get(),
-            'frutas' => FrutasComEstoqueOrigem::listar(),
+            'unidades_hub' => UnidadeNegocio::query()
+                ->where('is_hub', true)
+                ->permitidasPara(auth()->user())
+                ->orderBy('nome')
+                ->get(),
+            'frutas' => $frutas,
+            'frutas_catalogo' => FrutasComEstoqueOrigem::catalogoJs($frutas),
             'fretes' => Frete::query()->where('status_situacao', FreteStatusSituacao::ABERTA->value)->orderBy('nome')->get(),
         ];
     }
@@ -67,6 +78,7 @@ final class VendaMovimentacaoService
     {
         return DB::transaction(function () use ($input, $user): array {
             [$empresaOrigem, $unidadeOrigem, $empresaDestino, $unidadeFaturamento, $frete, $dataEmissao] = $this->resolverCabecalho($input);
+            $custoHub = $this->resolverCustoOperacionalHubVenda($unidadeOrigem, $input);
             $itens = $this->normalizarItens($input['itens'] ?? []);
             $numeroNf = trim((string) $input['numero_nf']);
             $observacao = $this->nullableTrim($input['observacao'] ?? null);
@@ -93,6 +105,7 @@ final class VendaMovimentacaoService
                     unidadeFaturamento: $unidadeFaturamento,
                     frete: $frete,
                     item: $item,
+                    custoHub: $custoHub,
                     dataMovimentacao: $dataEmissao,
                     user: $user,
                 ));
@@ -126,6 +139,8 @@ final class VendaMovimentacaoService
                 'data_emissao' => $ativa->data_movimentacao,
             ], $input), true);
 
+            $custoHub = $this->resolverCustoOperacionalHubVenda($unidadeOrigem, $input);
+
             $item = $this->normalizarItem([
                 'id_fruta' => $input['id_fruta'] ?? $ativa->id_fruta,
                 'qtd_fruta_um' => $input['qtd_fruta_um'],
@@ -155,11 +170,16 @@ final class VendaMovimentacaoService
             $precoMedioUm = (float) $estoque->preco_medio_um;
             $valorCustoSaida = round($precoMedioKg * $qtdKg, 2);
 
+            $valorCoKg = (float) $custoHub['valor_custo_operacional'];
+            $freteRateioAtual = (float) $ativa->valor_frete_rateio;
+
             $nova = $this->versionamento->criarNovaVersao($ativa, $this->atributosVenda([
                 'venda_nota_id' => $nota->id,
                 'id_empresa_origem' => $empresaOrigem->id,
                 'id_empresa_destino' => $empresaDestino->id,
                 'id_unidade_negocio_faturamento' => $unidadeFaturamento->id,
+                'id_custo_operacional' => $custoHub['id_custo_operacional'],
+                'valor_custo_operacional' => $custoHub['valor_custo_operacional'],
                 'id_fruta' => $fruta->id,
                 'qtd_fruta_um' => $qtdUm,
                 'qtd_fruta_kg' => $qtdKg,
@@ -168,7 +188,7 @@ final class VendaMovimentacaoService
                 'valor_nf_kg' => $valorNfKg,
                 'valor_custo_saida' => $valorCustoSaida,
                 'valor_total_movimentacao' => $valorCustoSaida,
-                'resultado_movimentacao' => round($valorNfTotal - $valorCustoSaida, 2),
+                'resultado_movimentacao' => $this->calcularResultadoVenda($valorNfTotal, $valorCustoSaida, $valorCoKg, $qtdKg, $freteRateioAtual),
                 'id_frete' => $frete?->id,
                 'saldo_estoque_fruta_kg' => (float) $estoque->qtd_fruta_kg,
                 'saldo_estoque_fruta_um' => (float) $estoque->qtd_fruta_um,
@@ -241,6 +261,7 @@ final class VendaMovimentacaoService
         UnidadeNegocio $unidadeFaturamento,
         ?Frete $frete,
         array $item,
+        array $custoHub,
         Carbon $dataMovimentacao,
         ?User $user,
     ): Movimentacao {
@@ -257,6 +278,7 @@ final class VendaMovimentacaoService
         $precoMedioKg = (float) $estoque->preco_medio_kg;
         $precoMedioUm = (float) $estoque->preco_medio_um;
         $valorCustoSaida = round($precoMedioKg * $qtdKg, 2);
+        $valorCoKg = (float) $custoHub['valor_custo_operacional'];
 
         $empresaDestino->loadMissing('entidade');
         $cliente = $empresaDestino->entidade;
@@ -302,7 +324,9 @@ final class VendaMovimentacaoService
             'valor_nf_kg' => $valorNfKg,
             'valor_custo_saida' => $valorCustoSaida,
             'valor_total_movimentacao' => $valorCustoSaida,
-            'resultado_movimentacao' => round($valorNfTotal - $valorCustoSaida, 2),
+            'id_custo_operacional' => $custoHub['id_custo_operacional'],
+            'valor_custo_operacional' => $custoHub['valor_custo_operacional'],
+            'resultado_movimentacao' => $this->calcularResultadoVenda($valorNfTotal, $valorCustoSaida, $valorCoKg, $qtdKg, 0),
             'id_frete' => $frete?->id,
             'saldo_estoque_fruta_kg' => $saldoKgNovo,
             'saldo_estoque_fruta_um' => $saldoUmNovo,
@@ -378,6 +402,63 @@ final class VendaMovimentacaoService
             : now();
 
         return [$empresaOrigem, $unidadeOrigem, $empresaDestino, $unidadeFaturamento, $frete, $dataEmissao];
+    }
+
+    /**
+     * @param  array<string, mixed>  $input
+     * @return array{id_custo_operacional: int|null, valor_custo_operacional: string}
+     */
+    private function resolverCustoOperacionalHubVenda(UnidadeNegocio $unidadeOrigem, array $input): array
+    {
+        $zerado = [
+            'id_custo_operacional' => null,
+            'valor_custo_operacional' => '0.00',
+        ];
+
+        if (! $unidadeOrigem->is_unidade_producao) {
+            return $zerado;
+        }
+
+        $aplicar = filter_var($input['aplicar_custo_operacional_hub'] ?? true, FILTER_VALIDATE_BOOLEAN);
+        if (! $aplicar) {
+            return $zerado;
+        }
+
+        $hubId = (int) ($input['id_unidade_negocio_hub_custo'] ?? 0);
+        if ($hubId <= 0) {
+            throw new InvalidArgumentException('Informe a unidade HUB para o custo operacional da venda.');
+        }
+
+        $hub = UnidadeNegocio::query()->findOrFail($hubId);
+        if (! $hub->is_hub) {
+            throw new InvalidArgumentException('A unidade selecionada para custo operacional deve ser HUB.');
+        }
+
+        $co = HistoricoCOUnNg::query()
+            ->where('id_unidade_negocio', $hub->id)
+            ->where('status_position', true)
+            ->first();
+
+        if ($co === null) {
+            throw new InvalidArgumentException('Não existe custo operacional vigente para o HUB selecionado.');
+        }
+
+        return [
+            'id_custo_operacional' => (int) $co->id,
+            'valor_custo_operacional' => number_format((float) $co->custo_operacional, 2, '.', ''),
+        ];
+    }
+
+    private function calcularResultadoVenda(
+        float $valorNfTotal,
+        float $valorCustoSaida,
+        float $valorCustoOperacionalKg,
+        float $qtdKg,
+        float $valorFreteRateio,
+    ): float {
+        $custoOperacionalTotal = round($valorCustoOperacionalKg * $qtdKg, 2);
+
+        return round($valorNfTotal - $valorCustoSaida - $custoOperacionalTotal - $valorFreteRateio, 2);
     }
 
     /**

@@ -157,6 +157,8 @@ class UnidadeNegocioController extends Controller
 
     public function historico(UnidadeNegocio $unidadeNegocio): View
     {
+        $unidadeNegocio->load('estado');
+
         $historicos = $unidadeNegocio->historicos()
             ->with('user')
             ->paginate(50);
@@ -164,6 +166,7 @@ class UnidadeNegocioController extends Controller
         return view('admin.unidades-negocio.historico', [
             'unidadeNegocio' => $unidadeNegocio,
             'historicos' => $historicos,
+            'estadosPorId' => Estado::query()->pluck('nome', 'id')->all(),
         ]);
     }
 }

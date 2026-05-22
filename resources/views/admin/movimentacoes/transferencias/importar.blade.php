@@ -97,6 +97,7 @@
                     <i class="ri-truck-line text-success me-1"></i>
                     Linhas prontas <span class="badge bg-success-subtle text-success ms-1" id="count-novas">0</span>
                 </h5>
+                <p class="text-muted small mb-0 mt-1">A origem vem da planilha. O destino é editável por NF — alterar uma NF aplica a todas as linhas da mesma origem com esse número.</p>
             </div>
             <div class="card-body p-0">
                 <div class="table-responsive">
@@ -107,7 +108,7 @@
                                     <input type="checkbox" class="form-check-input" id="check-all-novas">
                                 </th>
                                 <th>Linha</th>
-                                <th>Origem → Destino</th>
+                                <th>Origem · Destino</th>
                                 <th>Fruta · Qtd · NF</th>
                             </tr>
                         </thead>
@@ -214,6 +215,7 @@
 
         let importacaoAtiva = null;
         let preview = { novas: [], erros: [] };
+        let empresasDestino = [];
         let pollTimer = null;
         const POLL_INTERVAL_MS = 1500;
 
@@ -289,12 +291,52 @@
             const nf = escapeHtml(d.numero_nf_origem || '—');
             return `${fruta} · <strong>${um}</strong> ${umed} · NF ${nf}`;
         }
-        function rotuloOrigemDestino(d) {
+        function rotuloOrigem(d) {
             const o = fmtDoc(d.cnpj_origem);
-            const dest = fmtDoc(d.cnpj_destino);
             const no = escapeHtml(d.nome_origem || '');
-            const nd = escapeHtml(d.nome_destino || '');
-            return `<span class="text-muted small">${o}</span> ${no}<br><i class="ri-arrow-right-line"></i> <span class="text-muted small">${dest}</span> ${nd}`;
+            return `<span class="text-muted small">${o}</span> ${no}`;
+        }
+        function opcoesSelectDestino(idSelecionado) {
+            const id = Number(idSelecionado);
+            return empresasDestino.map(e => {
+                const cnpj = fmtDoc(e.cnpj);
+                const label = escapeHtml(e.label || '—');
+                const sel = Number(e.id) === id ? ' selected' : '';
+                return `<option value="${e.id}"${sel}>${label}${cnpj ? ' · ' + cnpj : ''}</option>`;
+            }).join('');
+        }
+        function chaveGrupoDestino(d) {
+            return String(d.id_empresa_origem || '') + '|' + String(d.numero_nf_origem || '');
+        }
+        function agruparNovasPorNf(lista) {
+            const grupos = new Map();
+            lista.forEach(item => {
+                const d = item.dados || {};
+                const chave = chaveGrupoDestino(d);
+                if (!grupos.has(chave)) {
+                    grupos.set(chave, []);
+                }
+                grupos.get(chave).push(item);
+            });
+            return Array.from(grupos.entries()).sort((a, b) => {
+                const la = a[1][0]?.linha ?? 0;
+                const lb = b[1][0]?.linha ?? 0;
+                return la - lb;
+            });
+        }
+        function selectDestinoGrupo(chave, rowIds, idEmpresaDestino, nf) {
+            if (!empresasDestino.length) {
+                return '<span class="text-muted small">—</span>';
+            }
+            const nfLabel = escapeHtml(nf || '—');
+            const rowIdsAttr = rowIds.join(',');
+            return `<label class="form-label text-muted small mb-0 mt-1">Destino · NF ${nfLabel}</label>
+                <select class="form-select form-select-sm sel-destino-grupo"
+                    data-grupo="${escapeHtml(chave)}"
+                    data-row-ids="${rowIdsAttr}"
+                    aria-label="Destino para NF ${nfLabel}">
+                    ${opcoesSelectDestino(idEmpresaDestino)}
+                </select>`;
         }
         function formatarErrosLinha(item) {
             const lista = item.erros || [];
@@ -305,18 +347,41 @@
         function renderNovas(lista) {
             tbodyNovas.innerHTML = '';
             countNovas.textContent = lista.length;
-            lista.forEach(item => {
-                const d = item.dados || {};
-                const tr = document.createElement('tr');
-                tr.innerHTML = `
-                    <td><input type="checkbox" class="form-check-input chk-nova" data-row="${item.row_id}" checked></td>
-                    <td>${item.linha}</td>
-                    <td class="small">${rotuloOrigemDestino(d)}</td>
-                    <td class="small">${resumoTransferencia(d)}</td>
-                `;
-                tbodyNovas.appendChild(tr);
+            agruparNovasPorNf(lista).forEach(([, itens]) => {
+                itens.forEach((item, idx) => {
+                    const d = item.dados || {};
+                    const idDestino = item.id_empresa_destino ?? d.id_empresa_destino ?? '';
+                    const tr = document.createElement('tr');
+                    const destinoCell = idx === 0
+                        ? `<td class="small align-top" rowspan="${itens.length}">
+                            <div>${rotuloOrigem(d)}</div>
+                            ${selectDestinoGrupo(chaveGrupoDestino(d), itens.map(i => i.row_id), idDestino, d.numero_nf_origem)}
+                           </td>`
+                        : '';
+                    tr.innerHTML = `
+                        <td><input type="checkbox" class="form-check-input chk-nova" data-row="${item.row_id}" checked></td>
+                        <td>${item.linha}</td>
+                        ${destinoCell}
+                        <td class="small">${resumoTransferencia(d)}</td>
+                    `;
+                    tbodyNovas.appendChild(tr);
+                });
             });
             checkAllNovas.checked = lista.length > 0;
+        }
+        function destinosPorRowSelecionados(rowIdsSelecionados) {
+            const selecionados = new Set(rowIdsSelecionados);
+            const out = {};
+            document.querySelectorAll('.sel-destino-grupo').forEach(sel => {
+                const ids = String(sel.dataset.rowIds || '').split(',').map(Number).filter(n => n > 0);
+                const destinoId = Number(sel.value);
+                ids.forEach(rowId => {
+                    if (selecionados.has(rowId)) {
+                        out[rowId] = destinoId;
+                    }
+                });
+            });
+            return out;
         }
         function renderErros(lista) {
             tbodyErros.innerHTML = '';
@@ -348,6 +413,7 @@
                 return;
             }
             preview = { novas: data.novas || [], erros: data.erros || [] };
+            empresasDestino = data.empresas_destino || [];
             renderErros(preview.erros);
             renderNovas(preview.novas);
             resultado.classList.remove('d-none');
@@ -447,6 +513,7 @@
                 showAlerta('warning', 'Selecione ao menos uma linha.');
                 return;
             }
+            const idEmpresaDestinoPorRow = destinosPorRowSelecionados(rowIds);
             setLoading(btnConfirmar, spinConfirmar, true);
             try {
                 const resp = await fetch(importacaoAtiva.urls.confirmar, {
@@ -458,7 +525,10 @@
                         'X-Requested-With': 'XMLHttpRequest',
                     },
                     credentials: 'same-origin',
-                    body: JSON.stringify({ row_ids_novas: rowIds }),
+                    body: JSON.stringify({
+                        row_ids_novas: rowIds,
+                        id_empresa_destino_por_row: idEmpresaDestinoPorRow,
+                    }),
                 });
                 const data = await resp.json();
                 if (!resp.ok) {
@@ -493,6 +563,7 @@
             inputArquivo.value = '';
             importacaoAtiva = null;
             preview = { novas: [], erros: [] };
+            empresasDestino = [];
             resultado.classList.add('d-none');
             resumoFinal.classList.add('d-none');
             resetProgressoUI();

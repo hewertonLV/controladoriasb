@@ -269,23 +269,34 @@
         const entitySingular = config.entityLabelSingular || entity.replace(/s$/, '') || 'registro';
 
         return {
-            search: '',
+            search: 'Pesquisar:',
             searchPlaceholder: config.searchPlaceholder || 'Pesquisar',
-            lengthMenu: 'Mostrar _MENU_',
-            info: `Exibindo _START_ a _END_ de _TOTAL_ ${entity}`,
+            lengthMenu: 'Exibir _MENU_',
+            info: `Mostrando _START_ a _END_ de _TOTAL_ ${entity}`,
             infoEmpty: `Nenhum ${entitySingular} para exibir`,
-            infoFiltered: '(filtrado de _MAX_ registros)',
+            infoFiltered: '(filtrado de _MAX_ no total)',
             zeroRecords: `Nenhum ${entitySingular} encontrado`,
             emptyTable: `Nenhum ${entitySingular} cadastrado`,
+            loadingRecords: 'Carregando…',
+            processing: 'Processando…',
             paginate: {
                 first: 'Primeiro',
                 previous: 'Anterior',
                 next: 'Próximo',
                 last: 'Último',
             },
+            aria: {
+                sortAscending: ': ativar para ordenar a coluna em ordem crescente',
+                sortDescending: ': ativar para ordenar a coluna em ordem decrescente',
+            },
             buttons: {
                 copy: 'Copiar',
                 print: 'Imprimir',
+                copyTitle: 'Copiar para a área de transferência',
+                copySuccess: {
+                    1: 'Uma linha copiada',
+                    _: '%d linhas copiadas',
+                },
             },
         };
     }

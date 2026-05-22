@@ -84,6 +84,27 @@ class FrutasComEstoqueOrigem
     }
 
     /**
+     * Catálogo leve para filtro de frutas por origem física no formulário (JS).
+     *
+     * @param  EloquentCollection<int, Fruta>  $frutas
+     * @return list<array{id: int, nome: string, origens: list<int>}>
+     */
+    public static function catalogoJs(EloquentCollection $frutas): array
+    {
+        return $frutas
+            ->map(fn (Fruta $fruta): array => [
+                'id' => (int) $fruta->id,
+                'nome' => (string) $fruta->nome,
+                'origens' => array_values(array_map(
+                    intval(...),
+                    $fruta->getAttribute('estoque_origem_empresa_ids') ?? [],
+                )),
+            ])
+            ->values()
+            ->all();
+    }
+
+    /**
      * @param  iterable<int, Empresa>  $empresas
      * @return list<int>
      */

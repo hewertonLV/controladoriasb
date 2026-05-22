@@ -2,8 +2,8 @@
     @csrf
 
     <div class="col-md-6">
-        <label for="id_empresa_origem" class="form-label">Unidade de negócio <span class="text-danger">*</span></label>
-        <select name="id_empresa_origem" id="id_empresa_origem" class="form-select @error('id_empresa_origem') is-invalid @enderror" data-search-select data-placeholder="Selecione a unidade" required>
+        <label for="id_empresa_origem" class="form-label">Unidade de Produção <span class="text-danger">*</span></label>
+        <select name="id_empresa_origem" id="id_empresa_origem" class="form-select @error('id_empresa_origem') is-invalid @enderror" data-search-select data-placeholder="Selecione a unidade de produção" required>
             <option value="">Selecione…</option>
             @foreach ($empresas_unidade as $e)
                 <option value="{{ $e->id }}" @selected(old('id_empresa_origem') == $e->id)>{{ $e->nomeExibicao() }}</option>

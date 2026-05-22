@@ -35,6 +35,8 @@ trait ValidatesUnidadeNegocioAttributes
             ],
             'custo_operacional' => ['required', 'numeric', 'min:0', 'decimal:0,2'],
             'possui_estoque' => ['required', 'boolean'],
+            'is_unidade_producao' => ['required', 'boolean'],
+            'is_hub' => ['required', 'boolean'],
         ];
     }
 
@@ -51,6 +53,8 @@ trait ValidatesUnidadeNegocioAttributes
             'cpf_cnpj' => 'CPF/CNPJ',
             'custo_operacional' => 'custo operacional',
             'possui_estoque' => 'controla estoque',
+            'is_unidade_producao' => 'unidade de produção',
+            'is_hub' => 'unidade HUB',
         ];
     }
 
@@ -84,6 +88,8 @@ trait ValidatesUnidadeNegocioAttributes
             'cpf_cnpj' => $documento === '' ? null : $documento,
             'custo_operacional' => $custoNormalizado,
             'possui_estoque' => $this->boolean('possui_estoque'),
+            'is_unidade_producao' => $this->boolean('is_unidade_producao'),
+            'is_hub' => $this->boolean('is_hub'),
         ]);
     }
 

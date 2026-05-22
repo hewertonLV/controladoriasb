@@ -6,6 +6,7 @@ use App\Enums\FreteStatusSituacao;
 use App\Http\Requests\Admin\Movimentacoes\Concerns\ValidaAcessoUnidadeNegocio;
 use App\Models\Cliente;
 use App\Models\Empresa;
+use App\Models\Estoque;
 use App\Models\Fruta;
 use App\Models\UnidadeNegocio;
 use App\Support\TextoCadastro;
@@ -32,6 +33,8 @@ class StoreVendaMovimentacaoRequest extends FormRequest
             'id_empresa_origem' => ['required', 'integer', Rule::exists('empresas', 'id')->where('entidade_type', UnidadeNegocio::class)],
             'id_empresa_destino' => ['required', 'integer', Rule::exists('empresas', 'id')->where('entidade_type', Cliente::class)],
             'id_unidade_negocio_faturamento' => ['nullable', 'integer', Rule::exists('unidades_negocio', 'id')],
+            'aplicar_custo_operacional_hub' => ['nullable', 'boolean'],
+            'id_unidade_negocio_hub_custo' => ['nullable', 'integer', Rule::exists('unidades_negocio', 'id')],
             'observacao' => ['nullable', 'string', 'max:5000'],
             'id_frete' => ['nullable', 'integer', Rule::exists('fretes', 'id')->where('status_situacao', FreteStatusSituacao::ABERTA->value)],
             'itens' => ['required', 'array', 'min:1'],
@@ -76,6 +79,52 @@ class StoreVendaMovimentacaoRequest extends FormRequest
                     $v->errors()->add('id_unidade_negocio_faturamento', 'A unidade de faturamento não pode ser HUB.');
                 }
             }
+
+            if ($origem !== null && $origem->is_unidade_producao) {
+                $aplicarHub = $this->boolean('aplicar_custo_operacional_hub');
+                $hubInformado = ! blank($this->input('id_unidade_negocio_hub_custo'));
+
+                if ($aplicarHub && ! $hubInformado) {
+                    $v->errors()->add('id_unidade_negocio_hub_custo', 'Informe a unidade HUB para o custo operacional.');
+                }
+
+                if (! $aplicarHub && $hubInformado) {
+                    $v->errors()->add('id_unidade_negocio_hub_custo', 'A unidade HUB de custo só deve ser informada com o switch ativado.');
+                }
+
+                if ($aplicarHub && $hubInformado) {
+                    $hub = UnidadeNegocio::query()->find((int) $this->input('id_unidade_negocio_hub_custo'));
+                    if ($hub !== null && ! $hub->is_hub) {
+                        $v->errors()->add('id_unidade_negocio_hub_custo', 'A unidade de custo operacional deve ser HUB.');
+                    }
+                }
+            } elseif (! blank($this->input('id_unidade_negocio_hub_custo')) || $this->boolean('aplicar_custo_operacional_hub')) {
+                $v->errors()->add('aplicar_custo_operacional_hub', 'Custo operacional do HUB só se aplica quando a origem for unidade de produção.');
+            }
+
+            if ($origem !== null) {
+                foreach ((array) $this->input('itens', []) as $i => $item) {
+                    if (blank($item['id_fruta'] ?? null)) {
+                        continue;
+                    }
+
+                    $temEstoqueNaOrigem = Estoque::query()
+                        ->where('id_unidade_negocio', $origem->id)
+                        ->where('id_fruta', (int) $item['id_fruta'])
+                        ->where(function ($query): void {
+                            $query->where('qtd_fruta_um', '>', 0)
+                                ->orWhere('qtd_fruta_kg', '>', 0);
+                        })
+                        ->exists();
+
+                    if (! $temEstoqueNaOrigem) {
+                        $v->errors()->add(
+                            "itens.{$i}.id_fruta",
+                            'Esta fruta não possui estoque na origem física selecionada.',
+                        );
+                    }
+                }
+            }
         });
     }
 
@@ -106,10 +155,25 @@ class StoreVendaMovimentacaoRequest extends FormRequest
             }
         }
 
-        $this->merge([
+        $empresaOrigem = Empresa::query()->with('entidade')->find((int) $this->input('id_empresa_origem'));
+        $origem = $empresaOrigem?->entidade instanceof UnidadeNegocio ? $empresaOrigem->entidade : null;
+
+        $merge = [
             'numero_nf' => trim((string) $this->input('numero_nf')),
             'itens' => $itens,
-        ]);
+        ];
+
+        if ($origem !== null && $origem->is_unidade_producao) {
+            $merge['aplicar_custo_operacional_hub'] = $this->boolean('aplicar_custo_operacional_hub', true);
+            if (! $merge['aplicar_custo_operacional_hub']) {
+                $merge['id_unidade_negocio_hub_custo'] = null;
+            }
+        } else {
+            $merge['aplicar_custo_operacional_hub'] = false;
+            $merge['id_unidade_negocio_hub_custo'] = null;
+        }
+
+        $this->merge($merge);
     }
 
     /**

@@ -7,14 +7,13 @@
     <table id="unidades-negocio-datatable" class="table table-sm table-striped table-hover table-centered admin-datatable-table mb-0 w-100">
             <thead>
                 <tr>
-                    <th># CI.</th>
+                    <th>ID CIGAM</th>
                     <th>UF</th>
                     <th>Unidade</th>
-                    <th>Doc.</th>
-                    <th>C. op.</th>
-                    <th>Est.</th>
+                    <th>CPF/CNPJ</th>
+                    <th>Custo oper.</th>
+                    <th>Estoque</th>
                     <th>Status</th>
-                    <th>Criado</th>
                     <th class="text-end">Ações</th>
                 </tr>
             </thead>
@@ -49,7 +48,6 @@
                                 </span>
                             @endif
                         </td>
-                        <td data-order="{{ $unidade->created_at?->timestamp ?? 0 }}">{{ optional($unidade->created_at)->format('d/m/Y H:i') ?? '—' }}</td>
                         <td class="text-end">
                             <div class="d-inline-flex gap-1 justify-content-end flex-nowrap">
                                 @can('unidades-negocio.editar')

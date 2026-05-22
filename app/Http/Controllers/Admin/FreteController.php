@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Admin;
 
 use App\Enums\FreteStatusSituacao;
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Admin\FreteCalendarioRequest;
 use App\Http\Requests\Admin\StoreFreteRequest;
 use App\Http\Requests\Admin\UpdateFreteRequest;
 use App\Models\Frete;
@@ -11,8 +12,10 @@ use App\Models\FreteHistorico;
 use App\Models\Veiculo;
 use App\Queries\FreteQuery;
 use App\Services\Fretes\FreteAuditoriaService;
+use App\Services\Fretes\FreteCalendarioService;
 use App\Services\Movimentacoes\FreteRateioMovimentacaoService;
 use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -24,6 +27,7 @@ class FreteController extends Controller
         private readonly FreteAuditoriaService $auditoria,
         private readonly FreteQuery $freteQuery,
         private readonly FreteRateioMovimentacaoService $freteRateio,
+        private readonly FreteCalendarioService $calendario,
     ) {}
 
     public function index(Request $request): View
@@ -105,6 +109,21 @@ class FreteController extends Controller
         return redirect()
             ->route('admin.fretes.index')
             ->with('success', "Frete \"{$frete->nome}\" atualizado com sucesso.");
+    }
+
+    public function calendario(): View
+    {
+        return view('admin.fretes.calendario', [
+            'mesAtual' => now()->format('Y-m'),
+            'eventosUrl' => route('admin.fretes.calendario.eventos'),
+        ]);
+    }
+
+    public function calendarioEventos(FreteCalendarioRequest $request): JsonResponse
+    {
+        return response()->json(
+            $this->calendario->payloadParaMes($request->mesReferencia(), $request->user()),
+        );
     }
 
     public function historico(Frete $frete): View

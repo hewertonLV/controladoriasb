@@ -5,8 +5,13 @@ namespace App\Http\Controllers\Admin\Movimentacoes;
 use App\Http\Controllers\Admin\Concerns\AutorizaProcessamentoUsuario;
 use App\Http\Controllers\Controller;
 use App\Jobs\Movimentacoes\ProcessarPreviewImportacaoVendasJob;
+use App\Models\Empresa;
+use App\Models\UnidadeNegocio;
+use App\Models\User;
 use App\Models\VendaImportacao;
 use App\Services\Movimentacoes\VendaMovimentacaoService;
+use App\Services\Permissoes\UnidadeNegocioAccessService;
+use App\Support\EmpresaEntidadeQuery;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -104,6 +109,7 @@ class VendaImportacaoController extends Controller
             'atualizacoes' => [],
             'sem_alteracoes' => [],
             'erros' => $resultado['erros'] ?? [],
+            'empresas_origem' => $this->empresasOrigemOpcoes($request->user()),
         ]);
     }
 
@@ -121,9 +127,13 @@ class VendaImportacaoController extends Controller
         $payload = $request->validate([
             'row_ids_novas' => ['nullable', 'array'],
             'row_ids_novas.*' => ['integer', 'min:1'],
+            'id_empresa_origem_por_row' => ['nullable', 'array'],
+            'id_empresa_origem_por_row.*' => ['integer', 'min:1'],
         ]);
 
         $rowIdsNovas = array_values(array_unique(array_map('intval', $payload['row_ids_novas'] ?? [])));
+        $origensPorRow = $this->normalizarOrigensPorRow($payload['id_empresa_origem_por_row'] ?? []);
+        $user = $request->user();
 
         if ($rowIdsNovas === []) {
             return response()->json([
@@ -142,9 +152,10 @@ class VendaImportacaoController extends Controller
 
         try {
             DB::transaction(function () use (
-                $request,
+                $user,
                 $rowIdsNovas,
                 $novasIndex,
+                $origensPorRow,
                 &$aplicadas,
                 &$ignoradas,
                 &$erros,
@@ -160,13 +171,40 @@ class VendaImportacaoController extends Controller
                     }
 
                     $dados = $item['dados'] ?? [];
+                    $idOrigem = $origensPorRow[$rowId] ?? (int) ($dados['id_empresa_origem'] ?? 0);
+                    $idDestino = (int) ($dados['id_empresa_destino'] ?? 0);
+
+                    if ($idOrigem <= 0) {
+                        $erros[] = [
+                            'linha' => (string) ($item['chave'] ?? $rowId),
+                            'erros' => ['Origem inválida para a linha.'],
+                        ];
+                        $ignoradas++;
+
+                        continue;
+                    }
+
+                    $erroOrigem = $this->validarEmpresaOrigemImportacao($idOrigem, $user);
+                    if ($erroOrigem !== null) {
+                        $erros[] = [
+                            'linha' => (string) ($item['chave'] ?? $rowId),
+                            'erros' => [$erroOrigem],
+                        ];
+                        $ignoradas++;
+
+                        continue;
+                    }
+
+                    $dadosEfetivos = array_merge($dados, ['id_empresa_origem' => $idOrigem]);
+                    $itemEfetivo = array_merge($item, ['dados' => $dadosEfetivos]);
+
                     $chaveGrupo = implode('|', [
                         (string) ($dados['numero_nf'] ?? ''),
-                        (int) ($dados['id_empresa_origem'] ?? 0),
-                        (int) ($dados['id_empresa_destino'] ?? 0),
+                        $idOrigem,
+                        $idDestino,
                     ]);
 
-                    $grupos[$chaveGrupo][] = $item;
+                    $grupos[$chaveGrupo][] = $itemEfetivo;
                 }
 
                 foreach ($grupos as $itens) {
@@ -188,7 +226,7 @@ class VendaImportacaoController extends Controller
                             'id_empresa_origem' => (int) ($primeiro['id_empresa_origem'] ?? 0),
                             'id_empresa_destino' => (int) ($primeiro['id_empresa_destino'] ?? 0),
                             'itens' => $itensVenda,
-                        ], $request->user());
+                        ], $user);
 
                         $aplicadas += $resultadoVenda['movimentacoes']->count();
                     } catch (InvalidArgumentException $e) {
@@ -257,6 +295,78 @@ class VendaImportacaoController extends Controller
         }
 
         return $out;
+    }
+
+    /**
+     * @return list<array{id: int, label: string, cnpj: string}>
+     */
+    private function empresasOrigemOpcoes(?User $user): array
+    {
+        return EmpresaEntidadeQuery::unidadesComEstoque()
+            ->with('entidade')
+            ->get()
+            ->filter(function (Empresa $empresa) use ($user): bool {
+                $unidade = $empresa->entidade;
+                if (! $unidade instanceof UnidadeNegocio || $unidade->is_hub) {
+                    return false;
+                }
+
+                if ($user === null) {
+                    return true;
+                }
+
+                return app(UnidadeNegocioAccessService::class)->canVenda($user, $unidade->id);
+            })
+            ->sortBy(fn (Empresa $empresa): string => mb_strtolower($empresa->nomeExibicao()))
+            ->map(fn (Empresa $empresa): array => [
+                'id' => $empresa->id,
+                'label' => $empresa->nomeExibicao(),
+                'cnpj' => $empresa->entidade instanceof UnidadeNegocio
+                    ? $empresa->entidade->cpf_cnpj
+                    : '',
+            ])
+            ->values()
+            ->all();
+    }
+
+    /**
+     * @param  array<int|string, mixed>  $raw
+     * @return array<int, int>
+     */
+    private function normalizarOrigensPorRow(array $raw): array
+    {
+        $out = [];
+        foreach ($raw as $rowId => $empresaId) {
+            $rowIdInt = (int) $rowId;
+            if ($rowIdInt > 0) {
+                $out[$rowIdInt] = (int) $empresaId;
+            }
+        }
+
+        return $out;
+    }
+
+    private function validarEmpresaOrigemImportacao(int $idEmpresaOrigem, ?User $user): ?string
+    {
+        $empresa = Empresa::query()->with('entidade')->find($idEmpresaOrigem);
+        if ($empresa === null) {
+            return 'Unidade de origem não encontrada.';
+        }
+
+        $unidade = $empresa->entidade;
+        if (! $unidade instanceof UnidadeNegocio || ! $unidade->possui_estoque) {
+            return 'Origem deve ser uma unidade de negócio que controla estoque.';
+        }
+
+        if ($unidade->is_hub) {
+            return 'Origem HUB não pode ser usada na importação; use o cadastro manual de venda.';
+        }
+
+        if ($user !== null && ! app(UnidadeNegocioAccessService::class)->canVenda($user, $unidade->id)) {
+            return UnidadeNegocioAccessService::MENSAGEM_SEM_ACESSO;
+        }
+
+        return null;
     }
 
     private function removerArquivoTemporario(VendaImportacao $importacao): void

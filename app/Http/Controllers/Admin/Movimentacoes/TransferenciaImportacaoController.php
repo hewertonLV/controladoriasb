@@ -5,8 +5,12 @@ namespace App\Http\Controllers\Admin\Movimentacoes;
 use App\Http\Controllers\Admin\Concerns\AutorizaProcessamentoUsuario;
 use App\Http\Controllers\Controller;
 use App\Jobs\Movimentacoes\ProcessarPreviewImportacaoTransferenciasJob;
+use App\Models\Empresa;
 use App\Models\TransferenciaImportacao;
+use App\Models\UnidadeNegocio;
 use App\Services\Movimentacoes\TransferenciaMovimentacaoService;
+use App\Services\Permissoes\UnidadeNegocioAccessService;
+use App\Support\EmpresaEntidadeQuery;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -104,6 +108,7 @@ class TransferenciaImportacaoController extends Controller
             'atualizacoes' => [],
             'sem_alteracoes' => [],
             'erros' => $resultado['erros'] ?? [],
+            'empresas_destino' => $this->empresasDestinoOpcoes($request->user()),
         ]);
     }
 
@@ -121,9 +126,12 @@ class TransferenciaImportacaoController extends Controller
         $payload = $request->validate([
             'row_ids_novas' => ['nullable', 'array'],
             'row_ids_novas.*' => ['integer', 'min:1'],
+            'id_empresa_destino_por_row' => ['nullable', 'array'],
+            'id_empresa_destino_por_row.*' => ['integer', 'min:1'],
         ]);
 
         $rowIdsNovas = array_values(array_unique(array_map('intval', $payload['row_ids_novas'] ?? [])));
+        $destinosPorRow = $this->normalizarDestinosPorRow($payload['id_empresa_destino_por_row'] ?? []);
 
         if ($rowIdsNovas === []) {
             return response()->json([
@@ -144,6 +152,7 @@ class TransferenciaImportacaoController extends Controller
             DB::transaction(function () use (
                 $rowIdsNovas,
                 $novasIndex,
+                $destinosPorRow,
                 &$aplicadas,
                 &$ignoradas,
                 &$erros,
@@ -157,11 +166,44 @@ class TransferenciaImportacaoController extends Controller
                     }
 
                     $dados = $item['dados'] ?? [];
+                    $idOrigem = (int) ($dados['id_empresa_origem'] ?? 0);
+                    $idDestino = $destinosPorRow[$rowId] ?? (int) ($dados['id_empresa_destino'] ?? 0);
+
+                    if ($idDestino <= 0) {
+                        $erros[] = [
+                            'linha' => (string) ($item['chave'] ?? $rowId),
+                            'erros' => ['Destino inválido para a linha.'],
+                        ];
+                        $ignoradas++;
+
+                        continue;
+                    }
+
+                    if ($idDestino === $idOrigem) {
+                        $erros[] = [
+                            'linha' => (string) ($item['chave'] ?? $rowId),
+                            'erros' => ['Origem e destino não podem ser a mesma unidade de negócio.'],
+                        ];
+                        $ignoradas++;
+
+                        continue;
+                    }
+
+                    $erroDestino = $this->validarEmpresaDestinoImportacao($idDestino);
+                    if ($erroDestino !== null) {
+                        $erros[] = [
+                            'linha' => (string) ($item['chave'] ?? $rowId),
+                            'erros' => [$erroDestino],
+                        ];
+                        $ignoradas++;
+
+                        continue;
+                    }
 
                     try {
                         $this->transferencias->criarTransferencia([
-                            'id_empresa_origem' => (int) ($dados['id_empresa_origem'] ?? 0),
-                            'id_empresa_destino' => (int) ($dados['id_empresa_destino'] ?? 0),
+                            'id_empresa_origem' => $idOrigem,
+                            'id_empresa_destino' => $idDestino,
                             'id_fruta' => (int) ($dados['id_fruta'] ?? 0),
                             'qtd_fruta_um' => (string) ($dados['qtd_fruta_um'] ?? '0'),
                             'numero_nf_origem' => (string) ($dados['numero_nf_origem'] ?? ''),
@@ -231,6 +273,70 @@ class TransferenciaImportacaoController extends Controller
         }
 
         return $out;
+    }
+
+    /**
+     * @return list<array{id: int, label: string, cnpj: string}>
+     */
+    private function empresasDestinoOpcoes(?\App\Models\User $user): array
+    {
+        return EmpresaEntidadeQuery::unidadesComEstoque()
+            ->with('entidade')
+            ->get()
+            ->filter(function (Empresa $empresa) use ($user): bool {
+                $unidade = $empresa->entidade;
+                if (! $unidade instanceof UnidadeNegocio) {
+                    return false;
+                }
+
+                if ($user === null) {
+                    return true;
+                }
+
+                return app(UnidadeNegocioAccessService::class)->canAccess($user, $unidade->id);
+            })
+            ->sortBy(fn (Empresa $empresa): string => mb_strtolower($empresa->nomeExibicao()))
+            ->map(fn (Empresa $empresa): array => [
+                'id' => $empresa->id,
+                'label' => $empresa->nomeExibicao(),
+                'cnpj' => $empresa->entidade instanceof UnidadeNegocio
+                    ? $empresa->entidade->cpf_cnpj
+                    : '',
+            ])
+            ->values()
+            ->all();
+    }
+
+    /**
+     * @param  array<int|string, mixed>  $raw
+     * @return array<int, int>
+     */
+    private function normalizarDestinosPorRow(array $raw): array
+    {
+        $out = [];
+        foreach ($raw as $rowId => $empresaId) {
+            $rowIdInt = (int) $rowId;
+            if ($rowIdInt > 0) {
+                $out[$rowIdInt] = (int) $empresaId;
+            }
+        }
+
+        return $out;
+    }
+
+    private function validarEmpresaDestinoImportacao(int $idEmpresaDestino): ?string
+    {
+        $empresa = Empresa::query()->with('entidade')->find($idEmpresaDestino);
+        if ($empresa === null) {
+            return 'Unidade de destino não encontrada.';
+        }
+
+        $unidade = $empresa->entidade;
+        if (! $unidade instanceof UnidadeNegocio || ! $unidade->possui_estoque) {
+            return 'Destino deve ser uma unidade de negócio que controla estoque.';
+        }
+
+        return null;
     }
 
     private function removerArquivoTemporario(TransferenciaImportacao $importacao): void

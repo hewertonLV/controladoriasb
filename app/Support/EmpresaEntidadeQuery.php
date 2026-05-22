@@ -56,4 +56,21 @@ final class EmpresaEntidadeQuery
             $unidadesQuery->pluck('id'),
         );
     }
+
+    /**
+     * Unidades de produção (fazenda) que controlam estoque.
+     *
+     * @return Builder<Empresa>
+     */
+    public static function unidadesProducaoComEstoque(): Builder
+    {
+        $unidadesQuery = UnidadeNegocio::query()
+            ->where('possui_estoque', true)
+            ->where('is_unidade_producao', true);
+
+        return self::porEntidadeIds(
+            UnidadeNegocio::class,
+            $unidadesQuery->pluck('id'),
+        );
+    }
 }

@@ -27,6 +27,7 @@ class UnidadeNegocioFactory extends Factory
             'status' => true,
             'possui_estoque' => false,
             'is_hub' => false,
+            'is_unidade_producao' => false,
         ];
     }
 

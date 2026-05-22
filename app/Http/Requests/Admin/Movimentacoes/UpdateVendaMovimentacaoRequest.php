@@ -4,6 +4,7 @@ namespace App\Http\Requests\Admin\Movimentacoes;
 
 use App\Enums\FreteStatusSituacao;
 use App\Models\Cliente;
+use App\Models\Empresa;
 use App\Models\UnidadeNegocio;
 use App\Support\TextoCadastro;
 use Illuminate\Validation\Rule;
@@ -44,6 +45,19 @@ class UpdateVendaMovimentacaoRequest extends StoreVendaMovimentacaoRequest
                 ? TextoCadastro::normalizarValorMonetarioBrasileiro($valorRaw)
                 : number_format(max(0, (float) $valorRaw), 2, '.', '');
         }
+        $empresaOrigem = Empresa::query()->with('entidade')->find((int) $this->input('id_empresa_origem'));
+        $origem = $empresaOrigem?->entidade instanceof UnidadeNegocio ? $empresaOrigem->entidade : null;
+
+        if ($origem !== null && $origem->is_unidade_producao) {
+            $merge['aplicar_custo_operacional_hub'] = $this->boolean('aplicar_custo_operacional_hub', true);
+            if (! $merge['aplicar_custo_operacional_hub']) {
+                $merge['id_unidade_negocio_hub_custo'] = null;
+            }
+        } else {
+            $merge['aplicar_custo_operacional_hub'] = false;
+            $merge['id_unidade_negocio_hub_custo'] = null;
+        }
+
         $this->merge($merge);
     }
 }

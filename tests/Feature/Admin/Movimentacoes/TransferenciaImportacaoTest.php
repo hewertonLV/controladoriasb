@@ -120,6 +120,121 @@ class TransferenciaImportacaoTest extends TestCase
         ]);
     }
 
+    public function test_confirmar_com_destino_alterado_na_previa(): void
+    {
+        [$origem, $destino, $fruta, $empresaOrigem, $empresaDestino] = $this->criarCenarioComEstoqueOrigem();
+
+        $destinoAlternativo = UnidadeNegocio::factory()->create([
+            'possui_estoque' => true,
+            'cpf_cnpj' => '55666777000188',
+        ]);
+        $empresaDestinoAlternativo = $destinoAlternativo->registroCorporativo()->firstOrFail();
+
+        HistoricoCOUnNg::factory()->create([
+            'id_unidade_negocio' => $destinoAlternativo->id,
+            'custo_operacional' => '2.00',
+            'status_position' => true,
+        ]);
+
+        $user = $this->userWithPermissions([
+            Permissions::MOVIMENTACOES_TRANSFERENCIAS_IMPORTAR,
+            Permissions::MOVIMENTACOES_TRANSFERENCIAS_IMPORTAR_CONFIRMAR,
+        ]);
+
+        $importacao = TransferenciaImportacao::create([
+            'uuid' => (string) \Illuminate\Support\Str::uuid(),
+            'user_id' => $user->id,
+            'arquivo_original' => 'override.xlsx',
+            'arquivo_path' => 'transferencias/importacoes/override.xlsx',
+            'status' => TransferenciaImportacao::STATUS_CONCLUIDO,
+            'resultado' => [
+                'novas' => [[
+                    'row_id' => 1,
+                    'linha' => 2,
+                    'chave' => 'x',
+                    'id_empresa_destino' => $empresaDestino->id,
+                    'dados' => [
+                        'id_empresa_origem' => $empresaOrigem->id,
+                        'id_empresa_destino' => $empresaDestino->id,
+                        'id_fruta' => $fruta->id,
+                        'qtd_fruta_um' => '1.00',
+                        'numero_nf_origem' => 'NF-ALT',
+                    ],
+                ]],
+                'erros' => [],
+            ],
+        ]);
+
+        $response = $this->actingAs($user)->postJson(
+            route('admin.movimentacoes.transferencias.importar.confirmar', $importacao),
+            [
+                'row_ids_novas' => [1],
+                'id_empresa_destino_por_row' => ['1' => $empresaDestinoAlternativo->id],
+            ],
+        );
+
+        $response->assertOk();
+        $response->assertJsonPath('resumo.aplicadas', 1);
+
+        $this->assertDatabaseHas('movimentacoes', [
+            'id_empresa_origem' => $empresaOrigem->id,
+            'id_empresa_destino' => $empresaDestinoAlternativo->id,
+            'id_fruta' => $fruta->id,
+            'numero_nf_origem' => 'NF-ALT',
+        ]);
+
+        $this->assertDatabaseMissing('movimentacoes', [
+            'id_empresa_origem' => $empresaOrigem->id,
+            'id_empresa_destino' => $empresaDestino->id,
+            'numero_nf_origem' => 'NF-ALT',
+        ]);
+    }
+
+    public function test_resultado_inclui_empresas_destino(): void
+    {
+        [$origem, $destino, $fruta, $empresaOrigem, $empresaDestino] = $this->criarCenarioComEstoqueOrigem();
+
+        $user = $this->userWithPermissions([
+            Permissions::MOVIMENTACOES_TRANSFERENCIAS_IMPORTAR,
+        ]);
+
+        $importacao = TransferenciaImportacao::create([
+            'uuid' => (string) \Illuminate\Support\Str::uuid(),
+            'user_id' => $user->id,
+            'arquivo_original' => 'resultado.xlsx',
+            'arquivo_path' => 'transferencias/importacoes/resultado.xlsx',
+            'status' => TransferenciaImportacao::STATUS_CONCLUIDO,
+            'resultado' => [
+                'novas' => [[
+                    'row_id' => 1,
+                    'linha' => 2,
+                    'chave' => 'x',
+                    'dados' => [
+                        'id_empresa_origem' => $empresaOrigem->id,
+                        'id_empresa_destino' => $empresaDestino->id,
+                        'id_fruta' => $fruta->id,
+                        'qtd_fruta_um' => '1.00',
+                        'numero_nf_origem' => 'NF-1',
+                    ],
+                ]],
+                'erros' => [],
+            ],
+        ]);
+
+        $response = $this->actingAs($user)->getJson(
+            route('admin.movimentacoes.transferencias.importar.resultado', $importacao),
+        );
+
+        $response->assertOk();
+        $response->assertJsonStructure([
+            'empresas_destino' => [['id', 'label', 'cnpj']],
+        ]);
+
+        $ids = collect($response->json('empresas_destino'))->pluck('id')->all();
+        $this->assertContains($empresaOrigem->id, $ids);
+        $this->assertContains($empresaDestino->id, $ids);
+    }
+
     public function test_mesma_origem_destino_fruta_com_nf_diferente_nao_e_duplicada(): void
     {
         [$origem, $destino, $fruta] = $this->criarCenarioComEstoqueOrigem();

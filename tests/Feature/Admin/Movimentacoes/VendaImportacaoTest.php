@@ -174,6 +174,143 @@ class VendaImportacaoTest extends TestCase
         ]);
     }
 
+    public function test_confirmar_com_origem_alterada_na_previa(): void
+    {
+        [$unidade, $cliente, $fruta, $empresaOrigem, $empresaCliente] = $this->criarCenarioComEstoqueOrigem();
+
+        $unidadeAlternativa = UnidadeNegocio::factory()->create([
+            'possui_estoque' => true,
+            'cpf_cnpj' => '55666777000188',
+        ]);
+        $empresaOrigemAlternativa = $unidadeAlternativa->registroCorporativo()->firstOrFail();
+
+        HistoricoCOUnNg::factory()->create([
+            'id_unidade_negocio' => $unidadeAlternativa->id,
+            'custo_operacional' => '2.00',
+            'status_position' => true,
+        ]);
+
+        $estoqueAlt = Estoque::factory()->create([
+            'id_unidade_negocio' => $unidadeAlternativa->id,
+            'id_fruta' => $fruta->id,
+            'qtd_fruta_kg' => '50.00',
+            'qtd_fruta_um' => '5.00',
+            'preco_medio_kg' => '5.00',
+            'preco_medio_um' => '50.00',
+            'valor_total_acumulado' => '250.00',
+        ]);
+
+        MovimentacaoEstoque::query()->create([
+            'id_estoque' => $estoqueAlt->id,
+            'id_unidade_negocio' => $unidadeAlternativa->id,
+            'id_fruta' => $fruta->id,
+            'movimentacao_id' => null,
+            'qtd_fruta_kg' => '50.00',
+            'qtd_fruta_um' => '5.00',
+            'preco_medio_kg' => '5.00',
+            'preco_medio_um' => '50.00',
+            'valor_total_fruta' => '250.00',
+            'status_ultima_posicao' => true,
+        ]);
+
+        $user = $this->userWithPermissions([
+            Permissions::MOVIMENTACOES_VENDAS_IMPORTAR,
+            Permissions::MOVIMENTACOES_VENDAS_IMPORTAR_CONFIRMAR,
+            Permissions::MOVIMENTACOES_VENDAS_CRIAR,
+        ]);
+
+        $importacao = VendaImportacao::create([
+            'uuid' => (string) \Illuminate\Support\Str::uuid(),
+            'user_id' => $user->id,
+            'arquivo_original' => 'override.xlsx',
+            'arquivo_path' => 'vendas/importacoes/override.xlsx',
+            'status' => VendaImportacao::STATUS_CONCLUIDO,
+            'resultado' => [
+                'novas' => [[
+                    'row_id' => 1,
+                    'linha' => 2,
+                    'chave' => 'x',
+                    'dados' => [
+                        'numero_nf' => 'NF-ALT-ORIGEM',
+                        'id_empresa_origem' => $empresaOrigem->id,
+                        'id_empresa_destino' => $empresaCliente->id,
+                        'id_fruta' => $fruta->id,
+                        'qtd_fruta_um' => '1.00',
+                        'valor_nf_total' => '150.00',
+                    ],
+                ]],
+                'erros' => [],
+            ],
+        ]);
+
+        $response = $this->actingAs($user)->postJson(
+            route('admin.movimentacoes.vendas.importar.confirmar', $importacao),
+            [
+                'row_ids_novas' => [1],
+                'id_empresa_origem_por_row' => ['1' => $empresaOrigemAlternativa->id],
+            ],
+        );
+
+        $response->assertOk();
+        $response->assertJsonPath('resumo.aplicadas', 1);
+
+        $this->assertDatabaseHas('vendas_notas', [
+            'numero_nf' => 'NF-ALT-ORIGEM',
+            'id_empresa_origem' => $empresaOrigemAlternativa->id,
+            'id_empresa_destino' => $empresaCliente->id,
+        ]);
+
+        $this->assertDatabaseMissing('vendas_notas', [
+            'numero_nf' => 'NF-ALT-ORIGEM',
+            'id_empresa_origem' => $empresaOrigem->id,
+        ]);
+    }
+
+    public function test_resultado_inclui_empresas_origem(): void
+    {
+        [$unidade, $cliente, $fruta, $empresaOrigem, $empresaCliente] = $this->criarCenarioComEstoqueOrigem();
+
+        $user = $this->userWithPermissions([
+            Permissions::MOVIMENTACOES_VENDAS_IMPORTAR,
+        ]);
+
+        $importacao = VendaImportacao::create([
+            'uuid' => (string) \Illuminate\Support\Str::uuid(),
+            'user_id' => $user->id,
+            'arquivo_original' => 'resultado.xlsx',
+            'arquivo_path' => 'vendas/importacoes/resultado.xlsx',
+            'status' => VendaImportacao::STATUS_CONCLUIDO,
+            'resultado' => [
+                'novas' => [[
+                    'row_id' => 1,
+                    'linha' => 2,
+                    'chave' => 'x',
+                    'dados' => [
+                        'numero_nf' => 'NF-1',
+                        'id_empresa_origem' => $empresaOrigem->id,
+                        'id_empresa_destino' => $empresaCliente->id,
+                        'id_fruta' => $fruta->id,
+                        'qtd_fruta_um' => '1.00',
+                        'valor_nf_total' => '100.00',
+                    ],
+                ]],
+                'erros' => [],
+            ],
+        ]);
+
+        $response = $this->actingAs($user)->getJson(
+            route('admin.movimentacoes.vendas.importar.resultado', $importacao),
+        );
+
+        $response->assertOk();
+        $response->assertJsonStructure([
+            'empresas_origem' => [['id', 'label', 'cnpj']],
+        ]);
+
+        $ids = collect($response->json('empresas_origem'))->pluck('id')->all();
+        $this->assertContains($empresaOrigem->id, $ids);
+    }
+
     public function test_tela_importar_exige_permissao(): void
     {
         $user = $this->userWithPermissions([

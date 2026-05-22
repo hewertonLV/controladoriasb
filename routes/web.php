@@ -30,13 +30,13 @@ use App\Http\Controllers\Admin\GrupoPermissaoController;
 use App\Http\Controllers\Admin\Movimentacoes\CancelarCompraMovimentacaoController;
 use App\Http\Controllers\Admin\Movimentacoes\CancelarDescarteMovimentacaoAdminController;
 use App\Http\Controllers\Admin\Movimentacoes\CancelarDoacaoMovimentacaoAdminController;
+use App\Http\Controllers\Admin\Movimentacoes\CancelarEntradaEstoqueMovimentacaoAdminController;
 use App\Http\Controllers\Admin\Movimentacoes\CancelarTransferenciaMovimentacaoAdminController;
 use App\Http\Controllers\Admin\Movimentacoes\CancelarVendaMovimentacaoAdminController;
 use App\Http\Controllers\Admin\Movimentacoes\CompraMovimentacaoController;
 use App\Http\Controllers\Admin\Movimentacoes\ConversaoEmbalagemMovimentacaoController;
 use App\Http\Controllers\Admin\Movimentacoes\DescarteMovimentacaoController;
 use App\Http\Controllers\Admin\Movimentacoes\DevolucaoMovimentacaoController;
-use App\Http\Controllers\Admin\Movimentacoes\CancelarEntradaEstoqueMovimentacaoAdminController;
 use App\Http\Controllers\Admin\Movimentacoes\DoacaoMovimentacaoController;
 use App\Http\Controllers\Admin\Movimentacoes\EntradaEstoqueMovimentacaoController;
 use App\Http\Controllers\Admin\Movimentacoes\RecebimentoTransferenciaController;
@@ -732,6 +732,14 @@ Route::middleware(['auth', 'verified', 'user.active', 'password.changed'])->grou
             Route::post('/importar/{importacao:uuid}/confirmar', [FreteImportacaoController::class, 'confirmar'])
                 ->middleware('permission:fretes.importar-confirmar')
                 ->name('importar.confirmar');
+
+            Route::get('/calendario', [FreteController::class, 'calendario'])
+                ->middleware('permission:fretes.visualizar')
+                ->name('calendario');
+
+            Route::get('/calendario/eventos', [FreteController::class, 'calendarioEventos'])
+                ->middleware('permission:fretes.visualizar')
+                ->name('calendario.eventos');
 
             Route::get('/criar', [FreteController::class, 'create'])
                 ->middleware('permission:fretes.criar')

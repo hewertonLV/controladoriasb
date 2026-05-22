@@ -17,6 +17,8 @@ class UnidadeNegocioAuditoriaService
         'id_estado',
         'status',
         'possui_estoque',
+        'is_unidade_producao',
+        'is_hub',
     ];
 
     public function registrarCriacao(UnidadeNegocio $unidade, ?User $user, string $origem): UnidadeNegocioHistorico
@@ -117,6 +119,8 @@ class UnidadeNegocioAuditoriaService
             'id_estado' => (int) $unidade->id_estado,
             'status' => (bool) $unidade->status,
             'possui_estoque' => (bool) $unidade->possui_estoque,
+            'is_unidade_producao' => (bool) $unidade->is_unidade_producao,
+            'is_hub' => (bool) $unidade->is_hub,
         ];
     }
 
@@ -133,7 +137,7 @@ class UnidadeNegocioAuditoriaService
             $valorAntes = $antes[$campo] ?? null;
             $valorDepois = $depois[$campo] ?? null;
 
-            if ($campo === 'status' || $campo === 'possui_estoque') {
+            if ($campo === 'status' || $campo === 'possui_estoque' || $campo === 'is_unidade_producao' || $campo === 'is_hub') {
                 $a = (bool) $valorAntes;
                 $b = (bool) $valorDepois;
             } elseif ($campo === 'id_estado') {

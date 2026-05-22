@@ -4,20 +4,26 @@
 @section('page-title', 'Histórico da Unidade de Negócio')
 
 @php
+    $estadosPorId = $estadosPorId ?? [];
+
     $rotuloCampo = [
         'id_cigam' => 'ID CIGAM',
+        'id_estado' => 'Estado (ICMS)',
         'razao_social' => 'Razão social',
         'nome' => 'Nome',
         'cpf_cnpj' => 'CPF/CNPJ',
         'custo_operacional' => 'Custo operacional',
         'status' => 'Status',
+        'possui_estoque' => 'Possui estoque',
+        'is_hub' => 'Hub',
+        'is_unidade_producao' => 'Unidade de produção',
     ];
 
-    $formatValor = function (string $campo, mixed $valor) {
+    $formatValor = function (string $campo, mixed $valor) use ($estadosPorId) {
         if ($valor === null || $valor === '') {
             return '—';
         }
-        if ($campo === 'cnpj_cpf') {
+        if ($campo === 'cpf_cnpj') {
             $d = preg_replace('/\D/', '', (string) $valor) ?? '';
             if (strlen($d) === 11) {
                 return substr($d, 0, 3).'.'.substr($d, 3, 3).'.'.substr($d, 6, 3).'-'.substr($d, 9, 2);
@@ -26,6 +32,19 @@
                 return substr($d, 0, 2).'.'.substr($d, 2, 3).'.'.substr($d, 5, 3).'/'.substr($d, 8, 4).'-'.substr($d, 12, 2);
             }
             return $d;
+        }
+        if ($campo === 'id_estado') {
+            $id = (int) $valor;
+            if ($id < 1) {
+                return '—';
+            }
+            return $estadosPorId[$id] ?? (string) $valor;
+        }
+        if ($campo === 'status') {
+            return $valor ? 'Ativa' : 'Inativa';
+        }
+        if (in_array($campo, ['possui_estoque', 'is_hub', 'is_unidade_producao'], true)) {
+            return $valor ? 'Sim' : 'Não';
         }
         return (string) $valor;
     };
@@ -47,13 +66,14 @@
                 <h4 class="header-title mb-1">{{ $unidadeNegocio->razao_social }}</h4>
                 <div class="text-muted small">
                     <code>{{ $unidadeNegocio->id_cigam }}</code> ·
-                    {{ $unidadeNegocio->cnpj_cpf_formatado }}
-                    @if ($unidadeNegocio->fantasia)
-                        · {{ $unidadeNegocio->fantasia }}
+                    Estado (ICMS): <span class="fw-semibold">{{ $unidadeNegocio->estado?->nome ?? '—' }}</span> ·
+                    {{ $unidadeNegocio->cpf_cnpj_formatado }}
+                    @if ($unidadeNegocio->nome && $unidadeNegocio->nome !== $unidadeNegocio->razao_social)
+                        · {{ $unidadeNegocio->nome }}
                     @endif
                 </div>
             </div>
-            <a href="{{ route('admin.unidadeNegocioes.index') }}" class="btn btn-light">
+            <a href="{{ route('admin.unidades-negocio.index') }}" class="btn btn-light">
                 <i class="ri-arrow-left-line me-1"></i> Voltar
             </a>
         </div>
@@ -88,7 +108,7 @@
                                     </span>
                                 </td>
                                 <td>
-                                    @if ($h->origem === \App\Models\Unidade de NegócioHistorico::ORIGEM_IMPORTACAO_EXCEL)
+                                    @if ($h->origem === \App\Models\UnidadeNegocioHistorico::ORIGEM_IMPORTACAO_EXCEL)
                                         <i class="ri-file-excel-2-line text-success me-1"></i>
                                     @else
                                         <i class="ri-user-line text-muted me-1"></i>
@@ -97,7 +117,7 @@
                                 </td>
                                 <td>{{ $h->user?->name ?? '—' }}</td>
                                 <td>
-                                    @if ($h->acao === \App\Models\Unidade de NegócioHistorico::ACAO_CRIACAO || $h->acao === \App\Models\Unidade de NegócioHistorico::ACAO_IMPORTACAO_CRIACAO)
+                                    @if ($h->acao === \App\Models\UnidadeNegocioHistorico::ACAO_CRIACAO || $h->acao === \App\Models\UnidadeNegocioHistorico::ACAO_IMPORTACAO_CRIACAO)
                                         <span class="text-muted small">Criação inicial — todos os campos foram definidos.</span>
                                     @elseif (! empty($h->alteracoes))
                                         <ul class="mb-0 ps-3 small">

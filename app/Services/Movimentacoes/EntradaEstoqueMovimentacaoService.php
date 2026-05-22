@@ -40,7 +40,7 @@ final class EntradaEstoqueMovimentacaoService
      */
     public function opcoesFormulario(): array
     {
-        $empresasUnidade = EmpresaEntidadeQuery::unidadesComEstoque()
+        $empresasUnidade = EmpresaEntidadeQuery::unidadesProducaoComEstoque()
             ->with('entidade')
             ->get()
             ->filter(fn (Empresa $e): bool => app(UnidadeNegocioAccessService::class)->canEntradaEstoque(auth()->user(), (int) $e->entidade->id))
@@ -78,6 +78,9 @@ final class EntradaEstoqueMovimentacaoService
             }
             if (! $unidade->possui_estoque) {
                 throw new InvalidArgumentException('A unidade deve controlar estoque.');
+            }
+            if (! $unidade->is_unidade_producao) {
+                throw new InvalidArgumentException('A entrada de estoque só pode ser registrada em unidade de produção.');
             }
 
             $fruta = Fruta::query()->findOrFail((int) $input['id_fruta']);

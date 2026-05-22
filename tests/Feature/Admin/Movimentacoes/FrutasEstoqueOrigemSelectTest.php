@@ -66,15 +66,23 @@ class FrutasEstoqueOrigemSelectTest extends TestCase
             $this->assertStringContainsString($banana->nome, (string) $html);
             $this->assertStringContainsString($mamao->nome, (string) $html);
             $this->assertStringNotContainsString($laranjaSemEstoque->nome, (string) $html);
-            $this->assertStringContainsString(
-                sprintf('value="%d" data-estoque-origens="%d"', $banana->id, $origemComBanana->registroCorporativo()->firstOrFail()->id),
-                (string) $html,
-            );
+
+            if (! $assertVenda) {
+                $this->assertStringContainsString(
+                    sprintf('value="%d" data-estoque-origens="%d"', $banana->id, $origemComBanana->registroCorporativo()->firstOrFail()->id),
+                    (string) $html,
+                );
+            }
 
             if ($assertVenda) {
                 $this->assertStringContainsString('origem física', strtolower((string) $html));
                 $this->assertStringContainsString('não do cliente', strtolower((string) $html));
                 $this->assertStringContainsString('data-venda-origem', (string) $html);
+                $this->assertStringContainsString('data-frutas-catalog', (string) $html);
+                $this->assertStringNotContainsString(
+                    sprintf('value="%d" data-estoque-origens=', $banana->id),
+                    (string) $html,
+                );
             }
 
             if ($assertTransferencia) {
@@ -122,6 +130,26 @@ class FrutasEstoqueOrigemSelectTest extends TestCase
             ->first();
         $this->assertNotNull($empresa);
         $this->assertContains($empresa->id, $frutas->first()->estoque_origem_empresa_ids);
+    }
+
+    public function test_catalogo_js_expoe_origens_por_fruta(): void
+    {
+        $this->seedBase();
+
+        [, $banana, $mamao] = $this->cenarioFrutasPorOrigem();
+        $empresaBanana = Empresa::query()
+            ->where('entidade_type', UnidadeNegocio::class)
+            ->whereHas('entidade', fn ($q) => $q->where('nome', 'ORIGEM COM BANANA SELECT'))
+            ->firstOrFail();
+
+        $catalogo = FrutasComEstoqueOrigem::catalogoJs(FrutasComEstoqueOrigem::listar());
+
+        $bananaCatalogo = collect($catalogo)->firstWhere('id', $banana->id);
+        $mamaoCatalogo = collect($catalogo)->firstWhere('id', $mamao->id);
+
+        $this->assertNotNull($bananaCatalogo);
+        $this->assertContains((int) $empresaBanana->id, $bananaCatalogo['origens']);
+        $this->assertNotContains((int) $empresaBanana->id, $mamaoCatalogo['origens'] ?? []);
     }
 
     public function test_compra_continua_listando_frutas_mesmo_sem_estoque_de_origem(): void

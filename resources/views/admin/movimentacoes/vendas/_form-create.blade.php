@@ -1,9 +1,18 @@
 @php
     $isEdit = isset($movimentacao);
-    $opcoes = $opcoes ?? compact('empresas_origem', 'empresas_destino_cliente', 'unidades_faturamento', 'frutas', 'fretes');
+    $opcoes = $opcoes ?? compact('empresas_origem', 'empresas_destino_cliente', 'unidades_faturamento', 'unidades_hub', 'frutas', 'frutas_catalogo', 'fretes');
+    $frutasCatalogo = $opcoes['frutas_catalogo'] ?? \App\Support\Movimentacoes\FrutasComEstoqueOrigem::catalogoJs($opcoes['frutas'] ?? collect());
+    $hubCoHistorico = ($isEdit && ($movimentacao->id_custo_operacional ?? null))
+        ? \App\Models\HistoricoCOUnNg::query()->find((int) $movimentacao->id_custo_operacional)
+        : null;
+    $aplicarHubCo = old('aplicar_custo_operacional_hub', $isEdit ? (bool) $hubCoHistorico : true);
+    $hubCoSelecionado = old('id_unidade_negocio_hub_custo', $hubCoHistorico?->id_unidade_negocio);
 @endphp
 
-<form method="POST" action="{{ $isEdit ? route('admin.movimentacoes.vendas.update', $movimentacao) : route('admin.movimentacoes.vendas.store') }}">
+<form method="POST"
+      action="{{ $isEdit ? route('admin.movimentacoes.vendas.update', $movimentacao) : route('admin.movimentacoes.vendas.store') }}"
+      data-venda-form
+      data-frutas-catalog='@json($frutasCatalogo)'>
     @csrf
     @if ($isEdit)
         @method('PUT')
@@ -19,7 +28,10 @@
             <select name="id_empresa_origem" id="id_empresa_origem" class="form-select" required data-venda-origem data-search-select data-placeholder="Selecione ou pesquise a origem física">
                 <option value="">Selecione</option>
                 @foreach ($opcoes['empresas_origem'] as $empresa)
-                    <option value="{{ $empresa->id }}" data-is-hub="{{ $empresa->entidade?->is_hub ? '1' : '0' }}" @selected((int) old('id_empresa_origem', $movimentacao->id_empresa_origem ?? 0) === $empresa->id)>
+                    <option value="{{ $empresa->id }}"
+                            data-is-hub="{{ $empresa->entidade?->is_hub ? '1' : '0' }}"
+                            data-is-producao="{{ $empresa->entidade?->is_unidade_producao ? '1' : '0' }}"
+                            @selected((int) old('id_empresa_origem', $movimentacao->id_empresa_origem ?? 0) === $empresa->id)>
                         {{ $empresa->nomeExibicao() }}
                     </option>
                 @endforeach
@@ -49,6 +61,41 @@
             </select>
             <small class="text-muted">Informe apenas quando a origem física for HUB. Caso contrário, a própria origem será usada automaticamente.</small>
         </div>
+        <div class="col-md-3 d-none" data-venda-hub-custo-wrapper>
+            <div class="form-check form-switch mb-2">
+                <input type="hidden" name="aplicar_custo_operacional_hub" value="0">
+                <input type="checkbox"
+                       class="form-check-input"
+                       id="aplicar_custo_operacional_hub"
+                       name="aplicar_custo_operacional_hub"
+                       value="1"
+                       data-venda-aplicar-hub-co
+                       @checked($aplicarHubCo)>
+                <label class="form-check-label" for="aplicar_custo_operacional_hub">Incluir custo operacional do HUB</label>
+            </div>
+            <div data-venda-hub-custo-select-wrapper @class(['d-none' => ! $aplicarHubCo])>
+                <label class="form-label">Unidade HUB (custo)</label>
+                <select @if($aplicarHubCo) name="id_unidade_negocio_hub_custo" @endif
+                        class="form-select @error('id_unidade_negocio_hub_custo') is-invalid @enderror"
+                        data-venda-hub-custo
+                        data-search-select
+                        data-placeholder="Selecione o HUB"
+                        @disabled(! $aplicarHubCo)>
+                    <option value="">Selecione</option>
+                    @forelse ($opcoes['unidades_hub'] ?? [] as $hub)
+                        <option value="{{ $hub->id }}" @selected((int) $hubCoSelecionado === $hub->id)>{{ $hub->nome }}</option>
+                    @empty
+                        <option value="" disabled>Nenhuma unidade marcada como HUB no cadastro</option>
+                    @endforelse
+                </select>
+                @error('id_unidade_negocio_hub_custo')<div class="invalid-feedback d-block">{{ $message }}</div>@enderror
+                @if (($opcoes['unidades_hub'] ?? collect())->isEmpty())
+                    <small class="text-warning d-block">Cadastre em Unidades de negócio uma unidade com o switch <strong>Unidade HUB</strong> ativo.</small>
+                @else
+                    <small class="text-muted">CO do HUB entra na margem da venda, não no preço médio do estoque.</small>
+                @endif
+            </div>
+        </div>
         <div class="col-md-3">
             <label class="form-label">Frete</label>
             <select name="id_frete" class="form-select" data-search-select data-placeholder="Selecione ou pesquise o frete">
@@ -72,10 +119,14 @@
         <div class="row g-3">
             <div class="col-md-4">
                 <label class="form-label">Fruta</label>
-                <select name="id_fruta" class="form-select" required data-fruta-select data-search-select data-placeholder="Selecione ou pesquise a fruta">
-                    @foreach ($opcoes['frutas'] as $fruta)
-                        <option value="{{ $fruta->id }}" data-estoque-origens="{{ implode(',', $fruta->estoque_origem_empresa_ids ?? []) }}" @selected((int) old('id_fruta', $movimentacao->id_fruta) === $fruta->id)>{{ $fruta->nome }}</option>
-                    @endforeach
+                <select name="id_fruta"
+                        class="form-select"
+                        required
+                        data-fruta-select
+                        data-search-select
+                        data-placeholder="Selecione ou pesquise a fruta"
+                        data-selected-fruta="{{ old('id_fruta', $movimentacao->id_fruta) }}">
+                    <option value="">Selecione ou pesquise a fruta</option>
                 </select>
             </div>
             <div class="col-md-3">
@@ -120,11 +171,14 @@
             @foreach ($itens as $i => $item)
                 <div class="row g-3 mb-2" data-item-row>
                     <div class="col-md-5">
-                        <select name="itens[{{ $i }}][id_fruta]" class="form-select" required data-fruta-select data-search-select data-placeholder="Selecione ou pesquise a fruta">
-                            <option value="">Fruta</option>
-                            @foreach ($opcoes['frutas'] as $fruta)
-                                <option value="{{ $fruta->id }}" data-estoque-origens="{{ implode(',', $fruta->estoque_origem_empresa_ids ?? []) }}" @selected((int) ($item['id_fruta'] ?? 0) === $fruta->id)>{{ $fruta->nome }}</option>
-                            @endforeach
+                        <select name="itens[{{ $i }}][id_fruta]"
+                                class="form-select"
+                                required
+                                data-fruta-select
+                                data-search-select
+                                data-placeholder="Selecione ou pesquise a fruta"
+                                data-selected-fruta="{{ $item['id_fruta'] ?? '' }}">
+                            <option value="">Selecione ou pesquise a fruta</option>
                         </select>
                     </div>
                     <div class="col-md-3">
@@ -159,11 +213,13 @@
     <template id="venda-item-template">
         <div class="row g-3 mb-2" data-item-row>
             <div class="col-md-5">
-                <select name="itens[__INDEX__][id_fruta]" class="form-select" required data-fruta-select data-search-select data-placeholder="Selecione ou pesquise a fruta">
-                    <option value="">Fruta</option>
-                    @foreach ($opcoes['frutas'] as $fruta)
-                        <option value="{{ $fruta->id }}" data-estoque-origens="{{ implode(',', $fruta->estoque_origem_empresa_ids ?? []) }}">{{ $fruta->nome }}</option>
-                    @endforeach
+                <select name="itens[__INDEX__][id_fruta]"
+                        class="form-select"
+                        required
+                        data-fruta-select
+                        data-search-select
+                        data-placeholder="Selecione ou pesquise a fruta">
+                    <option value="">Selecione ou pesquise a fruta</option>
                 </select>
             </div>
             <div class="col-md-3">
@@ -191,7 +247,20 @@
         const origem = document.querySelector('[data-venda-origem]');
         const wrapper = document.querySelector('[data-venda-faturamento-wrapper]');
         const faturamento = document.querySelector('[data-venda-faturamento]');
+        const hubCustoWrapper = document.querySelector('[data-venda-hub-custo-wrapper]');
+        const aplicarHubCo = document.querySelector('[data-venda-aplicar-hub-co]');
+        const hubCustoSelectWrapper = document.querySelector('[data-venda-hub-custo-select-wrapper]');
+        const hubCustoSelect = document.querySelector('[data-venda-hub-custo]');
+        const hubCustoFieldName = 'id_unidade_negocio_hub_custo';
         const avisoFruta = document.querySelector('[data-venda-fruta-aviso]');
+        const vendaForm = document.querySelector('[data-venda-form]');
+        let frutasCatalogo = [];
+
+        try {
+            frutasCatalogo = JSON.parse(vendaForm?.dataset?.frutasCatalog || '[]');
+        } catch {
+            frutasCatalogo = [];
+        }
 
         const reinitFrutaSelect = (select) => {
             if (!window.jQuery || !select) {
@@ -207,6 +276,59 @@
             window.AdminSearchSelect?.init(select);
         };
 
+        const frutaPermitidaNaOrigem = (fruta, origemId) => {
+            if (!origemId) {
+                return false;
+            }
+
+            return (fruta.origens || []).map(String).includes(String(origemId));
+        };
+
+        const popularSelectFrutas = (select, origemId) => {
+            const placeholder = select.dataset.placeholder || 'Selecione ou pesquise a fruta';
+            const valorPreservar = String(
+                select.dataset.selectedFruta || select.value || '',
+            ).trim();
+
+            select.innerHTML = `<option value="">${placeholder}</option>`;
+
+            if (origemId === '') {
+                select.value = '';
+                delete select.dataset.selectedFruta;
+                reinitFrutaSelect(select);
+
+                return false;
+            }
+
+            let temFrutaDisponivel = false;
+
+            frutasCatalogo.forEach((fruta) => {
+                if (!frutaPermitidaNaOrigem(fruta, origemId)) {
+                    return;
+                }
+
+                temFrutaDisponivel = true;
+                const option = document.createElement('option');
+                option.value = String(fruta.id);
+                option.textContent = fruta.nome;
+
+                if (String(fruta.id) === valorPreservar) {
+                    option.selected = true;
+                }
+
+                select.appendChild(option);
+            });
+
+            if (valorPreservar && select.value !== valorPreservar) {
+                select.value = '';
+            }
+
+            delete select.dataset.selectedFruta;
+            reinitFrutaSelect(select);
+
+            return temFrutaDisponivel;
+        };
+
         const filtrarFrutasPorOrigem = () => {
             if (!origem) {
                 return;
@@ -216,29 +338,9 @@
             let temFrutaDisponivel = false;
 
             document.querySelectorAll('[data-fruta-select]').forEach((select) => {
-                select.querySelectorAll('option').forEach((option) => {
-                    if (!option.value) {
-                        return;
-                    }
-
-                    const origens = (option.dataset.estoqueOrigens || '')
-                        .split(',')
-                        .map((id) => id.trim())
-                        .filter((id) => id !== '');
-                    const permitido = origemId !== '' && origens.includes(origemId);
-                    option.hidden = !permitido;
-                    option.disabled = !permitido;
-
-                    if (permitido) {
-                        temFrutaDisponivel = true;
-                    }
-                });
-
-                if (select.selectedOptions.length && select.selectedOptions[0].disabled) {
-                    select.value = '';
+                if (popularSelectFrutas(select, origemId)) {
+                    temFrutaDisponivel = true;
                 }
-
-                reinitFrutaSelect(select);
             });
 
             if (!avisoFruta) {
@@ -247,13 +349,41 @@
 
             if (origemId === '') {
                 avisoFruta.className = 'small mb-2 text-muted';
-                avisoFruta.innerHTML = 'Escolha a <strong>origem física</strong> (não o cliente) para liberar as frutas com estoque nessa unidade.';
+                avisoFruta.innerHTML = 'Escolha a <strong>origem física</strong> (não o cliente) para listar apenas frutas com estoque nessa unidade.';
             } else if (!temFrutaDisponivel) {
                 avisoFruta.className = 'small mb-2 text-danger';
                 avisoFruta.textContent = 'Nenhuma fruta com estoque nesta origem física. Verifique o estoque da unidade ou selecione outra origem.';
             } else {
                 avisoFruta.className = 'small mb-2 text-success';
-                avisoFruta.textContent = 'Frutas liberadas para a origem física selecionada.';
+                avisoFruta.textContent = 'Somente frutas com estoque na origem física selecionada.';
+            }
+        };
+
+        const onHubCustoToggle = () => {
+            if (!hubCustoSelect || !aplicarHubCo) {
+                return;
+            }
+
+            const ativo = aplicarHubCo.checked;
+
+            if (hubCustoSelectWrapper) {
+                hubCustoSelectWrapper.classList.toggle('d-none', !ativo);
+            }
+
+            if (ativo) {
+                hubCustoSelect.setAttribute('name', hubCustoFieldName);
+                hubCustoSelect.disabled = false;
+                hubCustoSelect.required = true;
+                window.AdminSearchSelect?.init(hubCustoSelect);
+            } else {
+                hubCustoSelect.removeAttribute('name');
+                hubCustoSelect.required = false;
+                hubCustoSelect.disabled = true;
+                hubCustoSelect.value = '';
+                if (window.jQuery?.fn?.select2 && window.jQuery(hubCustoSelect).hasClass('select2-hidden-accessible')) {
+                    window.jQuery(hubCustoSelect).val('').trigger('change');
+                }
+                window.AdminSearchSelect?.refresh(hubCustoSelect);
             }
         };
 
@@ -273,8 +403,34 @@
                 window.AdminSearchSelect?.refresh(faturamento);
             }
 
+            if (hubCustoWrapper && aplicarHubCo) {
+                const selecionada = origem?.options[origem.selectedIndex];
+                const origemEhProducao = selecionada?.dataset?.isProducao === '1';
+
+                hubCustoWrapper.classList.toggle('d-none', !origemEhProducao);
+
+                if (!origemEhProducao) {
+                    aplicarHubCo.checked = false;
+                    aplicarHubCo.disabled = true;
+                } else {
+                    aplicarHubCo.disabled = false;
+                    if (!aplicarHubCo.dataset.userTouched) {
+                        aplicarHubCo.checked = true;
+                    }
+                }
+
+                onHubCustoToggle();
+            }
+
             filtrarFrutasPorOrigem();
         };
+
+        if (aplicarHubCo) {
+            aplicarHubCo.addEventListener('change', () => {
+                aplicarHubCo.dataset.userTouched = '1';
+                onHubCustoToggle();
+            });
+        }
 
         if (origem) {
             origem.addEventListener('change', onOrigemAlterada);

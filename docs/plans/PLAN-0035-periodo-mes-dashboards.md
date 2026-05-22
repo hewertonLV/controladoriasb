@@ -17,4 +17,4 @@ Campo Month + Buscar em ambas dashboards, período 01→hoje (mês atual) ou mê
 
 ## Critério de conclusão
 
-- Buscar com mês passado retorna totais só daquele mês; Olho de Deus lista alertas do intervalo.
+- Buscar com mês passado retorna totais só daquele mês; Olho de Fabio lista alertas do intervalo.

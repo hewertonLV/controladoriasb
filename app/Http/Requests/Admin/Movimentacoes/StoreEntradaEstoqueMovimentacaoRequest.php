@@ -3,6 +3,7 @@
 namespace App\Http\Requests\Admin\Movimentacoes;
 
 use App\Http\Requests\Admin\Movimentacoes\Concerns\ValidaAcessoUnidadeNegocio;
+use App\Models\Empresa;
 use App\Models\Fruta;
 use App\Models\UnidadeNegocio;
 use App\Support\TextoCadastro;
@@ -52,6 +53,12 @@ class StoreEntradaEstoqueMovimentacaoRequest extends FormRequest
     {
         $validator->after(function (Validator $v): void {
             $this->validarAcessoEmpresaUnidade($v, 'id_empresa_origem', 'EntradaEstoque');
+
+            $empresa = Empresa::query()->with('entidade')->find((int) $this->input('id_empresa_origem'));
+            $unidade = $empresa?->entidade instanceof UnidadeNegocio ? $empresa->entidade : null;
+            if ($unidade !== null && ! $unidade->is_unidade_producao) {
+                $v->errors()->add('id_empresa_origem', 'Selecione uma unidade de produção.');
+            }
 
             foreach ((array) $this->input('itens', []) as $i => $item) {
                 if (! isset($item['id_fruta'])) {

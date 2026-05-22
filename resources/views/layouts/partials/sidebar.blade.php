@@ -231,8 +231,14 @@
                             @can('fretes.visualizar')
                                 <li class="side-nav-item">
                                     <a href="{{ route('admin.fretes.index') }}"
-                                       class="side-nav-link {{ request()->routeIs('admin.fretes.*') ? 'active' : '' }}">
+                                       class="side-nav-link {{ request()->routeIs('admin.fretes.index', 'admin.fretes.create', 'admin.fretes.edit', 'admin.fretes.historico', 'admin.fretes.importar*', 'admin.fretes.exportacoes.*') ? 'active' : '' }}">
                                         <span class="menu-text">Fretes</span>
+                                    </a>
+                                </li>
+                                <li class="side-nav-item">
+                                    <a href="{{ route('admin.fretes.calendario') }}"
+                                       class="side-nav-link {{ request()->routeIs('admin.fretes.calendario*') ? 'active' : '' }}">
+                                        <span class="menu-text">Calendário</span>
                                     </a>
                                 </li>
                             @endcan

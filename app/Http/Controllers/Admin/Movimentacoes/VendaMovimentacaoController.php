@@ -44,7 +44,9 @@ class VendaMovimentacaoController extends Controller
 
     public function create(VendaMovimentacaoService $vendas): View
     {
-        return view('admin.movimentacoes.vendas.create', $vendas->opcoesFormularioVenda());
+        return view('admin.movimentacoes.vendas.create', [
+            'opcoes' => $vendas->opcoesFormularioVenda(),
+        ]);
     }
 
     public function store(StoreVendaMovimentacaoRequest $request, CriarVendaMovimentacaoAction $criar): JsonResponse|RedirectResponse

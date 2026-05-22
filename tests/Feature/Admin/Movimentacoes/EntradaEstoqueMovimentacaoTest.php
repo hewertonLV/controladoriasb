@@ -107,7 +107,27 @@ class EntradaEstoqueMovimentacaoTest extends TestCase
         $this->actingAs($this->userEntradaEstoque())
             ->get(route('admin.movimentacoes.entradas-estoque.create'))
             ->assertOk()
-            ->assertSee('Registrar entrada da produção', false);
+            ->assertSee('Registrar entrada da produção', false)
+            ->assertSee('Unidade de Produção', false);
+    }
+
+    public function test_rejeita_unidade_que_nao_e_producao(): void
+    {
+        [$unidade, $empresa, $fruta] = $this->criarUnidadeEFruta();
+        $unidade->forceFill(['is_unidade_producao' => false])->save();
+
+        $this->actingAs($this->userEntradaEstoque())->postJson(
+            route('admin.movimentacoes.entradas-estoque.store'),
+            [
+                'id_empresa_origem' => $empresa->id,
+                'itens' => [[
+                    'id_fruta' => $fruta->id,
+                    'qtd_fruta_um' => '10',
+                    'preco_fruta_um' => '50,00',
+                ]],
+            ],
+        )->assertUnprocessable()
+            ->assertJsonValidationErrors(['id_empresa_origem']);
     }
 
     public function test_rejeita_quantidade_um_decimal(): void
@@ -135,6 +155,7 @@ class EntradaEstoqueMovimentacaoTest extends TestCase
     {
         $unidade = UnidadeNegocio::factory()->create([
             'possui_estoque' => true,
+            'is_unidade_producao' => true,
             'cpf_cnpj' => '11222333000181',
         ]);
         $empresa = $unidade->registroCorporativo()->firstOrFail();

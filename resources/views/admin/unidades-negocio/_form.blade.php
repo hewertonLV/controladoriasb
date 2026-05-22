@@ -117,6 +117,36 @@
                     @enderror
                 </div>
             </div>
+            <div class="col-md-4 d-flex align-items-end">
+                <div class="form-check form-switch pb-2">
+                    <input type="hidden" name="is_unidade_producao" value="0">
+                    <input type="checkbox"
+                           class="form-check-input @error('is_unidade_producao') is-invalid @enderror"
+                           id="is_unidade_producao"
+                           name="is_unidade_producao"
+                           value="1"
+                           @checked(old('is_unidade_producao', $unidadeNegocio->is_unidade_producao ?? false))>
+                    <label class="form-check-label" for="is_unidade_producao">Unidade de produção (fazenda)</label>
+                    @error('is_unidade_producao')
+                        <div class="invalid-feedback d-block">{{ $message }}</div>
+                    @enderror
+                </div>
+            </div>
+            <div class="col-md-4 d-flex align-items-end">
+                <div class="form-check form-switch pb-2">
+                    <input type="hidden" name="is_hub" value="0">
+                    <input type="checkbox"
+                           class="form-check-input @error('is_hub') is-invalid @enderror"
+                           id="is_hub"
+                           name="is_hub"
+                           value="1"
+                           @checked(old('is_hub', $unidadeNegocio->is_hub ?? false))>
+                    <label class="form-check-label" for="is_hub">Unidade HUB</label>
+                    @error('is_hub')
+                        <div class="invalid-feedback d-block">{{ $message }}</div>
+                    @enderror
+                </div>
+            </div>
         </div>
     </div>
 

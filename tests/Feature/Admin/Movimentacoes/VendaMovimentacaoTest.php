@@ -353,6 +353,48 @@ class VendaMovimentacaoTest extends TestCase
         ]))->assertJsonValidationErrors(['data_emissao']);
     }
 
+    public function test_venda_origem_producao_aplica_custo_operacional_hub_na_margem(): void
+    {
+        $this->seedBase();
+        $c = $this->cenarioBase();
+        $c['unidade']->forceFill(['is_unidade_producao' => true])->save();
+
+        $hub = UnidadeNegocio::factory()->create([
+            'is_hub' => true,
+            'id_estado' => Estado::ID_PERNAMBUCO,
+            'custo_operacional' => '1.50',
+        ]);
+        HistoricoCOUnNg::query()->where('id_unidade_negocio', $hub->id)->update(['status_position' => false]);
+        HistoricoCOUnNg::factory()->create([
+            'id_unidade_negocio' => $hub->id,
+            'custo_operacional' => '1.50',
+            'status_position' => true,
+        ]);
+
+        $this->registrarCompra($c, '10', '500,00');
+
+        $venda = $this->registrarVendaProducao($c, '2', '300,00', $hub, true);
+
+        $this->assertSame('1.50', (string) $venda->valor_custo_operacional);
+        $this->assertNotNull($venda->id_custo_operacional);
+        $this->assertSame('100.00', (string) $venda->valor_custo_saida);
+        $this->assertSame('170.00', (string) $venda->resultado_movimentacao);
+    }
+
+    public function test_venda_origem_producao_sem_hub_co_mantem_margem_sem_co(): void
+    {
+        $this->seedBase();
+        $c = $this->cenarioBase();
+        $c['unidade']->forceFill(['is_unidade_producao' => true])->save();
+        $this->registrarCompra($c, '10', '500,00');
+
+        $venda = $this->registrarVendaProducao($c, '2', '300,00', null, false);
+
+        $this->assertSame('0.00', (string) $venda->valor_custo_operacional);
+        $this->assertNull($venda->id_custo_operacional);
+        $this->assertSame('200.00', (string) $venda->resultado_movimentacao);
+    }
+
     public function test_unidade_faturamento_so_e_informada_quando_origem_fisica_for_hub(): void
     {
         $this->seedBase();
@@ -634,6 +676,33 @@ class VendaMovimentacaoTest extends TestCase
                 ['id_fruta' => $cenario['fruta']->id, 'qtd_fruta_um' => $qtdUm, 'valor_nf_total' => $valorNfTotal],
             ],
         ];
+    }
+
+    /**
+     * @param  array<string, mixed>  $cenario
+     */
+    private function registrarVendaProducao(
+        array $cenario,
+        string $qtdUm,
+        string $valorNfTotal,
+        ?UnidadeNegocio $hub,
+        bool $aplicarCo,
+    ): Movimentacao {
+        $payload = array_merge($this->payloadVenda($cenario, $qtdUm, $valorNfTotal), [
+            'aplicar_custo_operacional_hub' => $aplicarCo ? '1' : '0',
+            'id_unidade_negocio_hub_custo' => $aplicarCo && $hub !== null ? $hub->id : null,
+        ]);
+
+        $this->actingAs($this->movimentacoesVendasUsuario())->postJson(
+            route('admin.movimentacoes.vendas.store'),
+            $payload,
+        )->assertCreated();
+
+        return Movimentacao::query()
+            ->where('categoria_movimentacao_id', CategoriaMovimentacaoTipo::Venda->value)
+            ->where('status_movimentacao_id', StatusMovimentacao::ID_SAIDA)
+            ->orderByDesc('id')
+            ->firstOrFail();
     }
 
     private function cancelarVendaAdmin(Movimentacao $venda): void

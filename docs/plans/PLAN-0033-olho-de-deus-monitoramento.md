@@ -1,4 +1,4 @@
-# PLAN-0033: Olho de Deus (mesmo da ADR)
+# PLAN-0033: Olho de Fabio (mesmo da ADR)
 
 **ADR:** [ADR-0033](../decisions/ADR-0033-olho-de-deus-monitoramento.md)
 **Data:** 2026-05-20
