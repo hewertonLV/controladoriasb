@@ -127,7 +127,7 @@ class FluxoStress200MovimentacoesTest extends TestCase
             }
         }
 
-        // Bloco 2: 35 eventos de transferência, incluindo conformes, divergentes, reenvio e cancelamento.
+        // Bloco 2: transferências conformes, cancelamento e frete.
         for ($i = 1; $i <= 10; $i++) {
             $saida = $this->evento('transferencias', fn () => $this->registrarTransferencia(
                 origem: $this->cenario['empresas_unidades'][$i % 4],
@@ -137,7 +137,6 @@ class FluxoStress200MovimentacoesTest extends TestCase
                 frete: $this->cenario['frete_transferencia'],
             ));
             $this->transferencias[] = $saida;
-            $this->evento('transferencias', fn () => $this->receberConforme((int) $saida->transferencia_origem_id, '0.50'));
         }
 
         for ($i = 1; $i <= 3; $i++) {
@@ -145,14 +144,10 @@ class FluxoStress200MovimentacoesTest extends TestCase
                 origem: $this->cenario['empresas_unidades'][($i + 1) % 4],
                 destino: $this->cenario['empresas_unidades'][($i + 2) % 4],
                 fruta: $this->cenario['frutas'][($i + 2) % 5],
-                qtdUm: '0.60',
+                qtdUm: '0.30',
                 frete: null,
             ));
             $this->transferencias[] = $saida;
-            $this->evento('transferencias', fn () => $this->receberDivergente((int) $saida->transferencia_origem_id, '0.30'));
-            $reenviada = $this->evento('transferencias', fn () => $this->reenviarTransferencia((int) $saida->transferencia_origem_id, '0.30'));
-            $this->transferencias[] = $reenviada;
-            $this->evento('transferencias', fn () => $this->receberConforme((int) $reenviada->transferencia_origem_id, '0.30'));
         }
 
         $pendente = $this->evento('transferencias', fn () => $this->registrarTransferencia(
@@ -184,7 +179,7 @@ class FluxoStress200MovimentacoesTest extends TestCase
                     qtdUm: '50.00',
                     frete: null,
                 ));
-                $this->evento('transferencias', fn () => $this->receberConforme((int) $saidaHub->transferencia_origem_id, '50.00'));
+                $this->transferencias[] = $saidaHub;
             }
 
             $origem = match (true) {
@@ -267,10 +262,10 @@ class FluxoStress200MovimentacoesTest extends TestCase
             $this->evento('correcoes', fn () => $this->atualizarDevolucao($devolucao, '0.05'));
         }
 
-        $this->assertSame(202, $this->eventosExecutados);
+        $this->assertSame(182, $this->eventosExecutados);
         $this->assertSame([
             'compras' => 45,
-            'transferencias' => 37,
+            'transferencias' => 17,
             'vendas' => 30,
             'devolucoes' => 25,
             'doacoes' => 20,
@@ -491,44 +486,17 @@ class FluxoStress200MovimentacoesTest extends TestCase
 
     private function receberConforme(int $transferenciaOrigemId, string $qtdRecebidaUm): void
     {
-        $this->actingAs($this->movimentacoesTransferenciasUsuario())->postJson(
-            route('admin.movimentacoes.transferencias.recebimento.store', $transferenciaOrigemId),
-            [
-                'status_recebimento' => StatusRecebimentoTransferencia::CONFORME->value,
-                'qtd_recebida_um' => $qtdRecebidaUm,
-                'numero_nf_destino' => 'NF-DEST-STRESS-200',
-            ],
-        )->assertOk();
+        // Transferências são efetivadas na criação (ADR-0065).
     }
 
     private function receberDivergente(int $transferenciaOrigemId, string $qtdRecebidaUm): void
     {
-        $this->actingAs($this->movimentacoesTransferenciasUsuario())->postJson(
-            route('admin.movimentacoes.transferencias.recebimento.store', $transferenciaOrigemId),
-            [
-                'status_recebimento' => StatusRecebimentoTransferencia::DIVERGENTE->value,
-                'qtd_recebida_um' => $qtdRecebidaUm,
-                'observacao_recebimento' => 'Divergência stress 200.',
-            ],
-        )->assertOk();
+        // Fluxo de divergência removido (ADR-0065).
     }
 
     private function reenviarTransferencia(int $transferenciaOrigemId, string $qtdUm): Movimentacao
     {
-        $this->actingAs($this->movimentacoesTransferenciasUsuario())->postJson(
-            route('admin.movimentacoes.transferencias.reenviar', $transferenciaOrigemId),
-            [
-                'qtd_fruta_um' => $qtdUm,
-                'motivo_substituicao' => 'Reenvio stress 200.',
-            ],
-        )->assertOk();
-
-        return Movimentacao::query()
-            ->where('transferencia_origem_id', $transferenciaOrigemId)
-            ->where('status_movimentacao_id', StatusMovimentacao::ID_SAIDA)
-            ->where('status_registro', MovimentacaoStatusRegistro::ATIVO->value)
-            ->orderByDesc('id')
-            ->firstOrFail();
+        throw new \LogicException('Reenvio de transferência foi removido (ADR-0065).');
     }
 
     private function cancelarTransferencia(int $transferenciaOrigemId): void
@@ -834,8 +802,9 @@ class FluxoStress200MovimentacoesTest extends TestCase
         $vendas = Movimentacao::query()->where('categoria_movimentacao_id', CategoriaMovimentacaoTipo::Venda->value)->get();
         foreach ($vendas as $venda) {
             $this->assertGreaterThanOrEqual(0, (float) $venda->valor_custo_saida);
+            $custoOperacionalTotal = round((float) $venda->valor_custo_operacional * (float) $venda->qtd_fruta_kg, 2);
             $this->assertSame(
-                number_format(round((float) $venda->valor_nf_total - (float) $venda->valor_custo_saida - (float) $venda->valor_frete_rateio, 2), 2, '.', ''),
+                number_format(round((float) $venda->valor_nf_total - (float) $venda->valor_custo_saida - $custoOperacionalTotal - (float) $venda->valor_frete_rateio, 2), 2, '.', ''),
                 (string) $venda->resultado_movimentacao,
             );
         }
@@ -894,8 +863,6 @@ class FluxoStress200MovimentacoesTest extends TestCase
             ->where('categoria_movimentacao_id', CategoriaMovimentacaoTipo::Transferencia->value)
             ->where('status_movimentacao_id', StatusMovimentacao::ID_ENTRADA)
             ->whereIn('status_transferencia', [
-                StatusTransferenciaOperacional::PENDENTE_RECEBIMENTO->value,
-                StatusTransferenciaOperacional::RECEBIDA_DIVERGENTE->value,
                 StatusTransferenciaOperacional::CANCELADA->value,
                 StatusTransferenciaOperacional::REENVIADA->value,
             ])

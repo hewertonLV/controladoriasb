@@ -4,13 +4,11 @@ namespace App\Http\Controllers\Admin\Movimentacoes;
 
 use App\Actions\Movimentacoes\Transferencia\CancelarTransferenciaAction;
 use App\Actions\Movimentacoes\Transferencia\CriarTransferenciaMovimentacaoAction;
-use App\Actions\Movimentacoes\Transferencia\ReenviarTransferenciaAction;
 use App\Actions\Movimentacoes\Transferencia\VincularFreteTransferenciaAction;
 use App\Enums\CategoriaMovimentacaoTipo;
 use App\Enums\MovimentacaoStatusRegistro;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Admin\Movimentacoes\CancelarTransferenciaRequest;
-use App\Http\Requests\Admin\Movimentacoes\ReenviarTransferenciaRequest;
 use App\Http\Requests\Admin\Movimentacoes\VincularFreteTransferenciaRequest;
 use App\Http\Requests\Admin\Movimentacoes\StoreTransferenciaMovimentacaoRequest;
 use App\Enums\FreteStatusSituacao;
@@ -86,8 +84,8 @@ class TransferenciaMovimentacaoController extends Controller
         return redirect()
             ->route('admin.movimentacoes.transferencias.show', ['transferenciaOrigem' => $anchor])
             ->with('success', $pares->count() > 1
-                ? 'Transferências registradas (saídas na origem e entradas pendentes no destino).'
-                : 'Transferência registrada (saída na origem e entrada pendente no destino).');
+                ? 'Transferências registradas (saída na origem e entrada no destino).'
+                : 'Transferência registrada (saída na origem e entrada no destino).');
     }
 
     public function show(Movimentacao $transferenciaOrigem): View
@@ -142,24 +140,7 @@ class TransferenciaMovimentacaoController extends Controller
 
         return redirect()
             ->route('admin.movimentacoes.transferencias.show', ['transferenciaOrigem' => $anchor])
-            ->with('success', 'Frete atualizado. Rateio e estoque do destino foram recalculados quando aplicável.');
-    }
-
-    public function reenviar(
-        ReenviarTransferenciaRequest $request,
-        Movimentacao $transferenciaOrigem,
-        ReenviarTransferenciaAction $reenviar,
-    ): JsonResponse|RedirectResponse {
-        $anchor = (int) $transferenciaOrigem->transferencia_origem_id;
-        $par = $reenviar($request, $anchor);
-
-        if ($request->expectsJson()) {
-            return response()->json(['data' => $par]);
-        }
-
-        return redirect()
-            ->route('admin.movimentacoes.transferencias.show', ['transferenciaOrigem' => $anchor])
-            ->with('success', 'Transferência reenviada (nova versão ativa).');
+            ->with('success', 'Frete atualizado. Rateio e estoque do destino foram recalculados.');
     }
 
     public function cancelar(
@@ -176,6 +157,6 @@ class TransferenciaMovimentacaoController extends Controller
 
         return redirect()
             ->route('admin.movimentacoes.transferencias.index')
-            ->with('success', 'Transferência cancelada e estoque de origem estornado.');
+            ->with('success', 'Transferência cancelada; estoques de origem e destino estornados.');
     }
 }

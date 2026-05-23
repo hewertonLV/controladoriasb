@@ -5,6 +5,7 @@ namespace App\Services\Movimentacoes;
 use App\Enums\CategoriaMovimentacaoTipo;
 use App\Enums\FreteStatusSituacao;
 use App\Enums\MovimentacaoStatusRegistro;
+use App\Enums\StatusRecebimentoTransferencia;
 use App\Enums\StatusTransferenciaOperacional;
 use App\Enums\TipoEmpresaRegistro;
 use App\Models\Empresa;
@@ -28,7 +29,7 @@ use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
 
 /**
- * Regras e persistência exclusivas da categoria TRANSFERÊNCIA (saída origem + entrada pendente destino).
+ * Regras e persistência exclusivas da categoria TRANSFERÊNCIA (saída origem + entrada no destino).
  */
 final class TransferenciaMovimentacaoService
 {
@@ -111,81 +112,8 @@ final class TransferenciaMovimentacaoService
     }
 
     /**
-     * @param  array{
-     *     qtd_fruta_um:numeric-string|float|int|string,
-     *     numero_nf_origem?:string|null,
-     *     id_frete?:int|null,
-     *     observacao?:string|null,
-     *     motivo_substituicao?:string|null,
-     * }  $input
-     * @return array{saida: Movimentacao, entrada: Movimentacao}
-     */
-    public function reenviarAposDivergencia(int $transferenciaOrigemId, array $input): array
-    {
-        return DB::transaction(function () use ($transferenciaOrigemId, $input): array {
-            ['saida' => $saidaAntiga, 'entrada' => $entradaAntiga] = $this->obterParAtivoPorTransferenciaOrigemId($transferenciaOrigemId);
-
-            if ($entradaAntiga->status_transferencia !== StatusTransferenciaOperacional::RECEBIDA_DIVERGENTE->value) {
-                throw new InvalidArgumentException('Reenvio permitido somente após recebimento divergente.');
-            }
-
-            $this->estornarSaidaNoEstoqueOrigem($saidaAntiga);
-
-            $motivo = isset($input['motivo_substituicao']) ? trim((string) $input['motivo_substituicao']) : null;
-            if ($motivo === '') {
-                $motivo = null;
-            }
-
-            $novaVersao = (int) $saidaAntiga->versao + 1;
-            $agora = $saidaAntiga->data_movimentacao;
-
-            $saidaAntiga->forceFill([
-                'status_registro' => MovimentacaoStatusRegistro::SUBSTITUIDO->value,
-                'status_transferencia' => StatusTransferenciaOperacional::REENVIADA->value,
-                'motivo_substituicao' => $motivo,
-                'substituida_em' => now(),
-            ])->saveQuietly();
-
-            $entradaAntiga->forceFill([
-                'status_registro' => MovimentacaoStatusRegistro::SUBSTITUIDO->value,
-                'status_transferencia' => StatusTransferenciaOperacional::REENVIADA->value,
-                'motivo_substituicao' => $motivo,
-                'substituida_em' => now(),
-            ])->saveQuietly();
-
-            $payload = [
-                'id_empresa_origem' => (int) $saidaAntiga->id_empresa_origem,
-                'id_empresa_destino' => (int) $saidaAntiga->id_empresa_destino,
-                'id_fruta' => (int) $saidaAntiga->id_fruta,
-                'qtd_fruta_um' => $input['qtd_fruta_um'],
-                'numero_nf_origem' => $input['numero_nf_origem'] ?? $saidaAntiga->numero_nf_origem,
-                'id_frete' => array_key_exists('id_frete', $input) ? $input['id_frete'] : $saidaAntiga->id_frete,
-                'observacao' => $input['observacao'] ?? $saidaAntiga->observacao,
-            ];
-
-            $criado = $this->criarTransferenciaInterno($payload, $transferenciaOrigemId, $novaVersao, $agora, $saidaAntiga->id, $entradaAntiga->id);
-
-            $saidaNova = $criado['saida'];
-            $entradaNova = $criado['entrada'];
-
-            $saidaAntiga->forceFill(['substituida_por_id' => $saidaNova->id])->saveQuietly();
-            $entradaAntiga->forceFill(['substituida_por_id' => $entradaNova->id])->saveQuietly();
-
-            $saidaNova->forceFill([
-                'movimentacao_origem_id' => $saidaAntiga->id,
-            ])->saveQuietly();
-
-            $entradaNova->forceFill([
-                'movimentacao_origem_id' => $entradaAntiga->id,
-            ])->saveQuietly();
-
-            return ['saida' => $saidaNova->fresh(), 'entrada' => $entradaNova->fresh()];
-        });
-    }
-
-    /**
-     * Vincula, altera ou remove frete em transferência pendente ou recebida conforme.
-     * Recalcula rateio do(s) frete(s) afetado(s) e reprocessa estoque do destino quando já recebida conforme (ADR-0003).
+     * Vincula, altera ou remove frete em transferência recebida conforme.
+     * Recalcula rateio do(s) frete(s) afetado(s) e reprocessa estoque do destino (ADR-0003).
      *
      * @param  array{id_frete?:int|null}  $input
      */
@@ -194,15 +122,9 @@ final class TransferenciaMovimentacaoService
         DB::transaction(function () use ($transferenciaOrigemId, $input): void {
             ['saida' => $saida, 'entrada' => $entrada] = $this->obterParAtivoPorTransferenciaOrigemId($transferenciaOrigemId);
 
-            $statusAtual = (string) $entrada->status_transferencia;
-            $statusPermitidos = [
-                StatusTransferenciaOperacional::PENDENTE_RECEBIMENTO->value,
-                StatusTransferenciaOperacional::RECEBIDA_CONFORME->value,
-            ];
-
-            if (! in_array($statusAtual, $statusPermitidos, true)) {
+            if ($entrada->status_transferencia !== StatusTransferenciaOperacional::RECEBIDA_CONFORME->value) {
                 throw new InvalidArgumentException(
-                    'Vincular frete só é permitido para transferência pendente de recebimento ou recebida conforme.',
+                    'Vincular frete só é permitido para transferência recebida conforme.',
                 );
             }
 
@@ -234,19 +156,20 @@ final class TransferenciaMovimentacaoService
                 $this->reconciliacao->recalcularRateioFreteParaTransferencias($idFrete);
             }
 
+            $saida = $saida->fresh();
+            $entrada = $entrada->fresh();
+
             if ($freteNovo === null) {
                 $this->aplicarFreteZeroNoPar($saida, $entrada);
-
-                if ($statusAtual === StatusTransferenciaOperacional::RECEBIDA_CONFORME->value) {
-                    $unidadeDestino = $this->unidadeDaEmpresa(
-                        Empresa::query()->findOrFail((int) $entrada->id_empresa_destino),
-                    );
-                    $this->replayLinhaTempoEstoque->reprocessarUnidadeFruta(
-                        $unidadeDestino->id,
-                        (int) $entrada->id_fruta,
-                    );
-                }
             }
+
+            $unidadeDestino = $this->unidadeDaEmpresa(
+                Empresa::query()->findOrFail((int) $entrada->id_empresa_destino),
+            );
+            $this->replayLinhaTempoEstoque->reprocessarUnidadeFruta(
+                $unidadeDestino->id,
+                (int) $entrada->id_fruta,
+            );
         });
     }
 
@@ -255,14 +178,11 @@ final class TransferenciaMovimentacaoService
         DB::transaction(function () use ($transferenciaOrigemId, $motivo): void {
             ['saida' => $saida, 'entrada' => $entrada] = $this->obterParAtivoPorTransferenciaOrigemId($transferenciaOrigemId);
 
-            $st = $entrada->status_transferencia;
-            if (! in_array($st, [
-                StatusTransferenciaOperacional::PENDENTE_RECEBIMENTO->value,
-                StatusTransferenciaOperacional::RECEBIDA_DIVERGENTE->value,
-            ], true)) {
+            if ($entrada->status_transferencia !== StatusTransferenciaOperacional::RECEBIDA_CONFORME->value) {
                 throw new InvalidArgumentException('Cancelamento não permitido para o status atual da transferência.');
             }
 
+            $this->reverterEntradaNoEstoqueDestino($entrada);
             $this->estornarSaidaNoEstoqueOrigem($saida);
 
             $mot = $motivo !== null && trim($motivo) !== '' ? trim($motivo) : null;
@@ -285,6 +205,96 @@ final class TransferenciaMovimentacaoService
                 $this->reconciliacao->recalcularRateioFreteParaTransferencias((int) $saida->id_frete);
             }
         });
+    }
+
+    public function reverterEntradaNoEstoqueDestino(Movimentacao $entrada): void
+    {
+        if ((int) $entrada->categoria_movimentacao_id !== CategoriaMovimentacaoTipo::Transferencia->value) {
+            throw new InvalidArgumentException('Movimentação não é transferência.');
+        }
+        if ((int) $entrada->status_movimentacao_id !== StatusMovimentacao::ID_ENTRADA) {
+            throw new InvalidArgumentException('Somente perna de entrada pode ser revertida.');
+        }
+        if ($entrada->status_transferencia !== StatusTransferenciaOperacional::RECEBIDA_CONFORME->value) {
+            throw new InvalidArgumentException('Somente entrada recebida conforme pode ser revertida neste fluxo.');
+        }
+
+        $fruta = Fruta::query()->findOrFail((int) $entrada->id_fruta);
+        $kgPorUm = (float) $fruta->kg_por_unidade_medicao;
+
+        $qtdRecUm = (float) $entrada->qtd_recebida_um;
+        $qtdRecKg = (float) $entrada->qtd_recebida_kg;
+        if ($qtdRecUm <= 0 || $qtdRecKg <= 0) {
+            throw new InvalidArgumentException('Quantidades recebidas inválidas para reversão.');
+        }
+
+        $empresaDestino = Empresa::query()->with('entidade')->findOrFail((int) $entrada->id_empresa_destino);
+        $unidadeDestino = $this->unidadeDaEmpresa($empresaDestino);
+
+        $estoqueDestino = Estoque::query()
+            ->where('id_unidade_negocio', $unidadeDestino->id)
+            ->where('id_fruta', $fruta->id)
+            ->lockForUpdate()
+            ->firstOrFail();
+
+        $this->garantirPosicaoInicialSeNecessario($estoqueDestino, $unidadeDestino->id, $fruta->id);
+
+        $posicaoDestino = MovimentacaoEstoque::query()
+            ->where('id_unidade_negocio', $unidadeDestino->id)
+            ->where('id_fruta', $fruta->id)
+            ->where('status_ultima_posicao', true)
+            ->lockForUpdate()
+            ->firstOrFail();
+
+        $saldoUmAnt = (float) $posicaoDestino->qtd_fruta_um;
+        $saldoKgAnt = (float) $posicaoDestino->qtd_fruta_kg;
+        $Vprev = (float) $estoqueDestino->valor_total_acumulado;
+
+        if ($saldoUmAnt + 1e-6 < $qtdRecUm || $saldoKgAnt + 1e-6 < $qtdRecKg) {
+            throw new InvalidArgumentException('Saldo insuficiente no destino para reverter o recebimento.');
+        }
+
+        $precoEntradaKg = (float) $entrada->preco_medio_fruta_kg;
+        $Vlote = round($precoEntradaKg * $qtdRecKg, 2);
+        $saldoUmNovo = round($saldoUmAnt - $qtdRecUm, 2);
+        $saldoKgNovo = round($saldoKgAnt - $qtdRecKg, 2);
+        $Vnovo = round($Vprev - $Vlote, 2);
+        if ($Vnovo < -0.01) {
+            throw new InvalidArgumentException('Valor acumulado inconsistente ao reverter recebimento.');
+        }
+
+        $precoConsolidadoKg = $saldoKgNovo > 0 ? round($Vnovo / $saldoKgNovo, 2) : 0.0;
+        $precoConsolidadoUm = round($precoConsolidadoKg * $kgPorUm, 2);
+        $valorTotalSnapshot = round($saldoKgNovo * $precoConsolidadoKg, 2);
+
+        $posicaoDestino->forceFill(['status_ultima_posicao' => false])->save();
+
+        MovimentacaoEstoque::query()->create([
+            'id_estoque' => $estoqueDestino->id,
+            'id_unidade_negocio' => $unidadeDestino->id,
+            'id_fruta' => $fruta->id,
+            'movimentacao_id' => null,
+            'qtd_fruta_kg' => number_format($saldoKgNovo, 2, '.', ''),
+            'qtd_fruta_um' => number_format($saldoUmNovo, 2, '.', ''),
+            'preco_medio_kg' => number_format($precoConsolidadoKg, 2, '.', ''),
+            'preco_medio_um' => number_format($precoConsolidadoUm, 2, '.', ''),
+            'valor_total_fruta' => number_format($valorTotalSnapshot, 2, '.', ''),
+            'status_ultima_posicao' => true,
+        ]);
+
+        $estoqueDestino->forceFill([
+            'qtd_fruta_kg' => number_format($saldoKgNovo, 2, '.', ''),
+            'qtd_fruta_um' => number_format($saldoUmNovo, 2, '.', ''),
+            'preco_medio_kg' => number_format($precoConsolidadoKg, 2, '.', ''),
+            'preco_medio_um' => number_format($precoConsolidadoUm, 2, '.', ''),
+            'valor_total_acumulado' => number_format($Vnovo, 2, '.', ''),
+        ])->save();
+
+        $entrada->forceFill([
+            'id_movimentacao_estoque_new' => null,
+            'saldo_estoque_fruta_kg' => number_format($saldoKgNovo, 2, '.', ''),
+            'saldo_estoque_fruta_um' => number_format($saldoUmNovo, 2, '.', ''),
+        ])->saveQuietly();
     }
 
     /**
@@ -538,9 +548,89 @@ final class TransferenciaMovimentacaoService
 
         if ($frete !== null) {
             $this->reconciliacao->recalcularRateioFreteParaTransferencias((int) $frete->id);
+            $saida->refresh();
+            $entrada->refresh();
         }
 
+        $this->efetivarEntradaConforme($saida, $entrada, $unidadeDestino, $fruta, $qtdUm, $qtdKg);
+
         return ['saida' => $saida->fresh(), 'entrada' => $entrada->fresh()];
+    }
+
+    private function efetivarEntradaConforme(
+        Movimentacao $saida,
+        Movimentacao $entrada,
+        UnidadeNegocio $unidadeDestino,
+        Fruta $fruta,
+        float $qtdUm,
+        float $qtdKg,
+    ): void {
+        $kgPorUm = (float) $fruta->kg_por_unidade_medicao;
+
+        $estoqueDestino = Estoque::query()
+            ->where('id_unidade_negocio', $unidadeDestino->id)
+            ->where('id_fruta', $fruta->id)
+            ->lockForUpdate()
+            ->firstOrFail();
+
+        $this->garantirPosicaoInicialSeNecessario($estoqueDestino, $unidadeDestino->id, $fruta->id);
+
+        $posicaoDestino = MovimentacaoEstoque::query()
+            ->where('id_unidade_negocio', $unidadeDestino->id)
+            ->where('id_fruta', $fruta->id)
+            ->where('status_ultima_posicao', true)
+            ->lockForUpdate()
+            ->firstOrFail();
+
+        $saldoUmAnt = (float) $posicaoDestino->qtd_fruta_um;
+        $saldoKgAnt = (float) $posicaoDestino->qtd_fruta_kg;
+        $Vprev = (float) $estoqueDestino->valor_total_acumulado;
+
+        $precoEntradaKg = (float) $entrada->preco_medio_fruta_kg;
+        $Vlote = round($precoEntradaKg * $qtdKg, 2);
+        $Vnovo = round($Vprev + $Vlote, 2);
+        $saldoUmNovo = round($saldoUmAnt + $qtdUm, 2);
+        $saldoKgNovo = round($saldoKgAnt + $qtdKg, 2);
+        $precoConsolidadoKg = $saldoKgNovo > 0 ? round($Vnovo / $saldoKgNovo, 2) : 0.0;
+        $precoConsolidadoUm = round($precoConsolidadoKg * $kgPorUm, 2);
+        $valorTotalSnapshot = round($saldoKgNovo * $precoConsolidadoKg, 2);
+
+        $posicaoDestino->forceFill(['status_ultima_posicao' => false])->save();
+
+        $novaMe = MovimentacaoEstoque::query()->create([
+            'id_estoque' => $estoqueDestino->id,
+            'id_unidade_negocio' => $unidadeDestino->id,
+            'id_fruta' => $fruta->id,
+            'movimentacao_id' => $entrada->id,
+            'qtd_fruta_kg' => number_format($saldoKgNovo, 2, '.', ''),
+            'qtd_fruta_um' => number_format($saldoUmNovo, 2, '.', ''),
+            'preco_medio_kg' => number_format($precoConsolidadoKg, 2, '.', ''),
+            'preco_medio_um' => number_format($precoConsolidadoUm, 2, '.', ''),
+            'valor_total_fruta' => number_format($valorTotalSnapshot, 2, '.', ''),
+            'status_ultima_posicao' => true,
+        ]);
+
+        $entrada->forceFill([
+            'id_movimentacao_estoque_new' => $novaMe->id,
+            'qtd_recebida_um' => number_format($qtdUm, 2, '.', ''),
+            'qtd_recebida_kg' => number_format($qtdKg, 2, '.', ''),
+            'status_recebimento' => StatusRecebimentoTransferencia::CONFORME->value,
+            'saldo_estoque_fruta_kg' => number_format($saldoKgNovo, 2, '.', ''),
+            'saldo_estoque_fruta_um' => number_format($saldoUmNovo, 2, '.', ''),
+            'status_transferencia' => StatusTransferenciaOperacional::RECEBIDA_CONFORME->value,
+        ])->saveQuietly();
+
+        $saida->forceFill([
+            'status_transferencia' => StatusTransferenciaOperacional::RECEBIDA_CONFORME->value,
+        ])->saveQuietly();
+
+        $estoqueDestino->forceFill([
+            'qtd_fruta_kg' => number_format($saldoKgNovo, 2, '.', ''),
+            'qtd_fruta_um' => number_format($saldoUmNovo, 2, '.', ''),
+            'preco_medio_kg' => number_format($precoConsolidadoKg, 2, '.', ''),
+            'preco_medio_um' => number_format($precoConsolidadoUm, 2, '.', ''),
+            'valor_total_acumulado' => number_format($Vnovo, 2, '.', ''),
+        ])->save();
     }
 
     public function estornarSaidaNoEstoqueOrigem(Movimentacao $saida): void

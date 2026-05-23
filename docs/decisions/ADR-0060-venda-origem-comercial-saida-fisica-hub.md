@@ -13,7 +13,7 @@ A operação fatura pela loja comercial (coluna B da planilha), mas a fruta sai 
 - **`id_empresa_origem`** = origem comercial (loja, nunca HUB) — relatórios, ICMS e faturamento.
 - **`id_unidade_negocio_estoque`** (nullable) = unidade de saída física; default = origem comercial.
 - **`id_unidade_negocio_faturamento`** = sempre igual à origem comercial (sem select separado).
-- **CO na margem da venda = 0** quando a saída física for HUB (`is_hub = true`).
+- **CO na margem da venda = 0** quando a saída física for HUB (`is_hub = true`). **Atualização:** substituído por [ADR-0063](ADR-0063-venda-hub-co-unidade-faturamento.md) — CO da unidade de faturamento na margem, sem alterar PM.
 - **Realocação automática** na confirmação da venda: se saída física = HUB, **sempre** realocar a quantidade integral da venda da loja comercial via transferências HUB→loja **RECEBIDA_CONFORME** (última elegível primeiro), estornando ao preço de entrada original da transferência (desfaz efeito no custo médio da loja), devolver ao HUB ao preço de saída original **sem CO do HUB**, e dar replay nas duas unidades. Ver [ADR-0061](ADR-0061-realocacao-hub-venda-sempre-loja-faturamento.md).
 - **ADR-0059** substituída: HUB não aparece como origem comercial; importação usa origem comercial + select de saída física.
 

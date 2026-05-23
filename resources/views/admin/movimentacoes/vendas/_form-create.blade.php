@@ -1,6 +1,6 @@
 @php
     $isEdit = isset($movimentacao);
-    $opcoes = $opcoes ?? compact('empresas_origem', 'empresas_destino_cliente', 'unidades_estoque', 'unidades_hub', 'frutas', 'frutas_catalogo', 'fretes');
+    $opcoes = $opcoes ?? compact('empresas_origem', 'empresas_destino_cliente', 'centros_resultado', 'unidades_estoque', 'unidades_hub', 'frutas', 'frutas_catalogo', 'fretes');
     $frutasCatalogo = $opcoes['frutas_catalogo'] ?? \App\Support\Movimentacoes\FrutasComEstoqueOrigem::catalogoJs($opcoes['frutas'] ?? collect());
     $hubCoHistorico = ($isEdit && ($movimentacao->id_custo_operacional ?? null))
         ? \App\Models\HistoricoCOUnNg::query()->find((int) $movimentacao->id_custo_operacional)
@@ -24,7 +24,7 @@
             <input name="numero_nf" class="form-control" required value="{{ old('numero_nf', $movimentacao->vendaNota->numero_nf ?? '') }}">
         </div>
         <div class="col-md-3">
-            <label class="form-label">Origem comercial <span class="text-danger">*</span></label>
+            <label class="form-label">Unidade de faturamento <span class="text-danger">*</span></label>
             <select name="id_empresa_origem" id="id_empresa_origem" class="form-select" required data-venda-comercial data-search-select data-placeholder="Selecione ou pesquise a loja comercial">
                 <option value="">Selecione</option>
                 @foreach ($opcoes['empresas_origem'] as $empresa)
@@ -35,12 +35,26 @@
                     </option>
                 @endforeach
             </select>
-            <small class="text-muted">Loja que fatura e aparece nos relatórios (coluna B da planilha).</small>
+            <small class="text-muted">Loja comercial que fatura a NF (ex.: Barbalha). Galpões não aparecem aqui.</small>
+        </div>
+        <div class="col-md-3">
+            <label class="form-label">Centro de resultado</label>
+            <select name="id_unidade_negocio_centro_resultado" class="form-select" data-venda-centro data-search-select data-placeholder="Mesma da unidade de faturamento">
+                <option value="">Mesma da unidade de faturamento</option>
+                @foreach ($opcoes['centros_resultado'] ?? [] as $centro)
+                    <option value="{{ $centro->id }}"
+                            data-is-galpao="{{ $centro->is_galpao_operacional ? '1' : '0' }}"
+                            @selected((int) old('id_unidade_negocio_centro_resultado', $movimentacao->id_unidade_negocio_centro_resultado ?? 0) === $centro->id)>
+                        {{ $centro->nome }}{{ $centro->is_galpao_operacional ? ' · Galpão' : '' }}
+                    </option>
+                @endforeach
+            </select>
+            <small class="text-muted">Onde o PM é debitado e o CO entra na margem. Relatórios agrupam por este centro.</small>
         </div>
         <div class="col-md-3">
             <label class="form-label">Saída física (estoque)</label>
-            <select name="id_unidade_negocio_estoque" class="form-select" data-venda-estoque data-search-select data-placeholder="Mesma da origem comercial">
-                <option value="">Mesma da origem comercial</option>
+            <select name="id_unidade_negocio_estoque" class="form-select" data-venda-estoque data-search-select data-placeholder="Mesma do centro de resultado">
+                <option value="">Mesma do centro de resultado</option>
                 @foreach ($opcoes['unidades_estoque'] ?? [] as $unidade)
                     @php $empresaEstoque = $unidade->registroCorporativo()->first(); @endphp
                     <option value="{{ $unidade->id }}"
@@ -51,7 +65,7 @@
                     </option>
                 @endforeach
             </select>
-            <small class="text-muted">Unidade de onde a fruta sai fisicamente. Selecione o HUB para venda direta do centro de distribuição.</small>
+            <small class="text-muted">Unidade de onde a fruta sai fisicamente. Se diferente do centro, só debita estoque (ex.: HUB com margem na loja).</small>
         </div>
         <div class="col-md-3">
             <label class="form-label">Cliente destino</label>
@@ -169,7 +183,7 @@
                 <i class="ri-add-line me-1"></i> Adicionar fruta
             </button>
         </div>
-        <p class="small mb-2 text-muted" data-venda-fruta-aviso role="status">Escolha a origem comercial e, se necessário, a saída física para liberar as frutas com estoque.</p>
+        <p class="small mb-2 text-muted" data-venda-fruta-aviso role="status">Escolha a unidade de faturamento e, se necessário, a saída física para liberar as frutas com estoque.</p>
         <div data-items-container="venda">
             @foreach ($itens as $i => $item)
                 <div class="row g-3 mb-2" data-item-row>
@@ -359,7 +373,7 @@
 
             if (origemId === '') {
                 avisoFruta.className = 'small mb-2 text-muted';
-                avisoFruta.innerHTML = 'Escolha a <strong>origem comercial</strong> e, se necessário, a <strong>saída física</strong> para listar frutas com estoque.';
+                avisoFruta.innerHTML = 'Escolha a <strong>unidade de faturamento</strong> e, se necessário, a <strong>saída física</strong> para listar frutas com estoque.';
             } else if (!temFrutaDisponivel) {
                 avisoFruta.className = 'small mb-2 text-danger';
                 avisoFruta.textContent = 'Nenhuma fruta com estoque na saída física selecionada. Verifique o estoque ou selecione outra unidade.';

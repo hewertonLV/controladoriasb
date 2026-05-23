@@ -86,18 +86,15 @@ class FluxoIntegradoMovimentacoesComCustosEImpostosTest extends TestCase
             cliente: $c['cliente_doacao'],
         ));
 
-        // 4. Transferência A -> B.
-        $saidaAB1 = $this->evento(fn () => $this->registrarTransferencia(
+        // 4. Transferência A -> B (efetivada na criação).
+        $this->evento(fn () => $this->registrarTransferencia(
             origem: $c['empresa_a'],
             destino: $c['empresa_b'],
             fruta: $c['fruta'],
             qtdUm: '2',
         ));
 
-        // 5. Recebimento conforme em B.
-        $this->evento(fn () => $this->receberConforme((int) $saidaAB1->transferencia_origem_id, '2'));
-
-        // 6. Compra Unidade B.
+        // 5. Compra Unidade B.
         $compraB1 = $this->evento(fn () => $this->registrarCompra(
             fornecedor: $c['fornecedor_pe'],
             destino: $c['empresa_b'],
@@ -121,28 +118,15 @@ class FluxoIntegradoMovimentacoesComCustosEImpostosTest extends TestCase
         ));
 
         // 9. Transferência B -> C com Frete 2.
-        $saidaBC1 = $this->evento(fn () => $this->registrarTransferencia(
+        $this->evento(fn () => $this->registrarTransferencia(
             origem: $c['empresa_b'],
             destino: $c['empresa_c'],
             fruta: $c['fruta'],
-            qtdUm: '1',
-            frete: $c['frete2'],
-        ));
-
-        // 10. Recebimento divergente em C.
-        $this->evento(fn () => $this->receberDivergente((int) $saidaBC1->transferencia_origem_id, '0.5'));
-
-        // 11. Reenviar transferência B -> C.
-        $saidaBC2 = $this->evento(fn () => $this->reenviarTransferencia(
-            transferenciaOrigemId: (int) $saidaBC1->transferencia_origem_id,
             qtdUm: '0.5',
             frete: $c['frete2'],
         ));
 
-        // 12. Recebimento conforme em C.
-        $this->evento(fn () => $this->receberConforme((int) $saidaBC2->transferencia_origem_id, '0.5'));
-
-        // 13. Doação Unidade C.
+        // 10. Doação Unidade C.
         $doacaoC1 = $this->evento(fn () => $this->registrarDoacao(
             origem: $c['empresa_c'],
             fruta: $c['fruta'],
@@ -177,10 +161,7 @@ class FluxoIntegradoMovimentacoesComCustosEImpostosTest extends TestCase
             qtdUm: '0.25',
         ));
 
-        // 17. Recebimento conforme em A.
-        $this->evento(fn () => $this->receberConforme((int) $saidaCA1->transferencia_origem_id, '0.25'));
-
-        // 18. Compra Unidade C.
+        // 17. Compra Unidade C.
         $compraC1 = $this->evento(fn () => $this->registrarCompra(
             fornecedor: $c['fornecedor_pe'],
             destino: $c['empresa_c'],
@@ -221,10 +202,7 @@ class FluxoIntegradoMovimentacoesComCustosEImpostosTest extends TestCase
             qtdUm: '1',
         ));
 
-        // 24. Recebimento conforme em C.
-        $this->evento(fn () => $this->receberConforme((int) $saidaAC1->transferencia_origem_id, '1'));
-
-        // 25. Doação Unidade B.
+        // 24. Doação Unidade B.
         $doacaoB1 = $this->evento(fn () => $this->registrarDoacao(
             origem: $c['empresa_b'],
             fruta: $c['fruta'],
@@ -244,18 +222,15 @@ class FluxoIntegradoMovimentacoesComCustosEImpostosTest extends TestCase
         // 27. Atualizar compra Unidade A criando nova versão.
         $compraA4V2 = $this->evento(fn () => $this->atualizarCompra($compraA4, '600,00'));
 
-        // 28. Transferência C -> B.
+        // 28. Transferência C -> B (cancelada em seguida).
         $saidaCB1 = $this->evento(fn () => $this->registrarTransferencia(
             origem: $c['empresa_c'],
             destino: $c['empresa_b'],
             fruta: $c['fruta'],
-            qtdUm: '1',
+            qtdUm: '0.5',
         ));
 
-        // 29. Recebimento divergente em B.
-        $this->evento(fn () => $this->receberDivergente((int) $saidaCB1->transferencia_origem_id, '0.5'));
-
-        // 30. Cancelar transferência C -> B.
+        // 29. Cancelar transferência C -> B.
         $this->evento(fn () => $this->cancelarTransferencia((int) $saidaCB1->transferencia_origem_id));
 
         // 31. Compra Unidade C com Frete 2.
@@ -283,10 +258,7 @@ class FluxoIntegradoMovimentacoesComCustosEImpostosTest extends TestCase
             qtdUm: '1',
         ));
 
-        // 34. Recebimento conforme em B.
-        $this->evento(fn () => $this->receberConforme((int) $saidaAB2->transferencia_origem_id, '1'));
-
-        // 35. Venda em C.
+        // 34. Venda em C.
         $vendaC1 = $this->evento(fn () => $this->registrarVenda(
             origem: $c['empresa_c'],
             cliente: $c['cliente_doacao'],
@@ -303,7 +275,7 @@ class FluxoIntegradoMovimentacoesComCustosEImpostosTest extends TestCase
             qtdUm: '0.25',
         ));
 
-        $this->assertSame(36, $this->eventosExecutados);
+        $this->assertSame(28, $this->eventosExecutados);
 
         $this->assertSemEstoqueNegativo();
         foreach ([$c['unidade_a'], $c['unidade_b'], $c['unidade_c']] as $unidade) {
@@ -331,8 +303,6 @@ class FluxoIntegradoMovimentacoesComCustosEImpostosTest extends TestCase
         $this->assertSame(MovimentacaoStatusRegistro::CANCELADO->value, $compraB3->fresh()->status_registro);
         $this->assertSame(MovimentacaoStatusRegistro::CANCELADO->value, $doacaoA2->fresh()->status_registro);
         $this->assertSame(MovimentacaoStatusRegistro::CANCELADO->value, $saidaCB1->fresh()->status_registro);
-        $this->assertSame(MovimentacaoStatusRegistro::SUBSTITUIDO->value, $saidaBC1->fresh()->status_registro);
-        $this->assertSame(MovimentacaoStatusRegistro::ATIVO->value, $saidaBC2->fresh()->status_registro);
         $this->assertSame(MovimentacaoStatusRegistro::ATIVO->value, $compraC1->fresh()->status_registro);
         $this->assertSame(MovimentacaoStatusRegistro::ATIVO->value, $compraC2->fresh()->status_registro);
     }
@@ -590,55 +560,17 @@ class FluxoIntegradoMovimentacoesComCustosEImpostosTest extends TestCase
 
     private function reenviarTransferencia(int $transferenciaOrigemId, string $qtdUm, ?Frete $frete = null): Movimentacao
     {
-        $user = $this->movimentacoesTransferenciasUsuario();
-        $payload = [
-            'qtd_fruta_um' => $qtdUm,
-            'motivo_substituicao' => 'Reenvio stress após divergência.',
-        ];
-
-        if ($frete !== null) {
-            $payload['id_frete'] = $frete->id;
-        }
-
-        $this->actingAs($user)->postJson(
-            route('admin.movimentacoes.transferencias.reenviar', $transferenciaOrigemId),
-            $payload,
-        )->assertOk();
-
-        return Movimentacao::query()
-            ->where('transferencia_origem_id', $transferenciaOrigemId)
-            ->where('status_movimentacao_id', StatusMovimentacao::ID_SAIDA)
-            ->where('status_registro', MovimentacaoStatusRegistro::ATIVO->value)
-            ->orderByDesc('id')
-            ->firstOrFail();
+        throw new \LogicException('Reenvio de transferência foi removido (ADR-0065).');
     }
 
     private function receberConforme(int $transferenciaOrigemId, string $qtdRecebidaUm): void
     {
-        $user = $this->movimentacoesTransferenciasUsuario();
-
-        $this->actingAs($user)->postJson(
-            route('admin.movimentacoes.transferencias.recebimento.store', $transferenciaOrigemId),
-            [
-                'status_recebimento' => StatusRecebimentoTransferencia::CONFORME->value,
-                'qtd_recebida_um' => $qtdRecebidaUm,
-                'numero_nf_destino' => 'NF-DEST-STRESS',
-            ],
-        )->assertOk();
+        // Transferências são efetivadas na criação (ADR-0065).
     }
 
     private function receberDivergente(int $transferenciaOrigemId, string $qtdRecebidaUm): void
     {
-        $user = $this->movimentacoesTransferenciasUsuario();
-
-        $this->actingAs($user)->postJson(
-            route('admin.movimentacoes.transferencias.recebimento.store', $transferenciaOrigemId),
-            [
-                'status_recebimento' => StatusRecebimentoTransferencia::DIVERGENTE->value,
-                'qtd_recebida_um' => $qtdRecebidaUm,
-                'observacao_recebimento' => 'Divergência operacional stress.',
-            ],
-        )->assertOk();
+        // Fluxo de divergência removido (ADR-0065).
     }
 
     private function cancelarTransferencia(int $transferenciaOrigemId): void
@@ -882,8 +814,6 @@ class FluxoIntegradoMovimentacoesComCustosEImpostosTest extends TestCase
             ->where('categoria_movimentacao_id', CategoriaMovimentacaoTipo::Transferencia->value)
             ->where('status_movimentacao_id', StatusMovimentacao::ID_ENTRADA)
             ->whereIn('status_transferencia', [
-                StatusTransferenciaOperacional::PENDENTE_RECEBIMENTO->value,
-                StatusTransferenciaOperacional::RECEBIDA_DIVERGENTE->value,
                 StatusTransferenciaOperacional::CANCELADA->value,
                 StatusTransferenciaOperacional::REENVIADA->value,
             ])

@@ -19,7 +19,6 @@ final class CancelarTransferenciaMovimentacaoAdminService
 {
     public function __construct(
         private readonly TransferenciaMovimentacaoService $transferenciaMovimentacao,
-        private readonly RecebimentoTransferenciaService $recebimentoTransferencia,
         private readonly ReconciliacaoTransferenciaService $reconciliacaoTransferencia,
         private readonly ReprocessaSaidasTransferenciaOrigem $reprocessaSaidasTransferenciaOrigem,
         private readonly ReplayEstoqueCompraService $replayEstoqueDestino,
@@ -80,7 +79,7 @@ final class CancelarTransferenciaMovimentacaoAdminService
             $estoqueDestinoAntes = $this->auditoria->snapshotEstoque($estoqueDestino);
 
             if ($entrada->status_transferencia === StatusTransferenciaOperacional::RECEBIDA_CONFORME->value) {
-                $this->recebimentoTransferencia->reverterRecebimentoConformeParaCancelamentoAdministrativo($entrada);
+                $this->transferenciaMovimentacao->reverterEntradaNoEstoqueDestino($entrada);
                 $entrada = Movimentacao::query()->whereKey($entrada->id)->lockForUpdate()->firstOrFail();
             }
 

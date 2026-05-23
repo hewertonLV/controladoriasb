@@ -147,6 +147,22 @@
                     @enderror
                 </div>
             </div>
+            <div class="col-md-4 d-flex align-items-end">
+                <div class="form-check form-switch pb-2">
+                    <input type="hidden" name="is_galpao_operacional" value="0">
+                    <input type="checkbox"
+                           class="form-check-input @error('is_galpao_operacional') is-invalid @enderror"
+                           id="is_galpao_operacional"
+                           name="is_galpao_operacional"
+                           value="1"
+                           @checked(old('is_galpao_operacional', $unidadeNegocio->is_galpao_operacional ?? false))>
+                    <label class="form-check-label" for="is_galpao_operacional">Galpão operacional</label>
+                    @error('is_galpao_operacional')
+                        <div class="invalid-feedback d-block">{{ $message }}</div>
+                    @enderror
+                    <small class="text-muted d-block">Centro de resultado regional; não fatura NF.</small>
+                </div>
+            </div>
         </div>
     </div>
 

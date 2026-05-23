@@ -396,7 +396,54 @@ class VendaMovimentacaoTest extends TestCase
         $this->assertSame('200.00', (string) $venda->resultado_movimentacao);
     }
 
-    public function test_venda_comercial_com_saida_fisica_hub_debita_hub_co_zero_e_faturamento_loja(): void
+    public function test_venda_barbalha_nf_com_centro_galpao_aplica_co_galpao_e_debita_estoque_galpao(): void
+    {
+        $this->seedBase();
+        $c = $this->cenarioBarbalhaComGalpao();
+        $this->registrarCompraGalpao($c, '10', '500,00');
+
+        HistoricoCOUnNg::query()->where('id_unidade_negocio', $c['galpao']->id)->update(['status_position' => false]);
+        HistoricoCOUnNg::factory()->create([
+            'id_unidade_negocio' => $c['galpao']->id,
+            'custo_operacional' => '2.00',
+            'status_position' => true,
+        ]);
+        $c['galpao']->forceFill(['custo_operacional' => '2.00'])->save();
+
+        $this->actingAs($this->movimentacoesVendasUsuario())->postJson(route('admin.movimentacoes.vendas.store'), [
+            'numero_nf' => 'NF-GALPAO-1',
+            'id_empresa_origem' => $c['empresa_barbalha']->id,
+            'id_unidade_negocio_centro_resultado' => $c['galpao']->id,
+            'id_empresa_destino' => $c['empresa_cliente']->id,
+            'itens' => [
+                ['id_fruta' => $c['fruta']->id, 'qtd_fruta_um' => '2', 'valor_nf_total' => '300,00'],
+            ],
+        ])->assertCreated();
+
+        $venda = Movimentacao::query()
+            ->where('categoria_movimentacao_id', CategoriaMovimentacaoTipo::Venda->value)
+            ->latest('id')
+            ->firstOrFail();
+
+        $coGalpao = HistoricoCOUnNg::query()
+            ->where('id_unidade_negocio', $c['galpao']->id)
+            ->where('status_position', true)
+            ->firstOrFail();
+
+        $this->assertSame($c['barbalha']->id, (int) $venda->id_unidade_negocio_faturamento);
+        $this->assertSame($c['galpao']->id, (int) $venda->id_unidade_negocio_centro_resultado);
+        $this->assertNull($venda->id_unidade_negocio_estoque);
+        $this->assertSame('2.00', (string) $venda->valor_custo_operacional);
+        $this->assertSame((int) $coGalpao->id, (int) $venda->id_custo_operacional);
+        $this->assertSame('100.00', (string) $venda->valor_custo_saida);
+        $this->assertSame('160.00', (string) $venda->resultado_movimentacao);
+        $this->assertEstoque($c['galpao'], $c['fruta'], '80.00', '8.00', '5.00', '50.00', '400.00');
+        $this->assertFalse(
+            Estoque::query()->where('id_unidade_negocio', $c['barbalha']->id)->where('id_fruta', $c['fruta']->id)->exists(),
+        );
+    }
+
+    public function test_venda_comercial_com_saida_fisica_hub_aplica_co_faturamento_na_margem(): void
     {
         $this->seedBase();
         $c = $this->cenarioLojaComHub();
@@ -419,9 +466,17 @@ class VendaMovimentacaoTest extends TestCase
             ->latest('id')
             ->firstOrFail();
 
+        $coLoja = HistoricoCOUnNg::query()
+            ->where('id_unidade_negocio', $c['loja']->id)
+            ->where('status_position', true)
+            ->firstOrFail();
+
         $this->assertSame($c['loja']->id, (int) $venda->id_unidade_negocio_faturamento);
         $this->assertSame($c['hub']->id, (int) $venda->id_unidade_negocio_estoque);
-        $this->assertSame('0.00', (string) $venda->valor_custo_operacional);
+        $this->assertSame('1.00', (string) $venda->valor_custo_operacional);
+        $this->assertSame((int) $coLoja->id, (int) $venda->id_custo_operacional);
+        $this->assertSame('100.00', (string) $venda->valor_custo_saida);
+        $this->assertSame('180.00', (string) $venda->resultado_movimentacao);
         $this->assertEstoque($c['hub'], $c['fruta'], '0.00', '0.00', '5.00', '50.00', '0.00');
         $this->assertEstoque($c['loja'], $c['fruta'], '80.00', '8.00', '6.00', '60.00', '480.00');
     }
@@ -668,6 +723,72 @@ class VendaMovimentacaoTest extends TestCase
      * @param  array<string, mixed>  $clienteOverrides
      * @return array<string, mixed>
      */
+    private function cenarioBarbalhaComGalpao(array $clienteOverrides = []): array
+    {
+        $clienteOverrides = array_replace(['desconto_nf' => '0.00'], $clienteOverrides);
+        $fornecedor = Fornecedor::factory()->create(['id_estado' => Estado::ID_PERNAMBUCO]);
+        $cliente = Cliente::factory()->create($clienteOverrides);
+        $barbalha = UnidadeNegocio::factory()->create([
+            'possui_estoque' => true,
+            'id_estado' => Estado::ID_PERNAMBUCO,
+            'custo_operacional' => '0.00',
+            'is_hub' => false,
+            'is_galpao_operacional' => false,
+            'nome' => 'BARBALHA NF',
+        ]);
+        $galpao = UnidadeNegocio::factory()->create([
+            'possui_estoque' => true,
+            'id_estado' => Estado::ID_PERNAMBUCO,
+            'custo_operacional' => '0.00',
+            'is_hub' => false,
+            'is_galpao_operacional' => true,
+            'nome' => 'GALPAO RECIFE',
+            'cpf_cnpj' => null,
+        ]);
+
+        HistoricoCOUnNg::query()->whereIn('id_unidade_negocio', [$barbalha->id, $galpao->id])->update(['status_position' => false]);
+        HistoricoCOUnNg::factory()->create(['id_unidade_negocio' => $barbalha->id, 'custo_operacional' => '0.00', 'status_position' => true]);
+        HistoricoCOUnNg::factory()->create(['id_unidade_negocio' => $galpao->id, 'custo_operacional' => '0.00', 'status_position' => true]);
+
+        $fruta = Fruta::factory()->comIcmsCeara([
+            'entrada_nacional' => 0,
+            'entrada_externo' => 0,
+            'entrada_um' => FrutaUmIcms::KG->value,
+        ])->create(['kg_por_unidade_medicao' => 10]);
+
+        return [
+            'empresa_fornecedor' => $fornecedor->registroCorporativo()->firstOrFail(),
+            'empresa_cliente' => $cliente->registroCorporativo()->firstOrFail(),
+            'empresa_barbalha' => $barbalha->registroCorporativo()->firstOrFail(),
+            'empresa_galpao' => $galpao->registroCorporativo()->firstOrFail(),
+            'barbalha' => $barbalha,
+            'galpao' => $galpao,
+            'fruta' => $fruta,
+            'frete' => Frete::factory()->create(['valor' => '0.00', 'status_situacao' => FreteStatusSituacao::ABERTA->value]),
+        ];
+    }
+
+    /**
+     * @param  array<string, mixed>  $cenario
+     */
+    private function registrarCompraGalpao(array $cenario, string $qtdUm, string $valorNfTotal): Movimentacao
+    {
+        $this->actingAs($this->movimentacoesComprasUsuario())->postJson(route('admin.movimentacoes.compras.store'), [
+            'id_empresa_origem' => $cenario['empresa_fornecedor']->id,
+            'id_empresa_destino' => $cenario['empresa_galpao']->id,
+            'id_fruta' => $cenario['fruta']->id,
+            'qtd_fruta_um' => $qtdUm,
+            'valor_nf_total' => $valorNfTotal,
+            'id_frete' => $cenario['frete']->id,
+        ])->assertCreated();
+
+        return Movimentacao::query()->where('categoria_movimentacao_id', CategoriaMovimentacaoTipo::Compra->value)->orderByDesc('id')->firstOrFail();
+    }
+
+    /**
+     * @param  array<string, mixed>  $clienteOverrides
+     * @return array<string, mixed>
+     */
     private function cenarioLojaComHub(array $clienteOverrides = []): array
     {
         $clienteOverrides = array_replace(['desconto_nf' => '0.00'], $clienteOverrides);
@@ -889,14 +1010,7 @@ class VendaMovimentacaoTest extends TestCase
 
     private function confirmarTransferenciaConforme(int $transferenciaOrigemId, string $qtdRecebidaUm): void
     {
-        $this->actingAs($this->movimentacoesTransferenciasUsuario())->postJson(
-            route('admin.movimentacoes.transferencias.recebimento.store', $transferenciaOrigemId),
-            [
-                'status_recebimento' => StatusRecebimentoTransferencia::CONFORME->value,
-                'qtd_recebida_um' => $qtdRecebidaUm,
-                'numero_nf_destino' => 'NF-D-TESTE',
-            ],
-        )->assertOk();
+        // Transferências são efetivadas na criação (ADR-0065).
     }
 
     /**

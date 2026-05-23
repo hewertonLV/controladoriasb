@@ -4,6 +4,7 @@ namespace App\Http\Requests\Admin;
 
 use App\Http\Requests\Admin\Concerns\ValidatesUnidadeNegocioAttributes;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Validator;
 
 class StoreUnidadeNegocioRequest extends FormRequest
 {
@@ -41,5 +42,10 @@ class StoreUnidadeNegocioRequest extends FormRequest
     protected function prepareForValidation(): void
     {
         $this->prepareUnidadeNegocioForValidation();
+    }
+
+    public function withValidator(Validator $validator): void
+    {
+        $this->validarCombinacaoFlagsUnidadeNegocio($validator);
     }
 }

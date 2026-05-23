@@ -39,7 +39,6 @@ use App\Http\Controllers\Admin\Movimentacoes\DescarteMovimentacaoController;
 use App\Http\Controllers\Admin\Movimentacoes\DevolucaoMovimentacaoController;
 use App\Http\Controllers\Admin\Movimentacoes\DoacaoMovimentacaoController;
 use App\Http\Controllers\Admin\Movimentacoes\EntradaEstoqueMovimentacaoController;
-use App\Http\Controllers\Admin\Movimentacoes\RecebimentoTransferenciaController;
 use App\Http\Controllers\Admin\Movimentacoes\TransferenciaImportacaoController;
 use App\Http\Controllers\Admin\Movimentacoes\TransferenciaMovimentacaoController;
 use App\Http\Controllers\Admin\Movimentacoes\VendaImportacaoController;
@@ -941,17 +940,9 @@ Route::middleware(['auth', 'verified', 'user.active', 'password.changed'])->grou
                 ->middleware('permission:movimentacoes.transferencias.visualizar')
                 ->name('show');
 
-            Route::post('/{transferenciaOrigem}/recebimento', [RecebimentoTransferenciaController::class, 'store'])
-                ->middleware('permission:movimentacoes.transferencias.receber')
-                ->name('recebimento.store');
-
             Route::post('/{transferenciaOrigem}/vincular-frete', [TransferenciaMovimentacaoController::class, 'vincularFrete'])
                 ->middleware('permission:movimentacoes.transferencias.editar')
                 ->name('vincular-frete');
-
-            Route::post('/{transferenciaOrigem}/reenviar', [TransferenciaMovimentacaoController::class, 'reenviar'])
-                ->middleware('permission:movimentacoes.transferencias.reenviar')
-                ->name('reenviar');
 
             Route::post('/{transferenciaOrigem}/cancelar', [TransferenciaMovimentacaoController::class, 'cancelar'])
                 ->middleware('permission:movimentacoes.transferencias.cancelar')

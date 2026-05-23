@@ -356,11 +356,6 @@ class CancelamentoAdminMovimentacaoTest extends TestCase
             ->whereKey((int) $saida->pareada_movimentacao_id)
             ->firstOrFail();
 
-        $this->actingAs($user)->postJson(route('admin.movimentacoes.transferencias.recebimento.store', $anchor), [
-            'qtd_recebida_um' => '2',
-            'status_recebimento' => StatusRecebimentoTransferencia::CONFORME->value,
-        ])->assertOk();
-
         $estoqueDestAntes = Estoque::query()->where('id_unidade_negocio', $ud->id)->where('id_fruta', $fruta->id)->firstOrFail();
         $kgAntes = (float) $estoqueDestAntes->qtd_fruta_kg;
 

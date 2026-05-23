@@ -6,7 +6,6 @@ use App\Enums\CategoriaMovimentacaoTipo;
 use App\Enums\FrutaUmIcms;
 use App\Enums\MovimentacaoStatusRegistro;
 use App\Enums\Permissions;
-use App\Enums\StatusRecebimentoTransferencia;
 use App\Enums\StatusTransferenciaOperacional;
 use App\Models\Cliente;
 use App\Models\Empresa;
@@ -167,7 +166,7 @@ class TransferenciaMovimentacaoTest extends TestCase
         }
     }
 
-    public function test_criar_transferencia_gera_par_e_baixa_origem_sem_entrar_no_destino(): void
+    public function test_criar_transferencia_gera_par_baixa_origem_e_credita_destino(): void
     {
         $this->seedCategoriasEEstados();
 
@@ -200,8 +199,8 @@ class TransferenciaMovimentacaoTest extends TestCase
         $anchor = (int) $saida->transferencia_origem_id;
         $this->assertSame($anchor, (int) $entrada->transferencia_origem_id);
         $this->assertSame(StatusMovimentacao::ID_ENTRADA, (int) $entrada->status_movimentacao_id);
-        $this->assertSame(StatusTransferenciaOperacional::PENDENTE_RECEBIMENTO->value, $entrada->status_transferencia);
-        $this->assertNull($entrada->id_movimentacao_estoque_new);
+        $this->assertSame(StatusTransferenciaOperacional::RECEBIDA_CONFORME->value, $entrada->status_transferencia);
+        $this->assertNotNull($entrada->id_movimentacao_estoque_new);
 
         $estoqueOrigem = Estoque::query()
             ->where('id_unidade_negocio', $unidadeOrigem->id)
@@ -214,7 +213,8 @@ class TransferenciaMovimentacaoTest extends TestCase
             ->where('id_unidade_negocio', $unidadeDestino->id)
             ->where('id_fruta', $fruta->id)
             ->firstOrFail();
-        $this->assertSame('0.00', (string) $estoqueDestino->qtd_fruta_kg);
+        $this->assertSame('20.00', (string) $estoqueDestino->qtd_fruta_kg);
+        $this->assertSame('2.00', (string) $estoqueDestino->qtd_fruta_um);
     }
 
     public function test_criar_transferencia_multi_item_gera_um_par_por_fruta(): void
@@ -290,7 +290,7 @@ class TransferenciaMovimentacaoTest extends TestCase
         $this->assertSame('0.00', (string) $saida->valor_frete_rateio);
     }
 
-    public function test_vincular_frete_apos_recebimento_conforme_recalcula_entrada_e_estoque_destino(): void
+    public function test_vincular_frete_recalcula_entrada_e_estoque_destino(): void
     {
         $this->seedCategoriasEEstados();
 
@@ -298,7 +298,6 @@ class TransferenciaMovimentacaoTest extends TestCase
         $frete = Frete::factory()->create(['valor' => '100.00']);
         $user = $this->userWithPermissions([
             Permissions::MOVIMENTACOES_TRANSFERENCIAS_CRIAR,
-            Permissions::MOVIMENTACOES_TRANSFERENCIAS_RECEBER,
             Permissions::MOVIMENTACOES_TRANSFERENCIAS_EDITAR,
         ]);
 
@@ -314,14 +313,6 @@ class TransferenciaMovimentacaoTest extends TestCase
             ->where('categoria_movimentacao_id', CategoriaMovimentacaoTipo::Transferencia->value)
             ->firstOrFail();
         $anchor = (int) $saida->transferencia_origem_id;
-
-        $this->actingAs($user)->post(
-            route('admin.movimentacoes.transferencias.recebimento.store', ['transferenciaOrigem' => $anchor]),
-            [
-                'status_recebimento' => StatusRecebimentoTransferencia::CONFORME->value,
-                'qtd_recebida_um' => '10',
-            ],
-        )->assertRedirect();
 
         $entradaAntes = Movimentacao::query()
             ->where('status_movimentacao_id', StatusMovimentacao::ID_ENTRADA)
@@ -352,54 +343,6 @@ class TransferenciaMovimentacaoTest extends TestCase
         $this->assertGreaterThan(0.0, (float) $estoqueDestino->preco_medio_kg);
     }
 
-    public function test_recebimento_conforme_entra_no_estoque_destino(): void
-    {
-        $this->seedCategoriasEEstados();
-
-        [$empresaOrigem, $empresaDestino, , $unidadeDestino, $fruta] = $this->criarCenarioTransferencia();
-        $user = $this->movimentacoesTransferenciasUsuario();
-
-        $this->actingAs($user)->post(route('admin.movimentacoes.transferencias.store'), [
-            'id_empresa_origem' => $empresaOrigem->id,
-            'id_empresa_destino' => $empresaDestino->id,
-            'id_fruta' => $fruta->id,
-            'qtd_fruta_um' => '2',
-        ])->assertRedirect();
-
-        $saida = Movimentacao::query()
-            ->where('status_movimentacao_id', StatusMovimentacao::ID_SAIDA)
-            ->where('categoria_movimentacao_id', CategoriaMovimentacaoTipo::Transferencia->value)
-            ->firstOrFail();
-
-        $anchor = (int) $saida->transferencia_origem_id;
-
-        $this->actingAs($user)->post(
-            route('admin.movimentacoes.transferencias.recebimento.store', ['transferenciaOrigem' => $anchor]),
-            [
-                'status_recebimento' => StatusRecebimentoTransferencia::CONFORME->value,
-                'qtd_recebida_um' => '2',
-                'numero_nf_destino' => 'NF-D-1',
-            ],
-        )->assertRedirect();
-
-        $entrada = Movimentacao::query()
-            ->where('status_movimentacao_id', StatusMovimentacao::ID_ENTRADA)
-            ->where('transferencia_origem_id', $anchor)
-            ->where('status_registro', MovimentacaoStatusRegistro::ATIVO->value)
-            ->firstOrFail();
-
-        $this->assertNotNull($entrada->id_movimentacao_estoque_new);
-        $this->assertSame(StatusTransferenciaOperacional::RECEBIDA_CONFORME->value, $entrada->status_transferencia);
-
-        $estoqueDestino = Estoque::query()
-            ->where('id_unidade_negocio', $unidadeDestino->id)
-            ->where('id_fruta', $fruta->id)
-            ->firstOrFail();
-
-        $this->assertSame('20.00', (string) $estoqueDestino->qtd_fruta_kg);
-        $this->assertSame('2.00', (string) $estoqueDestino->qtd_fruta_um);
-    }
-
     public function test_detalhe_conforme_exibe_botao_cancelar_admin(): void
     {
         $this->seedCategoriasEEstados();
@@ -420,138 +363,18 @@ class TransferenciaMovimentacaoTest extends TestCase
             ->where('status_movimentacao_id', StatusMovimentacao::ID_SAIDA)
             ->value('transferencia_origem_id');
 
-        $this->actingAs($user)->post(
-            route('admin.movimentacoes.transferencias.recebimento.store', ['transferenciaOrigem' => $anchor]),
-            [
-                'status_recebimento' => StatusRecebimentoTransferencia::CONFORME->value,
-                'qtd_recebida_um' => '2',
-            ],
-        )->assertRedirect();
-
         $this->actingAs($user)
             ->get(route('admin.movimentacoes.transferencias.show', ['transferenciaOrigem' => $anchor]))
             ->assertOk()
             ->assertSee('Cancelar transferência', false)
-            ->assertSee('O que é recalculado ao cancelar', false);
+            ->assertSee('Cancelar (admin)', false);
     }
 
-    public function test_recebimento_conforme_com_quantidade_diferente_retorna_validacao(): void
+    public function test_cancelar_transferencia_conforme_restitui_origem_e_destino(): void
     {
         $this->seedCategoriasEEstados();
 
-        [$empresaOrigem, $empresaDestino, , , $fruta] = $this->criarCenarioTransferencia();
-        $user = $this->movimentacoesTransferenciasUsuario();
-
-        $this->actingAs($user)->post(route('admin.movimentacoes.transferencias.store'), [
-            'id_empresa_origem' => $empresaOrigem->id,
-            'id_empresa_destino' => $empresaDestino->id,
-            'id_fruta' => $fruta->id,
-            'qtd_fruta_um' => '2',
-        ])->assertRedirect();
-
-        $saida = Movimentacao::query()
-            ->where('status_movimentacao_id', StatusMovimentacao::ID_SAIDA)
-            ->where('categoria_movimentacao_id', CategoriaMovimentacaoTipo::Transferencia->value)
-            ->firstOrFail();
-
-        $anchor = (int) $saida->transferencia_origem_id;
-
-        $this->actingAs($user)->post(
-            route('admin.movimentacoes.transferencias.recebimento.store', ['transferenciaOrigem' => $anchor]),
-            [
-                'status_recebimento' => StatusRecebimentoTransferencia::CONFORME->value,
-                'qtd_recebida_um' => '1',
-            ],
-        )
-            ->assertSessionHasErrors('qtd_recebida_um');
-
-        $entrada = Movimentacao::query()
-            ->where('status_movimentacao_id', StatusMovimentacao::ID_ENTRADA)
-            ->where('transferencia_origem_id', $anchor)
-            ->where('status_registro', MovimentacaoStatusRegistro::ATIVO->value)
-            ->firstOrFail();
-
-        $this->assertSame(StatusTransferenciaOperacional::PENDENTE_RECEBIMENTO->value, $entrada->status_transferencia);
-        $this->assertNull($entrada->qtd_recebida_um);
-    }
-
-    public function test_formulario_recebimento_trava_quantidade_quando_conforme(): void
-    {
-        $this->seedCategoriasEEstados();
-
-        [$empresaOrigem, $empresaDestino, , , $fruta] = $this->criarCenarioTransferencia();
-        $user = $this->movimentacoesTransferenciasUsuario();
-
-        $this->actingAs($user)->post(route('admin.movimentacoes.transferencias.store'), [
-            'id_empresa_origem' => $empresaOrigem->id,
-            'id_empresa_destino' => $empresaDestino->id,
-            'id_fruta' => $fruta->id,
-            'qtd_fruta_um' => '2',
-        ])->assertRedirect();
-
-        $saida = Movimentacao::query()
-            ->where('status_movimentacao_id', StatusMovimentacao::ID_SAIDA)
-            ->where('categoria_movimentacao_id', CategoriaMovimentacaoTipo::Transferencia->value)
-            ->firstOrFail();
-
-        $this->actingAs($user)
-            ->get(route('admin.movimentacoes.transferencias.show', ['transferenciaOrigem' => (int) $saida->transferencia_origem_id]))
-            ->assertOk()
-            ->assertSee('data-recebimento-transferencia-form', false)
-            ->assertSee('data-status-recebimento', false)
-            ->assertSee('data-qtd-recebida-um', false)
-            ->assertSee('data-qtd-enviada="2.00"', false)
-            ->assertSee('qtd.readOnly = conforme', false);
-    }
-
-    public function test_recebimento_divergente_nao_altera_estoque_destino(): void
-    {
-        $this->seedCategoriasEEstados();
-
-        [$empresaOrigem, $empresaDestino, , $unidadeDestino, $fruta] = $this->criarCenarioTransferencia();
-        $user = $this->movimentacoesTransferenciasUsuario();
-
-        $this->actingAs($user)->post(route('admin.movimentacoes.transferencias.store'), [
-            'id_empresa_origem' => $empresaOrigem->id,
-            'id_empresa_destino' => $empresaDestino->id,
-            'id_fruta' => $fruta->id,
-            'qtd_fruta_um' => '2',
-        ])->assertRedirect();
-
-        $saida = Movimentacao::query()
-            ->where('status_movimentacao_id', StatusMovimentacao::ID_SAIDA)
-            ->firstOrFail();
-        $anchor = (int) $saida->transferencia_origem_id;
-
-        $this->actingAs($user)->post(
-            route('admin.movimentacoes.transferencias.recebimento.store', ['transferenciaOrigem' => $anchor]),
-            [
-                'status_recebimento' => StatusRecebimentoTransferencia::DIVERGENTE->value,
-                'qtd_recebida_um' => '1',
-                'observacao_recebimento' => 'Volume danificado.',
-            ],
-        )->assertRedirect();
-
-        $estoqueDestino = Estoque::query()
-            ->where('id_unidade_negocio', $unidadeDestino->id)
-            ->where('id_fruta', $fruta->id)
-            ->firstOrFail();
-
-        $this->assertSame('0.00', (string) $estoqueDestino->qtd_fruta_kg);
-
-        $entrada = Movimentacao::query()
-            ->where('status_movimentacao_id', StatusMovimentacao::ID_ENTRADA)
-            ->where('transferencia_origem_id', $anchor)
-            ->firstOrFail();
-        $this->assertSame(StatusTransferenciaOperacional::RECEBIDA_DIVERGENTE->value, $entrada->status_transferencia);
-        $this->assertNull($entrada->id_movimentacao_estoque_new);
-    }
-
-    public function test_cancelar_apos_divergencia_restitui_origem_e_marca_cancelada(): void
-    {
-        $this->seedCategoriasEEstados();
-
-        [$empresaOrigem, $empresaDestino, $unidadeOrigem, , $fruta] = $this->criarCenarioTransferencia();
+        [$empresaOrigem, $empresaDestino, $unidadeOrigem, $unidadeDestino, $fruta] = $this->criarCenarioTransferencia();
         $user = $this->movimentacoesTransferenciasUsuario();
 
         $this->actingAs($user)->post(route('admin.movimentacoes.transferencias.store'), [
@@ -565,26 +388,23 @@ class TransferenciaMovimentacaoTest extends TestCase
         $anchor = (int) $saida->transferencia_origem_id;
 
         $this->actingAs($user)->post(
-            route('admin.movimentacoes.transferencias.recebimento.store', ['transferenciaOrigem' => $anchor]),
-            [
-                'status_recebimento' => StatusRecebimentoTransferencia::DIVERGENTE->value,
-                'qtd_recebida_um' => '1',
-                'observacao_recebimento' => 'Divergência.',
-            ],
-        )->assertRedirect();
-
-        $this->actingAs($user)->post(
             route('admin.movimentacoes.transferencias.cancelar', ['transferenciaOrigem' => $anchor]),
-            ['motivo_substituicao' => 'Cancelado após divergência.'],
+            ['motivo_substituicao' => 'Cancelado após registro.'],
         )->assertRedirect(route('admin.movimentacoes.transferencias.index'));
 
         $estoqueOrigem = Estoque::query()
             ->where('id_unidade_negocio', $unidadeOrigem->id)
             ->where('id_fruta', $fruta->id)
             ->firstOrFail();
+        $estoqueDestino = Estoque::query()
+            ->where('id_unidade_negocio', $unidadeDestino->id)
+            ->where('id_fruta', $fruta->id)
+            ->firstOrFail();
 
         $this->assertSame('100.00', (string) $estoqueOrigem->qtd_fruta_kg);
         $this->assertSame('10.00', (string) $estoqueOrigem->qtd_fruta_um);
+        $this->assertSame('0.00', (string) $estoqueDestino->qtd_fruta_kg);
+        $this->assertSame('0.00', (string) $estoqueDestino->qtd_fruta_um);
 
         $this->assertSame(
             0,
@@ -819,161 +639,6 @@ class TransferenciaMovimentacaoTest extends TestCase
         );
     }
 
-    public function test_reenvio_apos_divergencia_cria_nova_versao_ativa_e_mantem_transferencia_origem_id(): void
-    {
-        $this->seedCategoriasEEstados();
-
-        [$empresaOrigem, $empresaDestino, $unidadeOrigem, , $fruta] = $this->criarCenarioTransferencia();
-        $user = $this->movimentacoesTransferenciasUsuario();
-
-        $this->actingAs($user)->post(route('admin.movimentacoes.transferencias.store'), [
-            'id_empresa_origem' => $empresaOrigem->id,
-            'id_empresa_destino' => $empresaDestino->id,
-            'id_fruta' => $fruta->id,
-            'qtd_fruta_um' => '2',
-        ])->assertRedirect();
-
-        $anchor = (int) Movimentacao::query()
-            ->where('status_movimentacao_id', StatusMovimentacao::ID_SAIDA)
-            ->where('status_registro', MovimentacaoStatusRegistro::ATIVO->value)
-            ->value('transferencia_origem_id');
-
-        $this->actingAs($user)->post(
-            route('admin.movimentacoes.transferencias.recebimento.store', ['transferenciaOrigem' => $anchor]),
-            [
-                'status_recebimento' => StatusRecebimentoTransferencia::DIVERGENTE->value,
-                'qtd_recebida_um' => '1',
-                'observacao_recebimento' => 'Divergente.',
-            ],
-        )->assertRedirect();
-
-        $this->actingAs($user)->post(
-            route('admin.movimentacoes.transferencias.reenviar', ['transferenciaOrigem' => $anchor]),
-            [
-                'qtd_fruta_um' => '1',
-                'motivo_substituicao' => 'Ajuste pós-conferência.',
-            ],
-        )->assertRedirect();
-
-        $saidaAtiva = Movimentacao::query()
-            ->where('transferencia_origem_id', $anchor)
-            ->where('status_movimentacao_id', StatusMovimentacao::ID_SAIDA)
-            ->where('status_registro', MovimentacaoStatusRegistro::ATIVO->value)
-            ->firstOrFail();
-
-        $this->assertSame(2, (int) $saidaAtiva->versao);
-        $this->assertSame($anchor, (int) $saidaAtiva->transferencia_origem_id);
-        $this->assertSame(StatusTransferenciaOperacional::PENDENTE_RECEBIMENTO->value, $saidaAtiva->status_transferencia);
-
-        $entradaAtiva = Movimentacao::query()
-            ->whereKey((int) $saidaAtiva->pareada_movimentacao_id)
-            ->firstOrFail();
-        $this->assertSame(StatusTransferenciaOperacional::PENDENTE_RECEBIMENTO->value, $entradaAtiva->status_transferencia);
-
-        $estoqueOrigem = Estoque::query()
-            ->where('id_unidade_negocio', $unidadeOrigem->id)
-            ->where('id_fruta', $fruta->id)
-            ->firstOrFail();
-        $this->assertSame('90.00', (string) $estoqueOrigem->qtd_fruta_kg);
-        $this->assertSame('9.00', (string) $estoqueOrigem->qtd_fruta_um);
-    }
-
-    public function test_reenvio_marca_versao_anterior_como_substituida(): void
-    {
-        $this->seedCategoriasEEstados();
-
-        [$empresaOrigem, $empresaDestino, , , $fruta] = $this->criarCenarioTransferencia();
-        $user = $this->movimentacoesTransferenciasUsuario();
-
-        $this->actingAs($user)->post(route('admin.movimentacoes.transferencias.store'), [
-            'id_empresa_origem' => $empresaOrigem->id,
-            'id_empresa_destino' => $empresaDestino->id,
-            'id_fruta' => $fruta->id,
-            'qtd_fruta_um' => '2',
-        ])->assertRedirect();
-
-        $saidaV1 = Movimentacao::query()
-            ->where('status_movimentacao_id', StatusMovimentacao::ID_SAIDA)
-            ->where('versao', 1)
-            ->where('categoria_movimentacao_id', CategoriaMovimentacaoTipo::Transferencia->value)
-            ->firstOrFail();
-        $anchor = (int) $saidaV1->transferencia_origem_id;
-
-        $this->actingAs($user)->post(
-            route('admin.movimentacoes.transferencias.recebimento.store', ['transferenciaOrigem' => $anchor]),
-            [
-                'status_recebimento' => StatusRecebimentoTransferencia::DIVERGENTE->value,
-                'qtd_recebida_um' => '1',
-                'observacao_recebimento' => 'Divergente.',
-            ],
-        )->assertRedirect();
-
-        $this->actingAs($user)->post(
-            route('admin.movimentacoes.transferencias.reenviar', ['transferenciaOrigem' => $anchor]),
-            ['qtd_fruta_um' => '1'],
-        )->assertRedirect();
-
-        $saidaV1->refresh();
-        $entradaV1 = Movimentacao::query()->whereKey((int) $saidaV1->pareada_movimentacao_id)->firstOrFail();
-
-        $this->assertSame(MovimentacaoStatusRegistro::SUBSTITUIDO->value, $saidaV1->status_registro);
-        $this->assertSame(MovimentacaoStatusRegistro::SUBSTITUIDO->value, $entradaV1->status_registro);
-        $this->assertSame(StatusTransferenciaOperacional::REENVIADA->value, $saidaV1->status_transferencia);
-        $this->assertSame(StatusTransferenciaOperacional::REENVIADA->value, $entradaV1->status_transferencia);
-    }
-
-    public function test_destino_pode_recusar_novamente_apos_reenvio(): void
-    {
-        $this->seedCategoriasEEstados();
-
-        [$empresaOrigem, $empresaDestino, , , $fruta] = $this->criarCenarioTransferencia();
-        $user = $this->movimentacoesTransferenciasUsuario();
-
-        $this->actingAs($user)->post(route('admin.movimentacoes.transferencias.store'), [
-            'id_empresa_origem' => $empresaOrigem->id,
-            'id_empresa_destino' => $empresaDestino->id,
-            'id_fruta' => $fruta->id,
-            'qtd_fruta_um' => '2',
-        ])->assertRedirect();
-
-        $anchor = (int) Movimentacao::query()
-            ->where('status_movimentacao_id', StatusMovimentacao::ID_SAIDA)
-            ->where('status_registro', MovimentacaoStatusRegistro::ATIVO->value)
-            ->value('transferencia_origem_id');
-
-        $this->actingAs($user)->post(
-            route('admin.movimentacoes.transferencias.recebimento.store', ['transferenciaOrigem' => $anchor]),
-            [
-                'status_recebimento' => StatusRecebimentoTransferencia::DIVERGENTE->value,
-                'qtd_recebida_um' => '1',
-                'observacao_recebimento' => 'Primeira divergência.',
-            ],
-        )->assertRedirect();
-
-        $this->actingAs($user)->post(
-            route('admin.movimentacoes.transferencias.reenviar', ['transferenciaOrigem' => $anchor]),
-            ['qtd_fruta_um' => '1'],
-        )->assertRedirect();
-
-        $this->actingAs($user)->post(
-            route('admin.movimentacoes.transferencias.recebimento.store', ['transferenciaOrigem' => $anchor]),
-            [
-                'status_recebimento' => StatusRecebimentoTransferencia::DIVERGENTE->value,
-                'qtd_recebida_um' => '0.5',
-                'observacao_recebimento' => 'Segunda divergência após reenvio.',
-            ],
-        )->assertRedirect();
-
-        $entradaAtiva = Movimentacao::query()
-            ->where('transferencia_origem_id', $anchor)
-            ->where('status_movimentacao_id', StatusMovimentacao::ID_ENTRADA)
-            ->where('status_registro', MovimentacaoStatusRegistro::ATIVO->value)
-            ->firstOrFail();
-
-        $this->assertSame(StatusTransferenciaOperacional::RECEBIDA_DIVERGENTE->value, $entradaAtiva->status_transferencia);
-        $this->assertSame('0.50', (string) $entradaAtiva->qtd_recebida_um);
-    }
-
     public function test_transferencia_cancelada_nao_entra_no_calculo_de_rateio_de_frete(): void
     {
         $this->seedCategoriasEEstados();
@@ -1023,15 +688,6 @@ class TransferenciaMovimentacaoTest extends TestCase
             ->where('status_movimentacao_id', StatusMovimentacao::ID_SAIDA)
             ->where('status_registro', MovimentacaoStatusRegistro::ATIVO->value)
             ->value('transferencia_origem_id');
-
-        $this->actingAs($user)->post(
-            route('admin.movimentacoes.transferencias.recebimento.store', ['transferenciaOrigem' => $anchorCancelar]),
-            [
-                'status_recebimento' => StatusRecebimentoTransferencia::DIVERGENTE->value,
-                'qtd_recebida_um' => '0.5',
-                'observacao_recebimento' => 'Div.',
-            ],
-        )->assertRedirect();
 
         $this->actingAs($user)->post(
             route('admin.movimentacoes.transferencias.cancelar', ['transferenciaOrigem' => $anchorCancelar]),
@@ -1100,34 +756,6 @@ class TransferenciaMovimentacaoTest extends TestCase
                 ->where('status_ultima_posicao', true)
                 ->count(),
         );
-
-        $anchor = (int) Movimentacao::query()
-            ->where('status_movimentacao_id', StatusMovimentacao::ID_SAIDA)
-            ->where('status_registro', MovimentacaoStatusRegistro::ATIVO->value)
-            ->value('transferencia_origem_id');
-
-        $this->actingAs($user)->post(
-            route('admin.movimentacoes.transferencias.recebimento.store', ['transferenciaOrigem' => $anchor]),
-            [
-                'status_recebimento' => StatusRecebimentoTransferencia::DIVERGENTE->value,
-                'qtd_recebida_um' => '1',
-                'observacao_recebimento' => 'Div.',
-            ],
-        )->assertRedirect();
-
-        $this->actingAs($user)->post(
-            route('admin.movimentacoes.transferencias.reenviar', ['transferenciaOrigem' => $anchor]),
-            ['qtd_fruta_um' => '1'],
-        )->assertRedirect();
-
-        $this->assertSame(
-            1,
-            MovimentacaoEstoque::query()
-                ->where('id_unidade_negocio', $unidadeOrigem->id)
-                ->where('id_fruta', $fruta->id)
-                ->where('status_ultima_posicao', true)
-                ->count(),
-        );
     }
 
     public function test_rollback_total_quando_falha_apos_baixa_na_origem(): void
@@ -1168,80 +796,6 @@ class TransferenciaMovimentacaoTest extends TestCase
         $this->assertSame((string) $estoqueAntes->qtd_fruta_um, (string) $estoqueDepois->qtd_fruta_um);
     }
 
-    public function test_usuario_sem_permissao_receber_nao_confirma_recebimento(): void
-    {
-        $this->seedCategoriasEEstados();
-
-        [$empresaOrigem, $empresaDestino, , , $fruta] = $this->criarCenarioTransferencia();
-
-        $completo = $this->movimentacoesTransferenciasUsuario();
-        $this->actingAs($completo)->post(route('admin.movimentacoes.transferencias.store'), [
-            'id_empresa_origem' => $empresaOrigem->id,
-            'id_empresa_destino' => $empresaDestino->id,
-            'id_fruta' => $fruta->id,
-            'qtd_fruta_um' => '1',
-        ])->assertRedirect();
-
-        $anchor = (int) Movimentacao::query()
-            ->where('status_movimentacao_id', StatusMovimentacao::ID_SAIDA)
-            ->value('transferencia_origem_id');
-
-        $semReceber = $this->userWithPermissions([
-            Permissions::MOVIMENTACOES_TRANSFERENCIAS_VISUALIZAR,
-            Permissions::MOVIMENTACOES_TRANSFERENCIAS_CRIAR,
-            Permissions::MOVIMENTACOES_TRANSFERENCIAS_REENVIAR,
-            Permissions::MOVIMENTACOES_TRANSFERENCIAS_CANCELAR,
-        ]);
-
-        $this->actingAs($semReceber)->post(
-            route('admin.movimentacoes.transferencias.recebimento.store', ['transferenciaOrigem' => $anchor]),
-            [
-                'status_recebimento' => StatusRecebimentoTransferencia::CONFORME->value,
-                'qtd_recebida_um' => '1',
-            ],
-        )->assertForbidden();
-    }
-
-    public function test_usuario_sem_permissao_reenviar_nao_reenvia(): void
-    {
-        $this->seedCategoriasEEstados();
-
-        [$empresaOrigem, $empresaDestino, , , $fruta] = $this->criarCenarioTransferencia();
-        $completo = $this->movimentacoesTransferenciasUsuario();
-
-        $this->actingAs($completo)->post(route('admin.movimentacoes.transferencias.store'), [
-            'id_empresa_origem' => $empresaOrigem->id,
-            'id_empresa_destino' => $empresaDestino->id,
-            'id_fruta' => $fruta->id,
-            'qtd_fruta_um' => '1',
-        ])->assertRedirect();
-
-        $anchor = (int) Movimentacao::query()
-            ->where('status_movimentacao_id', StatusMovimentacao::ID_SAIDA)
-            ->value('transferencia_origem_id');
-
-        $this->actingAs($completo)->post(
-            route('admin.movimentacoes.transferencias.recebimento.store', ['transferenciaOrigem' => $anchor]),
-            [
-                'status_recebimento' => StatusRecebimentoTransferencia::DIVERGENTE->value,
-                'qtd_recebida_um' => '0.5',
-                'observacao_recebimento' => 'Div.',
-            ],
-        )->assertRedirect();
-
-        $semReenviar = $this->userWithPermissions([
-            Permissions::MOVIMENTACOES_TRANSFERENCIAS_VISUALIZAR,
-            Permissions::MOVIMENTACOES_TRANSFERENCIAS_CRIAR,
-            Permissions::MOVIMENTACOES_TRANSFERENCIAS_RECEBER,
-            Permissions::MOVIMENTACOES_TRANSFERENCIAS_CANCELAR,
-        ]);
-
-        $this->actingAs($semReenviar)->post(
-            route('admin.movimentacoes.transferencias.reenviar', ['transferenciaOrigem' => $anchor]),
-            ['qtd_fruta_um' => '1'],
-        )->assertForbidden();
-    }
-
     public function test_usuario_sem_permissao_cancelar_nao_cancela(): void
     {
         $this->seedCategoriasEEstados();
@@ -1260,20 +814,10 @@ class TransferenciaMovimentacaoTest extends TestCase
             ->where('status_movimentacao_id', StatusMovimentacao::ID_SAIDA)
             ->value('transferencia_origem_id');
 
-        $this->actingAs($completo)->post(
-            route('admin.movimentacoes.transferencias.recebimento.store', ['transferenciaOrigem' => $anchor]),
-            [
-                'status_recebimento' => StatusRecebimentoTransferencia::DIVERGENTE->value,
-                'qtd_recebida_um' => '0.5',
-                'observacao_recebimento' => 'Div.',
-            ],
-        )->assertRedirect();
-
         $semCancelar = $this->userWithPermissions([
             Permissions::MOVIMENTACOES_TRANSFERENCIAS_VISUALIZAR,
             Permissions::MOVIMENTACOES_TRANSFERENCIAS_CRIAR,
-            Permissions::MOVIMENTACOES_TRANSFERENCIAS_RECEBER,
-            Permissions::MOVIMENTACOES_TRANSFERENCIAS_REENVIAR,
+            Permissions::MOVIMENTACOES_TRANSFERENCIAS_EDITAR,
         ]);
 
         $this->actingAs($semCancelar)->post(

@@ -79,7 +79,7 @@ class FluxoIntegradoMovimentacoesTest extends TestCase
         $this->assertUltimaPosicaoBateComEstoque($c['unidade_a'], $c['fruta']);
     }
 
-    public function test_cenario_3_compra_transferencia_conforme_baixa_origem_e_entrada_so_apos_recebimento(): void
+    public function test_cenario_3_compra_transferencia_baixa_origem_e_credita_destino_na_criacao(): void
     {
         $this->seedBase();
         $c = $this->cenarioBase();
@@ -89,30 +89,20 @@ class FluxoIntegradoMovimentacoesTest extends TestCase
         $anchor = (int) $saida->transferencia_origem_id;
 
         $this->assertEstoque($c['unidade_a'], $c['fruta'], '60.00', '6.00', '5.00', '50.00', '300.00');
-        $this->assertEstoque($c['unidade_b'], $c['fruta'], '0.00', '0.00', '0.00', '0.00', '0.00');
-
-        $entradaPendente = Movimentacao::query()
-            ->where('transferencia_origem_id', $anchor)
-            ->where('status_movimentacao_id', StatusMovimentacao::ID_ENTRADA)
-            ->firstOrFail();
-        $this->assertNull($entradaPendente->id_movimentacao_estoque_new);
-        $this->assertSame(StatusTransferenciaOperacional::PENDENTE_RECEBIMENTO->value, $entradaPendente->status_transferencia);
-
-        $this->confirmarTransferenciaConforme($anchor, '4');
+        $this->assertEstoque($c['unidade_b'], $c['fruta'], '40.00', '4.00', '5.00', '50.00', '200.00');
 
         $entrada = Movimentacao::query()
             ->where('transferencia_origem_id', $anchor)
             ->where('status_movimentacao_id', StatusMovimentacao::ID_ENTRADA)
             ->firstOrFail();
 
-        $this->assertSame(StatusTransferenciaOperacional::RECEBIDA_CONFORME->value, $entrada->status_transferencia);
         $this->assertNotNull($entrada->id_movimentacao_estoque_new);
-        $this->assertEstoque($c['unidade_b'], $c['fruta'], '40.00', '4.00', '5.00', '50.00', '200.00');
+        $this->assertSame(StatusTransferenciaOperacional::RECEBIDA_CONFORME->value, $entrada->status_transferencia);
         $this->assertUltimaPosicaoBateComEstoque($c['unidade_a'], $c['fruta']);
         $this->assertUltimaPosicaoBateComEstoque($c['unidade_b'], $c['fruta']);
     }
 
-    public function test_cenario_4_transferencia_divergente_cancelada_devolve_origem_e_nao_afeta_destino(): void
+    public function test_cenario_4_transferencia_cancelada_devolve_origem_e_destino(): void
     {
         $this->seedBase();
         $c = $this->cenarioBase();
@@ -121,7 +111,6 @@ class FluxoIntegradoMovimentacoesTest extends TestCase
         $saida = $this->registrarTransferencia($c, '3');
         $anchor = (int) $saida->transferencia_origem_id;
 
-        $this->marcarTransferenciaDivergente($anchor, '2');
         $this->cancelarTransferencia($anchor);
 
         $this->assertEstoque($c['unidade_a'], $c['fruta'], '100.00', '10.00', '5.00', '50.00', '500.00');
@@ -361,16 +350,14 @@ class FluxoIntegradoMovimentacoesTest extends TestCase
             ->assertForbidden();
 
         $saida = $this->registrarTransferencia($c, '2');
-        $semReceber = $this->userWithPermissions([
+        $semCancelar = $this->userWithPermissions([
             Permissions::MOVIMENTACOES_TRANSFERENCIAS_VISUALIZAR,
             Permissions::MOVIMENTACOES_TRANSFERENCIAS_CRIAR,
+            Permissions::MOVIMENTACOES_TRANSFERENCIAS_EDITAR,
         ]);
-        $this->actingAs($semReceber)->postJson(
-            route('admin.movimentacoes.transferencias.recebimento.store', (int) $saida->transferencia_origem_id),
-            [
-                'status_recebimento' => StatusRecebimentoTransferencia::CONFORME->value,
-                'qtd_recebida_um' => '2',
-            ],
+        $this->actingAs($semCancelar)->postJson(
+            route('admin.movimentacoes.transferencias.cancelar', (int) $saida->transferencia_origem_id),
+            ['motivo_substituicao' => 'Sem permissão.'],
         )->assertForbidden();
     }
 
@@ -588,30 +575,12 @@ class FluxoIntegradoMovimentacoesTest extends TestCase
 
     private function confirmarTransferenciaConforme(int $transferenciaOrigemId, string $qtdRecebidaUm): void
     {
-        $user = $this->movimentacoesTransferenciasUsuario();
-
-        $this->actingAs($user)->postJson(
-            route('admin.movimentacoes.transferencias.recebimento.store', $transferenciaOrigemId),
-            [
-                'status_recebimento' => StatusRecebimentoTransferencia::CONFORME->value,
-                'qtd_recebida_um' => $qtdRecebidaUm,
-                'numero_nf_destino' => 'NF-D-INT',
-            ],
-        )->assertOk();
+        // Transferências são efetivadas na criação (ADR-0065).
     }
 
     private function marcarTransferenciaDivergente(int $transferenciaOrigemId, string $qtdRecebidaUm): void
     {
-        $user = $this->movimentacoesTransferenciasUsuario();
-
-        $this->actingAs($user)->postJson(
-            route('admin.movimentacoes.transferencias.recebimento.store', $transferenciaOrigemId),
-            [
-                'status_recebimento' => StatusRecebimentoTransferencia::DIVERGENTE->value,
-                'qtd_recebida_um' => $qtdRecebidaUm,
-                'observacao_recebimento' => 'Divergência integrada de teste.',
-            ],
-        )->assertOk();
+        // Fluxo de divergência removido (ADR-0065).
     }
 
     private function cancelarTransferencia(int $transferenciaOrigemId): void

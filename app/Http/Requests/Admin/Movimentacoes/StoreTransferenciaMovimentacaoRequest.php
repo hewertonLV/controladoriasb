@@ -58,7 +58,6 @@ class StoreTransferenciaMovimentacaoRequest extends FormRequest
             'status_transferencia' => ['prohibited'],
             'transferencia_origem_id' => ['prohibited'],
             'pareada_movimentacao_id' => ['prohibited'],
-            'numero_nf_destino' => ['prohibited'],
             'qtd_recebida_um' => ['prohibited'],
             'qtd_recebida_kg' => ['prohibited'],
             'status_recebimento' => ['prohibited'],
@@ -95,6 +94,7 @@ class StoreTransferenciaMovimentacaoRequest extends FormRequest
             ],
             'itens.*.qtd_fruta_um' => ['required_with:itens', 'numeric', 'min:0.01'],
             'numero_nf_origem' => ['nullable', 'string', 'max:120'],
+            'numero_nf_destino' => ['nullable', 'string', 'max:120'],
             'id_frete' => [
                 'nullable',
                 'integer',
@@ -147,6 +147,7 @@ class StoreTransferenciaMovimentacaoRequest extends FormRequest
             'itens.*.id_fruta' => 'fruta',
             'itens.*.qtd_fruta_um' => 'quantidade na unidade de medida',
             'numero_nf_origem' => 'número da NF na origem',
+            'numero_nf_destino' => 'número da NF no destino',
             'id_frete' => 'frete',
             'observacao' => 'observação',
         ];

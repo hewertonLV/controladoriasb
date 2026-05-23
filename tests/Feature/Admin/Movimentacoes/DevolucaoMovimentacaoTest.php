@@ -453,15 +453,6 @@ class DevolucaoMovimentacaoTest extends TestCase
             ->orderByDesc('id')
             ->firstOrFail();
 
-        $this->actingAs($this->movimentacoesTransferenciasUsuario())->postJson(
-            route('admin.movimentacoes.transferencias.recebimento.store', (int) $saida->transferencia_origem_id),
-            [
-                'status_recebimento' => StatusRecebimentoTransferencia::CONFORME->value,
-                'qtd_recebida_um' => $qtdUm,
-                'numero_nf_destino' => 'NF-D-TESTE',
-            ],
-        )->assertOk();
-
         return $saida;
     }
 

@@ -127,7 +127,7 @@ final class RentabilidadeLojaService
         ?int $idDestino,
     ): Collection {
         $query = Movimentacao::query()
-            ->with(['empresaOrigem.entidade', 'empresaDestino.entidade', 'fruta'])
+            ->with(['empresaOrigem.entidade', 'empresaDestino.entidade', 'unidadeCentroResultado', 'fruta'])
             ->vigentesParaCalculo()
             ->where('categoria_movimentacao_id', CategoriaMovimentacaoTipo::Venda->value)
             ->where('status_movimentacao_id', StatusMovimentacao::ID_SAIDA)
@@ -204,7 +204,7 @@ final class RentabilidadeLojaService
     private function acumularVenda(array &$linhas, Movimentacao $venda, string $agrupamento): void
     {
         $clienteId = (int) $venda->id_empresa_destino;
-        $origemId = (int) $venda->id_empresa_origem;
+        $origemId = $this->resolverEmpresaCentroResultado($venda);
         $frutaId = (int) $venda->id_fruta;
 
         $chave = $this->chaveLinha($clienteId, $origemId, $frutaId, $agrupamento);
@@ -232,7 +232,7 @@ final class RentabilidadeLojaService
         }
 
         $clienteId = (int) $venda->id_empresa_destino;
-        $origemId = (int) $venda->id_empresa_origem;
+        $origemId = $this->resolverEmpresaCentroResultado($venda);
         $frutaId = (int) $venda->id_fruta;
 
         $chave = $this->chaveLinha($clienteId, $origemId, $frutaId, $agrupamento);
@@ -254,7 +254,9 @@ final class RentabilidadeLojaService
     private function linhaVazia(int $clienteId, int $origemId, int $frutaId, Movimentacao $referencia, string $agrupamento): array
     {
         $cliente = $referencia->empresaDestino ?? Empresa::query()->with('entidade')->find($clienteId);
-        $origem = $referencia->empresaOrigem ?? Empresa::query()->with('entidade')->find($origemId);
+        $origem = Empresa::query()->with('entidade')->find($origemId)
+            ?? $referencia->empresaOrigem
+            ?? Empresa::query()->with('entidade')->find($origemId);
         $fruta = $referencia->fruta;
 
         return [
@@ -386,5 +388,23 @@ final class RentabilidadeLojaService
         }
 
         return (int) $value;
+    }
+
+    private function resolverEmpresaCentroResultado(Movimentacao $venda): int
+    {
+        $centroUnidadeId = $venda->id_unidade_negocio_centro_resultado ?? $venda->id_unidade_negocio_faturamento;
+
+        if ($centroUnidadeId !== null) {
+            $empresaCentro = Empresa::query()
+                ->where('entidade_type', UnidadeNegocio::class)
+                ->where('entidade_id', (int) $centroUnidadeId)
+                ->value('id');
+
+            if ($empresaCentro !== null) {
+                return (int) $empresaCentro;
+            }
+        }
+
+        return (int) $venda->id_empresa_origem;
     }
 }

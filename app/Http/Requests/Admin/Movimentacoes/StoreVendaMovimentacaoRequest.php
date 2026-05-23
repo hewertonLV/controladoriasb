@@ -31,6 +31,7 @@ class StoreVendaMovimentacaoRequest extends FormRequest
         return array_merge($this->camposCalculadosProibidos(), [
             'numero_nf' => ['required', 'string', 'max:255'],
             'id_empresa_origem' => ['required', 'integer', Rule::exists('empresas', 'id')->where('entidade_type', UnidadeNegocio::class)],
+            'id_unidade_negocio_centro_resultado' => ['nullable', 'integer', Rule::exists('unidades_negocio', 'id')],
             'id_unidade_negocio_estoque' => ['nullable', 'integer', Rule::exists('unidades_negocio', 'id')],
             'id_empresa_destino' => ['required', 'integer', Rule::exists('empresas', 'id')->where('entidade_type', Cliente::class)],
             'id_unidade_negocio_faturamento' => ['prohibited'],
@@ -67,13 +68,26 @@ class StoreVendaMovimentacaoRequest extends FormRequest
                 if ($comercial->is_hub) {
                     $v->errors()->add('id_empresa_origem', 'Origem comercial não pode ser HUB. Selecione a loja e informe o HUB em saída física.');
                 }
+
+                if ($comercial->is_galpao_operacional) {
+                    $v->errors()->add('id_empresa_origem', 'Galpão operacional não pode faturar NF. Selecione a unidade de faturamento.');
+                }
             }
 
-            $unidadeEstoque = $this->resolverUnidadeEstoqueEfetiva($comercial);
-            if ($unidadeEstoque !== null) {
-                $this->validarAcessoUnidade($v, 'id_unidade_negocio_estoque', (int) $unidadeEstoque->id, 'Saída física');
+            $centro = $this->resolverUnidadeCentroResultadoEfetiva($comercial);
+            if ($centro !== null) {
+                $this->validarAcessoUnidade($v, 'id_unidade_negocio_centro_resultado', (int) $centro->id, 'Centro de resultado');
 
-                if (! $unidadeEstoque->possui_estoque) {
+                if ($centro->is_hub) {
+                    $v->errors()->add('id_unidade_negocio_centro_resultado', 'Centro de resultado não pode ser HUB.');
+                }
+            }
+
+            $unidadePm = $this->resolverUnidadePmDebitoEfetiva($comercial, $centro);
+            if ($unidadePm !== null) {
+                $this->validarAcessoUnidade($v, 'id_unidade_negocio_estoque', (int) $unidadePm->id, 'Saída física');
+
+                if (! $unidadePm->possui_estoque) {
                     $v->errors()->add('id_unidade_negocio_estoque', 'A unidade de saída física deve controlar estoque.');
                 }
 
@@ -83,7 +97,7 @@ class StoreVendaMovimentacaoRequest extends FormRequest
                     }
 
                     $temEstoqueNaOrigem = Estoque::query()
-                        ->where('id_unidade_negocio', $unidadeEstoque->id)
+                        ->where('id_unidade_negocio', $unidadePm->id)
                         ->where('id_fruta', (int) $item['id_fruta'])
                         ->where(function ($query): void {
                             $query->where('qtd_fruta_um', '>', 0)
@@ -91,7 +105,7 @@ class StoreVendaMovimentacaoRequest extends FormRequest
                         })
                         ->exists();
 
-                    if (! $temEstoqueNaOrigem && ! $this->podeRealocarDaLoja($comercial, $unidadeEstoque, (int) $item['id_fruta'])) {
+                    if (! $temEstoqueNaOrigem && ! $this->podeRealocarDaLoja($comercial, $centro, $unidadePm, (int) $item['id_fruta'])) {
                         $v->errors()->add(
                             "itens.{$i}.id_fruta",
                             'Esta fruta não possui estoque na saída física selecionada (nem saldo realocável da loja comercial).',
@@ -100,7 +114,7 @@ class StoreVendaMovimentacaoRequest extends FormRequest
                 }
             }
 
-            if ($comercial !== null && $comercial->is_unidade_producao && $unidadeEstoque !== null && ! $unidadeEstoque->is_hub) {
+            if ($comercial !== null && $comercial->is_unidade_producao && $unidadePm !== null && ! $unidadePm->is_hub) {
                 $aplicarHub = $this->boolean('aplicar_custo_operacional_hub');
                 $hubInformado = ! blank($this->input('id_unidade_negocio_hub_custo'));
 
@@ -124,23 +138,37 @@ class StoreVendaMovimentacaoRequest extends FormRequest
         });
     }
 
-    private function resolverUnidadeEstoqueEfetiva(?UnidadeNegocio $comercial): ?UnidadeNegocio
+    private function resolverUnidadeCentroResultadoEfetiva(?UnidadeNegocio $comercial): ?UnidadeNegocio
     {
         if ($comercial === null) {
             return null;
         }
 
+        $idCentro = $this->input('id_unidade_negocio_centro_resultado');
+        if (blank($idCentro)) {
+            return $comercial;
+        }
+
+        return UnidadeNegocio::query()->find((int) $idCentro);
+    }
+
+    private function resolverUnidadePmDebitoEfetiva(?UnidadeNegocio $comercial, ?UnidadeNegocio $centro): ?UnidadeNegocio
+    {
+        if ($comercial === null || $centro === null) {
+            return null;
+        }
+
         $idEstoque = $this->input('id_unidade_negocio_estoque');
         if (blank($idEstoque)) {
-            return $comercial;
+            return $centro;
         }
 
         return UnidadeNegocio::query()->find((int) $idEstoque);
     }
 
-    private function podeRealocarDaLoja(?UnidadeNegocio $comercial, UnidadeNegocio $estoque, int $idFruta): bool
+    private function podeRealocarDaLoja(?UnidadeNegocio $comercial, ?UnidadeNegocio $centro, UnidadeNegocio $pmDebito, int $idFruta): bool
     {
-        if ($comercial === null || ! $estoque->is_hub || $comercial->id === $estoque->id) {
+        if ($comercial === null || $centro === null || ! $pmDebito->is_hub || $centro->id !== $comercial->id) {
             return false;
         }
 
@@ -183,14 +211,15 @@ class StoreVendaMovimentacaoRequest extends FormRequest
 
         $empresaOrigem = Empresa::query()->with('entidade')->find((int) $this->input('id_empresa_origem'));
         $comercial = $empresaOrigem?->entidade instanceof UnidadeNegocio ? $empresaOrigem->entidade : null;
-        $estoque = $this->resolverUnidadeEstoqueEfetiva($comercial);
+        $centro = $this->resolverUnidadeCentroResultadoEfetiva($comercial);
+        $pmDebito = $this->resolverUnidadePmDebitoEfetiva($comercial, $centro);
 
         $merge = [
             'numero_nf' => trim((string) $this->input('numero_nf')),
             'itens' => $itens,
         ];
 
-        if ($comercial !== null && $comercial->is_unidade_producao && $estoque !== null && ! $estoque->is_hub) {
+        if ($comercial !== null && $comercial->is_unidade_producao && $pmDebito !== null && ! $pmDebito->is_hub) {
             $merge['aplicar_custo_operacional_hub'] = $this->boolean('aplicar_custo_operacional_hub', true);
             if (! $merge['aplicar_custo_operacional_hub']) {
                 $merge['id_unidade_negocio_hub_custo'] = null;

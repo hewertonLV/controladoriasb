@@ -17,6 +17,7 @@ use Illuminate\Support\Carbon;
  * @property int $id_empresa_origem
  * @property int $id_empresa_destino
  * @property int $id_unidade_negocio_faturamento
+ * @property int|null $id_unidade_negocio_centro_resultado
  * @property Carbon $data_emissao
  * @property string $valor_total_nf
  * @property string $status_registro
@@ -38,6 +39,7 @@ class VendaNota extends Model
         'id_empresa_origem',
         'id_empresa_destino',
         'id_unidade_negocio_faturamento',
+        'id_unidade_negocio_centro_resultado',
         'data_emissao',
         'valor_total_nf',
         'status_registro',
@@ -53,6 +55,7 @@ class VendaNota extends Model
             'id_empresa_origem' => 'integer',
             'id_empresa_destino' => 'integer',
             'id_unidade_negocio_faturamento' => 'integer',
+            'id_unidade_negocio_centro_resultado' => 'integer',
             'data_emissao' => 'datetime',
             'valor_total_nf' => 'decimal:2',
         ];
@@ -90,6 +93,14 @@ class VendaNota extends Model
     public function unidadeFaturamento(): BelongsTo
     {
         return $this->belongsTo(UnidadeNegocio::class, 'id_unidade_negocio_faturamento');
+    }
+
+    /**
+     * @return BelongsTo<UnidadeNegocio, $this>
+     */
+    public function unidadeCentroResultado(): BelongsTo
+    {
+        return $this->belongsTo(UnidadeNegocio::class, 'id_unidade_negocio_centro_resultado');
     }
 
     /**

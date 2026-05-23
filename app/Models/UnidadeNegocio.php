@@ -28,6 +28,7 @@ use Illuminate\Support\Carbon;
  * @property bool $possui_estoque
  * @property bool $is_hub
  * @property bool $is_unidade_producao
+ * @property bool $is_galpao_operacional
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
  * @property-read string $cpf_cnpj_formatado
@@ -58,6 +59,7 @@ class UnidadeNegocio extends Model
         'possui_estoque',
         'is_hub',
         'is_unidade_producao',
+        'is_galpao_operacional',
     ];
 
     /**
@@ -71,6 +73,7 @@ class UnidadeNegocio extends Model
             'possui_estoque' => 'boolean',
             'is_hub' => 'boolean',
             'is_unidade_producao' => 'boolean',
+            'is_galpao_operacional' => 'boolean',
             'custo_operacional' => 'decimal:2',
         ];
     }

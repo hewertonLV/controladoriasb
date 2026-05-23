@@ -5,6 +5,7 @@ namespace App\Http\Requests\Admin\Concerns;
 use App\Support\TextoCadastro;
 use Closure;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\Validator;
 
 trait ValidatesUnidadeNegocioAttributes
 {
@@ -37,6 +38,7 @@ trait ValidatesUnidadeNegocioAttributes
             'possui_estoque' => ['required', 'boolean'],
             'is_unidade_producao' => ['required', 'boolean'],
             'is_hub' => ['required', 'boolean'],
+            'is_galpao_operacional' => ['required', 'boolean'],
         ];
     }
 
@@ -55,6 +57,7 @@ trait ValidatesUnidadeNegocioAttributes
             'possui_estoque' => 'controla estoque',
             'is_unidade_producao' => 'unidade de produção',
             'is_hub' => 'unidade HUB',
+            'is_galpao_operacional' => 'galpão operacional',
         ];
     }
 
@@ -90,6 +93,7 @@ trait ValidatesUnidadeNegocioAttributes
             'possui_estoque' => $this->boolean('possui_estoque'),
             'is_unidade_producao' => $this->boolean('is_unidade_producao'),
             'is_hub' => $this->boolean('is_hub'),
+            'is_galpao_operacional' => $this->boolean('is_galpao_operacional'),
         ]);
     }
 
@@ -106,5 +110,22 @@ trait ValidatesUnidadeNegocioAttributes
                 $fail('O CPF/CNPJ deve ter 11 dígitos (CPF) ou 14 dígitos (CNPJ).');
             }
         };
+    }
+
+    protected function validarCombinacaoFlagsUnidadeNegocio(Validator $validator): void
+    {
+        $validator->after(function (Validator $v): void {
+            $isGalpao = $this->boolean('is_galpao_operacional');
+            $isHub = $this->boolean('is_hub');
+
+            if ($isGalpao && $isHub) {
+                $v->errors()->add('is_galpao_operacional', 'Galpão operacional não pode ser HUB.');
+                $v->errors()->add('is_hub', 'Unidade HUB não pode ser galpão operacional.');
+            }
+
+            if ($isGalpao && ! $this->boolean('possui_estoque')) {
+                $v->errors()->add('is_galpao_operacional', 'Galpão operacional deve controlar estoque.');
+            }
+        });
     }
 }
