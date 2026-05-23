@@ -105,6 +105,24 @@ class ClienteTest extends ClienteTestCase
             ->assertSessionHasErrors('id_cigam');
     }
 
+    public function test_cadastro_permite_mesmo_cnpj_cpf_em_clientes_distintos(): void
+    {
+        Cliente::factory()->create([
+            'id_cigam' => '000099',
+            'cnpj_cpf' => '11222333000181',
+        ]);
+
+        $this->actingAs($this->userWithPermissions([Permissions::CLIENTES_CRIAR]))
+            ->post(route('admin.clientes.store'), $this->clientePayload([
+                'id_cigam' => '100',
+                'cnpj_cpf' => '11.222.333/0001-81',
+            ]))
+            ->assertStatus(302)
+            ->assertSessionHas('success');
+
+        $this->assertSame(2, Cliente::query()->where('cnpj_cpf', '11222333000181')->count());
+    }
+
     public function test_edicao_atualiza_registro(): void
     {
         $cliente = Cliente::factory()->create([

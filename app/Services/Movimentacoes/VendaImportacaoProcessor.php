@@ -157,15 +157,17 @@ class VendaImportacaoProcessor
                 continue;
             }
 
-            $empresaCliente = $this->resolverEmpresaClientePorDocumento($dados['cnpj_cpf_cliente']);
-            if ($empresaCliente === null) {
+            $resolucaoCliente = $this->resolverEmpresaClientePorDocumento($dados['cnpj_cpf_cliente']);
+            if ($resolucaoCliente['empresa'] === null) {
                 $erros[] = $this->erroItem($rowId, $r, $dados, [
-                    'Cliente não encontrado para o CPF/CNPJ informado.',
+                    $resolucaoCliente['erro'] ?? 'Cliente não encontrado para o CPF/CNPJ informado.',
                 ]);
                 $this->atualizarProgressoSeNecessario($importacao, $linhasProcessadas, $totalLinhas, $novas, $erros);
 
                 continue;
             }
+
+            $empresaCliente = $resolucaoCliente['empresa'];
 
             $unidadeOrigem = $empresaOrigem->entidade;
             if (! $unidadeOrigem instanceof UnidadeNegocio) {
@@ -427,21 +429,43 @@ class VendaImportacaoProcessor
             ->first();
     }
 
-    private function resolverEmpresaClientePorDocumento(string $documento): ?Empresa
+    /**
+     * @return array{empresa: ?Empresa, erro: ?string}
+     */
+    private function resolverEmpresaClientePorDocumento(string $documento): array
     {
         $clientes = Cliente::query()->where('cnpj_cpf', $documento)->get();
 
-        if ($clientes->count() !== 1) {
-            return null;
+        if ($clientes->isEmpty()) {
+            return [
+                'empresa' => null,
+                'erro' => 'Cliente não encontrado para o CPF/CNPJ informado.',
+            ];
+        }
+
+        if ($clientes->count() > 1) {
+            return [
+                'empresa' => null,
+                'erro' => 'Existem vários clientes com o mesmo CPF/CNPJ; use o cadastro manual de venda ou ajuste os cadastros de cliente.',
+            ];
         }
 
         $cliente = $clientes->first();
 
-        return Empresa::query()
+        $empresa = Empresa::query()
             ->with('entidade')
             ->where('entidade_type', Cliente::class)
             ->where('entidade_id', $cliente->id)
             ->first();
+
+        if ($empresa === null) {
+            return [
+                'empresa' => null,
+                'erro' => 'Cliente não encontrado para o CPF/CNPJ informado.',
+            ];
+        }
+
+        return ['empresa' => $empresa, 'erro' => null];
     }
 
     /**

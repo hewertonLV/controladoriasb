@@ -69,7 +69,6 @@ class ClienteImportacaoProcessor
         $erros = [];
 
         $idsCigamVistos = [];
-        $cnpjCpfVistos = [];
         $buffer = [];
 
         $rowId = 0;
@@ -127,12 +126,6 @@ class ClienteImportacaoProcessor
                 $errosLinha[] = "ID CIGAM duplicado na planilha (já aparece na linha {$idsCigamVistos[$idCigam]}).";
             } elseif ($idCigam !== '') {
                 $idsCigamVistos[$idCigam] = $r;
-            }
-
-            if ($dados['cnpj_cpf'] !== '' && isset($cnpjCpfVistos[$dados['cnpj_cpf']])) {
-                $errosLinha[] = "CPF/CNPJ duplicado na planilha (já aparece na linha {$cnpjCpfVistos[$dados['cnpj_cpf']]}).";
-            } elseif ($dados['cnpj_cpf'] !== '') {
-                $cnpjCpfVistos[$dados['cnpj_cpf']] = $r;
             }
 
             if ($errosLinha !== []) {
@@ -253,7 +246,6 @@ class ClienteImportacaoProcessor
     private function flushBuffer(array $buffer, array &$novas, array &$atualizacoes, array &$semAlteracoes, array &$erros): void
     {
         $idsCigam = [];
-        $cnpjsNovos = [];
 
         foreach ($buffer as $item) {
             $idCigam = $item['dados']['id_cigam'];
@@ -268,18 +260,6 @@ class ClienteImportacaoProcessor
             ->keyBy('id_cigam');
 
         foreach ($buffer as $item) {
-            $cnpj = $item['dados']['cnpj_cpf'];
-            if ($cnpj !== '' && ! $existentes->has($item['dados']['id_cigam'])) {
-                $cnpjsNovos[] = $cnpj;
-            }
-        }
-
-        $colisoesPorCnpj = Cliente::query()
-            ->whereIn('cnpj_cpf', array_values(array_unique($cnpjsNovos)))
-            ->get(['id', 'id_cigam', 'cnpj_cpf'])
-            ->keyBy('cnpj_cpf');
-
-        foreach ($buffer as $item) {
             $rowId = $item['row_id'];
             $linha = $item['linha'];
             $dados = $item['dados'];
@@ -288,19 +268,6 @@ class ClienteImportacaoProcessor
             $clienteExistente = $existentes->get($idCigam);
 
             if ($clienteExistente === null) {
-                $colisao = $dados['cnpj_cpf'] !== '' ? $colisoesPorCnpj->get($dados['cnpj_cpf']) : null;
-                if ($colisao !== null) {
-                    $erros[] = [
-                        'row_id' => $rowId,
-                        'linha' => $linha,
-                        'id_cigam' => $idCigam,
-                        'erros' => ["CPF/CNPJ já cadastrado em outro cliente (id_cigam={$colisao->id_cigam})."],
-                        'dados' => $dados,
-                    ];
-
-                    continue;
-                }
-
                 $novas[] = [
                     'row_id' => $rowId,
                     'linha' => $linha,

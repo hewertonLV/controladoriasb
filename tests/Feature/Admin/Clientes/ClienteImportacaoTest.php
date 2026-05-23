@@ -80,6 +80,61 @@ class ClienteImportacaoTest extends ClienteTestCase
         $this->assertSame(1, $importacao->sem_alteracoes_count);
     }
 
+    public function test_importacao_permite_cnpj_cpf_duplicado_entre_clientes(): void
+    {
+        Storage::fake('local');
+        $user = $this->userWithPermissions([
+            Permissions::CLIENTES_IMPORTAR,
+            Permissions::CLIENTES_IMPORTAR_CONFIRMAR,
+        ]);
+        $unidade = UnidadeNegocio::factory()->create(['id_cigam' => '000110']);
+        Praca::factory()->create([
+            'nome' => 'PRACA CENTRO',
+            'id_unidade_negocio' => $unidade->id,
+        ]);
+        Cliente::factory()->create([
+            'id_cigam' => '7001',
+            'razao_social' => 'Cliente Existente',
+            'cnpj_cpf' => '11111111000111',
+            'id_unidade_negocio' => $unidade->id,
+        ]);
+
+        $path = $this->storeSpreadsheet([
+            ['7002', 'Outro Cliente Mesmo Doc', '11111111000111', '110', '0.00', 'PRACA CENTRO', ''],
+        ]);
+
+        $importacao = ClienteImportacao::create([
+            'uuid' => (string) Str::uuid(),
+            'user_id' => $user->id,
+            'arquivo_original' => 'clientes.xlsx',
+            'arquivo_path' => $path,
+            'status' => ClienteImportacao::STATUS_AGUARDANDO,
+        ]);
+
+        (new ProcessarPreviewImportacaoClientesJob($importacao->id))
+            ->handle(app(ClienteImportacaoProcessor::class));
+
+        $importacao->refresh();
+
+        $this->assertSame(ClienteImportacao::STATUS_CONCLUIDO, $importacao->status);
+        $this->assertSame(0, $importacao->erros_count);
+        $this->assertSame(1, $importacao->novas_count);
+
+        $this->actingAs($user)
+            ->postJson(route('admin.clientes.importar.confirmar', $importacao), [
+                'row_ids_novas' => [1],
+            ])
+            ->assertOk()
+            ->assertJsonPath('resumo.criadas', 1)
+            ->assertJsonPath('resumo.erros', []);
+
+        $this->assertSame(2, Cliente::query()->where('cnpj_cpf', '11111111000111')->count());
+        $this->assertDatabaseHas('clientes', [
+            'id_cigam' => '007002',
+            'cnpj_cpf' => '11111111000111',
+        ]);
+    }
+
     public function test_importacao_resolve_unidade_por_id_cigam_normalizado(): void
     {
         Storage::fake('local');

@@ -188,16 +188,6 @@ class ClienteImportacaoController extends Controller
                         continue;
                     }
 
-                    if (Cliente::query()->where('cnpj_cpf', $dados['cnpj_cpf'])->exists()) {
-                        $erros[] = [
-                            'linha' => $dados['id_cigam'],
-                            'erros' => ['CPF/CNPJ já cadastrado em outro cliente.'],
-                        ];
-                        $ignoradas++;
-
-                        continue;
-                    }
-
                     $cliente = Cliente::create([
                         'id_cigam' => $dados['id_cigam'],
                         'razao_social' => $dados['razao_social'],
@@ -250,21 +240,6 @@ class ClienteImportacaoController extends Controller
                     $erroValidacao = $this->validarDadosCliente($dados);
                     if ($erroValidacao !== null) {
                         $erros[] = ['linha' => $dados['id_cigam'], 'erros' => [$erroValidacao]];
-                        $ignoradas++;
-
-                        continue;
-                    }
-
-                    $colisao = Cliente::query()
-                        ->where('cnpj_cpf', $dados['cnpj_cpf'])
-                        ->where('id', '!=', $cliente->id)
-                        ->exists();
-
-                    if ($colisao) {
-                        $erros[] = [
-                            'linha' => $dados['id_cigam'],
-                            'erros' => ['CPF/CNPJ já cadastrado em outro cliente.'],
-                        ];
                         $ignoradas++;
 
                         continue;
