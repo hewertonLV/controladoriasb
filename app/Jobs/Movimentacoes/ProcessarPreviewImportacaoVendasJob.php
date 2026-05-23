@@ -44,7 +44,6 @@ class ProcessarPreviewImportacaoVendasJob implements ShouldQueue
             $processor->processar($importacao);
         } catch (Throwable $e) {
             $processor->marcarFalha($importacao, $e);
-            throw $e;
         }
     }
 

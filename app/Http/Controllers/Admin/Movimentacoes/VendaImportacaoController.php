@@ -15,6 +15,7 @@ use App\Support\EmpresaEntidadeQuery;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\View\View;
@@ -36,6 +37,12 @@ class VendaImportacaoController extends Controller
 
     public function iniciar(Request $request): JsonResponse
     {
+        if (app()->environment('production') && config('queue.default') === 'sync') {
+            return response()->json([
+                'message' => 'Importação de vendas exige QUEUE_CONNECTION=database ou redis em produção.',
+            ], 500);
+        }
+
         $validator = \Illuminate\Support\Facades\Validator::make($request->all(), [
             'arquivo' => ['required', 'file', 'mimes:xlsx,xls', 'max:5120'],
         ], [
@@ -62,15 +69,31 @@ class VendaImportacaoController extends Controller
             ], 500);
         }
 
-        $importacao = VendaImportacao::create([
-            'uuid' => (string) Str::uuid(),
-            'user_id' => $user?->id,
-            'arquivo_original' => $original,
-            'arquivo_path' => $path,
-            'status' => VendaImportacao::STATUS_AGUARDANDO,
-        ]);
+        try {
+            $importacao = VendaImportacao::create([
+                'uuid' => (string) Str::uuid(),
+                'user_id' => $user?->id,
+                'arquivo_original' => $original,
+                'arquivo_path' => $path,
+                'status' => VendaImportacao::STATUS_AGUARDANDO,
+            ]);
 
-        ProcessarPreviewImportacaoVendasJob::dispatch($importacao->id);
+            ProcessarPreviewImportacaoVendasJob::dispatch($importacao->id);
+        } catch (Throwable $e) {
+            Log::error('Falha ao iniciar importação de vendas', [
+                'arquivo' => $original,
+                'user_id' => $user?->id,
+                'erro' => $e->getMessage(),
+            ]);
+
+            if (Storage::disk('local')->exists($path)) {
+                Storage::disk('local')->delete($path);
+            }
+
+            return response()->json([
+                'message' => $this->mensagemErroIniciarImportacao($e),
+            ], 500);
+        }
 
         return response()->json([
             'uuid' => $importacao->uuid,
@@ -426,5 +449,15 @@ class VendaImportacaoController extends Controller
             }
         } catch (Throwable) {
         }
+    }
+
+    private function mensagemErroIniciarImportacao(Throwable $e): string
+    {
+        $msg = $e->getMessage();
+        if (str_contains($msg, 'venda_importacoes') || str_contains($msg, 'Base table or view not found')) {
+            return 'Estrutura de importação não encontrada no banco. Execute php artisan migrate no servidor e tente novamente.';
+        }
+
+        return 'Não foi possível iniciar a importação. Verifique o arquivo ou contate o suporte.';
     }
 }

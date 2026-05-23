@@ -417,6 +417,49 @@ class VendaImportacaoTest extends TestCase
             ->assertForbidden();
     }
 
+    public function test_iniciar_importacao_retorna_uuid_e_enfileira_job(): void
+    {
+        [$unidade, $cliente, $fruta] = $this->criarCenarioComEstoqueOrigem();
+
+        Storage::disk('local')->makeDirectory('vendas/importacoes');
+        $path = storage_path('app/private/vendas/importacoes/iniciar-teste.xlsx');
+        $this->criarPlanilha($path, [
+            ['Número NF', 'CNPJ Origem', 'CPF/CNPJ Cliente', 'ID CIGAM', 'Quantidade', 'UM', 'Valor Total'],
+            ['NF-INICIAR', $unidade->cpf_cnpj, $cliente->cnpj_cpf, $fruta->id_cigam, '1', 'CAIXA', '100,00'],
+        ]);
+
+        $user = $this->userWithPermissions([
+            Permissions::MOVIMENTACOES_VENDAS_IMPORTAR,
+        ]);
+
+        $arquivo = new \Illuminate\Http\UploadedFile(
+            $path,
+            'iniciar-teste.xlsx',
+            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            null,
+            true,
+        );
+
+        \Illuminate\Support\Facades\Queue::fake();
+
+        $response = $this->actingAs($user)
+            ->postJson(route('admin.movimentacoes.vendas.importar.iniciar'), ['arquivo' => $arquivo]);
+
+        $response->assertAccepted()
+            ->assertJsonStructure(['uuid', 'status', 'urls' => ['status', 'resultado', 'confirmar']]);
+
+        $this->assertDatabaseHas('venda_importacoes', [
+            'uuid' => $response->json('uuid'),
+            'status' => VendaImportacao::STATUS_AGUARDANDO,
+            'arquivo_original' => 'iniciar-teste.xlsx',
+        ]);
+
+        \Illuminate\Support\Facades\Queue::assertPushed(
+            \App\Jobs\Movimentacoes\ProcessarPreviewImportacaoVendasJob::class,
+            fn ($job) => VendaImportacao::query()->whereKey($job->importacaoId)->exists(),
+        );
+    }
+
     /**
      * @return array{0: UnidadeNegocio, 1: Cliente, 2: Fruta, 3: Empresa, 4: Empresa}
      */

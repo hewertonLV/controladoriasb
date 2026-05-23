@@ -100,7 +100,7 @@
                     <i class="ri-shopping-cart-line text-success me-1"></i>
                     Linhas prontas <span class="badge bg-success-subtle text-success ms-1" id="count-novas">0</span>
                 </h5>
-                <p class="text-muted small mb-0 mt-1">O cliente vem da planilha. A origem é editável por NF — alterar uma NF aplica a todas as linhas do mesmo cliente com esse número. Unidades HUB exigem unidade de faturamento.</p>
+                <p class="text-muted small mb-0 mt-1">O cliente vem da planilha. A origem comercial e a saída física (estoque) são editáveis por NF — alterar uma NF aplica a todas as linhas do mesmo cliente com esse número.</p>
             </div>
             <div class="card-body p-0">
                 <div class="table-responsive">
@@ -453,7 +453,7 @@
                 headers: { 'X-Requested-With': 'XMLHttpRequest', 'Accept': 'application/json' },
                 credentials: 'same-origin',
             });
-            const data = await resp.json();
+            const data = await resp.json().catch(() => ({}));
             if (!resp.ok) {
                 showAlerta('danger', escapeHtml(data.message || 'Erro ao carregar resultado.'));
                 return;
@@ -517,9 +517,9 @@
                     body: formData,
                     credentials: 'same-origin',
                 });
-                const data = await resp.json();
+                const data = await resp.json().catch(() => ({}));
                 if (!resp.ok) {
-                    let msg = data.message || 'Erro ao iniciar.';
+                    let msg = data.message || (resp.status === 500 ? 'Erro interno do servidor.' : 'Erro ao iniciar.');
                     if (data.errors?.arquivo) msg = data.errors.arquivo.join(' ');
                     showAlerta('danger', escapeHtml(msg));
                     return;
@@ -613,7 +613,7 @@
             importacaoAtiva = null;
             preview = { novas: [], erros: [] };
             empresasOrigem = [];
-            unidadesFaturamento = [];
+            unidadesEstoque = [];
             resultado.classList.add('d-none');
             resumoFinal.classList.add('d-none');
             resetProgressoUI();

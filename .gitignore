@@ -104,6 +104,7 @@ npm-debug.log*
 !planilhas/estoques_importacao.xlsx
 !planilhas/icms_importacao_modelo.xlsx
 !planilhas/transferencias_importacao.xlsx
+!planilhas/vendas_importacao.xlsx
 *.xls
 *.csv
 *.ods
@@ -120,3 +121,4 @@ planilhas/*
 !planilhas/estoques_importacao.xlsx
 !planilhas/icms_importacao_modelo.xlsx
 !planilhas/transferencias_importacao.xlsx
+!planilhas/vendas_importacao.xlsx
