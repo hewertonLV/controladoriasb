@@ -645,6 +645,36 @@ class CompraMovimentacaoTest extends TestCase
         $this->assertStringContainsString((string) $empresaFornecedor->id, (string) $html);
     }
 
+    public function test_detalhe_exibe_botao_cancelar_compra_com_permissao(): void
+    {
+        $this->seedCategoriasEEstados();
+
+        [$empresaFornecedor, $empresaUnidade, , $fruta, $frete] = $this->criarCenarioCompra();
+
+        $user = $this->userWithPermissions([
+            Permissions::MOVIMENTACOES_COMPRAS_CRIAR,
+            Permissions::MOVIMENTACOES_COMPRAS_VISUALIZAR,
+            Permissions::MOVIMENTACOES_COMPRAS_CANCELAR_ADMIN,
+        ]);
+
+        $this->actingAs($user)->postJson(route('admin.movimentacoes.compras.store'), [
+            'id_empresa_origem' => $empresaFornecedor->id,
+            'id_empresa_destino' => $empresaUnidade->id,
+            'id_fruta' => $fruta->id,
+            'qtd_fruta_um' => '5',
+            'valor_nf_total' => '1000.00',
+            'id_frete' => $frete->id,
+        ])->assertCreated();
+
+        $compra = Movimentacao::query()->firstOrFail();
+
+        $this->actingAs($user)
+            ->get(route('admin.movimentacoes.compras.show', $compra))
+            ->assertOk()
+            ->assertSee('Cancelar compra', false)
+            ->assertSee('O que é recalculado ao cancelar', false);
+    }
+
     private function selectHtml(string $html, string $id): string
     {
         $pattern = sprintf('/<select[^>]*id="%s"[^>]*>.*?<\/select>/s', preg_quote($id, '/'));

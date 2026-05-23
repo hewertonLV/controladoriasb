@@ -8,6 +8,7 @@ use App\Enums\FreteStatusSituacao;
 use App\Enums\FrutaUmIcms;
 use App\Enums\MovimentacaoStatusRegistro;
 use App\Enums\Permissions;
+use App\Enums\StatusRecebimentoTransferencia;
 use App\Models\Cliente;
 use App\Models\Estado;
 use App\Models\Estoque;
@@ -47,8 +48,8 @@ class VendaMovimentacaoTest extends TestCase
 
         $this->assertStringContainsString($c['unidade']->nome, $htmlDecodificado);
         $this->assertStringContainsString($c['empresa_cliente']->nomeExibicao(), $htmlDecodificado);
-        $this->assertStringContainsString($c['unidade_faturamento']->nome, $htmlDecodificado);
-        $this->assertStringNotContainsString('name="data_emissao"', (string) $html);
+        $this->assertStringNotContainsString('name="id_unidade_negocio_faturamento"', (string) $html);
+        $this->assertStringContainsString('name="id_unidade_negocio_estoque"', (string) $html);
     }
 
     public function test_usuario_com_permissao_cria_venda_multi_item_e_calcula_estoque_valores_e_resultado(): void
@@ -395,7 +396,72 @@ class VendaMovimentacaoTest extends TestCase
         $this->assertSame('200.00', (string) $venda->resultado_movimentacao);
     }
 
-    public function test_unidade_faturamento_so_e_informada_quando_origem_fisica_for_hub(): void
+    public function test_venda_comercial_com_saida_fisica_hub_debita_hub_co_zero_e_faturamento_loja(): void
+    {
+        $this->seedBase();
+        $c = $this->cenarioLojaComHub();
+        $this->registrarCompra($c, '10', '500,00');
+        $saida = $this->registrarTransferenciaHubParaLoja($c, '10');
+        $this->confirmarTransferenciaConforme((int) $saida->transferencia_origem_id, '10');
+
+        $this->actingAs($this->movimentacoesVendasUsuario())->postJson(route('admin.movimentacoes.vendas.store'), [
+            'numero_nf' => 'NF-HUB-1',
+            'id_empresa_origem' => $c['empresa_loja']->id,
+            'id_unidade_negocio_estoque' => $c['hub']->id,
+            'id_empresa_destino' => $c['empresa_cliente']->id,
+            'itens' => [
+                ['id_fruta' => $c['fruta']->id, 'qtd_fruta_um' => '2', 'valor_nf_total' => '300,00'],
+            ],
+        ])->assertCreated();
+
+        $venda = Movimentacao::query()
+            ->where('categoria_movimentacao_id', CategoriaMovimentacaoTipo::Venda->value)
+            ->latest('id')
+            ->firstOrFail();
+
+        $this->assertSame($c['loja']->id, (int) $venda->id_unidade_negocio_faturamento);
+        $this->assertSame($c['hub']->id, (int) $venda->id_unidade_negocio_estoque);
+        $this->assertSame('0.00', (string) $venda->valor_custo_operacional);
+        $this->assertEstoque($c['hub'], $c['fruta'], '0.00', '0.00', '5.00', '50.00', '0.00');
+        $this->assertEstoque($c['loja'], $c['fruta'], '80.00', '8.00', '6.00', '60.00', '480.00');
+    }
+
+    public function test_realocacao_automatica_ao_vender_do_hub_com_saldo_na_loja(): void
+    {
+        $this->seedBase();
+        $c = $this->cenarioLojaComHub();
+        $this->registrarCompra($c, '10', '500,00');
+
+        $saida = $this->registrarTransferenciaHubParaLoja($c, '10');
+        $this->confirmarTransferenciaConforme((int) $saida->transferencia_origem_id, '10');
+
+        $this->assertSame('0.00', (string) Estoque::query()->where('id_unidade_negocio', $c['hub']->id)->where('id_fruta', $c['fruta']->id)->value('qtd_fruta_kg'));
+        $this->assertSame('100.00', (string) Estoque::query()->where('id_unidade_negocio', $c['loja']->id)->where('id_fruta', $c['fruta']->id)->value('qtd_fruta_kg'));
+
+        $this->actingAs($this->movimentacoesVendasUsuario())->postJson(route('admin.movimentacoes.vendas.store'), [
+            'numero_nf' => 'NF-REALOC',
+            'id_empresa_origem' => $c['empresa_loja']->id,
+            'id_unidade_negocio_estoque' => $c['hub']->id,
+            'id_empresa_destino' => $c['empresa_cliente']->id,
+            'itens' => [
+                ['id_fruta' => $c['fruta']->id, 'qtd_fruta_um' => '3', 'valor_nf_total' => '450,00'],
+            ],
+        ])->assertCreated();
+
+        $this->assertEstoque($c['hub'], $c['fruta'], '0.00', '0.00', '5.00', '50.00', '0.00');
+        $this->assertSame('70.00', (string) Estoque::query()->where('id_unidade_negocio', $c['loja']->id)->where('id_fruta', $c['fruta']->id)->value('qtd_fruta_kg'));
+
+        $entradaTransfer = Movimentacao::query()
+            ->where('categoria_movimentacao_id', CategoriaMovimentacaoTipo::Transferencia->value)
+            ->where('status_movimentacao_id', StatusMovimentacao::ID_ENTRADA)
+            ->where('status_registro', MovimentacaoStatusRegistro::ATIVO->value)
+            ->latest('id')
+            ->firstOrFail();
+
+        $this->assertSame('7.00', (string) $entradaTransfer->qtd_fruta_um);
+    }
+
+    public function test_origem_comercial_nao_aceita_hub_nem_faturamento_separado(): void
     {
         $this->seedBase();
 
@@ -403,22 +469,20 @@ class VendaMovimentacaoTest extends TestCase
         $this->registrarCompra($origemNormal, '10', '500,00');
 
         $this->actingAs($this->movimentacoesVendasUsuario())->postJson(route('admin.movimentacoes.vendas.store'), array_merge($this->payloadVenda($origemNormal), [
-            'id_unidade_negocio_faturamento' => $origemNormal['unidade_faturamento']->id,
+            'id_unidade_negocio_faturamento' => $origemNormal['unidade']->id,
         ]))->assertJsonValidationErrors(['id_unidade_negocio_faturamento']);
 
-        $origemHub = $this->cenarioBase(origemHub: true);
-        $this->registrarCompra($origemHub, '10', '500,00');
+        $cHub = $this->cenarioLojaComHub();
+        $this->registrarCompra($cHub, '10', '500,00');
 
-        $this->actingAs($this->movimentacoesVendasUsuario())->postJson(route('admin.movimentacoes.vendas.store'), $this->payloadVenda($origemHub, '1', '100,00'))
-            ->assertCreated();
-
-        $venda = Movimentacao::query()
-            ->where('categoria_movimentacao_id', CategoriaMovimentacaoTipo::Venda->value)
-            ->where('id_empresa_origem', $origemHub['empresa_unidade']->id)
-            ->latest('id')
-            ->firstOrFail();
-
-        $this->assertSame($origemHub['unidade_faturamento']->id, (int) $venda->id_unidade_negocio_faturamento);
+        $this->actingAs($this->movimentacoesVendasUsuario())->postJson(route('admin.movimentacoes.vendas.store'), [
+            'numero_nf' => 'NF-TESTE',
+            'id_empresa_origem' => $cHub['empresa_hub']->id,
+            'id_empresa_destino' => $cHub['empresa_cliente']->id,
+            'itens' => [
+                ['id_fruta' => $cHub['fruta']->id, 'qtd_fruta_um' => '1', 'valor_nf_total' => '100,00'],
+            ],
+        ])->assertJsonValidationErrors(['id_empresa_origem']);
     }
 
     public function test_venda_permite_estoque_negativo_e_preserva_preco_medio(): void
@@ -508,10 +572,16 @@ class VendaMovimentacaoTest extends TestCase
             ->assertForbidden();
 
         $hub = UnidadeNegocio::factory()->create(['is_hub' => true, 'id_estado' => Estado::ID_PERNAMBUCO]);
-        $cenarioHub = $this->cenarioBase(origemHub: true);
-        $this->actingAs($this->movimentacoesVendasUsuario())->postJson(route('admin.movimentacoes.vendas.store'), array_merge($this->payloadVenda($cenarioHub), [
-            'id_unidade_negocio_faturamento' => $hub->id,
-        ]))->assertJsonValidationErrors(['id_unidade_negocio_faturamento']);
+        $cenarioHub = $this->cenarioLojaComHub();
+        $this->actingAs($this->movimentacoesVendasUsuario())->postJson(route('admin.movimentacoes.vendas.store'), [
+            'numero_nf' => 'NF-TESTE',
+            'id_empresa_origem' => $cenarioHub['empresa_loja']->id,
+            'id_unidade_negocio_estoque' => $hub->id,
+            'id_empresa_destino' => $cenarioHub['empresa_cliente']->id,
+            'itens' => [
+                ['id_fruta' => $cenarioHub['fruta']->id, 'qtd_fruta_um' => '1', 'valor_nf_total' => '100,00'],
+            ],
+        ])->assertJsonValidationErrors(['itens.0.id_fruta']);
 
         $venda = $this->registrarVenda($c, '2', '300,00');
         $this->actingAs($this->userWithoutEmpresaPermissions())->postJson(route('admin.movimentacoes.vendas.cancelar-admin', $venda), [
@@ -545,20 +615,23 @@ class VendaMovimentacaoTest extends TestCase
         $this->assertSame($historicosAntes, MovimentacaoHistorico::query()->count());
     }
 
-    public function test_origem_pode_ser_hub_e_destino_cliente_e_obrigatorio_para_rastreabilidade(): void
+    public function test_origem_comercial_obrigatoria_e_destino_cliente(): void
     {
         $this->seedBase();
-        $c = $this->cenarioBase(origemHub: true);
+        $c = $this->cenarioLojaComHub();
         $this->registrarCompra($c, '5', '250,00');
+        $saida = $this->registrarTransferenciaHubParaLoja($c, '5');
+        $this->confirmarTransferenciaConforme((int) $saida->transferencia_origem_id, '5');
 
-        $venda = $this->registrarVenda($c, '1', '180,00');
+        $venda = $this->registrarVendaLojaComHub($c, '1', '180,00');
 
         $this->assertSame($c['empresa_cliente']->id, (int) $venda->id_empresa_destino);
-        $this->assertSame($c['unidade_faturamento']->id, (int) $venda->id_unidade_negocio_faturamento);
+        $this->assertSame($c['loja']->id, (int) $venda->id_unidade_negocio_faturamento);
+        $this->assertSame($c['hub']->id, (int) $venda->id_unidade_negocio_estoque);
         $this->assertNotNull($venda->venda_nota_id);
         $this->assertNotNull($venda->vendaNota?->numero_nf);
 
-        $payload = $this->payloadVenda($c);
+        $payload = $this->payloadVendaLojaComHub($c);
         unset($payload['id_empresa_destino']);
         $this->actingAs($this->movimentacoesVendasUsuario())->postJson(route('admin.movimentacoes.vendas.store'), $payload)
             ->assertJsonValidationErrors(['id_empresa_destino']);
@@ -584,14 +657,98 @@ class VendaMovimentacaoTest extends TestCase
             'desconto_nf' => '0.00',
         ], $clienteOverrides);
 
-        return $this->montarCenarioBase($origemHub, $clienteOverrides);
+        if ($origemHub) {
+            return $this->montarCenarioBaseLegacy(true, $clienteOverrides);
+        }
+
+        return $this->montarCenarioBase($clienteOverrides);
     }
 
     /**
      * @param  array<string, mixed>  $clienteOverrides
      * @return array<string, mixed>
      */
-    private function montarCenarioBase(bool $origemHub, array $clienteOverrides): array
+    private function cenarioLojaComHub(array $clienteOverrides = []): array
+    {
+        $clienteOverrides = array_replace(['desconto_nf' => '0.00'], $clienteOverrides);
+        $fornecedor = Fornecedor::factory()->create(['id_estado' => Estado::ID_PERNAMBUCO]);
+        $cliente = Cliente::factory()->create($clienteOverrides);
+        $loja = UnidadeNegocio::factory()->create([
+            'possui_estoque' => true,
+            'id_estado' => Estado::ID_PERNAMBUCO,
+            'custo_operacional' => '1.00',
+            'is_hub' => false,
+        ]);
+        $hub = UnidadeNegocio::factory()->create([
+            'possui_estoque' => true,
+            'id_estado' => Estado::ID_PERNAMBUCO,
+            'custo_operacional' => '0.00',
+            'is_hub' => true,
+        ]);
+
+        HistoricoCOUnNg::query()->whereIn('id_unidade_negocio', [$loja->id, $hub->id])->update(['status_position' => false]);
+        HistoricoCOUnNg::factory()->create(['id_unidade_negocio' => $loja->id, 'custo_operacional' => '1.00', 'status_position' => true]);
+        HistoricoCOUnNg::factory()->create(['id_unidade_negocio' => $hub->id, 'custo_operacional' => '0.00', 'status_position' => true]);
+
+        $fruta = Fruta::factory()->comIcmsCeara([
+            'entrada_nacional' => 0,
+            'entrada_externo' => 0,
+            'entrada_um' => FrutaUmIcms::KG->value,
+        ])->create(['kg_por_unidade_medicao' => 10]);
+
+        return [
+            'empresa_fornecedor' => $fornecedor->registroCorporativo()->firstOrFail(),
+            'empresa_cliente' => $cliente->registroCorporativo()->firstOrFail(),
+            'empresa_loja' => $loja->registroCorporativo()->firstOrFail(),
+            'empresa_hub' => $hub->registroCorporativo()->firstOrFail(),
+            'empresa_unidade' => $hub->registroCorporativo()->firstOrFail(),
+            'loja' => $loja,
+            'hub' => $hub,
+            'unidade' => $hub,
+            'fruta' => $fruta,
+            'frete' => Frete::factory()->create(['valor' => '0.00', 'status_situacao' => FreteStatusSituacao::ABERTA->value]),
+        ];
+    }
+
+    /**
+     * @param  array<string, mixed>  $clienteOverrides
+     * @return array<string, mixed>
+     */
+    private function montarCenarioBase(array $clienteOverrides): array
+    {
+        $fornecedor = Fornecedor::factory()->create(['id_estado' => Estado::ID_PERNAMBUCO]);
+        $cliente = Cliente::factory()->create($clienteOverrides);
+        $unidade = UnidadeNegocio::factory()->create([
+            'possui_estoque' => true,
+            'id_estado' => Estado::ID_PERNAMBUCO,
+            'custo_operacional' => 0,
+            'is_hub' => false,
+        ]);
+
+        HistoricoCOUnNg::query()->where('id_unidade_negocio', $unidade->id)->update(['status_position' => false]);
+        HistoricoCOUnNg::factory()->create(['id_unidade_negocio' => $unidade->id, 'custo_operacional' => 0, 'status_position' => true]);
+
+        return [
+            'empresa_fornecedor' => $fornecedor->registroCorporativo()->firstOrFail(),
+            'empresa_cliente' => $cliente->registroCorporativo()->firstOrFail(),
+            'empresa_unidade' => $unidade->registroCorporativo()->firstOrFail(),
+            'unidade' => $unidade,
+            'fruta' => Fruta::factory()->comIcmsCeara([
+                'entrada_nacional' => 0,
+                'entrada_externo' => 0,
+                'entrada_um' => FrutaUmIcms::KG->value,
+            ])->create([
+                'kg_por_unidade_medicao' => 10,
+            ]),
+            'frete' => Frete::factory()->create(['valor' => '0.00', 'status_situacao' => FreteStatusSituacao::ABERTA->value]),
+        ];
+    }
+
+    /**
+     * @param  array<string, mixed>  $clienteOverrides
+     * @return array<string, mixed>
+     */
+    private function montarCenarioBaseLegacy(bool $origemHub, array $clienteOverrides): array
     {
         $fornecedor = Fornecedor::factory()->create(['id_estado' => Estado::ID_PERNAMBUCO]);
         $cliente = Cliente::factory()->create($clienteOverrides);
@@ -670,12 +827,76 @@ class VendaMovimentacaoTest extends TestCase
             'numero_nf' => 'NF-TESTE',
             'id_empresa_origem' => $cenario['empresa_unidade']->id,
             'id_empresa_destino' => $cenario['empresa_cliente']->id,
-            'id_unidade_negocio_faturamento' => $cenario['unidade']->is_hub ? $cenario['unidade_faturamento']->id : null,
             'id_frete' => $frete?->id,
             'itens' => [
                 ['id_fruta' => $cenario['fruta']->id, 'qtd_fruta_um' => $qtdUm, 'valor_nf_total' => $valorNfTotal],
             ],
         ];
+    }
+
+    /**
+     * @param  array<string, mixed>  $cenario
+     */
+    private function registrarVendaLojaComHub(array $cenario, string $qtdUm, string $valorNfTotal): Movimentacao
+    {
+        $this->actingAs($this->movimentacoesVendasUsuario())->postJson(
+            route('admin.movimentacoes.vendas.store'),
+            $this->payloadVendaLojaComHub($cenario, $qtdUm, $valorNfTotal),
+        )->assertCreated();
+
+        return Movimentacao::query()
+            ->where('categoria_movimentacao_id', CategoriaMovimentacaoTipo::Venda->value)
+            ->where('status_movimentacao_id', StatusMovimentacao::ID_SAIDA)
+            ->orderByDesc('id')
+            ->firstOrFail();
+    }
+
+    /**
+     * @param  array<string, mixed>  $cenario
+     * @return array<string, mixed>
+     */
+    private function payloadVendaLojaComHub(array $cenario, string $qtdUm = '1', string $valorNfTotal = '100,00'): array
+    {
+        return [
+            'numero_nf' => 'NF-TESTE',
+            'id_empresa_origem' => $cenario['empresa_loja']->id,
+            'id_unidade_negocio_estoque' => $cenario['hub']->id,
+            'id_empresa_destino' => $cenario['empresa_cliente']->id,
+            'itens' => [
+                ['id_fruta' => $cenario['fruta']->id, 'qtd_fruta_um' => $qtdUm, 'valor_nf_total' => $valorNfTotal],
+            ],
+        ];
+    }
+
+    /**
+     * @param  array<string, mixed>  $cenario
+     */
+    private function registrarTransferenciaHubParaLoja(array $cenario, string $qtdUm): Movimentacao
+    {
+        $this->actingAs($this->movimentacoesTransferenciasUsuario())->postJson(route('admin.movimentacoes.transferencias.store'), [
+            'id_empresa_origem' => $cenario['empresa_hub']->id,
+            'id_empresa_destino' => $cenario['empresa_loja']->id,
+            'id_fruta' => $cenario['fruta']->id,
+            'qtd_fruta_um' => $qtdUm,
+        ])->assertCreated();
+
+        return Movimentacao::query()
+            ->where('categoria_movimentacao_id', CategoriaMovimentacaoTipo::Transferencia->value)
+            ->where('status_movimentacao_id', StatusMovimentacao::ID_SAIDA)
+            ->orderByDesc('id')
+            ->firstOrFail();
+    }
+
+    private function confirmarTransferenciaConforme(int $transferenciaOrigemId, string $qtdRecebidaUm): void
+    {
+        $this->actingAs($this->movimentacoesTransferenciasUsuario())->postJson(
+            route('admin.movimentacoes.transferencias.recebimento.store', $transferenciaOrigemId),
+            [
+                'status_recebimento' => StatusRecebimentoTransferencia::CONFORME->value,
+                'qtd_recebida_um' => $qtdRecebidaUm,
+                'numero_nf_destino' => 'NF-D-TESTE',
+            ],
+        )->assertOk();
     }
 
     /**

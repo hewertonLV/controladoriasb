@@ -37,7 +37,12 @@ trait ValidatesClienteAttributes
                 'string',
                 $this->cpfCnpjLengthRule(),
             ],
-            'id_unidade_negocio' => ['required', 'integer', 'min:1', 'exists:unidades_negocio,id'],
+            'id_unidade_negocio' => [
+                'required',
+                'integer',
+                'min:1',
+                Rule::exists('unidades_negocio', 'id')->where(static fn ($query) => $query->where('is_hub', false)),
+            ],
             'id_praca' => [
                 'required',
                 'integer',
@@ -79,6 +84,7 @@ trait ValidatesClienteAttributes
     {
         return [
             'desconto_nf.min' => 'O desconto não pode ser negativo.',
+            'id_unidade_negocio.exists' => 'Selecione uma unidade de negócio válida (unidades HUB não são permitidas).',
         ];
     }
 

@@ -400,6 +400,41 @@ class TransferenciaMovimentacaoTest extends TestCase
         $this->assertSame('2.00', (string) $estoqueDestino->qtd_fruta_um);
     }
 
+    public function test_detalhe_conforme_exibe_botao_cancelar_admin(): void
+    {
+        $this->seedCategoriasEEstados();
+
+        [$empresaOrigem, $empresaDestino, , , $fruta] = $this->criarCenarioTransferencia();
+        $user = $this->movimentacoesTransferenciasUsuario([
+            Permissions::MOVIMENTACOES_TRANSFERENCIAS_CANCELAR_ADMIN,
+        ]);
+
+        $this->actingAs($user)->post(route('admin.movimentacoes.transferencias.store'), [
+            'id_empresa_origem' => $empresaOrigem->id,
+            'id_empresa_destino' => $empresaDestino->id,
+            'id_fruta' => $fruta->id,
+            'qtd_fruta_um' => '2',
+        ])->assertRedirect();
+
+        $anchor = (int) Movimentacao::query()
+            ->where('status_movimentacao_id', StatusMovimentacao::ID_SAIDA)
+            ->value('transferencia_origem_id');
+
+        $this->actingAs($user)->post(
+            route('admin.movimentacoes.transferencias.recebimento.store', ['transferenciaOrigem' => $anchor]),
+            [
+                'status_recebimento' => StatusRecebimentoTransferencia::CONFORME->value,
+                'qtd_recebida_um' => '2',
+            ],
+        )->assertRedirect();
+
+        $this->actingAs($user)
+            ->get(route('admin.movimentacoes.transferencias.show', ['transferenciaOrigem' => $anchor]))
+            ->assertOk()
+            ->assertSee('Cancelar transferência', false)
+            ->assertSee('O que é recalculado ao cancelar', false);
+    }
+
     public function test_recebimento_conforme_com_quantidade_diferente_retorna_validacao(): void
     {
         $this->seedCategoriasEEstados();

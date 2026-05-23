@@ -67,6 +67,89 @@ class VendaImportacaoTest extends TestCase
         $this->assertSame('300.00', $importacao->resultado['novas'][0]['dados']['valor_nf_total']);
     }
 
+    public function test_processor_aceita_planilha_em_kg_para_fruta_cadastrada_em_caixa(): void
+    {
+        [$unidade, $cliente, $fruta] = $this->criarCenarioComEstoqueOrigem();
+
+        $path = 'vendas/importacoes/kg-planilha.xlsx';
+        Storage::disk('local')->makeDirectory('vendas/importacoes');
+        $this->criarPlanilha(Storage::disk('local')->path($path), [
+            ['Número NF', 'CNPJ Origem', 'CPF/CNPJ Cliente', 'ID CIGAM', 'Quantidade', 'UM', 'Valor Total'],
+            ['NF-KG-001', $unidade->cpf_cnpj, $cliente->cnpj_cpf, $fruta->id_cigam, '20', 'KG', '400,00'],
+        ]);
+
+        $importacao = VendaImportacao::create([
+            'uuid' => (string) \Illuminate\Support\Str::uuid(),
+            'user_id' => null,
+            'arquivo_original' => 'kg-planilha.xlsx',
+            'arquivo_path' => $path,
+            'status' => VendaImportacao::STATUS_AGUARDANDO,
+        ]);
+
+        app(VendaImportacaoProcessor::class)->processar($importacao->fresh());
+
+        $importacao->refresh();
+        $this->assertCount(1, $importacao->resultado['novas'] ?? []);
+        $this->assertCount(0, $importacao->resultado['erros'] ?? []);
+
+        $dados = $importacao->resultado['novas'][0]['dados'];
+        $this->assertSame('20.00', $dados['qtd_planilha']);
+        $this->assertSame('KG', $dados['unidade_medicao_planilha']);
+        $this->assertSame('2.00', $dados['qtd_fruta_um']);
+        $this->assertSame('CAIXA', $dados['unidade_medicao']);
+    }
+
+    public function test_confirmar_venda_importada_com_planilha_em_kg(): void
+    {
+        [$unidade, $cliente, $fruta, $empresaOrigem, $empresaCliente] = $this->criarCenarioComEstoqueOrigem();
+
+        $user = $this->userWithPermissions([
+            Permissions::MOVIMENTACOES_VENDAS_IMPORTAR,
+            Permissions::MOVIMENTACOES_VENDAS_IMPORTAR_CONFIRMAR,
+            Permissions::MOVIMENTACOES_VENDAS_CRIAR,
+        ]);
+
+        $importacao = VendaImportacao::create([
+            'uuid' => (string) \Illuminate\Support\Str::uuid(),
+            'user_id' => $user->id,
+            'arquivo_original' => 'confirmar-kg.xlsx',
+            'arquivo_path' => 'vendas/importacoes/confirmar-kg.xlsx',
+            'status' => VendaImportacao::STATUS_CONCLUIDO,
+            'resultado' => [
+                'novas' => [[
+                    'row_id' => 1,
+                    'linha' => 2,
+                    'chave' => 'x',
+                    'dados' => [
+                        'numero_nf' => 'NF-KG-CONF',
+                        'id_empresa_origem' => $empresaOrigem->id,
+                        'id_empresa_destino' => $empresaCliente->id,
+                        'id_fruta' => $fruta->id,
+                        'qtd_fruta_um' => '2.00',
+                        'qtd_planilha' => '20.00',
+                        'unidade_medicao_planilha' => 'KG',
+                        'unidade_medicao' => 'CAIXA',
+                        'valor_nf_total' => '400.00',
+                    ],
+                ]],
+                'erros' => [],
+            ],
+        ]);
+
+        $response = $this->actingAs($user)->postJson(
+            route('admin.movimentacoes.vendas.importar.confirmar', $importacao),
+            ['row_ids_novas' => [1]],
+        );
+
+        $response->assertOk();
+        $response->assertJsonPath('resumo.aplicadas', 1);
+
+        $this->assertDatabaseHas('movimentacoes', [
+            'qtd_fruta_um' => '2.00',
+            'qtd_fruta_kg' => '20.00',
+        ]);
+    }
+
     public function test_mesma_nf_fruta_com_valor_diferente_nao_e_duplicada(): void
     {
         [$unidade, $cliente, $fruta] = $this->criarCenarioComEstoqueOrigem();
@@ -270,6 +353,13 @@ class VendaImportacaoTest extends TestCase
     {
         [$unidade, $cliente, $fruta, $empresaOrigem, $empresaCliente] = $this->criarCenarioComEstoqueOrigem();
 
+        $hub = UnidadeNegocio::factory()->create([
+            'possui_estoque' => true,
+            'is_hub' => true,
+            'cpf_cnpj' => '99888777000166',
+        ]);
+        $empresaHub = $hub->registroCorporativo()->firstOrFail();
+
         $user = $this->userWithPermissions([
             Permissions::MOVIMENTACOES_VENDAS_IMPORTAR,
         ]);
@@ -305,10 +395,15 @@ class VendaImportacaoTest extends TestCase
         $response->assertOk();
         $response->assertJsonStructure([
             'empresas_origem' => [['id', 'label', 'cnpj']],
+            'unidades_estoque' => [['id', 'label', 'is_hub']],
         ]);
 
-        $ids = collect($response->json('empresas_origem'))->pluck('id')->all();
-        $this->assertContains($empresaOrigem->id, $ids);
+        $idsOrigem = collect($response->json('empresas_origem'))->pluck('id')->all();
+        $this->assertContains($empresaOrigem->id, $idsOrigem);
+        $this->assertNotContains($empresaHub->id, $idsOrigem);
+
+        $idsEstoque = collect($response->json('unidades_estoque'))->pluck('id')->all();
+        $this->assertContains($hub->id, $idsEstoque);
     }
 
     public function test_tela_importar_exige_permissao(): void

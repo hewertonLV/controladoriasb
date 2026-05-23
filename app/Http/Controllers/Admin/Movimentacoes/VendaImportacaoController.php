@@ -110,6 +110,7 @@ class VendaImportacaoController extends Controller
             'sem_alteracoes' => [],
             'erros' => $resultado['erros'] ?? [],
             'empresas_origem' => $this->empresasOrigemOpcoes($request->user()),
+            'unidades_estoque' => $this->unidadesEstoqueOpcoes($request->user()),
         ]);
     }
 
@@ -129,10 +130,13 @@ class VendaImportacaoController extends Controller
             'row_ids_novas.*' => ['integer', 'min:1'],
             'id_empresa_origem_por_row' => ['nullable', 'array'],
             'id_empresa_origem_por_row.*' => ['integer', 'min:1'],
+            'id_unidade_negocio_estoque_por_row' => ['nullable', 'array'],
+            'id_unidade_negocio_estoque_por_row.*' => ['integer', 'min:1'],
         ]);
 
         $rowIdsNovas = array_values(array_unique(array_map('intval', $payload['row_ids_novas'] ?? [])));
         $origensPorRow = $this->normalizarOrigensPorRow($payload['id_empresa_origem_por_row'] ?? []);
+        $estoquesPorRow = $this->normalizarOrigensPorRow($payload['id_unidade_negocio_estoque_por_row'] ?? []);
         $user = $request->user();
 
         if ($rowIdsNovas === []) {
@@ -156,6 +160,7 @@ class VendaImportacaoController extends Controller
                 $rowIdsNovas,
                 $novasIndex,
                 $origensPorRow,
+                $estoquesPorRow,
                 &$aplicadas,
                 &$ignoradas,
                 &$erros,
@@ -173,6 +178,7 @@ class VendaImportacaoController extends Controller
                     $dados = $item['dados'] ?? [];
                     $idOrigem = $origensPorRow[$rowId] ?? (int) ($dados['id_empresa_origem'] ?? 0);
                     $idDestino = (int) ($dados['id_empresa_destino'] ?? 0);
+                    $idEstoque = $estoquesPorRow[$rowId] ?? null;
 
                     if ($idOrigem <= 0) {
                         $erros[] = [
@@ -184,7 +190,7 @@ class VendaImportacaoController extends Controller
                         continue;
                     }
 
-                    $erroOrigem = $this->validarEmpresaOrigemImportacao($idOrigem, $user);
+                    $erroOrigem = $this->validarEmpresaOrigemImportacao($idOrigem, $user, $idEstoque);
                     if ($erroOrigem !== null) {
                         $erros[] = [
                             'linha' => (string) ($item['chave'] ?? $rowId),
@@ -195,13 +201,17 @@ class VendaImportacaoController extends Controller
                         continue;
                     }
 
-                    $dadosEfetivos = array_merge($dados, ['id_empresa_origem' => $idOrigem]);
+                    $dadosEfetivos = array_merge($dados, [
+                        'id_empresa_origem' => $idOrigem,
+                        'id_unidade_negocio_estoque' => $idEstoque,
+                    ]);
                     $itemEfetivo = array_merge($item, ['dados' => $dadosEfetivos]);
 
                     $chaveGrupo = implode('|', [
                         (string) ($dados['numero_nf'] ?? ''),
                         $idOrigem,
                         $idDestino,
+                        (string) ($idEstoque ?? ''),
                     ]);
 
                     $grupos[$chaveGrupo][] = $itemEfetivo;
@@ -220,13 +230,19 @@ class VendaImportacaoController extends Controller
                         ];
                     }
 
+                    $payloadVenda = [
+                        'numero_nf' => (string) ($primeiro['numero_nf'] ?? ''),
+                        'id_empresa_origem' => (int) ($primeiro['id_empresa_origem'] ?? 0),
+                        'id_empresa_destino' => (int) ($primeiro['id_empresa_destino'] ?? 0),
+                        'itens' => $itensVenda,
+                    ];
+
+                    if (($primeiro['id_unidade_negocio_estoque'] ?? null) !== null) {
+                        $payloadVenda['id_unidade_negocio_estoque'] = (int) $primeiro['id_unidade_negocio_estoque'];
+                    }
+
                     try {
-                        $resultadoVenda = $this->vendas->registrarVenda([
-                            'numero_nf' => (string) ($primeiro['numero_nf'] ?? ''),
-                            'id_empresa_origem' => (int) ($primeiro['id_empresa_origem'] ?? 0),
-                            'id_empresa_destino' => (int) ($primeiro['id_empresa_destino'] ?? 0),
-                            'itens' => $itensVenda,
-                        ], $user);
+                        $resultadoVenda = $this->vendas->registrarVenda($payloadVenda, $user);
 
                         $aplicadas += $resultadoVenda['movimentacoes']->count();
                     } catch (InvalidArgumentException $e) {
@@ -298,7 +314,7 @@ class VendaImportacaoController extends Controller
     }
 
     /**
-     * @return list<array{id: int, label: string, cnpj: string}>
+     * @return list<array{id: int, label: string, is_hub: bool}>
      */
     private function empresasOrigemOpcoes(?User $user): array
     {
@@ -307,7 +323,11 @@ class VendaImportacaoController extends Controller
             ->get()
             ->filter(function (Empresa $empresa) use ($user): bool {
                 $unidade = $empresa->entidade;
-                if (! $unidade instanceof UnidadeNegocio || $unidade->is_hub) {
+                if (! $unidade instanceof UnidadeNegocio) {
+                    return false;
+                }
+
+                if ($unidade->is_hub) {
                     return false;
                 }
 
@@ -330,6 +350,24 @@ class VendaImportacaoController extends Controller
     }
 
     /**
+     * @return list<array{id: int, label: string, is_hub: bool}>
+     */
+    private function unidadesEstoqueOpcoes(?User $user): array
+    {
+        return UnidadeNegocio::query()
+            ->where('possui_estoque', true)
+            ->permitidasPara($user)
+            ->orderBy('nome')
+            ->get(['id', 'nome', 'razao_social', 'is_hub'])
+            ->map(fn (UnidadeNegocio $unidade): array => [
+                'id' => $unidade->id,
+                'label' => $unidade->nome ?: $unidade->razao_social,
+                'is_hub' => (bool) $unidade->is_hub,
+            ])
+            ->all();
+    }
+
+    /**
      * @param  array<int|string, mixed>  $raw
      * @return array<int, int>
      */
@@ -346,7 +384,7 @@ class VendaImportacaoController extends Controller
         return $out;
     }
 
-    private function validarEmpresaOrigemImportacao(int $idEmpresaOrigem, ?User $user): ?string
+    private function validarEmpresaOrigemImportacao(int $idEmpresaOrigem, ?User $user, ?int $idUnidadeEstoque = null): ?string
     {
         $empresa = Empresa::query()->with('entidade')->find($idEmpresaOrigem);
         if ($empresa === null) {
@@ -355,15 +393,26 @@ class VendaImportacaoController extends Controller
 
         $unidade = $empresa->entidade;
         if (! $unidade instanceof UnidadeNegocio || ! $unidade->possui_estoque) {
-            return 'Origem deve ser uma unidade de negócio que controla estoque.';
+            return 'Origem comercial deve ser uma unidade de negócio que controla estoque.';
         }
 
         if ($unidade->is_hub) {
-            return 'Origem HUB não pode ser usada na importação; use o cadastro manual de venda.';
+            return 'Origem comercial não pode ser HUB. Selecione a loja e informe o HUB em saída física.';
         }
 
         if ($user !== null && ! app(UnidadeNegocioAccessService::class)->canVenda($user, $unidade->id)) {
             return UnidadeNegocioAccessService::MENSAGEM_SEM_ACESSO;
+        }
+
+        if ($idUnidadeEstoque !== null && $idUnidadeEstoque > 0) {
+            $estoque = UnidadeNegocio::query()->find($idUnidadeEstoque);
+            if ($estoque === null || ! $estoque->possui_estoque) {
+                return 'Unidade de saída física inválida.';
+            }
+
+            if ($user !== null && ! app(UnidadeNegocioAccessService::class)->canAccess($user, $estoque->id)) {
+                return UnidadeNegocioAccessService::MENSAGEM_SEM_ACESSO;
+            }
         }
 
         return null;

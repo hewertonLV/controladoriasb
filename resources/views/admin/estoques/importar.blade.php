@@ -116,6 +116,7 @@
                     <i class="ri-add-circle-line text-success me-1"></i>
                     Novas posições <span class="badge bg-success-subtle text-success ms-1" id="count-novas">0</span>
                 </h5>
+                <p class="text-muted small mb-0 mt-1">Switch ligado (padrão): soma o CO vigente da unidade ao preço médio/kg da linha.</p>
             </div>
             <div class="card-body p-0">
                 <div class="table-responsive">
@@ -128,6 +129,7 @@
                                 <th>Linha</th>
                                 <th>Unidade / Fruta</th>
                                 <th>Qtd (UM) · Preço total</th>
+                                <th style="min-width: 180px;">Incluir CO</th>
                             </tr>
                         </thead>
                         <tbody id="tbody-novas"></tbody>
@@ -155,6 +157,7 @@
                                 <th>Unidade / Fruta</th>
                                 <th>Valores atuais</th>
                                 <th>Alterações</th>
+                                <th style="min-width: 180px;">Incluir CO</th>
                             </tr>
                         </thead>
                         <tbody id="tbody-atualizacoes"></tbody>
@@ -383,12 +386,69 @@
             }
         }
 
-        function resumoPosicao(d) {
+        function resumoPosicao(d, aplicarCo) {
             const um = escapeHtml(d.qtd_fruta_um);
-            const total = escapeHtml(d.valor_total);
-            const kg = escapeHtml(d.qtd_fruta_kg || '0');
-            const precoKg = escapeHtml(d.preco_medio_kg || '0');
-            return `${um} UM · R$ ${total} total<br><span class="text-muted">→ ${kg} kg · R$ ${precoKg}/kg</span>`;
+            let precoKg = parseFloat(d.preco_medio_kg || 0);
+            const co = parseFloat(d.custo_operacional_kg || 0);
+            const kg = parseFloat(d.qtd_fruta_kg || 0);
+            if (aplicarCo && co > 0) {
+                precoKg = Math.round((precoKg + co) * 100) / 100;
+            }
+            const total = Math.round(kg * precoKg * 100) / 100;
+            const kgFmt = escapeHtml(String(kg.toFixed(2)));
+            const precoKgFmt = escapeHtml(precoKg.toFixed(2));
+            const totalFmt = escapeHtml(total.toFixed(2));
+            const coHint = aplicarCo && co > 0
+                ? `<br><span class="text-muted">+ CO R$ ${escapeHtml(co.toFixed(2))}/kg</span>`
+                : '';
+            return `${um} UM · R$ ${totalFmt} total<br><span class="text-muted">→ ${kgFmt} kg · R$ ${precoKgFmt}/kg</span>${coHint}`;
+        }
+
+        function fmtMoeda(v) {
+            const n = parseFloat(v);
+            if (Number.isNaN(n)) return '0,00';
+            return n.toFixed(2).replace('.', ',');
+        }
+
+        function switchCustoOperacional(rowId, d) {
+            const co = d.custo_operacional_kg ?? '0.00';
+            const coAttr = escapeHtml(String(co));
+            return `<div class="form-check form-switch mb-0">
+                <input type="checkbox" class="form-check-input sw-co-importacao" role="switch"
+                    data-row="${rowId}" data-custo-kg="${coAttr}" checked
+                    aria-label="Incluir custo operacional da unidade">
+                <label class="form-check-label small sw-co-label">Sim · R$ ${fmtMoeda(co)}/kg</label>
+            </div>`;
+        }
+
+        function atualizarLabelCoSwitch(sw) {
+            const label = sw.closest('.form-check')?.querySelector('.sw-co-label');
+            if (!label) return;
+            const co = sw.dataset.custoKg || '0';
+            const estado = sw.checked ? 'Sim' : 'Não';
+            label.textContent = estado + ' · R$ ' + fmtMoeda(co) + '/kg';
+        }
+
+        function coPorRowSelecionados(rowIdsSelecionados) {
+            const selecionados = new Set(rowIdsSelecionados);
+            const out = {};
+            document.querySelectorAll('.sw-co-importacao').forEach(sw => {
+                const rowId = Number(sw.dataset.row);
+                if (selecionados.has(rowId)) {
+                    out[rowId] = sw.checked;
+                }
+            });
+            return out;
+        }
+
+        function atualizarResumoPosicaoLinha(rowId) {
+            const sw = document.querySelector('.sw-co-importacao[data-row="' + rowId + '"]');
+            const cell = document.querySelector('[data-resumo-posicao-row="' + rowId + '"]');
+            if (!sw || !cell) return;
+            const d = cell._dadosPosicao;
+            if (!d) return;
+            const prefix = cell.dataset.resumoPrefix || '';
+            cell.innerHTML = prefix + resumoPosicao(d, sw.checked);
         }
 
         function rotuloUnidadeFruta(item) {
@@ -426,8 +486,11 @@
                     <td><input type="checkbox" class="form-check-input chk-nova" data-row="${item.row_id}" checked></td>
                     <td>${item.linha}</td>
                     <td><code>${escapeHtml(item.chave)}</code></td>
-                    <td class="small">${resumoPosicao(d)}</td>
+                    <td class="small" data-resumo-posicao-row="${item.row_id}">${resumoPosicao(d, true)}</td>
+                    <td class="align-middle">${switchCustoOperacional(item.row_id, d)}</td>
                 `;
+                const cell = tr.querySelector('[data-resumo-posicao-row]');
+                if (cell) cell._dadosPosicao = d;
                 tbodyNovas.appendChild(tr);
             });
             checkAllNovas.checked = lista.length > 0;
@@ -446,14 +509,21 @@
                         <span class="text-success fw-semibold">${fmtCampoValor(c.campo, c.novo)}</span>
                     </div>
                 `).join('');
+                const dNovos = item.dados_novos || {};
                 const tr = document.createElement('tr');
                 tr.innerHTML = `
                     <td><input type="checkbox" class="form-check-input chk-atual" data-row="${item.row_id}" checked></td>
                     <td>${item.linha}</td>
                     <td><code>${escapeHtml(item.chave)}</code></td>
-                    <td class="small">${resumoPosicao(item.dados_atuais)}</td>
-                    <td>${diffs}</td>
+                    <td class="small">${resumoPosicao(item.dados_atuais, false)}</td>
+                    <td>
+                        ${diffs}
+                        <div class="small mt-1 text-muted" data-resumo-posicao-row="${item.row_id}" data-resumo-prefix="Novo: ">Novo: ${resumoPosicao(dNovos, true)}</div>
+                    </td>
+                    <td class="align-middle">${switchCustoOperacional(item.row_id, dNovos)}</td>
                 `;
+                const cell = tr.querySelector('[data-resumo-posicao-row]');
+                if (cell) cell._dadosPosicao = dNovos;
                 tbodyAtual.appendChild(tr);
             });
             checkAllAtual.checked = lista.length > 0;
@@ -651,6 +721,10 @@
         });
         document.addEventListener('change', e => {
             if (e.target.matches('.chk-nova, .chk-atual')) atualizarResumoSelecao();
+            if (e.target.matches('.sw-co-importacao')) {
+                atualizarLabelCoSwitch(e.target);
+                atualizarResumoPosicaoLinha(Number(e.target.dataset.row));
+            }
         });
 
         btnConfirmar.addEventListener('click', async () => {
@@ -667,6 +741,9 @@
                 return;
             }
 
+            const rowIdsTodos = rowIdsNovas.concat(rowIdsAtual);
+            const aplicarCoPorRow = coPorRowSelecionados(rowIdsTodos);
+
             setLoading(btnConfirmar, spinConfirmar, true);
             try {
                 const resp = await fetch(importacaoAtiva.urls.confirmar, {
@@ -681,6 +758,7 @@
                     body: JSON.stringify({
                         row_ids_novas: rowIdsNovas,
                         row_ids_atualizacoes: rowIdsAtual,
+                        aplicar_custo_operacional_por_row: aplicarCoPorRow,
                     }),
                 });
                 const data = await resp.json();

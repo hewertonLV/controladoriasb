@@ -72,6 +72,7 @@ class CompraMovimentacaoController extends Controller
             'custoOperacionalHistorico',
             'origem',
             'versaoAnterior',
+            'canceladaPor',
         ]);
 
         return view('admin.movimentacoes.compras.show', [

@@ -6,6 +6,7 @@ use App\Models\Estoque;
 use App\Models\EstoqueImportacao;
 use App\Models\Fruta;
 use App\Models\UnidadeNegocio;
+use App\Support\Estoques\EstoqueImportacaoCustoOperacional;
 use App\Support\Estoques\EstoqueImportacaoPosicaoDerivador;
 use App\Support\TextoCadastro;
 use Illuminate\Support\Facades\Log;
@@ -321,6 +322,7 @@ class EstoqueImportacaoProcessor
         }
 
         $unidades = UnidadeNegocio::query()
+            ->with('historicoCustoOperacionalAtual')
             ->whereIn('id_cigam', array_values(array_unique($idsUn)))
             ->get()
             ->keyBy('id_cigam');
@@ -396,7 +398,10 @@ class EstoqueImportacaoProcessor
                 continue;
             }
 
-            $dadosEnriquecidos = $this->enrichComPosicaoDerivada($dados, $fruta);
+            $dadosEnriquecidos = array_merge(
+                $this->enrichComPosicaoDerivada($dados, $fruta),
+                EstoqueImportacaoCustoOperacional::metadadosPreview($unidade),
+            );
 
             $k = $unidade->id.'_'.$fruta->id;
             $existente = $estoques->get($k);

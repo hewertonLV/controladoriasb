@@ -527,7 +527,8 @@ class FluxoIntegradoMovimentacoesComCustosEImpostosTest extends TestCase
         ];
 
         if ($origem->loadMissing('entidade')->entidade?->is_hub) {
-            $payload['id_unidade_negocio_faturamento'] = $unidadeFaturamento->id;
+            $payload['id_empresa_origem'] = $unidadeFaturamento->registroCorporativo()->firstOrFail()->id;
+            $payload['id_unidade_negocio_estoque'] = $origem->entidade_id;
         }
 
         $this->actingAs($this->movimentacoesVendasUsuario())->postJson(route('admin.movimentacoes.vendas.store'), $payload)->assertCreated();

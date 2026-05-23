@@ -36,13 +36,14 @@ final class VendaMovimentacaoService
         private readonly MovimentacaoAuditoriaService $auditoria,
         private readonly FreteRateioMovimentacaoService $freteRateio,
         private readonly FrutaIcmsCalculoService $icmsCalculo,
+        private readonly RealocacaoEstoqueHubVendaService $realocacaoEstoqueHub,
     ) {}
 
     /**
      * @return array{
      *     empresas_origem: Collection<int, Empresa>,
      *     empresas_destino_cliente: Collection<int, Empresa>,
-     *     unidades_faturamento: Collection<int, UnidadeNegocio>,
+     *     unidades_estoque: Collection<int, UnidadeNegocio>,
      *     unidades_hub: Collection<int, UnidadeNegocio>,
      *     frutas: Collection<int, Fruta>,
      *     frutas_catalogo: list<array{id: int, nome: string, origens: list<int>}>,
@@ -55,10 +56,16 @@ final class VendaMovimentacaoService
 
         return [
             'empresas_origem' => Empresa::query()->where('entidade_type', UnidadeNegocio::class)->with('entidade')->get()
-                ->filter(fn (Empresa $e): bool => app(UnidadeNegocioAccessService::class)->canAccess(auth()->user(), (int) $e->entidade->id))
+                ->filter(fn (Empresa $e): bool => $e->entidade instanceof UnidadeNegocio
+                    && ! $e->entidade->is_hub
+                    && app(UnidadeNegocioAccessService::class)->canAccess(auth()->user(), (int) $e->entidade->id))
                 ->sortBy(fn (Empresa $e): string => mb_strtolower($e->nomeExibicao()))->values(),
             'empresas_destino_cliente' => Empresa::query()->where('entidade_type', Cliente::class)->with('entidade')->get()->sortBy(fn (Empresa $e): string => mb_strtolower($e->nomeExibicao()))->values(),
-            'unidades_faturamento' => UnidadeNegocio::query()->where('is_hub', false)->orderBy('nome')->get(),
+            'unidades_estoque' => UnidadeNegocio::query()
+                ->where('possui_estoque', true)
+                ->permitidasPara(auth()->user())
+                ->orderBy('nome')
+                ->get(),
             'unidades_hub' => UnidadeNegocio::query()
                 ->where('is_hub', true)
                 ->permitidasPara(auth()->user())
@@ -77,8 +84,8 @@ final class VendaMovimentacaoService
     public function registrarVenda(array $input, ?User $user = null): array
     {
         return DB::transaction(function () use ($input, $user): array {
-            [$empresaOrigem, $unidadeOrigem, $empresaDestino, $unidadeFaturamento, $frete, $dataEmissao] = $this->resolverCabecalho($input);
-            $custoHub = $this->resolverCustoOperacionalHubVenda($unidadeOrigem, $input);
+            [$empresaOrigem, $unidadeComercial, $unidadeEstoque, $empresaDestino, $unidadeFaturamento, $frete, $dataEmissao] = $this->resolverCabecalho($input);
+            $custoHub = $this->resolverCustoOperacionalHubVenda($unidadeComercial, $unidadeEstoque, $input);
             $itens = $this->normalizarItens($input['itens'] ?? []);
             $numeroNf = trim((string) $input['numero_nf']);
             $observacao = $this->nullableTrim($input['observacao'] ?? null);
@@ -100,7 +107,8 @@ final class VendaMovimentacaoService
                 $movimentacoes->push($this->criarMovimentacaoVenda(
                     nota: $nota,
                     empresaOrigem: $empresaOrigem,
-                    unidadeOrigem: $unidadeOrigem,
+                    unidadeComercial: $unidadeComercial,
+                    unidadeEstoque: $unidadeEstoque,
                     empresaDestino: $empresaDestino,
                     unidadeFaturamento: $unidadeFaturamento,
                     frete: $frete,
@@ -130,16 +138,16 @@ final class VendaMovimentacaoService
             $this->assertVendaSaidaAtiva($ativa);
             $this->versionamento->validarPodeSubstituir($ativa);
 
-            [$empresaOrigem, $unidadeOrigem, $empresaDestino, $unidadeFaturamento, $frete, $dataEmissao] = $this->resolverCabecalho(array_merge([
+            [$empresaOrigem, $unidadeComercial, $unidadeEstoque, $empresaDestino, $unidadeFaturamento, $frete, $dataEmissao] = $this->resolverCabecalho(array_merge([
                 'numero_nf' => $ativa->vendaNota?->numero_nf,
                 'id_empresa_origem' => $ativa->id_empresa_origem,
                 'id_empresa_destino' => $ativa->id_empresa_destino,
-                'id_unidade_negocio_faturamento' => $ativa->id_unidade_negocio_faturamento,
+                'id_unidade_negocio_estoque' => $ativa->id_unidade_negocio_estoque,
                 'id_frete' => $ativa->id_frete,
                 'data_emissao' => $ativa->data_movimentacao,
             ], $input), true);
 
-            $custoHub = $this->resolverCustoOperacionalHubVenda($unidadeOrigem, $input);
+            $custoHub = $this->resolverCustoOperacionalHubVenda($unidadeComercial, $unidadeEstoque, $input);
 
             $item = $this->normalizarItem([
                 'id_fruta' => $input['id_fruta'] ?? $ativa->id_fruta,
@@ -165,7 +173,9 @@ final class VendaMovimentacaoService
             $valorNfUm = round($valorNfTotal / $qtdUm, 2);
             $valorNfKg = round($valorNfTotal / $qtdKg, 2);
 
-            $estoque = $this->obterOuCriarEstoqueComLock($unidadeOrigem->id, $fruta->id);
+            $this->realocacaoEstoqueHub->garantirSaldoFisicoParaVenda($unidadeComercial, $unidadeEstoque, $fruta, $qtdKg, $qtdUm);
+
+            $estoque = $this->obterOuCriarEstoqueComLock($unidadeEstoque->id, $fruta->id);
             $precoMedioKg = (float) $estoque->preco_medio_kg;
             $precoMedioUm = (float) $estoque->preco_medio_um;
             $valorCustoSaida = round($precoMedioKg * $qtdKg, 2);
@@ -178,6 +188,7 @@ final class VendaMovimentacaoService
                 'id_empresa_origem' => $empresaOrigem->id,
                 'id_empresa_destino' => $empresaDestino->id,
                 'id_unidade_negocio_faturamento' => $unidadeFaturamento->id,
+                'id_unidade_negocio_estoque' => $this->idUnidadeEstoquePersistido($unidadeComercial, $unidadeEstoque),
                 'id_custo_operacional' => $custoHub['id_custo_operacional'],
                 'valor_custo_operacional' => $custoHub['valor_custo_operacional'],
                 'id_fruta' => $fruta->id,
@@ -197,7 +208,7 @@ final class VendaMovimentacaoService
                 'data_movimentacao' => $dataEmissao,
             ]), $this->nullableTrim($input['motivo_substituicao'] ?? null), $user);
 
-            $this->replayVenda->reprocessarSaidasVendaNaUnidadeOrigem($unidadeOrigem->id, $fruta->id, $nova->id);
+            $this->replayVenda->reprocessarSaidasVendaNaUnidadeOrigem($unidadeEstoque->id, $fruta->id, $nova->id);
             $this->atualizarValorTotalNota($nota);
             if ($ativa->id_frete !== null) {
                 $this->recalcularRateioFreteParaVendas((int) $ativa->id_frete);
@@ -213,10 +224,9 @@ final class VendaMovimentacaoService
     public function estornarVendaNoEstoqueOrigem(Movimentacao $venda): void
     {
         $this->assertVendaSaida($venda);
-        $empresaOrigem = Empresa::query()->with('entidade')->findOrFail((int) $venda->id_empresa_origem);
-        $unidadeOrigem = $this->unidadeDaEmpresa($empresaOrigem);
-        $estoque = $this->obterOuCriarEstoqueComLock($unidadeOrigem->id, (int) $venda->id_fruta);
-        $posicaoAtual = $this->obterOuCriarPosicaoAtual($estoque, $unidadeOrigem->id, (int) $venda->id_fruta);
+        $unidadeEstoque = $this->resolverUnidadeEstoqueDaVenda($venda);
+        $estoque = $this->obterOuCriarEstoqueComLock($unidadeEstoque->id, (int) $venda->id_fruta);
+        $posicaoAtual = $this->obterOuCriarPosicaoAtual($estoque, $unidadeEstoque->id, (int) $venda->id_fruta);
 
         $saldoKgNovo = round((float) $posicaoAtual->qtd_fruta_kg + (float) $venda->qtd_fruta_kg, 2);
         $saldoUmNovo = round((float) $posicaoAtual->qtd_fruta_um + (float) $venda->qtd_fruta_um, 2);
@@ -225,7 +235,7 @@ final class VendaMovimentacaoService
         $posicaoAtual->forceFill(['status_ultima_posicao' => false])->save();
         MovimentacaoEstoque::query()->create([
             'id_estoque' => $estoque->id,
-            'id_unidade_negocio' => $unidadeOrigem->id,
+            'id_unidade_negocio' => $unidadeEstoque->id,
             'id_fruta' => $venda->id_fruta,
             'movimentacao_id' => null,
             'qtd_fruta_kg' => number_format($saldoKgNovo, 2, '.', ''),
@@ -256,7 +266,8 @@ final class VendaMovimentacaoService
     private function criarMovimentacaoVenda(
         VendaNota $nota,
         Empresa $empresaOrigem,
-        UnidadeNegocio $unidadeOrigem,
+        UnidadeNegocio $unidadeComercial,
+        UnidadeNegocio $unidadeEstoque,
         Empresa $empresaDestino,
         UnidadeNegocio $unidadeFaturamento,
         ?Frete $frete,
@@ -273,8 +284,10 @@ final class VendaMovimentacaoService
         $valorNfUm = round($valorNfTotal / $qtdUm, 2);
         $valorNfKg = round($valorNfTotal / $qtdKg, 2);
 
-        $estoque = $this->obterOuCriarEstoqueComLock($unidadeOrigem->id, $fruta->id);
-        $posicaoOrigem = $this->obterOuCriarPosicaoAtual($estoque, $unidadeOrigem->id, $fruta->id);
+        $this->realocacaoEstoqueHub->garantirSaldoFisicoParaVenda($unidadeComercial, $unidadeEstoque, $fruta, $qtdKg, $qtdUm);
+
+        $estoque = $this->obterOuCriarEstoqueComLock($unidadeEstoque->id, $fruta->id);
+        $posicaoOrigem = $this->obterOuCriarPosicaoAtual($estoque, $unidadeEstoque->id, $fruta->id);
         $precoMedioKg = (float) $estoque->preco_medio_kg;
         $precoMedioUm = (float) $estoque->preco_medio_um;
         $valorCustoSaida = round($precoMedioKg * $qtdKg, 2);
@@ -316,6 +329,7 @@ final class VendaMovimentacaoService
             'id_empresa_origem' => $empresaOrigem->id,
             'id_empresa_destino' => $empresaDestino->id,
             'id_unidade_negocio_faturamento' => $unidadeFaturamento->id,
+            'id_unidade_negocio_estoque' => $this->idUnidadeEstoquePersistido($unidadeComercial, $unidadeEstoque),
             'id_fruta' => $fruta->id,
             'qtd_fruta_um' => $qtdUm,
             'qtd_fruta_kg' => $qtdKg,
@@ -339,7 +353,7 @@ final class VendaMovimentacaoService
 
         $novaMe = MovimentacaoEstoque::query()->create([
             'id_estoque' => $estoque->id,
-            'id_unidade_negocio' => $unidadeOrigem->id,
+            'id_unidade_negocio' => $unidadeEstoque->id,
             'id_fruta' => $fruta->id,
             'movimentacao_id' => $mov->id,
             'qtd_fruta_kg' => number_format($saldoKgNovo, 2, '.', ''),
@@ -365,29 +379,23 @@ final class VendaMovimentacaoService
     }
 
     /**
-     * @return array{Empresa, UnidadeNegocio, Empresa, UnidadeNegocio, Frete|null, Carbon}
+     * @return array{Empresa, UnidadeNegocio, UnidadeNegocio, Empresa, UnidadeNegocio, Frete|null, Carbon}
      */
     private function resolverCabecalho(array $input, bool $usarDataInformada = false): array
     {
         $empresaOrigem = Empresa::query()->with('entidade')->findOrFail((int) $input['id_empresa_origem']);
         $this->assertEmpresaTipo($empresaOrigem, TipoEmpresaRegistro::UNIDADE_NEGOCIO);
-        $unidadeOrigem = $this->unidadeDaEmpresa($empresaOrigem);
+        $unidadeComercial = $this->unidadeDaEmpresa($empresaOrigem);
+
+        if ($unidadeComercial->is_hub) {
+            throw new InvalidArgumentException('Origem comercial não pode ser HUB. Informe a loja comercial e selecione o HUB em saída física.');
+        }
+
+        $unidadeEstoque = $this->resolverUnidadeEstoque($input, $unidadeComercial);
+        $unidadeFaturamento = $unidadeComercial;
 
         $empresaDestino = Empresa::query()->with('entidade')->findOrFail((int) $input['id_empresa_destino']);
         $this->assertEmpresaTipo($empresaDestino, TipoEmpresaRegistro::CLIENTE);
-
-        if ($unidadeOrigem->is_hub) {
-            if (($input['id_unidade_negocio_faturamento'] ?? null) === null || $input['id_unidade_negocio_faturamento'] === '') {
-                throw new InvalidArgumentException('Informe a unidade de faturamento quando a origem física for HUB.');
-            }
-
-            $unidadeFaturamento = UnidadeNegocio::query()->findOrFail((int) $input['id_unidade_negocio_faturamento']);
-            if ($unidadeFaturamento->is_hub) {
-                throw new InvalidArgumentException('A unidade de faturamento não pode ser HUB.');
-            }
-        } else {
-            $unidadeFaturamento = $unidadeOrigem;
-        }
 
         $frete = null;
         if (($input['id_frete'] ?? null) !== null && $input['id_frete'] !== '') {
@@ -401,21 +409,56 @@ final class VendaMovimentacaoService
             ? $this->resolverData($input['data_emissao'] ?? null)
             : now();
 
-        return [$empresaOrigem, $unidadeOrigem, $empresaDestino, $unidadeFaturamento, $frete, $dataEmissao];
+        return [$empresaOrigem, $unidadeComercial, $unidadeEstoque, $empresaDestino, $unidadeFaturamento, $frete, $dataEmissao];
+    }
+
+    private function resolverUnidadeEstoque(array $input, UnidadeNegocio $unidadeComercial): UnidadeNegocio
+    {
+        $idEstoque = $input['id_unidade_negocio_estoque'] ?? null;
+        if ($idEstoque === null || $idEstoque === '') {
+            return $unidadeComercial;
+        }
+
+        $unidadeEstoque = UnidadeNegocio::query()->findOrFail((int) $idEstoque);
+        if (! $unidadeEstoque->possui_estoque) {
+            throw new InvalidArgumentException('A unidade de saída física deve controlar estoque.');
+        }
+
+        return $unidadeEstoque;
+    }
+
+    private function idUnidadeEstoquePersistido(UnidadeNegocio $unidadeComercial, UnidadeNegocio $unidadeEstoque): ?int
+    {
+        return $unidadeComercial->id === $unidadeEstoque->id ? null : $unidadeEstoque->id;
+    }
+
+    private function resolverUnidadeEstoqueDaVenda(Movimentacao $venda): UnidadeNegocio
+    {
+        if ($venda->id_unidade_negocio_estoque !== null) {
+            return UnidadeNegocio::query()->findOrFail((int) $venda->id_unidade_negocio_estoque);
+        }
+
+        $empresaOrigem = Empresa::query()->with('entidade')->findOrFail((int) $venda->id_empresa_origem);
+
+        return $this->unidadeDaEmpresa($empresaOrigem);
     }
 
     /**
      * @param  array<string, mixed>  $input
      * @return array{id_custo_operacional: int|null, valor_custo_operacional: string}
      */
-    private function resolverCustoOperacionalHubVenda(UnidadeNegocio $unidadeOrigem, array $input): array
+    private function resolverCustoOperacionalHubVenda(UnidadeNegocio $unidadeComercial, UnidadeNegocio $unidadeEstoque, array $input): array
     {
         $zerado = [
             'id_custo_operacional' => null,
             'valor_custo_operacional' => '0.00',
         ];
 
-        if (! $unidadeOrigem->is_unidade_producao) {
+        if ($unidadeEstoque->is_hub) {
+            return $zerado;
+        }
+
+        if (! $unidadeComercial->is_unidade_producao) {
             return $zerado;
         }
 

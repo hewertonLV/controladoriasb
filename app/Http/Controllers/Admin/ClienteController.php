@@ -9,6 +9,7 @@ use App\Models\Cliente;
 use App\Models\ClienteHistorico;
 use App\Models\Grupo;
 use App\Models\Praca;
+use App\Models\UnidadeNegocio;
 use App\Queries\ClienteQuery;
 use App\Services\Clientes\ClienteAuditoriaService;
 use Illuminate\Database\Eloquent\Collection;
@@ -44,6 +45,7 @@ class ClienteController extends Controller
             'cliente' => new Cliente([
                 'desconto_nf' => '0.00',
             ]),
+            'unidadesNegocio' => $this->unidadesParaFormulario(),
             'pracas' => $this->pracasParaFormulario(),
             'grupos' => $this->gruposParaFormulario(),
         ]);
@@ -75,6 +77,7 @@ class ClienteController extends Controller
     {
         return view('admin.clientes.edit', [
             'cliente' => $cliente->load(['praca', 'grupo']),
+            'unidadesNegocio' => $this->unidadesParaFormulario(),
             'pracas' => $this->pracasParaFormulario(),
             'grupos' => $this->gruposParaFormulario(),
         ]);
@@ -116,6 +119,17 @@ class ClienteController extends Controller
             'cliente' => $cliente->load(['praca', 'grupo']),
             'historicos' => $historicos,
         ]);
+    }
+
+    /**
+     * @return Collection<int, UnidadeNegocio>
+     */
+    private function unidadesParaFormulario()
+    {
+        return UnidadeNegocio::query()
+            ->where('is_hub', false)
+            ->orderBy('nome')
+            ->get(['id', 'nome', 'id_cigam']);
     }
 
     /**

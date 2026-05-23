@@ -17,6 +17,7 @@
                 </p>
                 <p class="text-muted mb-0 small mt-1">
                     Duplicidade na planilha: mesma NF, origem, cliente, fruta, quantidade, UM e valor.
+                    Coluna F: UM cadastrada da fruta ou <code>KG</code> (quantidade em kg; convertida para a UM da fruta na confirmação).
                     Modelo: <code>planilhas/vendas_importacao.xlsx</code>
                 </p>
             </div>
@@ -99,7 +100,7 @@
                     <i class="ri-shopping-cart-line text-success me-1"></i>
                     Linhas prontas <span class="badge bg-success-subtle text-success ms-1" id="count-novas">0</span>
                 </h5>
-                <p class="text-muted small mb-0 mt-1">O cliente vem da planilha. A origem é editável por NF — alterar uma NF aplica a todas as linhas do mesmo cliente com esse número.</p>
+                <p class="text-muted small mb-0 mt-1">O cliente vem da planilha. A origem é editável por NF — alterar uma NF aplica a todas as linhas do mesmo cliente com esse número. Unidades HUB exigem unidade de faturamento.</p>
             </div>
             <div class="card-body p-0">
                 <div class="table-responsive">
@@ -218,6 +219,7 @@
         let importacaoAtiva = null;
         let preview = { novas: [], erros: [] };
         let empresasOrigem = [];
+        let unidadesEstoque = [];
         let pollTimer = null;
         const POLL_INTERVAL_MS = 1500;
 
@@ -289,10 +291,17 @@
         function resumoVenda(d) {
             const nf = escapeHtml(d.numero_nf || '—');
             const fruta = escapeHtml(d.fruta_nome || d.id_cigam_fruta || '—');
-            const qtd = escapeHtml(d.qtd_fruta_um);
-            const umed = escapeHtml(d.unidade_medicao || 'UM');
             const valor = escapeHtml(d.valor_nf_total || '0');
-            return `NF <strong>${nf}</strong> · ${fruta} · ${qtd} ${umed} · R$ ${valor}`;
+            let qtdPart;
+            const umPlanilha = d.unidade_medicao_planilha || d.unidade_medicao || 'UM';
+            const umFruta = d.unidade_medicao || 'UM';
+            if (d.unidade_medicao_planilha && d.unidade_medicao_planilha !== umFruta) {
+                qtdPart = escapeHtml(d.qtd_planilha || d.qtd_fruta_um) + ' ' + escapeHtml(umPlanilha)
+                    + ' → ' + escapeHtml(d.qtd_fruta_um) + ' ' + escapeHtml(umFruta);
+            } else {
+                qtdPart = escapeHtml(d.qtd_fruta_um) + ' ' + escapeHtml(umFruta);
+            }
+            return `NF <strong>${nf}</strong> · ${fruta} · ${qtdPart} · R$ ${valor}`;
         }
         function rotuloCliente(d) {
             const cli = fmtDoc(d.cnpj_cpf_cliente);
@@ -307,6 +316,16 @@
                 const sel = Number(e.id) === id ? ' selected' : '';
                 return `<option value="${e.id}"${sel}>${label}${cnpj ? ' · ' + cnpj : ''}</option>`;
             }).join('');
+        }
+        function opcoesSelectEstoque(idSelecionado) {
+            const id = Number(idSelecionado);
+            const opts = ['<option value="">Mesma da origem comercial</option>'];
+            unidadesEstoque.forEach(u => {
+                const hub = u.is_hub ? ' · HUB' : '';
+                const sel = Number(u.id) === id ? ' selected' : '';
+                opts.push(`<option value="${u.id}"${sel}>${escapeHtml(u.label || '—')}${hub}</option>`);
+            });
+            return opts.join('');
         }
         function chaveGrupoOrigem(d) {
             return String(d.numero_nf || '') + '|' + String(d.id_empresa_destino || '');
@@ -333,13 +352,37 @@
             }
             const nfLabel = escapeHtml(nf || '—');
             const rowIdsAttr = rowIds.join(',');
-            return `<label class="form-label text-muted small mb-0 mt-1">Origem · NF ${nfLabel}</label>
+            return `<label class="form-label text-muted small mb-0 mt-1">Origem comercial · NF ${nfLabel}</label>
                 <select class="form-select form-select-sm sel-origem-grupo"
                     data-grupo="${escapeHtml(chave)}"
                     data-row-ids="${rowIdsAttr}"
-                    aria-label="Origem para NF ${nfLabel}">
+                    aria-label="Origem comercial para NF ${nfLabel}">
                     ${opcoesSelectOrigem(idEmpresaOrigem)}
-                </select>`;
+                </select>
+                <div class="estoque-grupo mt-1" data-grupo="${escapeHtml(chave)}">
+                    <label class="form-label text-muted small mb-0">Saída física (estoque)</label>
+                    <select class="form-select form-select-sm sel-estoque-grupo"
+                        data-grupo="${escapeHtml(chave)}"
+                        data-row-ids="${rowIdsAttr}"
+                        aria-label="Saída física para NF ${nfLabel}">
+                        ${opcoesSelectEstoque('')}
+                    </select>
+                </div>`;
+        }
+        function estoquesPorRowSelecionados(rowIdsSelecionados) {
+            const selecionados = new Set(rowIdsSelecionados);
+            const out = {};
+            document.querySelectorAll('.sel-estoque-grupo').forEach(sel => {
+                const ids = String(sel.dataset.rowIds || '').split(',').map(Number).filter(n => n > 0);
+                const estoqueId = Number(sel.value);
+                if (!estoqueId) return;
+                ids.forEach(rowId => {
+                    if (selecionados.has(rowId)) {
+                        out[rowId] = estoqueId;
+                    }
+                });
+            });
+            return out;
         }
         function origensPorRowSelecionados(rowIdsSelecionados) {
             const selecionados = new Set(rowIdsSelecionados);
@@ -417,6 +460,7 @@
             }
             preview = { novas: data.novas || [], erros: data.erros || [] };
             empresasOrigem = data.empresas_origem || [];
+            unidadesEstoque = data.unidades_estoque || [];
             renderErros(preview.erros);
             renderNovas(preview.novas);
             resultado.classList.remove('d-none');
@@ -517,6 +561,7 @@
                 return;
             }
             const idEmpresaOrigemPorRow = origensPorRowSelecionados(rowIds);
+            const idUnidadeNegocioEstoquePorRow = estoquesPorRowSelecionados(rowIds);
             setLoading(btnConfirmar, spinConfirmar, true);
             try {
                 const resp = await fetch(importacaoAtiva.urls.confirmar, {
@@ -531,6 +576,7 @@
                     body: JSON.stringify({
                         row_ids_novas: rowIds,
                         id_empresa_origem_por_row: idEmpresaOrigemPorRow,
+                        id_unidade_negocio_estoque_por_row: idUnidadeNegocioEstoquePorRow,
                     }),
                 });
                 const data = await resp.json();
@@ -567,6 +613,7 @@
             importacaoAtiva = null;
             preview = { novas: [], erros: [] };
             empresasOrigem = [];
+            unidadesFaturamento = [];
             resultado.classList.add('d-none');
             resumoFinal.classList.add('d-none');
             resetProgressoUI();

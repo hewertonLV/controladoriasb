@@ -174,8 +174,27 @@ class FluxoStress200MovimentacoesTest extends TestCase
 
         // Bloco 3: 30 vendas, com frete compartilhado e estoque negativo permitido na venda do HUB.
         for ($i = 1; $i <= 30; $i++) {
+            if ($i === 30) {
+                $frutaVendaHub = $this->cenario['frutas'][$i % 5];
+                $destinoHub = $this->cenario['empresas_unidades'][($i % 3) + 1];
+                $saidaHub = $this->evento('transferencias', fn () => $this->registrarTransferencia(
+                    origem: $this->cenario['empresa_hub'],
+                    destino: $destinoHub,
+                    fruta: $frutaVendaHub,
+                    qtdUm: '50.00',
+                    frete: null,
+                ));
+                $this->evento('transferencias', fn () => $this->receberConforme((int) $saidaHub->transferencia_origem_id, '50.00'));
+            }
+
+            $origem = match (true) {
+                $i === 30 => $this->cenario['empresa_hub'],
+                ($i % 4) === 0 => $this->cenario['empresas_unidades'][1],
+                default => $this->cenario['empresas_unidades'][$i % 4],
+            };
+
             $venda = $this->evento('vendas', fn () => $this->registrarVenda(
-                origem: $i === 30 ? $this->cenario['empresa_hub'] : $this->cenario['empresas_unidades'][$i % 4],
+                origem: $origem,
                 cliente: $this->cenario['clientes'][$i % 3],
                 unidadeFaturamento: $this->cenario['unidades'][($i % 3) + 1],
                 fruta: $this->cenario['frutas'][$i % 5],
@@ -248,10 +267,10 @@ class FluxoStress200MovimentacoesTest extends TestCase
             $this->evento('correcoes', fn () => $this->atualizarDevolucao($devolucao, '0.05'));
         }
 
-        $this->assertSame(200, $this->eventosExecutados);
+        $this->assertSame(202, $this->eventosExecutados);
         $this->assertSame([
             'compras' => 45,
-            'transferencias' => 35,
+            'transferencias' => 37,
             'vendas' => 30,
             'devolucoes' => 25,
             'doacoes' => 20,
@@ -532,7 +551,8 @@ class FluxoStress200MovimentacoesTest extends TestCase
         ];
 
         if ($origem->loadMissing('entidade')->entidade?->is_hub) {
-            $payload['id_unidade_negocio_faturamento'] = $unidadeFaturamento->id;
+            $payload['id_empresa_origem'] = $unidadeFaturamento->registroCorporativo()->firstOrFail()->id;
+            $payload['id_unidade_negocio_estoque'] = $origem->entidade_id;
         }
 
         if ($frete !== null) {
@@ -542,9 +562,13 @@ class FluxoStress200MovimentacoesTest extends TestCase
         $this->actingAs($this->movimentacoesVendasUsuario())->postJson(route('admin.movimentacoes.vendas.store'), $payload)
             ->assertCreated();
 
+        $empresaOrigemPersistida = $origem->loadMissing('entidade')->entidade?->is_hub
+            ? $unidadeFaturamento->registroCorporativo()->firstOrFail()->id
+            : $origem->id;
+
         return Movimentacao::query()
             ->where('categoria_movimentacao_id', CategoriaMovimentacaoTipo::Venda->value)
-            ->where('id_empresa_origem', $origem->id)
+            ->where('id_empresa_origem', $empresaOrigemPersistida)
             ->where('id_fruta', $fruta->id)
             ->orderByDesc('id')
             ->firstOrFail();
@@ -829,7 +853,8 @@ class FluxoStress200MovimentacoesTest extends TestCase
                 $this->assertNotNull($devolucao->id_movimentacao_estoque_new);
             }
 
-            if ($devolucao->tipo_devolucao === TipoDevolucao::SEM_RETORNO_ESTOQUE->value) {
+            if ($devolucao->tipo_devolucao === TipoDevolucao::SEM_RETORNO_ESTOQUE->value
+                && $devolucao->status_registro === MovimentacaoStatusRegistro::ATIVO->value) {
                 $this->assertNull($devolucao->id_movimentacao_estoque_new);
                 $this->assertLessThanOrEqual(0, (float) $devolucao->resultado_devolucao);
             }

@@ -75,9 +75,10 @@ class FrutasEstoqueOrigemSelectTest extends TestCase
             }
 
             if ($assertVenda) {
-                $this->assertStringContainsString('origem física', strtolower((string) $html));
-                $this->assertStringContainsString('não do cliente', strtolower((string) $html));
-                $this->assertStringContainsString('data-venda-origem', (string) $html);
+                $this->assertStringContainsString('origem comercial', strtolower((string) $html));
+                $this->assertStringContainsString('saída física', strtolower((string) $html));
+                $this->assertStringContainsString('data-venda-comercial', (string) $html);
+                $this->assertStringContainsString('data-venda-estoque', (string) $html);
                 $this->assertStringContainsString('data-frutas-catalog', (string) $html);
                 $this->assertStringNotContainsString(
                     sprintf('value="%d" data-estoque-origens=', $banana->id),

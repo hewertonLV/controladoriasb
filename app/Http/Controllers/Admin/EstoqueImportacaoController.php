@@ -8,6 +8,7 @@ use App\Jobs\Estoques\ProcessarPreviewImportacaoEstoquesJob;
 use App\Models\EstoqueImportacao;
 use App\Models\Fruta;
 use App\Models\UnidadeNegocio;
+use App\Support\Estoques\EstoqueImportacaoCustoOperacional;
 use App\Services\Estoques\EstoqueMovimentacaoService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -98,7 +99,9 @@ class EstoqueImportacaoController extends Controller
             ], 409);
         }
 
-        $resultado = $importacao->resultado ?? [];
+        $resultado = EstoqueImportacaoCustoOperacional::enriquecerCoNoPreviewResultado(
+            $importacao->resultado ?? [],
+        );
 
         return response()->json([
             'status' => $importacao->status,
@@ -125,10 +128,13 @@ class EstoqueImportacaoController extends Controller
             'row_ids_novas.*' => ['integer', 'min:1'],
             'row_ids_atualizacoes' => ['nullable', 'array'],
             'row_ids_atualizacoes.*' => ['integer', 'min:1'],
+            'aplicar_custo_operacional_por_row' => ['nullable', 'array'],
+            'aplicar_custo_operacional_por_row.*' => ['boolean'],
         ]);
 
         $rowIdsNovas = array_values(array_unique(array_map('intval', $payload['row_ids_novas'] ?? [])));
         $rowIdsAtual = array_values(array_unique(array_map('intval', $payload['row_ids_atualizacoes'] ?? [])));
+        $coPorRow = $this->normalizarCoPorRow($payload['aplicar_custo_operacional_por_row'] ?? []);
 
         if ($rowIdsNovas === [] && $rowIdsAtual === []) {
             return response()->json([
@@ -152,6 +158,7 @@ class EstoqueImportacaoController extends Controller
                 $rowIdsAtual,
                 $novasIndex,
                 $atualIndex,
+                $coPorRow,
                 &$aplicadas,
                 &$ignoradas,
                 &$erros,
@@ -164,7 +171,9 @@ class EstoqueImportacaoController extends Controller
                         continue;
                     }
 
-                    $unidade = UnidadeNegocio::query()->find((int) ($item['id_unidade_negocio'] ?? 0));
+                    $unidade = UnidadeNegocio::query()
+                        ->with('historicoCustoOperacionalAtual')
+                        ->find((int) ($item['id_unidade_negocio'] ?? 0));
                     $fruta = Fruta::query()->find((int) ($item['id_fruta'] ?? 0));
                     if ($unidade === null || $fruta === null) {
                         $ignoradas++;
@@ -173,12 +182,20 @@ class EstoqueImportacaoController extends Controller
                     }
 
                     $dados = $item['dados'] ?? [];
+                    $aplicarCo = $coPorRow[$rowId] ?? true;
+
                     try {
+                        $precoMedioKg = EstoqueImportacaoCustoOperacional::precoMedioKgAplicandoCo(
+                            (string) ($dados['preco_medio_kg'] ?? '0'),
+                            $unidade,
+                            $aplicarCo,
+                        );
+
                         $this->movimentacaoService->definirPosicaoAbsoluta(
                             $unidade,
                             $fruta,
                             (string) ($dados['qtd_fruta_kg'] ?? '0'),
-                            (string) ($dados['preco_medio_kg'] ?? '0'),
+                            $precoMedioKg,
                         );
                         $aplicadas++;
                     } catch (\InvalidArgumentException $e) {
@@ -198,7 +215,9 @@ class EstoqueImportacaoController extends Controller
                         continue;
                     }
 
-                    $unidade = UnidadeNegocio::query()->find((int) ($item['id_unidade_negocio'] ?? 0));
+                    $unidade = UnidadeNegocio::query()
+                        ->with('historicoCustoOperacionalAtual')
+                        ->find((int) ($item['id_unidade_negocio'] ?? 0));
                     $fruta = Fruta::query()->find((int) ($item['id_fruta'] ?? 0));
                     if ($unidade === null || $fruta === null) {
                         $ignoradas++;
@@ -207,12 +226,20 @@ class EstoqueImportacaoController extends Controller
                     }
 
                     $dados = $item['dados_novos'] ?? [];
+                    $aplicarCo = $coPorRow[$rowId] ?? true;
+
                     try {
+                        $precoMedioKg = EstoqueImportacaoCustoOperacional::precoMedioKgAplicandoCo(
+                            (string) ($dados['preco_medio_kg'] ?? '0'),
+                            $unidade,
+                            $aplicarCo,
+                        );
+
                         $this->movimentacaoService->definirPosicaoAbsoluta(
                             $unidade,
                             $fruta,
                             (string) ($dados['qtd_fruta_kg'] ?? '0'),
-                            (string) ($dados['preco_medio_kg'] ?? '0'),
+                            $precoMedioKg,
                         );
                         $aplicadas++;
                     } catch (\InvalidArgumentException $e) {
@@ -275,6 +302,23 @@ class EstoqueImportacaoController extends Controller
             $rowId = (int) ($item['row_id'] ?? 0);
             if ($rowId > 0) {
                 $out[$rowId] = $item;
+            }
+        }
+
+        return $out;
+    }
+
+    /**
+     * @param  array<int|string, mixed>  $raw
+     * @return array<int, bool>
+     */
+    private function normalizarCoPorRow(array $raw): array
+    {
+        $out = [];
+        foreach ($raw as $rowId => $valor) {
+            $rowIdInt = (int) $rowId;
+            if ($rowIdInt > 0) {
+                $out[$rowIdInt] = filter_var($valor, FILTER_VALIDATE_BOOLEAN);
             }
         }
 

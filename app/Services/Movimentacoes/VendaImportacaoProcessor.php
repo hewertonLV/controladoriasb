@@ -12,6 +12,7 @@ use App\Models\User;
 use App\Models\VendaImportacao;
 use App\Services\Frutas\FrutaPlanilhaNormalizer;
 use App\Services\Permissoes\UnidadeNegocioAccessService;
+use App\Support\Movimentacoes\VendaImportacaoQuantidade;
 use App\Support\TextoCadastro;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
@@ -211,9 +212,18 @@ class VendaImportacaoProcessor
                 continue;
             }
 
-            if ($fruta->unidade_medicao !== $dados['unidade_medicao']) {
+            $quantidadeNormalizada = VendaImportacaoQuantidade::normalizar(
+                $fruta,
+                $dados['qtd_fruta_um'],
+                $dados['unidade_medicao'],
+            );
+
+            if ($quantidadeNormalizada === null) {
                 $erros[] = $this->erroItem($rowId, $r, $dados, [
-                    "Unidade de medição da planilha ({$dados['unidade_medicao']}) difere da cadastrada para a fruta ({$fruta->unidade_medicao}).",
+                    VendaImportacaoQuantidade::mensagemErroUnidadeMedicao(
+                        $dados['unidade_medicao'],
+                        (string) $fruta->unidade_medicao,
+                    ),
                 ]);
                 $this->atualizarProgressoSeNecessario($importacao, $linhasProcessadas, $totalLinhas, $novas, $erros);
 
@@ -252,8 +262,10 @@ class VendaImportacaoProcessor
                     'id_empresa_origem' => $empresaOrigem->id,
                     'id_empresa_destino' => $empresaCliente->id,
                     'id_fruta' => $fruta->id,
-                    'qtd_fruta_um' => $dados['qtd_fruta_um'],
-                    'unidade_medicao' => $dados['unidade_medicao'],
+                    'qtd_fruta_um' => $quantidadeNormalizada['qtd_fruta_um'],
+                    'qtd_planilha' => $quantidadeNormalizada['qtd_planilha'],
+                    'unidade_medicao' => $quantidadeNormalizada['unidade_medicao_fruta'],
+                    'unidade_medicao_planilha' => $quantidadeNormalizada['unidade_medicao_planilha'],
                     'valor_nf_total' => $dados['valor_nf_total'],
                     'cnpj_origem' => $dados['cnpj_origem'],
                     'cnpj_cpf_cliente' => $dados['cnpj_cpf_cliente'],

@@ -59,14 +59,20 @@ final class CancelarVendaMovimentacaoAdminService
             $fretes = [];
 
             foreach ($movimentacoes as $mov) {
-                $empresaOrigem = Empresa::query()->with('entidade')->findOrFail((int) $mov->id_empresa_origem);
-                $unidadeOrigem = $empresaOrigem->entidade;
-                if (! $unidadeOrigem instanceof UnidadeNegocio) {
-                    throw new InvalidArgumentException('Unidade de origem inválida.');
-                }
+                $unidadeEstoque = $mov->id_unidade_negocio_estoque !== null
+                    ? UnidadeNegocio::query()->findOrFail((int) $mov->id_unidade_negocio_estoque)
+                    : (function () use ($mov): UnidadeNegocio {
+                        $empresaOrigem = Empresa::query()->with('entidade')->findOrFail((int) $mov->id_empresa_origem);
+                        $unidade = $empresaOrigem->entidade;
+                        if (! $unidade instanceof UnidadeNegocio) {
+                            throw new InvalidArgumentException('Unidade de origem inválida.');
+                        }
+
+                        return $unidade;
+                    })();
 
                 $estoque = Estoque::query()
-                    ->where('id_unidade_negocio', $unidadeOrigem->id)
+                    ->where('id_unidade_negocio', $unidadeEstoque->id)
                     ->where('id_fruta', (int) $mov->id_fruta)
                     ->lockForUpdate()
                     ->firstOrFail();
@@ -91,8 +97,8 @@ final class CancelarVendaMovimentacaoAdminService
                     'motivo_cancelamento' => $motivo,
                 ])->saveQuietly();
 
-                $reprocessos[$unidadeOrigem->id.':'.$mov->id_fruta] = [
-                    'id_unidade_negocio' => (int) $unidadeOrigem->id,
+                $reprocessos[$unidadeEstoque->id.':'.$mov->id_fruta] = [
+                    'id_unidade_negocio' => (int) $unidadeEstoque->id,
                     'id_fruta' => (int) $mov->id_fruta,
                     'movimentacao_id' => (int) $mov->id,
                 ];

@@ -1,7 +1,11 @@
 @php
     /** @var \App\Models\Cliente $cliente */
+    /** @var \Illuminate\Support\Collection<int, \App\Models\UnidadeNegocio> $unidadesNegocio */
     /** @var \Illuminate\Support\Collection<int, \App\Models\Praca> $pracas */
     /** @var \Illuminate\Support\Collection<int, \App\Models\Grupo> $grupos */
+
+    $unidadeSelecionada = (int) old('id_unidade_negocio', $cliente->id_unidade_negocio ?: 0);
+    $pracaSelecionada = (int) old('id_praca', $cliente->id_praca ?: 0);
 @endphp
 
 <div class="card">
@@ -73,15 +77,18 @@
             </div>
             <div class="col-md-4">
                 <label for="id_unidade_negocio" class="form-label">Unidade de Negócio <span class="text-danger">*</span></label>
-                <input type="number"
-                       id="id_unidade_negocio"
-                       name="id_unidade_negocio"
-                       value="{{ old('id_unidade_negocio', $cliente->id_unidade_negocio) }}"
-                       class="form-control @error('id_unidade_negocio') is-invalid @enderror"
-                       min="1"
-                       step="1"
-                       required
-                       placeholder="Ex.: 1">
+                <select id="id_unidade_negocio"
+                        name="id_unidade_negocio"
+                        class="form-select @error('id_unidade_negocio') is-invalid @enderror"
+                        required>
+                    <option value="">Selecione...</option>
+                    @foreach ($unidadesNegocio as $unidade)
+                        <option value="{{ $unidade->id }}"
+                            @selected((int) old('id_unidade_negocio', $cliente->id_unidade_negocio) === (int) $unidade->id)>
+                            {{ $unidade->nome }} ({{ $unidade->id_cigam }})
+                        </option>
+                    @endforeach
+                </select>
                 @error('id_unidade_negocio')
                     <div class="invalid-feedback">{{ $message }}</div>
                 @enderror
@@ -91,15 +98,20 @@
                 <select id="id_praca"
                         name="id_praca"
                         class="form-select @error('id_praca') is-invalid @enderror"
+                        data-praca-selecionada="{{ $pracaSelecionada > 0 ? $pracaSelecionada : '' }}"
+                        @disabled($unidadeSelecionada < 1)
                         required>
-                    <option value="">Selecione...</option>
-                    @foreach ($pracas as $praca)
-                        <option value="{{ $praca->id }}"
-                                data-unidade="{{ $praca->id_unidade_negocio }}"
-                                @selected((int) old('id_praca', $cliente->id_praca) === $praca->id)>
-                            {{ $praca->nome }} (UN {{ $praca->id_unidade_negocio }})
-                        </option>
-                    @endforeach
+                    <option value="">
+                        {{ $unidadeSelecionada < 1 ? 'Selecione a unidade de negócio' : 'Selecione...' }}
+                    </option>
+                    @if ($unidadeSelecionada > 0)
+                        @foreach ($pracas->where('id_unidade_negocio', $unidadeSelecionada) as $praca)
+                            <option value="{{ $praca->id }}"
+                                @selected($pracaSelecionada === $praca->id)>
+                                {{ $praca->nome }}
+                            </option>
+                        @endforeach
+                    @endif
                 </select>
                 @error('id_praca')
                     <div class="invalid-feedback">{{ $message }}</div>
@@ -148,3 +160,69 @@
         </button>
     </div>
 </div>
+
+<template id="cliente-pracas-opcoes">
+    @foreach ($pracas as $praca)
+        <option value="{{ $praca->id }}" data-unidade="{{ $praca->id_unidade_negocio }}">
+            {{ $praca->nome }}
+        </option>
+    @endforeach
+</template>
+
+@push('scripts')
+    <script>
+        (function () {
+            const unidadeSelect = document.getElementById('id_unidade_negocio');
+            const pracaSelect = document.getElementById('id_praca');
+            const template = document.getElementById('cliente-pracas-opcoes');
+
+            if (!unidadeSelect || !pracaSelect || !template) {
+                return;
+            }
+
+            function atualizarPracas(resetSelecao) {
+                const unidadeId = unidadeSelect.value;
+                const pracaSelecionada = resetSelecao ? '' : (pracaSelect.dataset.pracaSelecionada || '');
+
+                while (pracaSelect.options.length > 1) {
+                    pracaSelect.remove(1);
+                }
+
+                if (!unidadeId) {
+                    pracaSelect.value = '';
+                    pracaSelect.disabled = true;
+                    pracaSelect.options[0].textContent = 'Selecione a unidade de negócio';
+                    return;
+                }
+
+                pracaSelect.disabled = false;
+                pracaSelect.options[0].textContent = 'Selecione...';
+
+                let selecionou = false;
+                template.content.querySelectorAll('option[data-unidade]').forEach(function (option) {
+                    if (option.dataset.unidade !== unidadeId) {
+                        return;
+                    }
+
+                    const clone = option.cloneNode(true);
+                    if (pracaSelecionada !== '' && clone.value === pracaSelecionada) {
+                        clone.selected = true;
+                        selecionou = true;
+                    }
+                    pracaSelect.appendChild(clone);
+                });
+
+                if (!selecionou) {
+                    pracaSelect.value = '';
+                }
+            }
+
+            unidadeSelect.addEventListener('change', function () {
+                pracaSelect.dataset.pracaSelecionada = '';
+                atualizarPracas(true);
+            });
+
+            atualizarPracas(false);
+        })();
+    </script>
+@endpush

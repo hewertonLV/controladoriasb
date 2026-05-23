@@ -98,6 +98,8 @@ class TransferenciaMovimentacaoController extends Controller
             'fruta',
             'frete',
             'movimentacaoPareada.custoOperacionalHistorico',
+            'canceladaPor',
+            'movimentacaoPareada.canceladaPor',
         ]);
 
         $entrada = $saida->movimentacaoPareada;

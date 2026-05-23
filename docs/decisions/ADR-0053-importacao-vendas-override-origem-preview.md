@@ -10,7 +10,9 @@ Após a análise, a origem vem do CNPJ da coluna B e o cliente (destino da venda
 
 ## Decisão
 
-Na prévia (linhas prontas), exibir **select** de unidades de negócio com estoque (exceto HUB), pré-selecionado com a origem da planilha.
+Na prévia (linhas prontas), exibir **select** de unidades de negócio com estoque (incluindo **HUB**), pré-selecionado com a origem da planilha.
+
+Quando a origem efetiva for HUB, exibir também select de **unidade de faturamento** (não-HUB) no mesmo grupo NF + cliente.
 
 O select é **agrupado por NF + cliente** (`id_empresa_destino`): alterar a origem de uma NF aplica a todas as linhas prontas com o mesmo número de NF e mesmo cliente.
 
@@ -24,5 +26,5 @@ Na confirmação, aceitar mapa opcional `id_empresa_origem_por_row`. O agrupamen
 ## Consequências
 
 - Endpoint `resultado` inclui `empresas_origem`.
-- Override de origem na confirmação; validação rejeita HUB e origem sem estoque da fruta ao gravar.
+- Override de origem na confirmação; validação rejeita origem sem estoque da fruta ao gravar; origem HUB exige faturamento.
 - Duplicidade na planilha (ADR-0048) continua baseada nos campos da planilha, não no override.

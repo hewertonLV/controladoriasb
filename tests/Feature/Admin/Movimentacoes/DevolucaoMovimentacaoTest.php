@@ -7,6 +7,7 @@ use App\Enums\CategoriaMovimentacaoTipo;
 use App\Enums\FreteStatusSituacao;
 use App\Enums\MovimentacaoStatusRegistro;
 use App\Enums\Permissions;
+use App\Enums\StatusRecebimentoTransferencia;
 use App\Enums\TipoDevolucao;
 use App\Models\Cliente;
 use App\Models\Estado;
@@ -232,12 +233,13 @@ class DevolucaoMovimentacaoTest extends TestCase
 
         $hub = $this->cenarioBase(origemHub: true, custoFaturamento: 2.0);
         $this->registrarCompra($hub, '10', '500,00');
+        $this->registrarTransferenciaHubParaLoja($hub, '10');
         $vendaHub = $this->registrarVenda($hub, '2', '400,00');
         $devHub = $this->registrarDevolucao($vendaHub, TipoDevolucao::COM_RETORNO_ESTOQUE, '1', $hub['unidade_faturamento']);
 
         $this->assertSame('2.00', (string) $devHub->valor_custo_operacional);
         $this->assertSame('70.00', (string) $devHub->valor_custo_devolucao);
-        $this->assertEstoque($hub['unidade_faturamento'], $hub['fruta'], '10.00', '1.00', '7.00', '70.00', '70.00');
+        $this->assertEstoque($hub['unidade_faturamento'], $hub['fruta'], '90.00', '9.00', '7.00', '70.00', '630.00');
     }
 
     public function test_devolucao_com_retorno_usa_unidade_fisica_informada_e_hub_nao_hub_define_custo_operacional(): void
@@ -253,6 +255,7 @@ class DevolucaoMovimentacaoTest extends TestCase
         HistoricoCOUnNg::factory()->create(['id_unidade_negocio' => $retornoHub->id, 'custo_operacional' => 9, 'status_position' => true]);
 
         $this->registrarCompra($c, '10', '500,00');
+        $this->registrarTransferenciaHubParaLoja($c, '10');
         $venda = $this->registrarVenda($c, '2', '400,00');
         $devolucao = $this->registrarDevolucao($venda, TipoDevolucao::COM_RETORNO_ESTOQUE, '1', $retornoHub);
 
@@ -344,6 +347,8 @@ class DevolucaoMovimentacaoTest extends TestCase
             'empresa_fornecedor' => $fornecedor->registroCorporativo()->firstOrFail(),
             'empresa_cliente' => $cliente->registroCorporativo()->firstOrFail(),
             'empresa_unidade' => $unidade->registroCorporativo()->firstOrFail(),
+            'empresa_hub' => $origemHub ? $unidade->registroCorporativo()->firstOrFail() : null,
+            'empresa_loja' => $origemHub ? $unidadeFaturamento->registroCorporativo()->firstOrFail() : null,
             'unidade' => $unidade,
             'unidade_faturamento' => $unidadeFaturamento,
             'fruta' => Fruta::factory()->create([
@@ -385,7 +390,8 @@ class DevolucaoMovimentacaoTest extends TestCase
         ];
 
         if ($cenario['unidade']->is_hub) {
-            $payload['id_unidade_negocio_faturamento'] = $cenario['unidade_faturamento']->id;
+            $payload['id_empresa_origem'] = $cenario['unidade_faturamento']->registroCorporativo()->firstOrFail()->id;
+            $payload['id_unidade_negocio_estoque'] = $cenario['unidade']->id;
         }
 
         $this->actingAs($this->movimentacoesVendasUsuario())->postJson(route('admin.movimentacoes.vendas.store'), $payload)->assertCreated();
@@ -427,6 +433,36 @@ class DevolucaoMovimentacaoTest extends TestCase
         $this->actingAs($this->userWithPermissions([Permissions::MOVIMENTACOES_DEVOLUCOES_CANCELAR_ADMIN]))
             ->postJson(route('admin.movimentacoes.devolucoes.cancelar-admin', $devolucao), ['motivo' => 'Cancelamento administrativo de devolução.'])
             ->assertOk();
+    }
+
+    /**
+     * @param  array<string, mixed>  $cenario
+     */
+    private function registrarTransferenciaHubParaLoja(array $cenario, string $qtdUm): Movimentacao
+    {
+        $this->actingAs($this->movimentacoesTransferenciasUsuario())->postJson(route('admin.movimentacoes.transferencias.store'), [
+            'id_empresa_origem' => $cenario['empresa_hub']->id,
+            'id_empresa_destino' => $cenario['empresa_loja']->id,
+            'id_fruta' => $cenario['fruta']->id,
+            'qtd_fruta_um' => $qtdUm,
+        ])->assertCreated();
+
+        $saida = Movimentacao::query()
+            ->where('categoria_movimentacao_id', CategoriaMovimentacaoTipo::Transferencia->value)
+            ->where('status_movimentacao_id', StatusMovimentacao::ID_SAIDA)
+            ->orderByDesc('id')
+            ->firstOrFail();
+
+        $this->actingAs($this->movimentacoesTransferenciasUsuario())->postJson(
+            route('admin.movimentacoes.transferencias.recebimento.store', (int) $saida->transferencia_origem_id),
+            [
+                'status_recebimento' => StatusRecebimentoTransferencia::CONFORME->value,
+                'qtd_recebida_um' => $qtdUm,
+                'numero_nf_destino' => 'NF-D-TESTE',
+            ],
+        )->assertOk();
+
+        return $saida;
     }
 
     private function assertEstoque(UnidadeNegocio $unidade, Fruta $fruta, string $kg, string $um, string $precoKg, string $precoUm, string $valor): void

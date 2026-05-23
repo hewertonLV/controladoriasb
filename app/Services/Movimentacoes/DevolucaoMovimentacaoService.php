@@ -334,7 +334,11 @@ final class DevolucaoMovimentacaoService
         }
 
         $empresaOrigemVenda = Empresa::query()->with('entidade')->findOrFail((int) $venda->id_empresa_origem);
-        if (! $empresaOrigemVenda->entidade instanceof UnidadeNegocio || ! $empresaOrigemVenda->entidade->is_hub || $unidadeDestino->is_hub) {
+        $unidadeEstoqueVenda = $venda->id_unidade_negocio_estoque !== null
+            ? UnidadeNegocio::query()->findOrFail((int) $venda->id_unidade_negocio_estoque)
+            : ($empresaOrigemVenda->entidade instanceof UnidadeNegocio ? $empresaOrigemVenda->entidade : null);
+
+        if (! $unidadeEstoqueVenda instanceof UnidadeNegocio || ! $unidadeEstoqueVenda->is_hub || $unidadeDestino->is_hub) {
             return ['id' => null, 'valor' => 0.0];
         }
 

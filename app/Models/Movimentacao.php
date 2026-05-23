@@ -51,6 +51,7 @@ use Illuminate\Support\Carbon;
  * @property int|null $categoria_descarte_id
  * @property int|null $venda_nota_id
  * @property int|null $id_unidade_negocio_faturamento
+ * @property int|null $id_unidade_negocio_estoque
  * @property int|null $id_unidade_negocio_retorno
  * @property int|null $movimentacao_venda_origem_id
  * @property int|null $devolucao_origem_id
@@ -108,6 +109,7 @@ use Illuminate\Support\Carbon;
  * @property-read CategoriaDescarte|null $categoriaDescarte
  * @property-read VendaNota|null $vendaNota
  * @property-read UnidadeNegocio|null $unidadeFaturamento
+ * @property-read UnidadeNegocio|null $unidadeEstoque
  * @property-read UnidadeNegocio|null $unidadeRetorno
  * @property-read Movimentacao|null $vendaOrigem
  * @property-read Movimentacao|null $devolucaoOrigem
@@ -162,6 +164,7 @@ class Movimentacao extends Model
         'categoria_descarte_id',
         'venda_nota_id',
         'id_unidade_negocio_faturamento',
+        'id_unidade_negocio_estoque',
         'id_unidade_negocio_retorno',
         'movimentacao_venda_origem_id',
         'devolucao_origem_id',
@@ -224,6 +227,7 @@ class Movimentacao extends Model
             'categoria_descarte_id' => 'integer',
             'venda_nota_id' => 'integer',
             'id_unidade_negocio_faturamento' => 'integer',
+            'id_unidade_negocio_estoque' => 'integer',
             'id_unidade_negocio_retorno' => 'integer',
             'movimentacao_venda_origem_id' => 'integer',
             'devolucao_origem_id' => 'integer',
@@ -371,6 +375,14 @@ class Movimentacao extends Model
     public function unidadeFaturamento(): BelongsTo
     {
         return $this->belongsTo(UnidadeNegocio::class, 'id_unidade_negocio_faturamento');
+    }
+
+    /**
+     * @return BelongsTo<UnidadeNegocio, $this>
+     */
+    public function unidadeEstoque(): BelongsTo
+    {
+        return $this->belongsTo(UnidadeNegocio::class, 'id_unidade_negocio_estoque');
     }
 
     /**

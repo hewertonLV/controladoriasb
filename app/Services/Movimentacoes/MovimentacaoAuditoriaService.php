@@ -49,6 +49,7 @@ final class MovimentacaoAuditoriaService
             'venda_nota_id' => $movimentacao->venda_nota_id,
             'numero_nf' => $movimentacao->vendaNota?->numero_nf,
             'id_unidade_negocio_faturamento' => $movimentacao->id_unidade_negocio_faturamento,
+            'id_unidade_negocio_estoque' => $movimentacao->id_unidade_negocio_estoque,
             'id_unidade_negocio_retorno' => $movimentacao->id_unidade_negocio_retorno,
             'movimentacao_venda_origem_id' => $movimentacao->movimentacao_venda_origem_id,
             'devolucao_origem_id' => $movimentacao->devolucao_origem_id,

@@ -1,4 +1,5 @@
 @php
+    use App\Enums\MovimentacaoStatusRegistro;
     use App\Enums\StatusRecebimentoTransferencia;
     use App\Enums\StatusTransferenciaOperacional;
 
@@ -6,6 +7,10 @@
     $pendente = ($entrada->status_transferencia ?? '') === StatusTransferenciaOperacional::PENDENTE_RECEBIMENTO->value;
     $conforme = ($entrada->status_transferencia ?? '') === StatusTransferenciaOperacional::RECEBIDA_CONFORME->value;
     $divergente = ($entrada->status_transferencia ?? '') === StatusTransferenciaOperacional::RECEBIDA_DIVERGENTE->value;
+    $cancelada = ($entrada->status_transferencia ?? '') === StatusTransferenciaOperacional::CANCELADA->value
+        || $saida->status_registro === MovimentacaoStatusRegistro::CANCELADO->value;
+    $parAtivo = $saida->status_registro === MovimentacaoStatusRegistro::ATIVO->value
+        && $entrada->status_registro === MovimentacaoStatusRegistro::ATIVO->value;
     $podeVincularFrete = $pendente || $conforme;
 @endphp
 
@@ -269,6 +274,89 @@
                     </div>
                 </div>
             @endcan
+        </div>
+    @endif
+
+    @if ($conforme && $parAtivo)
+        @can('movimentacoes.transferencias.cancelar-admin')
+            <div class="card mt-3 border-danger border-opacity-25">
+                <div class="card-header bg-danger-subtle">
+                    <h5 class="mb-0">Cancelar transferência</h5>
+                </div>
+                <div class="card-body">
+                    <p class="text-muted small mb-3">
+                        Transferência recebida conforme. O cancelamento invalida saída e entrada e reprocessa
+                        os estoques de origem e destino.
+                    </p>
+                    <form method="POST"
+                          action="{{ route('admin.movimentacoes.transferencias.cancelar-admin', ['transferenciaOrigem' => $anchor]) }}"
+                          class="row g-2 align-items-end"
+                          data-confirm="Cancelar esta transferência recebida conforme? Origem e destino serão recalculados."
+                          data-confirm-title="Cancelar transferência"
+                          data-confirm-variant="danger"
+                          data-confirm-btn="Cancelar">
+                        @csrf
+                        <div class="col-md-9">
+                            <label for="motivo-cancelar-transferencia-conforme" class="form-label">Motivo</label>
+                            <input id="motivo-cancelar-transferencia-conforme"
+                                   name="motivo"
+                                   class="form-control"
+                                   required
+                                   placeholder="Motivo do cancelamento administrativo">
+                        </div>
+                        <div class="col-md-3 d-grid">
+                            <button class="btn btn-danger" type="submit">Cancelar transferência</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <div class="card mt-3 border-warning border-opacity-25">
+                <div class="card-body">
+                    <h5 class="fs-14 text-uppercase text-muted mb-2">O que é recalculado ao cancelar</h5>
+                    <ul class="small mb-0">
+                        <li>
+                            <strong>Recebimento conforme:</strong> revertido antes do cancelamento (a entrada deixa de
+                            compor o estoque destino como recebida).
+                        </li>
+                        <li>
+                            <strong>Saída e entrada:</strong> marcadas como canceladas, com motivo, usuário e data.
+                        </li>
+                        <li>
+                            <strong>Estoque origem:</strong> estorno da saída enviada + replay das saídas de
+                            transferência vigentes na unidade/fruta (snapshots, saldos e preço médio).
+                        </li>
+                        <li>
+                            <strong>Estoque destino:</strong> replay de compras ativas e transferências recebidas
+                            conforme — quantidades, preço médio consolidado e snapshots de estoque.
+                        </li>
+                        <li>
+                            <strong>Frete vinculado</strong> (se houver): rateio R$/kg entre movimentações do frete.
+                        </li>
+                        <li>
+                            <strong>Auditoria:</strong> snapshots de origem e destino antes e depois (saída + entrada).
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        @endcan
+    @endif
+
+    @if ($cancelada)
+        <div class="card mt-3 border-secondary">
+            <div class="card-body">
+                <h5 class="fs-14 text-uppercase text-muted mb-2">Transferência cancelada</h5>
+                <p class="mb-1">
+                    <strong>Cancelada em:</strong>
+                    {{ $saida->cancelada_em?->format('d/m/Y H:i') ?? $saida->substituida_em?->format('d/m/Y H:i') ?? '—' }}
+                </p>
+                <p class="mb-1">
+                    <strong>Responsável:</strong> {{ $saida->canceladaPor?->name ?? '—' }}
+                </p>
+                <p class="mb-0">
+                    <strong>Motivo:</strong> {{ $saida->motivo_cancelamento ?: $saida->motivo_substituicao ?: '—' }}
+                </p>
+            </div>
         </div>
     @endif
 @endsection

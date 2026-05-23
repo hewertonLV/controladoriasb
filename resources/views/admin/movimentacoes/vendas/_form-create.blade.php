@@ -1,6 +1,6 @@
 @php
     $isEdit = isset($movimentacao);
-    $opcoes = $opcoes ?? compact('empresas_origem', 'empresas_destino_cliente', 'unidades_faturamento', 'unidades_hub', 'frutas', 'frutas_catalogo', 'fretes');
+    $opcoes = $opcoes ?? compact('empresas_origem', 'empresas_destino_cliente', 'unidades_estoque', 'unidades_hub', 'frutas', 'frutas_catalogo', 'fretes');
     $frutasCatalogo = $opcoes['frutas_catalogo'] ?? \App\Support\Movimentacoes\FrutasComEstoqueOrigem::catalogoJs($opcoes['frutas'] ?? collect());
     $hubCoHistorico = ($isEdit && ($movimentacao->id_custo_operacional ?? null))
         ? \App\Models\HistoricoCOUnNg::query()->find((int) $movimentacao->id_custo_operacional)
@@ -24,19 +24,34 @@
             <input name="numero_nf" class="form-control" required value="{{ old('numero_nf', $movimentacao->vendaNota->numero_nf ?? '') }}">
         </div>
         <div class="col-md-3">
-            <label class="form-label">Origem física <span class="text-danger">*</span></label>
-            <select name="id_empresa_origem" id="id_empresa_origem" class="form-select" required data-venda-origem data-search-select data-placeholder="Selecione ou pesquise a origem física">
+            <label class="form-label">Origem comercial <span class="text-danger">*</span></label>
+            <select name="id_empresa_origem" id="id_empresa_origem" class="form-select" required data-venda-comercial data-search-select data-placeholder="Selecione ou pesquise a loja comercial">
                 <option value="">Selecione</option>
                 @foreach ($opcoes['empresas_origem'] as $empresa)
                     <option value="{{ $empresa->id }}"
-                            data-is-hub="{{ $empresa->entidade?->is_hub ? '1' : '0' }}"
                             data-is-producao="{{ $empresa->entidade?->is_unidade_producao ? '1' : '0' }}"
                             @selected((int) old('id_empresa_origem', $movimentacao->id_empresa_origem ?? 0) === $empresa->id)>
                         {{ $empresa->nomeExibicao() }}
                     </option>
                 @endforeach
             </select>
-            <small class="text-muted">Unidade de onde sai o estoque. As frutas dos itens dependem deste campo — não do cliente.</small>
+            <small class="text-muted">Loja que fatura e aparece nos relatórios (coluna B da planilha).</small>
+        </div>
+        <div class="col-md-3">
+            <label class="form-label">Saída física (estoque)</label>
+            <select name="id_unidade_negocio_estoque" class="form-select" data-venda-estoque data-search-select data-placeholder="Mesma da origem comercial">
+                <option value="">Mesma da origem comercial</option>
+                @foreach ($opcoes['unidades_estoque'] ?? [] as $unidade)
+                    @php $empresaEstoque = $unidade->registroCorporativo()->first(); @endphp
+                    <option value="{{ $unidade->id }}"
+                            data-id-empresa="{{ $empresaEstoque?->id ?? '' }}"
+                            data-is-hub="{{ $unidade->is_hub ? '1' : '0' }}"
+                            @selected((int) old('id_unidade_negocio_estoque', $movimentacao->id_unidade_negocio_estoque ?? 0) === $unidade->id)>
+                        {{ $unidade->nome }}{{ $unidade->is_hub ? ' · HUB' : '' }}
+                    </option>
+                @endforeach
+            </select>
+            <small class="text-muted">Unidade de onde a fruta sai fisicamente. Selecione o HUB para venda direta do centro de distribuição.</small>
         </div>
         <div class="col-md-3">
             <label class="form-label">Cliente destino</label>
@@ -48,18 +63,6 @@
                     </option>
                 @endforeach
             </select>
-        </div>
-        <div class="col-md-3" data-venda-faturamento-wrapper>
-            <label class="form-label">Unidade faturamento</label>
-            <select name="id_unidade_negocio_faturamento" class="form-select" data-venda-faturamento data-search-select data-placeholder="Selecione ou pesquise a unidade de faturamento">
-                <option value="">Selecione</option>
-                @foreach ($opcoes['unidades_faturamento'] as $unidade)
-                    <option value="{{ $unidade->id }}" @selected((int) old('id_unidade_negocio_faturamento', $movimentacao->id_unidade_negocio_faturamento ?? 0) === $unidade->id)>
-                        {{ $unidade->nome }}
-                    </option>
-                @endforeach
-            </select>
-            <small class="text-muted">Informe apenas quando a origem física for HUB. Caso contrário, a própria origem será usada automaticamente.</small>
         </div>
         <div class="col-md-3 d-none" data-venda-hub-custo-wrapper>
             <div class="form-check form-switch mb-2">
@@ -166,7 +169,7 @@
                 <i class="ri-add-line me-1"></i> Adicionar fruta
             </button>
         </div>
-        <p class="small mb-2 text-muted" data-venda-fruta-aviso role="status">Escolha a <strong>origem física</strong> para liberar as frutas com estoque nessa unidade.</p>
+        <p class="small mb-2 text-muted" data-venda-fruta-aviso role="status">Escolha a origem comercial e, se necessário, a saída física para liberar as frutas com estoque.</p>
         <div data-items-container="venda">
             @foreach ($itens as $i => $item)
                 <div class="row g-3 mb-2" data-item-row>
@@ -244,9 +247,8 @@
 
 <script>
     document.addEventListener('DOMContentLoaded', function () {
-        const origem = document.querySelector('[data-venda-origem]');
-        const wrapper = document.querySelector('[data-venda-faturamento-wrapper]');
-        const faturamento = document.querySelector('[data-venda-faturamento]');
+        const comercial = document.querySelector('[data-venda-comercial]');
+        const estoque = document.querySelector('[data-venda-estoque]');
         const hubCustoWrapper = document.querySelector('[data-venda-hub-custo-wrapper]');
         const aplicarHubCo = document.querySelector('[data-venda-aplicar-hub-co]');
         const hubCustoSelectWrapper = document.querySelector('[data-venda-hub-custo-select-wrapper]');
@@ -329,12 +331,20 @@
             return temFrutaDisponivel;
         };
 
-        const filtrarFrutasPorOrigem = () => {
-            if (!origem) {
-                return;
+        const empresaEstoqueEfetivaId = () => {
+            if (estoque && estoque.value) {
+                const opt = estoque.options[estoque.selectedIndex];
+                const idEmpresa = opt?.dataset?.idEmpresa;
+                if (idEmpresa) {
+                    return String(idEmpresa);
+                }
             }
 
-            const origemId = String(origem.value || '').trim();
+            return String(comercial?.value || '').trim();
+        };
+
+        const filtrarFrutasPorOrigem = () => {
+            const origemId = empresaEstoqueEfetivaId();
             let temFrutaDisponivel = false;
 
             document.querySelectorAll('[data-fruta-select]').forEach((select) => {
@@ -349,13 +359,13 @@
 
             if (origemId === '') {
                 avisoFruta.className = 'small mb-2 text-muted';
-                avisoFruta.innerHTML = 'Escolha a <strong>origem física</strong> (não o cliente) para listar apenas frutas com estoque nessa unidade.';
+                avisoFruta.innerHTML = 'Escolha a <strong>origem comercial</strong> e, se necessário, a <strong>saída física</strong> para listar frutas com estoque.';
             } else if (!temFrutaDisponivel) {
                 avisoFruta.className = 'small mb-2 text-danger';
-                avisoFruta.textContent = 'Nenhuma fruta com estoque nesta origem física. Verifique o estoque da unidade ou selecione outra origem.';
+                avisoFruta.textContent = 'Nenhuma fruta com estoque na saída física selecionada. Verifique o estoque ou selecione outra unidade.';
             } else {
                 avisoFruta.className = 'small mb-2 text-success';
-                avisoFruta.textContent = 'Somente frutas com estoque na origem física selecionada.';
+                avisoFruta.textContent = 'Somente frutas com estoque na saída física selecionada.';
             }
         };
 
@@ -387,29 +397,17 @@
             }
         };
 
-        const onOrigemAlterada = () => {
-            if (wrapper && faturamento) {
-                const selecionada = origem.options[origem.selectedIndex];
-                const origemEhHub = selecionada?.dataset?.isHub === '1';
+        const onCamposAlterados = () => {
+            if (hubCustoWrapper && aplicarHubCo && comercial && estoque) {
+                const comercialOpt = comercial.options[comercial.selectedIndex];
+                const estoqueOpt = estoque.value ? estoque.options[estoque.selectedIndex] : null;
+                const origemEhProducao = comercialOpt?.dataset?.isProducao === '1';
+                const estoqueEhHub = estoqueOpt?.dataset?.isHub === '1';
+                const exibirCo = origemEhProducao && !estoqueEhHub;
 
-                wrapper.classList.toggle('d-none', !origemEhHub);
-                faturamento.required = origemEhHub;
-                faturamento.disabled = !origemEhHub;
+                hubCustoWrapper.classList.toggle('d-none', !exibirCo);
 
-                if (!origemEhHub) {
-                    faturamento.value = '';
-                }
-
-                window.AdminSearchSelect?.refresh(faturamento);
-            }
-
-            if (hubCustoWrapper && aplicarHubCo) {
-                const selecionada = origem?.options[origem.selectedIndex];
-                const origemEhProducao = selecionada?.dataset?.isProducao === '1';
-
-                hubCustoWrapper.classList.toggle('d-none', !origemEhProducao);
-
-                if (!origemEhProducao) {
+                if (!exibirCo) {
                     aplicarHubCo.checked = false;
                     aplicarHubCo.disabled = true;
                 } else {
@@ -432,18 +430,21 @@
             });
         }
 
-        if (origem) {
-            origem.addEventListener('change', onOrigemAlterada);
-
-            if (window.jQuery?.fn?.select2) {
-                window.jQuery(origem).on('change.select2.vendaOrigem', onOrigemAlterada);
+        [comercial, estoque].forEach((el) => {
+            if (!el) {
+                return;
             }
-        }
+            el.addEventListener('change', onCamposAlterados);
+            if (window.jQuery?.fn?.select2) {
+                window.jQuery(el).on('change.select2.vendaCampos', onCamposAlterados);
+            }
+        });
 
         const container = document.querySelector('[data-items-container="venda"]');
         const addButton = document.querySelector('[data-add-item="venda"]');
         const template = document.getElementById('venda-item-template');
         if (!container || !addButton || !template) {
+            setTimeout(onCamposAlterados, 0);
             return;
         }
 
@@ -481,6 +482,6 @@
         refreshRemoveButtons();
 
         // Select2 do layout inicia depois deste script; refiltra após init e se origem já veio do old().
-        setTimeout(onOrigemAlterada, 0);
+        setTimeout(onCamposAlterados, 0);
     });
 </script>
