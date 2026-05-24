@@ -246,4 +246,24 @@ class UnidadeNegocioTest extends UnidadeNegocioTestCase
 
         $this->assertTrue($unidade->fresh()->status);
     }
+
+    public function test_galpao_operacional_pode_emitir_nota_fiscal(): void
+    {
+        $this->actingAs($this->userWithPermissions([Permissions::UNIDADES_NEGOCIO_CRIAR]))
+            ->post(route('admin.unidades-negocio.store'), $this->unidadePayload([
+                'id_cigam' => '88001',
+                'nome' => 'CD BARBALHA',
+                'razao_social' => 'CD BARBALHA',
+                'possui_estoque' => true,
+                'is_galpao_operacional' => true,
+                'emite_nota_fiscal' => true,
+            ]))
+            ->assertRedirect(route('admin.unidades-negocio.index'));
+
+        $this->assertDatabaseHas('unidades_negocio', [
+            'id_cigam' => '088001',
+            'is_galpao_operacional' => true,
+            'emite_nota_fiscal' => true,
+        ]);
+    }
 }

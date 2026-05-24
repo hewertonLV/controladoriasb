@@ -262,6 +262,32 @@ final class Permissions
 
     public const MOVIMENTACOES_CONVERSOES_EMBALAGEM_CRIAR = 'movimentacoes.conversoes-embalagem.criar';
 
+    public const CAPTACAO_LOTE_VISUALIZAR = 'captacao.lote.visualizar';
+
+    public const CAPTACAO_PEDIDO_EDITAR = 'captacao.pedido.editar';
+
+    public const CAPTACAO_CLIENTE_FRUTA_VINCULAR = 'captacao.cliente_fruta.vincular';
+
+    public const CAPTACAO_FATURAMENTO_FINALIZAR = 'captacao.faturamento.finalizar';
+
+    public const CAPTACAO_LOTE_TRANSFERENCIA_INICIAR = 'captacao.lote.transferencia.iniciar';
+
+    public const CAPTACAO_LOTE_TRANSFERENCIA_VALIDAR = 'captacao.lote.transferencia.validar';
+
+    public const CAPTACAO_LOTE_FRETE_VINCULAR = 'captacao.lote.frete.vincular';
+
+    public const CAPTACAO_LOTE_FRETE_CONCLUIR = 'captacao.lote.frete.concluir';
+
+    public const CAPTACAO_LOTE_FATURAMENTO_INICIAR = 'captacao.lote.faturamento.iniciar';
+
+    public const CAPTACAO_LOTE_VENDA_FINALIZAR = 'captacao.lote.venda.finalizar';
+
+    public const CAPTACAO_ROMANEIO_MANUAL = 'captacao.romaneio.manual';
+
+    public const CAPTACAO_ALERTAS_VISUALIZAR = 'captacao.alertas.visualizar';
+
+    public const CAPTACAO_ROTA_EDITAR = 'captacao.rota.editar';
+
     public const RELATORIOS_RENTABILIDADE_LOJA_VISUALIZAR = 'relatorios.rentabilidade-loja.visualizar';
 
     public const OLHO_DE_FABIO_VISUALIZAR = 'olho-de-fabio.visualizar';
@@ -481,6 +507,21 @@ final class Permissions
             'Movimentações — Conversão de Embalagem' => [
                 self::MOVIMENTACOES_CONVERSOES_EMBALAGEM_VISUALIZAR,
                 self::MOVIMENTACOES_CONVERSOES_EMBALAGEM_CRIAR,
+            ],
+            'Captação' => [
+                self::CAPTACAO_LOTE_VISUALIZAR,
+                self::CAPTACAO_PEDIDO_EDITAR,
+                self::CAPTACAO_CLIENTE_FRUTA_VINCULAR,
+                self::CAPTACAO_ROTA_EDITAR,
+                self::CAPTACAO_FATURAMENTO_FINALIZAR,
+                self::CAPTACAO_LOTE_TRANSFERENCIA_INICIAR,
+                self::CAPTACAO_LOTE_TRANSFERENCIA_VALIDAR,
+                self::CAPTACAO_LOTE_FRETE_VINCULAR,
+                self::CAPTACAO_LOTE_FRETE_CONCLUIR,
+                self::CAPTACAO_LOTE_FATURAMENTO_INICIAR,
+                self::CAPTACAO_LOTE_VENDA_FINALIZAR,
+                self::CAPTACAO_ROMANEIO_MANUAL,
+                self::CAPTACAO_ALERTAS_VISUALIZAR,
             ],
             'Relatórios' => [
                 self::RELATORIOS_RENTABILIDADE_LOJA_VISUALIZAR,

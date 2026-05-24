@@ -248,6 +248,62 @@
             @endcanany
 
             @canany([
+                'captacao.lote.visualizar',
+                'captacao.alertas.visualizar',
+                'captacao.romaneio.manual',
+                'captacao.pedido.editar',
+                'captacao.cliente_fruta.vincular',
+                'captacao.rota.editar',
+            ])
+                <li class="side-nav-title mt-2">Captação</li>
+                @canany(['captacao.cliente_fruta.vincular', 'captacao.pedido.editar', 'captacao.lote.visualizar'])
+                    <li class="side-nav-item">
+                        <a href="{{ route('admin.captacao.frutas-por-loja.index') }}"
+                           class="side-nav-link {{ request()->routeIs('admin.captacao.frutas-por-loja.*', 'admin.captacao.clientes.frutas.*') ? 'active' : '' }}">
+                            <span class="menu-icon"><i class="ri-apple-line"></i></span>
+                            <span class="menu-text">Frutas por loja</span>
+                        </a>
+                    </li>
+                @endcanany
+                @can('captacao.lote.visualizar')
+                    <li class="side-nav-item">
+                        <a href="{{ route('admin.captacao.lotes.index') }}"
+                           class="side-nav-link {{ request()->routeIs('admin.captacao.lotes.*', 'admin.captacao.matriz.*') ? 'active' : '' }}">
+                            <span class="menu-icon"><i class="ri-shopping-basket-line"></i></span>
+                            <span class="menu-text">Lotes e matriz</span>
+                        </a>
+                    </li>
+                @endcan
+                @canany(['captacao.rota.editar', 'captacao.lote.visualizar'])
+                    <li class="side-nav-item">
+                        <a href="{{ route('admin.captacao.rotas.index') }}"
+                           class="side-nav-link {{ request()->routeIs('admin.captacao.rotas.*') ? 'active' : '' }}">
+                            <span class="menu-icon"><i class="ri-route-line"></i></span>
+                            <span class="menu-text">Rotas de captação</span>
+                        </a>
+                    </li>
+                @endcanany
+                @can('captacao.alertas.visualizar')
+                    <li class="side-nav-item">
+                        <a href="{{ route('admin.captacao.alertas.index') }}"
+                           class="side-nav-link {{ request()->routeIs('admin.captacao.alertas.*') ? 'active' : '' }}">
+                            <span class="menu-icon"><i class="ri-alarm-warning-line"></i></span>
+                            <span class="menu-text">Alertas comerciais</span>
+                        </a>
+                    </li>
+                @endcan
+                @can('captacao.romaneio.manual')
+                    <li class="side-nav-item">
+                        <a href="{{ route('admin.captacao.romaneio-manual.create') }}"
+                           class="side-nav-link {{ request()->routeIs('admin.captacao.romaneio-manual.*') ? 'active' : '' }}">
+                            <span class="menu-icon"><i class="ri-truck-line"></i></span>
+                            <span class="menu-text">Romaneio manual</span>
+                        </a>
+                    </li>
+                @endcan
+            @endcanany
+
+            @canany([
                 'movimentacoes.compras.visualizar',
                 'movimentacoes.compras.criar',
                 'movimentacoes.transferencias.visualizar',

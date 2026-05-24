@@ -325,4 +325,28 @@ trait CreatesUsersWithRoles
             Permissions::MOVIMENTACOES_DEVOLUCOES_EDITAR,
         ], $extra))));
     }
+
+    /**
+     * Permissões completas do módulo Captação (testes).
+     *
+     * @param  list<string>  $extra
+     */
+    protected function captacaoManager(array $extra = []): User
+    {
+        return $this->userWithPermissions(array_values(array_unique(array_merge([
+            Permissions::CAPTACAO_LOTE_VISUALIZAR,
+            Permissions::CAPTACAO_PEDIDO_EDITAR,
+            Permissions::CAPTACAO_CLIENTE_FRUTA_VINCULAR,
+            Permissions::CAPTACAO_ROTA_EDITAR,
+            Permissions::CAPTACAO_FATURAMENTO_FINALIZAR,
+            Permissions::CAPTACAO_LOTE_TRANSFERENCIA_INICIAR,
+            Permissions::CAPTACAO_LOTE_TRANSFERENCIA_VALIDAR,
+            Permissions::CAPTACAO_LOTE_FRETE_VINCULAR,
+            Permissions::CAPTACAO_LOTE_FRETE_CONCLUIR,
+            Permissions::CAPTACAO_LOTE_FATURAMENTO_INICIAR,
+            Permissions::CAPTACAO_LOTE_VENDA_FINALIZAR,
+            Permissions::CAPTACAO_ROMANEIO_MANUAL,
+            Permissions::CAPTACAO_ALERTAS_VISUALIZAR,
+        ], $extra))));
+    }
 }

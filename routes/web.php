@@ -1,5 +1,15 @@
 <?php
 
+use App\Http\Controllers\Admin\Captacao\AlertasComerciaisController;
+use App\Http\Controllers\Admin\Captacao\CaptacaoFaturamentoController;
+use App\Http\Controllers\Admin\Captacao\CaptacaoLoteController;
+use App\Http\Controllers\Admin\Captacao\CaptacaoLoteFreteController;
+use App\Http\Controllers\Admin\Captacao\CaptacaoLotePipelineController;
+use App\Http\Controllers\Admin\Captacao\CaptacaoMatrizController;
+use App\Http\Controllers\Admin\Captacao\RomaneioManualController;
+use App\Http\Controllers\Admin\Captacao\CaptacaoRotaController;
+use App\Http\Controllers\Admin\Captacao\ClienteFrutaVinculoController;
+use App\Http\Controllers\Admin\Captacao\PedidoCaptacaoController;
 use App\Http\Controllers\Admin\ClienteController;
 use App\Http\Controllers\Admin\ClienteExportacaoController;
 use App\Http\Controllers\Admin\ClienteImportacaoController;
@@ -1141,6 +1151,156 @@ Route::middleware(['auth', 'verified', 'user.active', 'password.changed'])->grou
             Route::get('/rentabilidade-loja', RentabilidadeLojaController::class)
                 ->middleware('permission:relatorios.rentabilidade-loja.visualizar')
                 ->name('rentabilidade-loja.index');
+        });
+
+        Route::prefix('captacao')->name('captacao.')->group(function () {
+            Route::get('/lotes', [CaptacaoLoteController::class, 'index'])
+                ->middleware('permission:captacao.lote.visualizar')
+                ->name('lotes.index');
+
+            Route::post('/lotes', [CaptacaoLoteController::class, 'store'])
+                ->middleware('permission:captacao.lote.visualizar')
+                ->name('lotes.store');
+
+            Route::get('/lotes/{lote}', [CaptacaoLoteController::class, 'show'])
+                ->middleware('permission:captacao.lote.visualizar')
+                ->name('lotes.show');
+
+            Route::post('/lotes/{lote}/pedidos', [PedidoCaptacaoController::class, 'store'])
+                ->middleware('permission:captacao.pedido.editar')
+                ->name('lotes.pedidos.store');
+
+            Route::get('/matriz', [CaptacaoMatrizController::class, 'index'])
+                ->middleware('permission:captacao.lote.visualizar')
+                ->name('matriz.index');
+
+            Route::get('/lotes/{lote}/matriz/estado', [CaptacaoMatrizController::class, 'estado'])
+                ->middleware('permission:captacao.lote.visualizar')
+                ->name('lotes.matriz.estado');
+
+            Route::post('/lotes/{lote}/matriz/adicionar-loja', [CaptacaoMatrizController::class, 'adicionarLoja'])
+                ->middleware('permission:captacao.pedido.editar')
+                ->name('lotes.matriz.adicionar-loja');
+
+            Route::patch('/lotes/{lote}/celula', [CaptacaoMatrizController::class, 'updateCelula'])
+                ->middleware('permission:captacao.pedido.editar')
+                ->name('lotes.celula.update');
+
+            Route::get('/lotes/{lote}/fretes', [CaptacaoLoteFreteController::class, 'index'])
+                ->middleware('permission:captacao.lote.frete.vincular')
+                ->name('lotes.fretes.index');
+
+            Route::post('/lotes/{lote}/fretes/transferencia', [CaptacaoLoteFreteController::class, 'vincularTransferencia'])
+                ->middleware('permission:captacao.lote.frete.vincular')
+                ->name('lotes.fretes.transferencia');
+
+            Route::post('/lotes/{lote}/fretes/fruta-venda', [CaptacaoLoteFreteController::class, 'vincularFrutaVenda'])
+                ->middleware('permission:captacao.lote.frete.vincular')
+                ->name('lotes.fretes.fruta-venda');
+
+            Route::get('/romaneio-manual/criar', [RomaneioManualController::class, 'create'])
+                ->middleware('permission:captacao.romaneio.manual')
+                ->name('romaneio-manual.create');
+
+            Route::post('/romaneio-manual', [RomaneioManualController::class, 'store'])
+                ->middleware('permission:captacao.romaneio.manual')
+                ->name('romaneio-manual.store');
+
+            Route::get('/romaneio-manual/{lote}', [RomaneioManualController::class, 'show'])
+                ->middleware('permission:captacao.romaneio.manual')
+                ->name('romaneio-manual.show');
+
+            Route::get('/romaneio-manual/{lote}/editar', [RomaneioManualController::class, 'edit'])
+                ->middleware('permission:captacao.romaneio.manual')
+                ->name('romaneio-manual.edit');
+
+            Route::post('/romaneio-manual/{lote}/frutas', [RomaneioManualController::class, 'adicionarFruta'])
+                ->middleware('permission:captacao.romaneio.manual')
+                ->name('romaneio-manual.frutas.store');
+
+            Route::patch('/romaneio-manual/{lote}/linhas/{linha}', [RomaneioManualController::class, 'updateLinha'])
+                ->middleware('permission:captacao.romaneio.manual')
+                ->name('romaneio-manual.linhas.update');
+
+            Route::post('/romaneio-manual/{lote}/confirmar', [RomaneioManualController::class, 'confirmar'])
+                ->middleware('permission:captacao.romaneio.manual')
+                ->name('romaneio-manual.confirmar');
+
+            Route::post('/romaneio-manual/{lote}/iniciar-transferencia', [RomaneioManualController::class, 'iniciarTransferencia'])
+                ->middleware('permission:captacao.lote.transferencia.iniciar')
+                ->name('romaneio-manual.iniciar-transferencia');
+
+            Route::post('/romaneio-manual/{lote}/concluir-transferencia', [RomaneioManualController::class, 'concluirTransferencia'])
+                ->middleware('permission:captacao.lote.transferencia.validar')
+                ->name('romaneio-manual.concluir-transferencia');
+
+            Route::post('/faturamento/finalizar', [CaptacaoFaturamentoController::class, 'finalizar'])
+                ->middleware('permission:captacao.faturamento.finalizar')
+                ->name('faturamento.finalizar');
+
+            Route::post('/lotes/{lote}/pipeline/iniciar-transferencia', [CaptacaoLotePipelineController::class, 'iniciarTransferencia'])
+                ->middleware('permission:captacao.lote.transferencia.iniciar')
+                ->name('lotes.pipeline.iniciar-transferencia');
+
+            Route::post('/lotes/{lote}/pipeline/validar-transferencias', [CaptacaoLotePipelineController::class, 'validarTransferencias'])
+                ->middleware('permission:captacao.lote.transferencia.validar')
+                ->name('lotes.pipeline.validar-transferencias');
+
+            Route::post('/lotes/{lote}/pipeline/concluir-frete', [CaptacaoLotePipelineController::class, 'concluirFrete'])
+                ->middleware('permission:captacao.lote.frete.concluir')
+                ->name('lotes.pipeline.concluir-frete');
+
+            Route::post('/lotes/{lote}/pipeline/iniciar-faturamento', [CaptacaoLotePipelineController::class, 'iniciarFaturamento'])
+                ->middleware('permission:captacao.lote.faturamento.iniciar')
+                ->name('lotes.pipeline.iniciar-faturamento');
+
+            Route::post('/lotes/{lote}/pipeline/finalizar-vendas', [CaptacaoLotePipelineController::class, 'finalizarVendas'])
+                ->middleware('permission:captacao.lote.venda.finalizar')
+                ->name('lotes.pipeline.finalizar-vendas');
+
+            Route::get('/alertas', [AlertasComerciaisController::class, 'index'])
+                ->middleware('permission:captacao.alertas.visualizar')
+                ->name('alertas.index');
+
+            Route::get('/frutas-por-loja', [ClienteFrutaVinculoController::class, 'listagem'])
+                ->middleware('permission:captacao.cliente_fruta.vincular|captacao.pedido.editar|captacao.lote.visualizar')
+                ->name('frutas-por-loja.index');
+
+            Route::get('/clientes/{cliente}/frutas', [ClienteFrutaVinculoController::class, 'index'])
+                ->middleware('permission:captacao.cliente_fruta.vincular|captacao.pedido.editar|captacao.lote.visualizar')
+                ->name('clientes.frutas.index');
+
+            Route::put('/clientes/{cliente}/frutas', [ClienteFrutaVinculoController::class, 'sync'])
+                ->middleware('permission:captacao.cliente_fruta.vincular|captacao.pedido.editar')
+                ->name('clientes.frutas.sync');
+
+            Route::post('/clientes/{cliente}/frutas', [ClienteFrutaVinculoController::class, 'store'])
+                ->middleware('permission:captacao.cliente_fruta.vincular|captacao.pedido.editar')
+                ->name('clientes.frutas.store');
+
+            Route::delete('/clientes/{cliente}/frutas/{vinculo}', [ClienteFrutaVinculoController::class, 'destroy'])
+                ->middleware('permission:captacao.cliente_fruta.vincular|captacao.pedido.editar')
+                ->name('clientes.frutas.destroy');
+
+            Route::get('/rotas', [CaptacaoRotaController::class, 'index'])
+                ->middleware('permission:captacao.rota.editar|captacao.lote.visualizar')
+                ->name('rotas.index');
+
+            Route::get('/rotas/criar', [CaptacaoRotaController::class, 'create'])
+                ->middleware('permission:captacao.rota.editar')
+                ->name('rotas.create');
+
+            Route::post('/rotas', [CaptacaoRotaController::class, 'store'])
+                ->middleware('permission:captacao.rota.editar')
+                ->name('rotas.store');
+
+            Route::get('/rotas/{rota}/editar', [CaptacaoRotaController::class, 'edit'])
+                ->middleware('permission:captacao.rota.editar')
+                ->name('rotas.edit');
+
+            Route::put('/rotas/{rota}', [CaptacaoRotaController::class, 'update'])
+                ->middleware('permission:captacao.rota.editar')
+                ->name('rotas.update');
         });
 
         Route::prefix('grupos-permissoes')->name('grupos-permissoes.')->group(function () {

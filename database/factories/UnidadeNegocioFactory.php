@@ -29,6 +29,7 @@ class UnidadeNegocioFactory extends Factory
             'is_hub' => false,
             'is_unidade_producao' => false,
             'is_galpao_operacional' => false,
+            'emite_nota_fiscal' => true,
         ];
     }
 
@@ -36,6 +37,27 @@ class UnidadeNegocioFactory extends Factory
     {
         return $this->state(fn (array $attributes) => [
             'status' => false,
+        ]);
+    }
+
+    public function galpaoOperacional(): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'is_galpao_operacional' => true,
+            'emite_nota_fiscal' => false,
+            'possui_estoque' => true,
+            'is_hub' => false,
+        ]);
+    }
+
+    /** Galpão regional que também emite NF (ex.: CD Barbalha). */
+    public function galpaoComFaturamento(): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'is_galpao_operacional' => true,
+            'emite_nota_fiscal' => true,
+            'possui_estoque' => true,
+            'is_hub' => false,
         ]);
     }
 }

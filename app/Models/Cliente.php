@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Captacao\ClienteFrutaVinculo;
 use App\Support\TextoCadastro;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -161,5 +162,13 @@ class Cliente extends Model
     public function historicos(): HasMany
     {
         return $this->hasMany(ClienteHistorico::class, 'cliente_id');
+    }
+
+    /**
+     * @return HasMany<ClienteFrutaVinculo, $this>
+     */
+    public function frutaVinculos(): HasMany
+    {
+        return $this->hasMany(ClienteFrutaVinculo::class, 'id_cliente');
     }
 }

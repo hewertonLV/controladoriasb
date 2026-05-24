@@ -55,6 +55,11 @@
                     <i class="ri-add-line me-1"></i> Novo cliente
                 </a>
             @endcan
+            @canany(['captacao.cliente_fruta.vincular', 'captacao.pedido.editar', 'captacao.lote.visualizar'])
+                <a href="{{ route('admin.captacao.frutas-por-loja.index') }}" class="btn btn-soft-primary">
+                    <i class="ri-apple-line me-1"></i> Frutas por loja (captação)
+                </a>
+            @endcanany
         </x-slot:actions>
 
         @include('admin.clientes._table', [

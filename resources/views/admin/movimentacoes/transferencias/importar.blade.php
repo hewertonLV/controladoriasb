@@ -4,6 +4,7 @@
 @section('page-title', 'Importar Transferências')
 
 @section('content')
+    <x-admin.import-legado-banner />
     <div class="card mb-3">
         <div class="card-header d-flex flex-wrap align-items-center gap-2">
             <div class="me-auto">

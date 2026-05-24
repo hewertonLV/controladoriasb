@@ -59,7 +59,7 @@ final class VendaMovimentacaoService
             'empresas_origem' => Empresa::query()->where('entidade_type', UnidadeNegocio::class)->with('entidade')->get()
                 ->filter(fn (Empresa $e): bool => $e->entidade instanceof UnidadeNegocio
                     && ! $e->entidade->is_hub
-                    && ! $e->entidade->is_galpao_operacional
+                    && $e->entidade->emite_nota_fiscal
                     && app(UnidadeNegocioAccessService::class)->canAccess(auth()->user(), (int) $e->entidade->id))
                 ->sortBy(fn (Empresa $e): string => mb_strtolower($e->nomeExibicao()))->values(),
             'empresas_destino_cliente' => Empresa::query()->where('entidade_type', Cliente::class)->with('entidade')->get()->sortBy(fn (Empresa $e): string => mb_strtolower($e->nomeExibicao()))->values(),
@@ -411,8 +411,8 @@ final class VendaMovimentacaoService
             throw new InvalidArgumentException('Origem comercial não pode ser HUB. Informe a loja comercial e selecione o HUB em saída física.');
         }
 
-        if ($unidadeFaturamento->is_galpao_operacional) {
-            throw new InvalidArgumentException('Galpão operacional não pode faturar NF. Selecione a unidade de faturamento (ex.: Barbalha).');
+        if (! $unidadeFaturamento->emite_nota_fiscal) {
+            throw new InvalidArgumentException('Esta unidade não emite nota fiscal. Selecione a unidade de faturamento (ex.: Barbalha ou CD Barbalha).');
         }
 
         $unidadeCentroResultado = $this->resolverUnidadeCentroResultado($input, $unidadeFaturamento);

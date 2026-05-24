@@ -12,7 +12,7 @@ Barbalha emite NF para si e para galpões sem CNPJ (Recife, Maceió, Paraíba), 
 
 ### Galpão operacional
 
-- Flag `is_galpao_operacional` em `unidades_negocio`: `possui_estoque = true`, `is_hub = false`, CNPJ opcional, **não** aparece como unidade de faturamento.
+- Flag `is_galpao_operacional` em `unidades_negocio`: `possui_estoque = true`, `is_hub = false`, CNPJ opcional. Emissão de NF é controlada por `emite_nota_fiscal` — ver [ADR-0082](ADR-0082-galpao-operacional-emite-nota-fiscal.md) (ex.: CD Barbalha galpão + NF).
 - Galpões: Recife, Maceió, Paraíba (cadastro manual).
 
 ### Clientes

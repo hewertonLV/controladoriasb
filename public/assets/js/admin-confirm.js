@@ -47,6 +47,14 @@
     let pendingForm = null;
     let pendingTrigger = null;
     let modalInstance = null;
+    let modalMode = 'confirm';
+    let actionsBound = false;
+
+    function resolveBootstrapModal() {
+        const bs = globalThis.bootstrap ?? window.bootstrap;
+
+        return bs?.Modal ?? null;
+    }
 
     function getModalElements() {
         const modalEl = document.getElementById(MODAL_ID);
@@ -120,12 +128,41 @@
         elements.confirmBtn.className = `btn ${variant.btnClass}`;
     }
 
+    function restoreModalFooter(elements) {
+        elements.cancelBtn.classList.remove('d-none');
+        elements.confirmBtn.textContent = 'Confirmar';
+        elements.cancelBtn.textContent = 'Cancelar';
+        modalMode = 'confirm';
+    }
+
+    function ensureActionsBound() {
+        if (actionsBound) {
+            return;
+        }
+
+        bindModalActions();
+        actionsBound = true;
+    }
+
+    function getOrCreateModalInstance(modalEl) {
+        const Modal = resolveBootstrapModal();
+        if (!Modal) {
+            return null;
+        }
+
+        return Modal.getOrCreateInstance(modalEl);
+    }
+
     function openConfirm(trigger) {
+        ensureActionsBound();
+
         const elements = getModalElements();
-        if (!elements || typeof window.bootstrap === 'undefined' || !window.bootstrap.Modal) {
+        const Modal = resolveBootstrapModal();
+        if (!elements || !Modal) {
             return false;
         }
 
+        modalMode = 'confirm';
         const options = readOptions(trigger);
         applyVariant(elements, options.variant);
 
@@ -133,6 +170,7 @@
         elements.body.textContent = options.message;
         elements.confirmBtn.textContent = options.confirmLabel;
         elements.cancelBtn.textContent = options.cancelLabel;
+        elements.cancelBtn.classList.remove('d-none');
 
         pendingTrigger = trigger;
         pendingForm = trigger.tagName === 'FORM' ? trigger : trigger.closest('form');
@@ -149,11 +187,46 @@
             elements.promptInput.classList.remove('is-invalid');
         }
 
-        if (!modalInstance) {
-            modalInstance = window.bootstrap.Modal.getOrCreateInstance(elements.modalEl);
+        modalInstance = getOrCreateModalInstance(elements.modalEl);
+        modalInstance?.show();
+
+        return true;
+    }
+
+    /**
+     * Modal informativo (somente OK) — mesmo template visual do confirm.
+     *
+     * @param {{ title?: string, message: string, variant?: string, confirmLabel?: string }} options
+     */
+    function openAlert(options) {
+        ensureActionsBound();
+
+        const elements = getModalElements();
+        const Modal = resolveBootstrapModal();
+        if (!elements || !Modal) {
+            console.error('[AdminConfirm] Modal ou Bootstrap indisponível.', options);
+
+            return false;
         }
 
-        modalInstance.show();
+        modalMode = 'alert';
+        pendingForm = null;
+        pendingTrigger = null;
+
+        const variantKey = (options.variant || 'warning').toLowerCase();
+        const variant = VARIANTS[variantKey] || VARIANTS.warning;
+        applyVariant(elements, variant);
+
+        elements.titleText.textContent = options.title || 'Atenção';
+        elements.body.textContent = options.message || '';
+        elements.confirmBtn.textContent = options.confirmLabel || 'Entendi';
+        elements.cancelBtn.classList.add('d-none');
+        elements.promptWrap.classList.add('d-none');
+        elements.promptInput.classList.remove('is-invalid');
+
+        modalInstance = getOrCreateModalInstance(elements.modalEl);
+        modalInstance?.show();
+
         return true;
     }
 
@@ -215,6 +288,12 @@
         }
 
         elements.confirmBtn.addEventListener('click', () => {
+            if (modalMode === 'alert') {
+                modalInstance?.hide();
+
+                return;
+            }
+
             modalInstance?.hide();
             submitPendingForm();
         });
@@ -224,6 +303,7 @@
             pendingTrigger = null;
             elements.promptWrap.classList.add('d-none');
             elements.promptInput.classList.remove('is-invalid');
+            restoreModalFooter(elements);
         });
     }
 
@@ -265,13 +345,30 @@
         });
     }
 
+    function showSessionErrorModal() {
+        const el = document.getElementById('admin-flash-modal-error');
+        const mensagem = (el?.textContent || '').trim();
+        if (mensagem === '') {
+            return;
+        }
+
+        openAlert({
+            title: 'Atenção',
+            message: mensagem,
+            variant: 'warning',
+            confirmLabel: 'Entendi',
+        });
+    }
+
     function bootstrapConfirm() {
-        bindModalActions();
+        ensureActionsBound();
         bindDocumentHandlers();
+        showSessionErrorModal();
     }
 
     window.AdminConfirm = {
         open: openConfirm,
+        alert: openAlert,
     };
 
     if (document.readyState === 'loading') {

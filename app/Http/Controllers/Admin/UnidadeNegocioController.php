@@ -46,6 +46,7 @@ class UnidadeNegocioController extends Controller
                 'possui_estoque' => false,
                 'custo_operacional' => '0.00',
                 'id_estado' => Estado::ID_CEARA,
+                'emite_nota_fiscal' => true,
             ]),
         ]);
     }

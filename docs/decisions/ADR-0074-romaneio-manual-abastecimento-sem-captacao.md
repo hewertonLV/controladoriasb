@@ -14,10 +14,13 @@
 
 - Campo `tipo_lote` no registro de lote operacional: `CAPTACAO_PEDIDOS` (padrão) | `ROMANEIO_MANUAL`.
 - Lote `ROMANEIO_MANUAL`: `(data, faturamento, galpão destino)`; **zero** pedidos vinculados.
+- **Unidade de faturamento** (campo único no topo do formulário, válida para todas as linhas): usada na **exportação Cigan**, que não possui lógica de galpão operacional.
+- **Galpão de destino**: estoque operacional a abastecer (Romaneio 2 / transferências Lucas).
 
 ### Tela “Romaneio manual de abastecimento”
 
-- CRUD de **linhas manuais**: fruta, quantidade (na UM da fruta), **origem física** (unidade de saída — HUB etc.), galpão destino = do lote.
+- No topo: data, **unidade de faturamento (Cigan)** e **galpão de destino**; abaixo, linhas de reposição.
+- CRUD de **linhas manuais**: fruta, quantidade (na UM da fruta), **origem física** (unidade de saída — HUB etc.).
 - Motivo/observação opcional (ex.: “reposição estoque”).
 - **Romaneio 1 (carregamento)** **não se aplica** — sem lojas/rotas.
 - Ao **confirmar romaneio manual**: calcular **Romaneio 2** (mesma regra da captação):

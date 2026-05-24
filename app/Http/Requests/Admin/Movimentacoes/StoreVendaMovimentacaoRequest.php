@@ -69,8 +69,8 @@ class StoreVendaMovimentacaoRequest extends FormRequest
                     $v->errors()->add('id_empresa_origem', 'Origem comercial não pode ser HUB. Selecione a loja e informe o HUB em saída física.');
                 }
 
-                if ($comercial->is_galpao_operacional) {
-                    $v->errors()->add('id_empresa_origem', 'Galpão operacional não pode faturar NF. Selecione a unidade de faturamento.');
+                if (! $comercial->emite_nota_fiscal) {
+                    $v->errors()->add('id_empresa_origem', 'Esta unidade não emite nota fiscal. Selecione a unidade de faturamento.');
                 }
             }
 

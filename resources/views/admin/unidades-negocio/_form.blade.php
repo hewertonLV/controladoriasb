@@ -160,7 +160,23 @@
                     @error('is_galpao_operacional')
                         <div class="invalid-feedback d-block">{{ $message }}</div>
                     @enderror
-                    <small class="text-muted d-block">Centro de resultado regional; não fatura NF.</small>
+                    <small class="text-muted d-block">Centro de resultado regional (estoque gerencial, captação). Ex.: Recife, Maceió, CD Barbalha.</small>
+                </div>
+            </div>
+            <div class="col-md-4 d-flex align-items-end">
+                <div class="form-check form-switch pb-2">
+                    <input type="hidden" name="emite_nota_fiscal" value="0">
+                    <input type="checkbox"
+                           class="form-check-input @error('emite_nota_fiscal') is-invalid @enderror"
+                           id="emite_nota_fiscal"
+                           name="emite_nota_fiscal"
+                           value="1"
+                           @checked(old('emite_nota_fiscal', $unidadeNegocio->emite_nota_fiscal ?? true))>
+                    <label class="form-check-label" for="emite_nota_fiscal">Emite nota fiscal (CNPJ)</label>
+                    @error('emite_nota_fiscal')
+                        <div class="invalid-feedback d-block">{{ $message }}</div>
+                    @enderror
+                    <small class="text-muted d-block">Origem comercial / faturamento na captação. Galpões regionais (Recife) costumam desmarcar; CD Barbalha marca os dois.</small>
                 </div>
             </div>
         </div>

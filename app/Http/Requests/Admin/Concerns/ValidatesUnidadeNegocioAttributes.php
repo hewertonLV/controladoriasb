@@ -39,6 +39,7 @@ trait ValidatesUnidadeNegocioAttributes
             'is_unidade_producao' => ['required', 'boolean'],
             'is_hub' => ['required', 'boolean'],
             'is_galpao_operacional' => ['required', 'boolean'],
+            'emite_nota_fiscal' => ['required', 'boolean'],
         ];
     }
 
@@ -58,6 +59,7 @@ trait ValidatesUnidadeNegocioAttributes
             'is_unidade_producao' => 'unidade de produção',
             'is_hub' => 'unidade HUB',
             'is_galpao_operacional' => 'galpão operacional',
+            'emite_nota_fiscal' => 'emite nota fiscal',
         ];
     }
 
@@ -94,6 +96,7 @@ trait ValidatesUnidadeNegocioAttributes
             'is_unidade_producao' => $this->boolean('is_unidade_producao'),
             'is_hub' => $this->boolean('is_hub'),
             'is_galpao_operacional' => $this->boolean('is_galpao_operacional'),
+            'emite_nota_fiscal' => $this->boolean('emite_nota_fiscal'),
         ]);
     }
 
@@ -125,6 +128,10 @@ trait ValidatesUnidadeNegocioAttributes
 
             if ($isGalpao && ! $this->boolean('possui_estoque')) {
                 $v->errors()->add('is_galpao_operacional', 'Galpão operacional deve controlar estoque.');
+            }
+
+            if ($isHub && $this->boolean('emite_nota_fiscal')) {
+                $v->errors()->add('emite_nota_fiscal', 'Unidade HUB não emite nota fiscal.');
             }
         });
     }

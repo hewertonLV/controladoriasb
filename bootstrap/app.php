@@ -1,6 +1,8 @@
 <?php
 
+use App\Exceptions\Captacao\CaptacaoEdicaoBloqueadaException;
 use App\Http\Middleware\UseRequestRootUrl;
+use Illuminate\Http\Request;
 use App\Http\Middleware\EnsurePasswordWasChanged;
 use App\Http\Middleware\EnsureUserIsActive;
 use App\Http\Middleware\FinishRequestDebug;
@@ -16,6 +18,7 @@ use Spatie\Permission\Middleware\RoleOrPermissionMiddleware;
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
         web: __DIR__.'/../routes/web.php',
+        api: __DIR__.'/../routes/api.php',
         commands: __DIR__.'/../routes/console.php',
         health: '/up',
     )
@@ -39,5 +42,16 @@ return Application::configure(basePath: dirname(__DIR__))
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
-        //
+        $exceptions->render(function (CaptacaoEdicaoBloqueadaException $e, Request $request) {
+            if ($request->expectsJson()) {
+                return response()->json([
+                    'message' => $e->getMessage(),
+                    'code' => 'captacao_edicao_bloqueada',
+                ], 422);
+            }
+
+            return redirect()
+                ->back()
+                ->with('error', $e->getMessage());
+        });
     })->create();

@@ -27,6 +27,10 @@ abstract class UnidadeNegocioTestCase extends TestCase
             'cpf_cnpj' => '11222333000181',
             'custo_operacional' => '10.50',
             'possui_estoque' => false,
+            'is_unidade_producao' => false,
+            'is_hub' => false,
+            'is_galpao_operacional' => false,
+            'emite_nota_fiscal' => true,
         ], $overrides);
     }
 }
