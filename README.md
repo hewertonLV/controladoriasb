@@ -2,6 +2,8 @@
 
 Sistema interno (Laravel 13 + MySQL + Highdmin/Bootstrap) integrado ao ERP CIGAM.
 
+**Versão atual:** ver arquivo [`VERSION`](VERSION). Linha **2.x** em desenvolvimento (captação de pedidos). Para voltar à linha **1.x** (movimentações + importações), consulte [`docs/VERSIONING.md`](docs/VERSIONING.md).
+
 ## Pilha técnica
 
 - PHP 8.3+

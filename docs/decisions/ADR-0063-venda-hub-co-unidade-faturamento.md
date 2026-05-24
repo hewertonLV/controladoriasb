@@ -1,7 +1,7 @@
 # ADR-0063: Venda com saída no HUB — CO da unidade de faturamento
 
 **Data:** 2026-05-19
-**Status:** Aceito
+**Status:** Aceito (refinado por [ADR-0077](ADR-0077-custo-embutido-pm-e-co-venda-hub-praca.md))
 **Contexto:** Margem de venda com saída física no HUB (complementa ADR-0060)
 
 ## Contexto
@@ -12,9 +12,9 @@ Quando a fruta sai fisicamente do HUB para uma venda faturada por uma loja comer
 
 Na venda com **saída física = HUB** (`id_unidade_negocio_estoque` aponta para unidade `is_hub`):
 
-- Snapshot do **CO vigente da unidade de faturamento** (`id_empresa_origem` / `id_unidade_negocio_faturamento`) em `valor_custo_operacional` (R$/kg).
+- Snapshot do **CO vigente da unidade de negócio da praça do cliente** (`id_praca` → UN de CO; se indisponível, unidade de faturamento) em `valor_custo_operacional` (R$/kg) — detalhe [ADR-0077](ADR-0077-custo-embutido-pm-e-co-venda-hub-praca.md).
 - O CO entra **somente na margem** (`resultado_movimentacao`), **sem** alterar preço médio do HUB nem da loja.
-- Composição da margem: `valor_nf − valor_custo_saida (PM HUB) − (CO_faturamento × kg) − frete_rateio`.
+- Composição da margem: `valor_nf − valor_custo_saida (PM HUB) − (CO_praça × kg) − frete_rateio` (`pracas.id_unidade_negocio` via [ADR-0077](ADR-0077-custo-embutido-pm-e-co-venda-hub-praca.md)).
 - O HUB registra apenas a saída ao preço médio; lucro/prejuízo consolidado fica na unidade de faturamento via `resultado_movimentacao` e relatórios que filtram por origem/faturamento.
 
 **Unidade de produção** com saída **não-HUB** mantém ADR-0050 (switch + CO do HUB selecionado). Saída comercial da própria loja mantém CO = 0 na margem (já embutido no PM).
