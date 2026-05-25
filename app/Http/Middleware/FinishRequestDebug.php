@@ -52,7 +52,23 @@ class FinishRequestDebug
         RequestDebugContext::reset();
 
         if ($record['trace_id'] ?? null) {
+            return $this->expireTraceCookie($response);
+        }
+
+        return $response;
+    }
+
+    /**
+     * StreamedResponse (downloads) não usa ResponseTrait::withoutCookie().
+     */
+    private function expireTraceCookie(Response $response): Response
+    {
+        if (method_exists($response, 'withoutCookie')) {
             return $response->withoutCookie('rd_trace');
+        }
+
+        if (function_exists('cookie')) {
+            $response->headers->setCookie(cookie('rd_trace', null, -2628000));
         }
 
         return $response;

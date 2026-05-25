@@ -24,7 +24,10 @@ class CaptacaoLoteTimelineUiTest extends TestCase
         $this->assertSame('concluido', $passos[1]['estado']);
         $this->assertSame('atual', $passos[2]['estado']);
         $this->assertSame('pendente', $passos[3]['estado']);
-        $this->assertStringContainsString('Cigan', CaptacaoLoteTimelineUi::descricaoAtual($lote));
+        $descricao = CaptacaoLoteTimelineUi::descricaoAtual($lote);
+        $this->assertStringContainsString('HUB', $descricao);
+        $this->assertStringContainsString('Cigan', $descricao);
+        $this->assertStringNotContainsString('Lucas', $descricao);
     }
 
     public function test_romaneio_manual_tem_sequencia_reduzida(): void

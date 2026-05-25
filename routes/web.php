@@ -1290,6 +1290,10 @@ Route::middleware(['auth', 'verified', 'user.active', 'password.changed'])->grou
                 ->middleware('permission:captacao.lote.transferencia.iniciar')
                 ->name('lotes.pipeline.iniciar-transferencia');
 
+            Route::put('/lotes/{lote}/hub-origem-cigan', [CaptacaoLotePipelineController::class, 'definirHubOrigemCigan'])
+                ->middleware('permission:captacao.lote.transferencia.iniciar')
+                ->name('lotes.hub-origem-cigan.update');
+
             Route::get('/lotes/{lote}/arquivo-cigan-transferencia', [CaptacaoLotePipelineController::class, 'downloadArquivoCiganTransferencia'])
                 ->middleware('permission:captacao.lote.transferencia.iniciar')
                 ->name('lotes.arquivo-cigan-transferencia');

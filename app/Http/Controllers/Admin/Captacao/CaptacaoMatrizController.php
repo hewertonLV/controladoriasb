@@ -15,11 +15,13 @@ use App\Http\Requests\Admin\Captacao\UpdateCaptacaoRotaVeiculoRequest;
 use App\Models\Captacao\CaptacaoLote;
 use App\Models\Captacao\CaptacaoRota;
 use App\Models\Cliente;
+use App\Models\UnidadeNegocio;
 use App\Services\Captacao\CaptacaoLoteService;
 use App\Services\Captacao\CaptacaoMatrizRotasService;
 use App\Services\Captacao\CaptacaoMatrizEstadoService;
 use App\Services\Captacao\ClienteFrutaVinculoService;
 use App\Services\Captacao\PedidoService;
+use App\Services\Captacao\RomaneioAbastecimentoService;
 use App\Services\Permissoes\UnidadeNegocioAccessService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -38,7 +40,12 @@ class CaptacaoMatrizController extends Controller
     public function index(Request $request): View
     {
         $loteId = $request->integer('lote');
-        $lote = CaptacaoLote::query()->with(['unidadeGalpao', 'unidadeFaturamento', 'carteira:id,nome'])->findOrFail($loteId);
+        $lote = CaptacaoLote::query()->with([
+            'unidadeGalpao',
+            'unidadeFaturamento',
+            'unidadeHubOrigem:id,nome,id_cigam',
+            'carteira:id,nome',
+        ])->findOrFail($loteId);
 
         if (! app(UnidadeNegocioAccessService::class)->canAccess($request->user(), $lote->id_unidade_negocio_galpao)) {
             abort(403, UnidadeNegocioAccessService::MENSAGEM_SEM_ACESSO);
@@ -71,8 +78,20 @@ class CaptacaoMatrizController extends Controller
             $aba = $lote->status->exibeAbaArquivoCiganTransferencia() ? 'arquivo-cigan' : 'quantidade';
         }
 
+        $hubsDisponiveis = UnidadeNegocio::query()
+            ->where('is_hub', true)
+            ->where('status', true)
+            ->orderBy('nome')
+            ->get(['id', 'nome', 'id_cigam']);
+
+        $romaneioAbastecimento = $lote->status->exibeAbaArquivoCiganTransferencia()
+            ? app(RomaneioAbastecimentoService::class)->preview($lote)
+            : collect();
+
         return view('admin.captacao.matriz.index', [
             'lote' => $lote,
+            'hubsDisponiveis' => $hubsDisponiveis,
+            'romaneioAbastecimento' => $romaneioAbastecimento,
             'clientes' => $matriz['clientes'],
             'frutas' => $matriz['frutas'],
             'frutasPorCliente' => $matriz['frutasPorCliente'],

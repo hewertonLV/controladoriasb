@@ -477,17 +477,89 @@
                 <div class="tab-pane fade {{ $aba === 'arquivo-cigan' ? 'show active' : '' }}" id="matriz-tab-arquivo-cigan" role="tabpanel">
                     <div class="card-body border-top-0 pt-4 pb-4">
                         <p class="text-muted small mb-3">
-                            Baixe o arquivo TXT para importação no Cigan. O layout do arquivo será definido em uma etapa posterior;
-                            por enquanto o download gera um arquivo vazio com a extensão correta.
+                            Arquivo TXT no layout <strong>EDI NF Cigam</strong> (registros <code>N</code> + <code>I</code>),
+                            com as quantidades <strong>a receber</strong> do Romaneio 2 — Abastecimento.
+                            Informe o <strong>HUB de origem</strong> (saída física) antes do download. No arquivo, o <strong>destino</strong> (cliente/cobrança) é a unidade de <strong>faturamento da carteira</strong> ({{ $lote->unidadeFaturamento?->nome ?? '—' }}).
                         </p>
-                        @can(\App\Enums\Permissions::CAPTACAO_LOTE_TRANSFERENCIA_INICIAR)
-                            <a href="{{ route('admin.captacao.lotes.arquivo-cigan-transferencia', $lote) }}"
-                               class="btn btn-primary btn-sm">
-                                <i class="ri-download-2-line me-1"></i> Baixar arquivo TXT (Cigan)
-                            </a>
-                        @else
-                            <p class="small text-warning mb-0">Sem permissão para baixar o arquivo de transferência.</p>
-                        @endcan
+
+                        <div class="row g-3 mb-3">
+                            <div class="col-lg-6">
+                                @can(\App\Enums\Permissions::CAPTACAO_LOTE_TRANSFERENCIA_INICIAR)
+                                    <form method="post" action="{{ route('admin.captacao.lotes.hub-origem-cigan.update', $lote) }}" class="row g-2 align-items-end">
+                                        @csrf
+                                        @method('PUT')
+                                        <div class="col-12">
+                                            <label class="form-label" for="hub-origem-cigan">Unidade HUB de origem</label>
+                                            <select name="id_unidade_negocio_hub_origem" id="hub-origem-cigan" class="form-select @error('id_unidade_negocio_hub_origem') is-invalid @enderror" required>
+                                                <option value="">Selecione o HUB…</option>
+                                                @foreach ($hubsDisponiveis as $hub)
+                                                    <option value="{{ $hub->id }}" @selected((int) old('id_unidade_negocio_hub_origem', $lote->id_unidade_negocio_hub_origem) === $hub->id)>
+                                                        {{ $hub->nome }} (Cigam {{ $hub->id_cigam }})
+                                                    </option>
+                                                @endforeach
+                                            </select>
+                                            @error('id_unidade_negocio_hub_origem')
+                                                <div class="invalid-feedback">{{ $message }}</div>
+                                            @enderror
+                                        </div>
+                                        <div class="col-auto">
+                                            <button type="submit" class="btn btn-soft-primary btn-sm">Salvar HUB</button>
+                                        </div>
+                                    </form>
+                                @endcan
+                                @if ($lote->unidadeHubOrigem)
+                                    <p class="small mb-0 mt-2 text-success">
+                                        HUB atual: <strong>{{ $lote->unidadeHubOrigem->nome }}</strong>
+                                        (Cigam {{ $lote->unidadeHubOrigem->id_cigam }}) — transportadora no TXT; destino fiscal = faturamento {{ $lote->unidadeFaturamento?->nome }}.
+                                    </p>
+                                @endif
+                            </div>
+                            <div class="col-lg-6">
+                                @can(\App\Enums\Permissions::CAPTACAO_LOTE_TRANSFERENCIA_INICIAR)
+                                    @if ($lote->id_unidade_negocio_hub_origem)
+                                        <a href="{{ route('admin.captacao.lotes.arquivo-cigan-transferencia', $lote) }}"
+                                           class="btn btn-primary btn-sm">
+                                            <i class="ri-download-2-line me-1"></i> Baixar arquivo TXT (Cigan)
+                                        </a>
+                                    @else
+                                        <button type="button" class="btn btn-primary btn-sm" disabled title="Selecione e salve o HUB de origem">
+                                            <i class="ri-download-2-line me-1"></i> Baixar arquivo TXT (Cigan)
+                                        </button>
+                                        <p class="small text-muted mb-0 mt-1">Salve o HUB de origem para habilitar o download.</p>
+                                    @endif
+                                @else
+                                    <p class="small text-warning mb-0">Sem permissão para baixar o arquivo de transferência.</p>
+                                @endcan
+                            </div>
+                        </div>
+
+                        <div class="table-responsive">
+                            <table class="table table-sm align-middle mb-0">
+                                <thead>
+                                <tr>
+                                    <th>Fruta</th>
+                                    <th class="text-end">A receber (UM)</th>
+                                    <th class="text-end">A receber (kg)</th>
+                                </tr>
+                                </thead>
+                                <tbody>
+                                @forelse ($romaneioAbastecimento as $linha)
+                                    <tr @class(['table-light' => (float) $linha['a_receber_um'] <= 0])>
+                                        <td>{{ $linha['fruta_nome'] }}</td>
+                                        <td class="text-end">{{ $linha['a_receber_um_formatado'] }} {{ $linha['unidade_medicao'] }}</td>
+                                        <td class="text-end">{{ $linha['a_receber_kg_formatado'] }}</td>
+                                    </tr>
+                                @empty
+                                    <tr>
+                                        <td colspan="3" class="text-muted">Sem linhas no romaneio de abastecimento.</td>
+                                    </tr>
+                                @endforelse
+                                </tbody>
+                            </table>
+                        </div>
+                        <p class="text-muted small mt-2 mb-0">
+                            Somente itens com «a receber» &gt; 0 entram no TXT. Impostos podem ser calculados pelo Cigan na importação.
+                        </p>
                     </div>
                 </div>
             @endif

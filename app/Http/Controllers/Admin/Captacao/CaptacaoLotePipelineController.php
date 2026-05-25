@@ -3,11 +3,13 @@
 namespace App\Http\Controllers\Admin\Captacao;
 
 use App\Actions\Captacao\ConcluirEtapaFreteLoteAction;
+use App\Actions\Captacao\DefinirHubOrigemCiganLoteAction;
 use App\Actions\Captacao\FinalizarVendasLoteAction;
 use App\Actions\Captacao\IniciarFaturamentoCiganAction;
 use App\Actions\Captacao\IniciarTransferenciaCiganAction;
 use App\Actions\Captacao\ValidarTransferenciasGerenciaisLoteAction;
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Admin\Captacao\DefinirHubOrigemCiganLoteRequest;
 use App\Models\Captacao\CaptacaoLote;
 use App\Models\Captacao\CaptacaoLoteCiganExport;
 use App\Services\Captacao\GerarArquivoCiganService;
@@ -64,7 +66,21 @@ class CaptacaoLotePipelineController extends Controller
         return Storage::disk('local')->download($export->caminho_arquivo);
     }
 
-    public function downloadArquivoCiganTransferencia(Request $request, CaptacaoLote $lote): StreamedResponse
+    public function definirHubOrigemCigan(DefinirHubOrigemCiganLoteRequest $request, CaptacaoLote $lote): RedirectResponse
+    {
+        $this->assertGalpao($request, $lote);
+
+        app(DefinirHubOrigemCiganLoteAction::class)->executar(
+            $lote,
+            (int) $request->validated('id_unidade_negocio_hub_origem'),
+        );
+
+        return redirect()
+            ->route('admin.captacao.matriz.index', ['lote' => $lote->id, 'aba' => 'arquivo-cigan'])
+            ->with('success', 'HUB de origem definido. Você já pode baixar o arquivo TXT.');
+    }
+
+    public function downloadArquivoCiganTransferencia(Request $request, CaptacaoLote $lote): StreamedResponse|RedirectResponse
     {
         $this->assertGalpao($request, $lote);
 
@@ -80,7 +96,7 @@ class CaptacaoLotePipelineController extends Controller
                 echo $conteudo;
             },
             $nomeArquivo,
-            ['Content-Type' => 'text/plain; charset=UTF-8'],
+            ['Content-Type' => 'text/plain; charset=ISO-8859-1'],
         );
     }
 

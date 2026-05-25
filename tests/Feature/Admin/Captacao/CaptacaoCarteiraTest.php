@@ -149,6 +149,7 @@ class CaptacaoCarteiraTest extends CaptacaoTestCase
             'id_praca' => $c['cliente']->id_praca,
             'id_captacao_carteira' => null,
             'razao_social' => 'LOJA LIVRE CARTEIRA TESTE',
+            'fantasia' => null,
         ]);
         $this->assertNull($semCarteira->fresh()->id_captacao_carteira);
 

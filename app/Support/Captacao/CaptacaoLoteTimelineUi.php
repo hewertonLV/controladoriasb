@@ -103,8 +103,8 @@ final class CaptacaoLoteTimelineUi
         if ($tipo === CaptacaoLoteTipo::RomaneioManual) {
             return match ($status) {
                 CaptacaoLoteStatus::CaptacaoEmAndamento => 'Monte as frutas e as quantidades em caixas. Quando terminar, feche o romaneio para liberar a transferência.',
-                CaptacaoLoteStatus::AguardandoTransferenciaCigan => 'Romaneio fechado. Lucas deve iniciar a transferência e gerar o arquivo para o Cigan.',
-                CaptacaoLoteStatus::TransferenciaCiganIniciada => 'Aguardando Lucas finalizar as transferências no Cigan. Depois, use «Concluir transferência» no SB.',
+                CaptacaoLoteStatus::AguardandoTransferenciaCigan => 'Romaneio fechado. Inicie a transferência no SB e gere o arquivo Cigan para o HUB efetuar no sistema fiscal.',
+                CaptacaoLoteStatus::TransferenciaCiganIniciada => 'Arquivo Cigan disponível. Aguardando o HUB efetuar as transferências no Cigan. Depois, conclua a transferência no SB.',
                 CaptacaoLoteStatus::TransferenciaFinalizada => 'Abastecimento e transferências concluídos. Este lote manual não possui etapa de vendas.',
                 default => $status->label(),
             };
@@ -112,8 +112,8 @@ final class CaptacaoLoteTimelineUi
 
         return match ($status) {
             CaptacaoLoteStatus::CaptacaoEmAndamento => 'Pedidos, rotas e quantidades podem ser editados na matriz ou no app. Finalize a captação do faturamento quando o dia estiver completo.',
-            CaptacaoLoteStatus::AguardandoTransferenciaCigan => 'Captação do faturamento finalizada. Lucas deve iniciar a transferência e baixar o arquivo para o Cigan.',
-            CaptacaoLoteStatus::TransferenciaCiganIniciada => 'Aguardando Lucas finalizar as transferências no Cigan. As quantidades do romaneio estão travadas.',
+            CaptacaoLoteStatus::AguardandoTransferenciaCigan => 'Captação do faturamento finalizada. Inicie a transferência no SB (arquivo Cigan); em seguida o HUB efetua no Cigan.',
+            CaptacaoLoteStatus::TransferenciaCiganIniciada => 'Arquivo Cigan gerado. Aguardando o HUB efetuar as transferências no Cigan. As quantidades do romaneio estão travadas no SB.',
             CaptacaoLoteStatus::AguardandoVinculoFrete => 'Transferências gerenciais validadas no SB. Vincule fretes se necessário (opcional) e conclua a etapa de frete.',
             CaptacaoLoteStatus::TransferenciaFinalizada => 'Transferência encerrada. Romaneio principal imutável. Ajuste preços na matriz até Jefferson iniciar o faturamento no Cigan.',
             CaptacaoLoteStatus::FaturamentoCiganIniciado => 'Aguardando Jefferson finalizar as vendas no Cigan antes de efetivar no SB.',

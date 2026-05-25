@@ -12,7 +12,7 @@ Após **Iniciar transferência**, o lote fica em `TRANSFERENCIA_CIGAN_INICIADA`.
 
 - Na **matriz**, quando o lote estiver em `TRANSFERENCIA_CIGAN_INICIADA`, exibir aba **Arquivo Cigan** com botão de download.
 - Download via GET `/lotes/{lote}/arquivo-cigan-transferencia`, permissão `captacao.lote.transferencia.iniciar`, `Content-Type: text/plain`.
-- Conteúdo **vazio** por enquanto (`GerarArquivoCiganService::conteudoTxtTransferencia()`); snapshot CSV legado em `captacao_lote_cigan_exports` permanece separado.
+- Layout EDI implementado em [ADR-0105](ADR-0105-arquivo-cigan-edi-transferencia-hub.md); snapshot CSV legado em `captacao_lote_cigan_exports` permanece separado.
 - Aba indisponível fora dessa fase (404 no download).
 
 ## Alternativas consideradas

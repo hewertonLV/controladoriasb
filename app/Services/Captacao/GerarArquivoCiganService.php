@@ -25,11 +25,13 @@ final class GerarArquivoCiganService
     }
 
     /**
-     * Conteúdo TXT para importação no Cigan (transferência). Placeholder até spec do layout.
+     * Conteúdo TXT EDI NF Cigam (transferência HUB → galpão, Romaneio 2 «a receber»).
      */
     public function conteudoTxtTransferencia(CaptacaoLote $lote): string
     {
-        return '';
+        $gerador = app(CiganEdiNfTransferenciaGerador::class);
+
+        return $gerador->paraIso88591($gerador->gerar($lote));
     }
 
     private function gerar(CaptacaoLote $lote, User $user, string $tipo, string $conteudo): CaptacaoLoteCiganExport

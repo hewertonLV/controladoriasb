@@ -167,13 +167,7 @@ class CaptacaoIntegracaoMovimentacoesTest extends CaptacaoTestCase
 
     private function criarLoteComPedido(array $c, int $quantidade, ?string $precoVenda = null): CaptacaoLote
     {
-        $lote = CaptacaoLote::query()->create([
-            'data_referencia' => '2026-05-29',
-            'id_unidade_negocio_faturamento' => $c['faturamento']->id,
-            'id_unidade_negocio_galpao' => $c['galpao']->id,
-            'tipo' => 'CAPTACAO_PEDIDOS',
-            'status' => CaptacaoLoteStatus::CaptacaoEmAndamento,
-        ]);
+        $lote = $this->criarLoteCaptacao($c);
 
         $item = [
             'id_fruta' => $c['fruta']->id,
@@ -190,7 +184,7 @@ class CaptacaoIntegracaoMovimentacoesTest extends CaptacaoTestCase
             'id_cliente' => $c['cliente']->id,
             'id_captacao_rota' => $c['rota']->id,
             'itens' => [$item],
-        ]);
+        ])->assertRedirect()->assertSessionHasNoErrors();
 
         $lote->update(['status' => CaptacaoLoteStatus::AguardandoTransferenciaCigan]);
 

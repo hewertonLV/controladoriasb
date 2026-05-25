@@ -118,7 +118,7 @@ class CaptacaoPipelineTest extends CaptacaoTestCase
             ->assertSee('Baixar arquivo TXT (Cigan)', false);
     }
 
-    public function test_download_arquivo_cigan_transferencia_txt_vazio(): void
+    public function test_download_arquivo_cigan_exige_hub_origem(): void
     {
         $c = $this->cenarioCaptacaoBasico();
         $lote = $this->criarLoteCaptacao($c);
@@ -127,16 +127,80 @@ class CaptacaoPipelineTest extends CaptacaoTestCase
 
         $lote->update(['status' => CaptacaoLoteStatus::TransferenciaCiganIniciada]);
 
+        $this->actingAs($user)
+            ->get(route('admin.captacao.lotes.arquivo-cigan-transferencia', $lote))
+            ->assertRedirect()
+            ->assertSessionHasErrors('id_unidade_negocio_hub_origem');
+    }
+
+    public function test_download_arquivo_cigan_transferencia_txt_layout_edi(): void
+    {
+        $c = $this->cenarioCaptacaoBasico();
+        $c['faturamento']->update(['id_cigam' => '881001']);
+        $c['galpao']->update(['id_cigam' => '882002']);
+        $hub = $this->criarHubComEstoque($c['fruta']);
+        $hub->update(['id_cigam' => '883003']);
+        $lote = $this->criarLoteCaptacao($c);
+        $user = $this->captacaoManager();
+        $user->unidadesNegocio()->sync([$c['faturamento']->id, $c['galpao']->id, $hub->id]);
+
+        $this->actingAs($user)->postJson(route('admin.captacao.lotes.matriz.adicionar-loja', $lote), [
+            'id_cliente' => $c['cliente']->id,
+        ])->assertOk();
+
+        $this->actingAs($user)->patchJson(route('admin.captacao.lotes.celula.update', $lote), [
+            'id_cliente' => $c['cliente']->id,
+            'id_fruta' => $c['fruta']->id,
+            'quantidade' => 5,
+            'preco_venda' => 10,
+        ])->assertOk();
+
+        $lote->update([
+            'status' => CaptacaoLoteStatus::TransferenciaCiganIniciada,
+            'id_unidade_negocio_hub_origem' => $hub->id,
+        ]);
+
         $response = $this->actingAs($user)
             ->get(route('admin.captacao.lotes.arquivo-cigan-transferencia', $lote));
 
         $response->assertOk();
-        $response->assertHeader('content-type', 'text/plain; charset=UTF-8');
-        $this->assertSame('', $response->streamedContent());
+        $response->assertHeader('content-type', 'text/plain; charset=ISO-8859-1');
+
+        $conteudo = $response->streamedContent();
+        $linhas = array_values(array_filter(explode("\n", rtrim($conteudo, "\r\n"))));
+
+        $this->assertGreaterThanOrEqual(2, count($linhas));
+        $this->assertSame(688, strlen($linhas[0]));
+        $this->assertSame('N', $linhas[0][0]);
+        $this->assertSame('881001', substr($linhas[0], 51, 6), 'Cliente/cobrança deve ser o faturamento da carteira');
+        $this->assertSame('883003', substr($linhas[0], 131, 6), 'Transportadora deve ser o HUB de origem');
+        $this->assertNotSame('882002', substr($linhas[0], 51, 6), 'Galpão não é o destino fiscal do registro N');
+        $this->assertSame('I', $linhas[1][0]);
+        $this->assertSame(719, strlen($linhas[1]));
         $this->assertStringContainsString(
             'cigan-transferencia-lote-'.$lote->id.'.txt',
             (string) $response->headers->get('content-disposition'),
         );
+    }
+
+    public function test_definir_hub_origem_cigan_na_matriz(): void
+    {
+        $c = $this->cenarioCaptacaoBasico();
+        $hub = $this->criarHubComEstoque($c['fruta']);
+        $lote = $this->criarLoteCaptacao($c);
+        $user = $this->captacaoManager();
+        $user->unidadesNegocio()->sync([$c['faturamento']->id, $c['galpao']->id, $hub->id]);
+
+        $lote->update(['status' => CaptacaoLoteStatus::TransferenciaCiganIniciada]);
+
+        $this->actingAs($user)
+            ->put(route('admin.captacao.lotes.hub-origem-cigan.update', $lote), [
+                'id_unidade_negocio_hub_origem' => $hub->id,
+            ])
+            ->assertRedirect(route('admin.captacao.matriz.index', ['lote' => $lote->id, 'aba' => 'arquivo-cigan']))
+            ->assertSessionHas('success');
+
+        $this->assertSame($hub->id, $lote->fresh()->id_unidade_negocio_hub_origem);
     }
 
     public function test_download_arquivo_cigan_transferencia_indisponivel_fora_da_fase(): void

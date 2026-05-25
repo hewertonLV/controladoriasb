@@ -24,6 +24,7 @@ class CaptacaoLote extends Model
         'id_captacao_carteira',
         'id_unidade_negocio_faturamento',
         'id_unidade_negocio_galpao',
+        'id_unidade_negocio_hub_origem',
         'tipo',
         'status',
     ];
@@ -53,6 +54,11 @@ class CaptacaoLote extends Model
     public function unidadeGalpao(): BelongsTo
     {
         return $this->belongsTo(UnidadeNegocio::class, 'id_unidade_negocio_galpao');
+    }
+
+    public function unidadeHubOrigem(): BelongsTo
+    {
+        return $this->belongsTo(UnidadeNegocio::class, 'id_unidade_negocio_hub_origem');
     }
 
     public function pedidos(): HasMany
