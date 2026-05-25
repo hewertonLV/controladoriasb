@@ -11,9 +11,9 @@
                 <p class="text-muted mb-0">
                     Layout fixo (linha 1 é cabeçalho e pode ter qualquer texto):
                     <code>A</code> ID CIGAM · <code>B</code> Razão social ·
-                    <code>C</code> CPF/CNPJ · <code>D</code> Unidade negócio · <code>E</code> Desconto NF ·
-                    <code>F</code> Praça (nome) · <code>G</code> Grupo (nome, opcional) ·
-                    Fantasia opcional por cabeçalho: <code>fantasia</code>, <code>nome fantasia</code> ou <code>fantasia_cliente</code>
+                    <code>C</code> CPF/CNPJ · <code>D</code> ID CIGAM unidade de negócio ·
+                    <code>E</code> Desconto NF · <code>F</code> Praça (nome) ·
+                    <code>G</code> Grupo (nome, opcional) · <code>H</code> Fantasia (opcional)
                 </p>
             </div>
             <a href="{{ route('admin.clientes.index') }}" class="btn btn-light">
@@ -127,9 +127,10 @@
                                 <th>Razão social</th>
                                 <th>Fantasia</th>
                                 <th>CPF/CNPJ</th>
-                                <th>UN</th>
+                                <th>UN (CIGAM)</th>
                                 <th>Desc. NF</th>
-                                <th>Desc. contrato</th>
+                                <th>Praça</th>
+                                <th>Grupo</th>
                             </tr>
                         </thead>
                         <tbody id="tbody-novas"></tbody>
@@ -155,8 +156,14 @@
                                 </th>
                                 <th>Linha</th>
                                 <th>ID CIGAM</th>
-                                <th>Cliente</th>
-                                <th>Campos alterados</th>
+                                <th>Razão social</th>
+                                <th>Fantasia</th>
+                                <th>CPF/CNPJ</th>
+                                <th>UN (CIGAM)</th>
+                                <th>Desc. NF</th>
+                                <th>Praça</th>
+                                <th>Grupo</th>
+                                <th>Alterações</th>
                             </tr>
                         </thead>
                         <tbody id="tbody-atualizacoes"></tbody>
@@ -321,10 +328,57 @@
             if (d.length === 14) return d.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/, '$1.$2.$3/$4-$5');
             return d;
         }
-        function fmtCampoValor(campo, v) {
+        const rotulosCampoCliente = {
+            razao_social: 'Razão social',
+            fantasia: 'Fantasia',
+            cnpj_cpf: 'CPF/CNPJ',
+            id_unidade_negocio: 'Unidade de negócio',
+            id_cigam_unidade: 'UN (CIGAM)',
+            desconto_nf: 'Desconto NF',
+            id_praca: 'Praça',
+            praca_nome: 'Praça',
+            grupo_id: 'Grupo',
+            grupo_nome: 'Grupo',
+        };
+
+        const chavesColunasPreviewCliente = [
+            'razao_social',
+            'fantasia',
+            'cnpj_cpf',
+            'id_cigam_unidade',
+            'desconto_nf',
+            'praca_nome',
+            'grupo_nome',
+        ];
+
+        function fmtCampoValor(campo, v, d) {
             if (campo === 'cnpj_cpf') return fmtDoc(v);
+            if (campo === 'praca_nome' || campo === 'grupo_nome' || campo === 'id_cigam_unidade') {
+                return (v === null || v === undefined || v === '') ? '—' : escapeHtml(v);
+            }
+            if (campo === 'desconto_nf') {
+                const n = parseFloat(String(v || '0').replace(',', '.'));
+                return Number.isNaN(n) ? '—' : n.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+            }
+            if (campo === 'id_praca' && d?.praca_nome) return escapeHtml(d.praca_nome);
+            if (campo === 'grupo_id') return d?.grupo_nome ? escapeHtml(d.grupo_nome) : '—';
+            if (campo === 'id_unidade_negocio' && d?.id_cigam_unidade) return escapeHtml(d.id_cigam_unidade);
+            if (campo === 'fantasia' && (v === null || v === undefined || v === '')) return '—';
             if (v === null || v === undefined || v === '') return '—';
             return escapeHtml(v);
+        }
+
+        function celulasDadosCliente(d, camposAlterados) {
+            const alterados = new Set((camposAlterados || []).map(c => {
+                if (c.campo === 'id_praca') return 'praca_nome';
+                if (c.campo === 'grupo_id') return 'grupo_nome';
+                if (c.campo === 'id_unidade_negocio') return 'id_cigam_unidade';
+                return c.campo;
+            }));
+            return chavesColunasPreviewCliente.map(campo => {
+                const cls = alterados.has(campo) ? ' class="table-warning"' : '';
+                return `<td${cls}>${fmtCampoValor(campo, d[campo], d)}</td>`;
+            }).join('');
         }
         function showAlerta(tipo, mensagem) {
             alertaPreview.className = 'alert mt-3 alert-' + tipo;
@@ -399,11 +453,7 @@
                     <td><input type="checkbox" class="form-check-input chk-nova" data-row="${item.row_id}" checked></td>
                     <td>${item.linha}</td>
                     <td><code>${escapeHtml(d.id_cigam)}</code></td>
-                    <td>${escapeHtml(d.razao_social)}</td>
-                    <td>${escapeHtml(d.fantasia || '—')}</td>
-                    <td>${fmtDoc(d.cnpj_cpf)}</td>
-                    <td>${escapeHtml(d.id_unidade_negocio)}</td>
-                    <td>${escapeHtml(d.desconto_nf)}</td>
+                    ${celulasDadosCliente(d)}
                 `;
                 tbodyNovas.appendChild(tr);
             });
@@ -414,12 +464,14 @@
             tbodyAtual.innerHTML = '';
             countAtual.textContent = lista.length;
             lista.forEach(item => {
+                const dn = item.dados_novos || {};
+                const da = item.dados_atuais || {};
                 const diffs = (item.campos_alterados || []).map(c => `
                     <div class="small mb-1">
-                        <span class="text-muted">${escapeHtml(c.campo)}:</span>
-                        <span class="text-decoration-line-through text-danger">${fmtCampoValor(c.campo, c.atual)}</span>
+                        <span class="text-muted">${escapeHtml(rotulosCampoCliente[c.campo] || c.campo)}:</span>
+                        <span class="text-decoration-line-through text-danger">${fmtCampoValor(c.campo, c.atual, da)}</span>
                         <i class="ri-arrow-right-line text-muted mx-1"></i>
-                        <span class="text-success fw-semibold">${fmtCampoValor(c.campo, c.novo)}</span>
+                        <span class="text-success fw-semibold">${fmtCampoValor(c.campo, c.novo, dn)}</span>
                     </div>
                 `).join('');
                 const tr = document.createElement('tr');
@@ -427,8 +479,8 @@
                     <td><input type="checkbox" class="form-check-input chk-atual" data-row="${item.row_id}" checked></td>
                     <td>${item.linha}</td>
                     <td><code>${escapeHtml(item.id_cigam)}</code></td>
-                    <td><span class="fw-semibold">${escapeHtml(item.dados_atuais.razao_social)}</span></td>
-                    <td>${diffs}</td>
+                    ${celulasDadosCliente(dn, item.campos_alterados)}
+                    <td class="small">${diffs || '<span class="text-muted">—</span>'}</td>
                 `;
                 tbodyAtual.appendChild(tr);
             });

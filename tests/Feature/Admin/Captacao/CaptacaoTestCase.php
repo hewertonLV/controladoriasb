@@ -2,7 +2,10 @@
 
 namespace Tests\Feature\Admin\Captacao;
 
+use App\Models\Captacao\CaptacaoCarteira;
+use App\Models\Captacao\CaptacaoLote;
 use App\Models\Captacao\CaptacaoRota;
+use App\Services\Captacao\CaptacaoLoteService;
 use App\Models\Cliente;
 use App\Models\Estoque;
 use App\Models\Fruta;
@@ -23,7 +26,7 @@ abstract class CaptacaoTestCase extends TestCase
     use RefreshDatabase;
 
     /**
-     * @return array{faturamento: UnidadeNegocio, galpao: UnidadeNegocio, cliente: Cliente, fruta: Fruta, rota: CaptacaoRota}
+     * @return array{faturamento: UnidadeNegocio, galpao: UnidadeNegocio, carteira: CaptacaoCarteira, cliente: Cliente, fruta: Fruta, rota: CaptacaoRota}
      */
     protected function cenarioCaptacaoBasico(): array
     {
@@ -31,25 +34,48 @@ abstract class CaptacaoTestCase extends TestCase
             'possui_estoque' => true,
             'is_hub' => false,
             'is_galpao_operacional' => false,
+            'emite_nota_fiscal' => true,
         ]);
 
         $galpao = UnidadeNegocio::factory()->galpaoOperacional()->create();
 
+        $carteira = app(CaptacaoLoteService::class)->garantirCarteira($faturamento->id, $galpao->id);
+
         $cliente = Cliente::factory()->create([
             'id_unidade_negocio' => $faturamento->id,
+            'id_captacao_carteira' => $carteira->id,
+            'razao_social' => 'CLIENTE CAPTACAO TESTE',
+            'fantasia' => null,
         ]);
 
         $fruta = Fruta::factory()->create();
 
         $rota = CaptacaoRota::query()->create([
-            'id_unidade_negocio_galpao' => $galpao->id,
+            'id_captacao_carteira' => $carteira->id,
             'nome' => 'Rota Teste',
             'ativo' => true,
         ]);
 
         app(ClienteFrutaVinculoService::class)->sincronizarFrutas($cliente, [$fruta->id]);
 
-        return compact('faturamento', 'galpao', 'cliente', 'fruta', 'rota');
+        return compact('faturamento', 'galpao', 'carteira', 'cliente', 'fruta', 'rota');
+    }
+
+    /**
+     * @param  array{faturamento: UnidadeNegocio, galpao: UnidadeNegocio, carteira?: CaptacaoCarteira}  $c
+     */
+    protected function criarLoteCaptacao(array $c, string $data = '2026-05-29'): CaptacaoLote
+    {
+        $carteira = $c['carteira'] ?? app(CaptacaoLoteService::class)->garantirCarteira($c['faturamento']->id, $c['galpao']->id);
+
+        return CaptacaoLote::query()->create([
+            'data_referencia' => $data,
+            'id_captacao_carteira' => $carteira->id,
+            'id_unidade_negocio_faturamento' => $c['faturamento']->id,
+            'id_unidade_negocio_galpao' => $c['galpao']->id,
+            'tipo' => 'CAPTACAO_PEDIDOS',
+            'status' => 'CAPTACAO_EM_ANDAMENTO',
+        ]);
     }
 
     protected function seedCaptacaoMovimentacao(): void

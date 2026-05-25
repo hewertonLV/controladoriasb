@@ -7,6 +7,7 @@ use App\Models\Captacao\CaptacaoLote;
 use App\Models\User;
 use App\Services\Captacao\CaptacaoLoteService;
 use App\Services\Captacao\GerarVendasCaptacaoLoteService;
+use App\Services\Captacao\PedidoService;
 use Illuminate\Validation\ValidationException;
 
 final class FinalizarVendasLoteAction
@@ -14,6 +15,7 @@ final class FinalizarVendasLoteAction
     public function __construct(
         private readonly CaptacaoLoteService $lotes,
         private readonly GerarVendasCaptacaoLoteService $gerarVendas,
+        private readonly PedidoService $pedidos,
     ) {}
 
     public function executar(CaptacaoLote $lote, ?User $user = null): CaptacaoLote
@@ -23,6 +25,8 @@ final class FinalizarVendasLoteAction
                 'status' => 'Inicie o faturamento Cigan antes de finalizar vendas.',
             ]);
         }
+
+        $this->pedidos->assertPedidosComQuantidadeTemRota($lote);
 
         $this->gerarVendas->executar($lote, $user);
 

@@ -84,7 +84,7 @@ class ClienteImportacaoProcessor
                 $this->valorPorHeaderOuCelula($sheet, $headers, $r, ['DESCONTONF', 'DESCNF'], 'E'),
                 $this->valorPorHeaderOuCelula($sheet, $headers, $r, ['PRACA', 'PRAÇA'], 'F'),
                 $this->valorPorHeaderOuCelula($sheet, $headers, $r, ['GRUPO'], 'G'),
-                $this->valorPorHeaderOuCelula($sheet, $headers, $r, ['FANTASIA', 'NOMEFANTASIA', 'FANTASIACLIENTE'], null),
+                $this->valorPorHeaderOuCelula($sheet, $headers, $r, ['FANTASIA', 'NOMEFANTASIA', 'FANTASIACLIENTE'], 'H'),
             ];
 
             $linhasProcessadas++;
@@ -408,14 +408,23 @@ class ClienteImportacaoProcessor
      */
     private function snapshot(Cliente $cliente): array
     {
+        $cliente->loadMissing([
+            'praca:id,nome',
+            'grupo:id,nome',
+            'unidadeNegocio:id,id_cigam',
+        ]);
+
         return [
             'id_cigam' => $cliente->id_cigam,
             'razao_social' => $cliente->razao_social,
             'fantasia' => $cliente->fantasia,
             'cnpj_cpf' => $cliente->cnpj_cpf,
             'id_unidade_negocio' => (int) $cliente->id_unidade_negocio,
+            'id_cigam_unidade' => $cliente->unidadeNegocio?->id_cigam ?? '',
             'id_praca' => (int) $cliente->id_praca,
+            'praca_nome' => $cliente->praca?->nome ?? '',
             'grupo_id' => $cliente->grupo_id !== null ? (int) $cliente->grupo_id : null,
+            'grupo_nome' => $cliente->grupo?->nome,
             'desconto_nf' => (string) $cliente->desconto_nf,
         ];
     }

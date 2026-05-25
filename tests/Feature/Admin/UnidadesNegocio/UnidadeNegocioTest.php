@@ -266,4 +266,26 @@ class UnidadeNegocioTest extends UnidadeNegocioTestCase
             'emite_nota_fiscal' => true,
         ]);
     }
+
+    public function test_unidade_pode_ser_hub_e_galpao_operacional(): void
+    {
+        $this->actingAs($this->userWithPermissions([Permissions::UNIDADES_NEGOCIO_CRIAR]))
+            ->post(route('admin.unidades-negocio.store'), $this->unidadePayload([
+                'id_cigam' => '88002',
+                'nome' => 'CD HUB GALPAO',
+                'razao_social' => 'CD HUB GALPAO',
+                'possui_estoque' => true,
+                'is_hub' => true,
+                'is_galpao_operacional' => true,
+                'emite_nota_fiscal' => false,
+            ]))
+            ->assertRedirect(route('admin.unidades-negocio.index'));
+
+        $this->assertDatabaseHas('unidades_negocio', [
+            'id_cigam' => '088002',
+            'is_hub' => true,
+            'is_galpao_operacional' => true,
+            'possui_estoque' => true,
+        ]);
+    }
 }

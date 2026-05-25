@@ -14,7 +14,7 @@
                 @include('admin.captacao.rotas._form', ['rota' => $rota])
                 <div class="d-flex gap-2 mt-3">
                     <button type="submit" class="btn btn-primary">Salvar alterações</button>
-                    <a href="{{ route('admin.captacao.rotas.index', ['galpao' => $rota->id_unidade_negocio_galpao]) }}" class="btn btn-light">Voltar</a>
+                    <a href="{{ route('admin.captacao.rotas.index', ['carteira' => $rota->id_captacao_carteira]) }}" class="btn btn-light">Voltar</a>
                 </div>
             </form>
         </div>

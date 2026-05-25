@@ -29,7 +29,7 @@
     flex-wrap: nowrap !important;
 }
 
-.page-container .card .table td.text-end .btn {
+.page-container .card .table td.text-end .btn:not(.btn-primary):not(.btn-outline-primary):not(.btn-soft-primary) {
     background: transparent !important;
     border-color: transparent !important;
     box-shadow: none !important;
@@ -38,6 +38,14 @@
     line-height: 1;
     padding: 0.1rem;
     text-decoration: none;
+}
+
+/* Botões com cor semântica mantêm contraste no modo claro (evita ícone branco em fundo branco). */
+.page-container .card .table td.text-end .btn.btn-primary,
+.page-container .card .table td.text-end .btn.btn-outline-primary,
+.page-container .card .table td.text-end .btn.btn-soft-primary {
+    font-size: 0.78rem;
+    padding: 0.28rem 0.55rem;
 }
 
 .page-container .card .table td.text-end .btn i {

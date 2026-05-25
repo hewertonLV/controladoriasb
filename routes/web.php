@@ -6,9 +6,13 @@ use App\Http\Controllers\Admin\Captacao\CaptacaoLoteController;
 use App\Http\Controllers\Admin\Captacao\CaptacaoLoteFreteController;
 use App\Http\Controllers\Admin\Captacao\CaptacaoLotePipelineController;
 use App\Http\Controllers\Admin\Captacao\CaptacaoMatrizController;
+use App\Http\Controllers\Admin\Captacao\CaptacaoPedidoPorLojaController;
 use App\Http\Controllers\Admin\Captacao\RomaneioManualController;
 use App\Http\Controllers\Admin\Captacao\CaptacaoRotaController;
+use App\Http\Controllers\Admin\Captacao\CaptacaoCarteiraController;
+use App\Http\Controllers\Admin\Captacao\CaptacaoConsultaController;
 use App\Http\Controllers\Admin\Captacao\ClienteFrutaVinculoController;
+use App\Http\Controllers\Admin\Captacao\ClienteFrutaVinculoImportacaoController;
 use App\Http\Controllers\Admin\Captacao\PedidoCaptacaoController;
 use App\Http\Controllers\Admin\ClienteController;
 use App\Http\Controllers\Admin\ClienteExportacaoController;
@@ -1186,6 +1190,50 @@ Route::middleware(['auth', 'verified', 'user.active', 'password.changed'])->grou
                 ->middleware('permission:captacao.pedido.editar')
                 ->name('lotes.celula.update');
 
+            Route::post('/lotes/{lote}/pedidos/{cliente}/captacao-concluida', [CaptacaoMatrizController::class, 'toggleConclusao'])
+                ->middleware('permission:captacao.pedido.editar')
+                ->name('lotes.pedidos.captacao-concluida');
+
+            Route::patch('/lotes/{lote}/pedidos/{cliente}/numero-pedido', [CaptacaoMatrizController::class, 'updateNumeroPedido'])
+                ->middleware('permission:captacao.pedido.editar')
+                ->name('lotes.pedidos.numero-pedido');
+
+            Route::patch('/lotes/{lote}/pedidos/{cliente}/rota', [CaptacaoMatrizController::class, 'updateRota'])
+                ->middleware('permission:captacao.pedido.editar')
+                ->name('lotes.pedidos.rota');
+
+            Route::patch('/lotes/{lote}/pedidos/{cliente}/ordem-carregamento', [CaptacaoMatrizController::class, 'updateOrdemCarregamento'])
+                ->middleware('permission:captacao.pedido.editar')
+                ->name('lotes.pedidos.ordem-carregamento');
+
+            Route::patch('/lotes/{lote}/rotas/{rota}/motorista', [CaptacaoMatrizController::class, 'updateMotoristaRota'])
+                ->middleware('permission:captacao.pedido.editar')
+                ->name('lotes.rotas.motorista');
+
+            Route::patch('/lotes/{lote}/rotas/{rota}/veiculo', [CaptacaoMatrizController::class, 'updateVeiculoRota'])
+                ->middleware('permission:captacao.pedido.editar')
+                ->name('lotes.rotas.veiculo');
+
+            Route::get('/pedidos-por-loja', [CaptacaoPedidoPorLojaController::class, 'carteiras'])
+                ->middleware('permission:captacao.pedido.editar')
+                ->name('pedidos-por-loja.carteiras');
+
+            Route::get('/lotes/{lote}/pedidos-por-loja', [CaptacaoPedidoPorLojaController::class, 'lojas'])
+                ->middleware('permission:captacao.pedido.editar')
+                ->name('pedidos-por-loja.lojas');
+
+            Route::get('/lotes/{lote}/pedidos-por-loja/{cliente}', [CaptacaoPedidoPorLojaController::class, 'show'])
+                ->middleware('permission:captacao.pedido.editar')
+                ->name('pedidos-por-loja.show');
+
+            Route::put('/lotes/{lote}/pedidos-por-loja/{cliente}', [CaptacaoPedidoPorLojaController::class, 'salvar'])
+                ->middleware('permission:captacao.pedido.editar')
+                ->name('pedidos-por-loja.salvar');
+
+            Route::post('/lotes/{lote}/pedidos-por-loja/{cliente}/captacao-concluida', [CaptacaoPedidoPorLojaController::class, 'toggleConclusao'])
+                ->middleware('permission:captacao.pedido.editar')
+                ->name('pedidos-por-loja.captacao-concluida');
+
             Route::get('/lotes/{lote}/fretes', [CaptacaoLoteFreteController::class, 'index'])
                 ->middleware('permission:captacao.lote.frete.vincular')
                 ->name('lotes.fretes.index');
@@ -1242,6 +1290,10 @@ Route::middleware(['auth', 'verified', 'user.active', 'password.changed'])->grou
                 ->middleware('permission:captacao.lote.transferencia.iniciar')
                 ->name('lotes.pipeline.iniciar-transferencia');
 
+            Route::get('/lotes/{lote}/arquivo-cigan-transferencia', [CaptacaoLotePipelineController::class, 'downloadArquivoCiganTransferencia'])
+                ->middleware('permission:captacao.lote.transferencia.iniciar')
+                ->name('lotes.arquivo-cigan-transferencia');
+
             Route::post('/lotes/{lote}/pipeline/validar-transferencias', [CaptacaoLotePipelineController::class, 'validarTransferencias'])
                 ->middleware('permission:captacao.lote.transferencia.validar')
                 ->name('lotes.pipeline.validar-transferencias');
@@ -1266,6 +1318,30 @@ Route::middleware(['auth', 'verified', 'user.active', 'password.changed'])->grou
                 ->middleware('permission:captacao.cliente_fruta.vincular|captacao.pedido.editar|captacao.lote.visualizar')
                 ->name('frutas-por-loja.index');
 
+            Route::get('/frutas-por-loja/importar', [ClienteFrutaVinculoImportacaoController::class, 'importar'])
+                ->middleware('permission:captacao.cliente_fruta.vincular')
+                ->name('frutas-por-loja.importar');
+
+            Route::post('/frutas-por-loja/importar/iniciar', [ClienteFrutaVinculoImportacaoController::class, 'iniciar'])
+                ->middleware('permission:captacao.cliente_fruta.vincular')
+                ->name('frutas-por-loja.importar.iniciar');
+
+            Route::get('/frutas-por-loja/importar/{importacao:uuid}/status', [ClienteFrutaVinculoImportacaoController::class, 'status'])
+                ->middleware('permission:captacao.cliente_fruta.vincular')
+                ->name('frutas-por-loja.importar.status');
+
+            Route::get('/frutas-por-loja/importar/{importacao:uuid}/resultado', [ClienteFrutaVinculoImportacaoController::class, 'resultado'])
+                ->middleware('permission:captacao.cliente_fruta.vincular')
+                ->name('frutas-por-loja.importar.resultado');
+
+            Route::post('/frutas-por-loja/importar/{importacao:uuid}/confirmar', [ClienteFrutaVinculoImportacaoController::class, 'confirmar'])
+                ->middleware('permission:captacao.cliente_fruta.vincular')
+                ->name('frutas-por-loja.importar.confirmar');
+
+            Route::get('/frutas-por-loja/{cliente}', [ClienteFrutaVinculoController::class, 'show'])
+                ->middleware('permission:captacao.cliente_fruta.vincular|captacao.pedido.editar|captacao.lote.visualizar')
+                ->name('frutas-por-loja.show');
+
             Route::get('/clientes/{cliente}/frutas', [ClienteFrutaVinculoController::class, 'index'])
                 ->middleware('permission:captacao.cliente_fruta.vincular|captacao.pedido.editar|captacao.lote.visualizar')
                 ->name('clientes.frutas.index');
@@ -1281,6 +1357,38 @@ Route::middleware(['auth', 'verified', 'user.active', 'password.changed'])->grou
             Route::delete('/clientes/{cliente}/frutas/{vinculo}', [ClienteFrutaVinculoController::class, 'destroy'])
                 ->middleware('permission:captacao.cliente_fruta.vincular|captacao.pedido.editar')
                 ->name('clientes.frutas.destroy');
+
+            Route::get('/consulta/sem-pedido', [CaptacaoConsultaController::class, 'clientesSemPedido'])
+                ->middleware('permission:captacao.lote.visualizar|captacao.alertas.visualizar')
+                ->name('consulta.sem-pedido');
+
+            Route::get('/carteiras', [CaptacaoCarteiraController::class, 'index'])
+                ->middleware('permission:captacao.lote.visualizar')
+                ->name('carteiras.index');
+
+            Route::get('/carteiras/criar', [CaptacaoCarteiraController::class, 'create'])
+                ->middleware('permission:captacao.lote.visualizar')
+                ->name('carteiras.create');
+
+            Route::post('/carteiras', [CaptacaoCarteiraController::class, 'store'])
+                ->middleware('permission:captacao.lote.visualizar')
+                ->name('carteiras.store');
+
+            Route::get('/carteiras/{carteira}/editar', [CaptacaoCarteiraController::class, 'edit'])
+                ->middleware('permission:captacao.lote.visualizar')
+                ->name('carteiras.edit');
+
+            Route::put('/carteiras/{carteira}', [CaptacaoCarteiraController::class, 'update'])
+                ->middleware('permission:captacao.lote.visualizar')
+                ->name('carteiras.update');
+
+            Route::post('/carteiras/{carteira}/inativar', [CaptacaoCarteiraController::class, 'inativar'])
+                ->middleware('permission:captacao.lote.visualizar')
+                ->name('carteiras.inativar');
+
+            Route::post('/carteiras/{carteira}/reativar', [CaptacaoCarteiraController::class, 'reativar'])
+                ->middleware('permission:captacao.lote.visualizar')
+                ->name('carteiras.reativar');
 
             Route::get('/rotas', [CaptacaoRotaController::class, 'index'])
                 ->middleware('permission:captacao.rota.editar|captacao.lote.visualizar')

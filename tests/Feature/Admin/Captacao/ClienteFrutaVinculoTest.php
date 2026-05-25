@@ -42,7 +42,7 @@ class ClienteFrutaVinculoTest extends CaptacaoTestCase
         $this->assertContains($c['fruta']->id, $dados['frutasPorCliente'][$c['cliente']->id]);
     }
 
-    public function test_usuario_so_visualizar_ve_botao_ver_frutas_sem_salvar(): void
+    public function test_usuario_so_visualizar_ve_botao_detalhe_sem_salvar(): void
     {
         $c = $this->cenarioCaptacaoBasico();
         $user = $this->userWithPermissions([Permissions::CAPTACAO_LOTE_VISUALIZAR]);
@@ -50,7 +50,13 @@ class ClienteFrutaVinculoTest extends CaptacaoTestCase
         $this->actingAs($user)
             ->get(route('admin.captacao.frutas-por-loja.index', ['faturamento' => $c['faturamento']->id]))
             ->assertOk()
-            ->assertSee('Ver frutas', false)
+            ->assertSee('Detalhe', false)
+            ->assertDontSee('Salvar vínculos', false);
+
+        $this->actingAs($user)
+            ->get(route('admin.captacao.frutas-por-loja.show', $c['cliente']))
+            ->assertOk()
+            ->assertSee('Vincular frutas a esta loja', false)
             ->assertDontSee('Salvar vínculos', false);
 
         $this->actingAs($user)
@@ -68,14 +74,19 @@ class ClienteFrutaVinculoTest extends CaptacaoTestCase
         $this->actingAs($user)
             ->get(route('admin.captacao.frutas-por-loja.index', ['faturamento' => $c['faturamento']->id]))
             ->assertOk()
-            ->assertSee('Vincular frutas', false)
-            ->assertSee((string) ($c['cliente']->fantasia ?: $c['cliente']->razao_social), false);
+            ->assertSee('Detalhe', false)
+            ->assertSee('CLIENTE CAPTACAO TESTE', false);
+
+        $this->actingAs($user)
+            ->get(route('admin.captacao.frutas-por-loja.show', $c['cliente']))
+            ->assertOk()
+            ->assertSee('Salvar vínculos', false);
 
         $this->actingAs($user)
             ->put(route('admin.captacao.clientes.frutas.sync', $c['cliente']), [
                 'id_frutas' => [$c['fruta']->id],
             ])
-            ->assertRedirect();
+            ->assertRedirect(route('admin.captacao.frutas-por-loja.show', $c['cliente']));
 
         $this->assertDatabaseHas('cliente_fruta_vinculos', [
             'id_cliente' => $c['cliente']->id,

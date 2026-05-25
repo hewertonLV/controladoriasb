@@ -64,10 +64,11 @@ final class VendaMovimentacaoService
                 ->sortBy(fn (Empresa $e): string => mb_strtolower($e->nomeExibicao()))->values(),
             'empresas_destino_cliente' => Empresa::query()->where('entidade_type', Cliente::class)->with('entidade')->get()->sortBy(fn (Empresa $e): string => mb_strtolower($e->nomeExibicao()))->values(),
             'centros_resultado' => UnidadeNegocio::query()
-                ->where('is_hub', false)
                 ->where(function ($query): void {
                     $query->where('is_galpao_operacional', true)
-                        ->orWhere('possui_estoque', true);
+                        ->orWhere(function ($q): void {
+                            $q->where('is_hub', false)->where('possui_estoque', true);
+                        });
                 })
                 ->permitidasPara(auth()->user())
                 ->orderBy('nome')
@@ -444,7 +445,7 @@ final class VendaMovimentacaoService
         }
 
         $centro = UnidadeNegocio::query()->findOrFail((int) $idCentro);
-        if ($centro->is_hub) {
+        if ($centro->is_hub && ! $centro->is_galpao_operacional) {
             throw new InvalidArgumentException('Centro de resultado não pode ser HUB.');
         }
 

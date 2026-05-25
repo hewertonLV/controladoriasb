@@ -24,6 +24,14 @@ final class GerarArquivoCiganService
         return $this->gerar($lote, $user, 'VENDA', $this->conteudoPlaceholderVendas($lote));
     }
 
+    /**
+     * Conteúdo TXT para importação no Cigan (transferência). Placeholder até spec do layout.
+     */
+    public function conteudoTxtTransferencia(CaptacaoLote $lote): string
+    {
+        return '';
+    }
+
     private function gerar(CaptacaoLote $lote, User $user, string $tipo, string $conteudo): CaptacaoLoteCiganExport
     {
         $path = sprintf(

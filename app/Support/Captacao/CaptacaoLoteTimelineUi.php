@@ -115,7 +115,7 @@ final class CaptacaoLoteTimelineUi
             CaptacaoLoteStatus::AguardandoTransferenciaCigan => 'Captação do faturamento finalizada. Lucas deve iniciar a transferência e baixar o arquivo para o Cigan.',
             CaptacaoLoteStatus::TransferenciaCiganIniciada => 'Aguardando Lucas finalizar as transferências no Cigan. As quantidades do romaneio estão travadas.',
             CaptacaoLoteStatus::AguardandoVinculoFrete => 'Transferências gerenciais validadas no SB. Vincule fretes se necessário (opcional) e conclua a etapa de frete.',
-            CaptacaoLoteStatus::TransferenciaFinalizada => 'Transferência encerrada. Romaneio principal imutável. Jefferson pode iniciar o faturamento de vendas no Cigan.',
+            CaptacaoLoteStatus::TransferenciaFinalizada => 'Transferência encerrada. Romaneio principal imutável. Ajuste preços na matriz até Jefferson iniciar o faturamento no Cigan.',
             CaptacaoLoteStatus::FaturamentoCiganIniciado => 'Aguardando Jefferson finalizar as vendas no Cigan antes de efetivar no SB.',
             CaptacaoLoteStatus::VendasFinalizadas => 'Vendas efetivadas no SB. Ciclo do lote concluído.',
             default => $status->label(),

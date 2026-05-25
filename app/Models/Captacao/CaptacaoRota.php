@@ -2,7 +2,6 @@
 
 namespace App\Models\Captacao;
 
-use App\Models\UnidadeNegocio;
 use App\Models\Veiculo;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -18,8 +17,9 @@ class CaptacaoRota extends Model
      * @var list<string>
      */
     protected $fillable = [
-        'id_unidade_negocio_galpao',
+        'id_captacao_carteira',
         'nome',
+        'nome_motorista',
         'id_veiculo',
         'ativo',
     ];
@@ -34,9 +34,9 @@ class CaptacaoRota extends Model
         ];
     }
 
-    public function unidadeGalpao(): BelongsTo
+    public function carteira(): BelongsTo
     {
-        return $this->belongsTo(UnidadeNegocio::class, 'id_unidade_negocio_galpao');
+        return $this->belongsTo(CaptacaoCarteira::class, 'id_captacao_carteira');
     }
 
     public function veiculo(): BelongsTo

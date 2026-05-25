@@ -270,7 +270,30 @@
                         <a href="{{ route('admin.captacao.lotes.index') }}"
                            class="side-nav-link {{ request()->routeIs('admin.captacao.lotes.*', 'admin.captacao.matriz.*') ? 'active' : '' }}">
                             <span class="menu-icon"><i class="ri-shopping-basket-line"></i></span>
-                            <span class="menu-text">Lotes e matriz</span>
+                            <span class="menu-text">Captação</span>
+                        </a>
+                    </li>
+                    @can('captacao.pedido.editar')
+                        <li class="side-nav-item">
+                            <a href="{{ route('admin.captacao.pedidos-por-loja.carteiras') }}"
+                               class="side-nav-link {{ request()->routeIs('admin.captacao.pedidos-por-loja.*') ? 'active' : '' }}">
+                                <span class="menu-icon"><i class="ri-store-2-line"></i></span>
+                                <span class="menu-text">Captação por loja</span>
+                            </a>
+                        </li>
+                    @endcan
+                    <li class="side-nav-item">
+                        <a href="{{ route('admin.captacao.consulta.sem-pedido') }}"
+                           class="side-nav-link {{ request()->routeIs('admin.captacao.consulta.*') ? 'active' : '' }}">
+                            <span class="menu-icon"><i class="ri-user-search-line"></i></span>
+                            <span class="menu-text">Sem pedido (consulta)</span>
+                        </a>
+                    </li>
+                    <li class="side-nav-item">
+                        <a href="{{ route('admin.captacao.carteiras.index') }}"
+                           class="side-nav-link {{ request()->routeIs('admin.captacao.carteiras.*') ? 'active' : '' }}">
+                            <span class="menu-icon"><i class="ri-briefcase-line"></i></span>
+                            <span class="menu-text">Carteiras</span>
                         </a>
                     </li>
                 @endcan

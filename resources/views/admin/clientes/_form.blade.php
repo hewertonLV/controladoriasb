@@ -134,6 +134,20 @@
                     <div class="invalid-feedback">{{ $message }}</div>
                 @enderror
             </div>
+            @isset($carteirasCaptacao)
+                <div class="col-md-6">
+                    <label for="id_captacao_carteira" class="form-label">Carteira de captação</label>
+                    <select id="id_captacao_carteira" name="id_captacao_carteira" class="form-select @error('id_captacao_carteira') is-invalid @enderror">
+                        <option value="">Sem carteira</option>
+                        @foreach ($carteirasCaptacao as $carteira)
+                            <option value="{{ $carteira->id }}" @selected((int) old('id_captacao_carteira', $cliente->id_captacao_carteira) === $carteira->id)>
+                                {{ $carteira->nome }}
+                            </option>
+                        @endforeach
+                    </select>
+                    @error('id_captacao_carteira')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                </div>
+            @endisset
             <div class="col-md-4">
                 <label for="desconto_nf" class="form-label">Desconto NF <span class="text-danger">*</span></label>
                 <input type="number"
@@ -148,8 +162,55 @@
                     <div class="invalid-feedback">{{ $message }}</div>
                 @enderror
             </div>
+            <div class="col-md-4">
+                <label for="percentual_margem_alvo" class="form-label">Margem alvo captação (%)</label>
+                <input type="number"
+                       id="percentual_margem_alvo"
+                       name="percentual_margem_alvo"
+                       value="{{ old('percentual_margem_alvo', $cliente->percentual_margem_alvo ?? '') }}"
+                       class="form-control @error('percentual_margem_alvo') is-invalid @enderror"
+                       min="0"
+                       max="99.99"
+                       step="0.01"
+                       placeholder="Ex.: 30">
+                <div class="form-text">Sobre o preço de venda; usado para sugerir preço ideal na captação por loja.</div>
+                @error('percentual_margem_alvo')
+                    <div class="invalid-feedback">{{ $message }}</div>
+                @enderror
+            </div>
         </div>
     </div>
+
+    @isset($diasSemanaCaptacao)
+        <div class="card mt-3">
+            <div class="card-header"><strong>Agenda de captação</strong></div>
+            <div class="card-body">
+                <p class="text-muted small">Dias da semana em que o pedido costuma ser <strong>criado</strong> e <strong>enviado</strong> (0 = domingo).</p>
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        <span class="form-label d-block">Dias de criação do pedido</span>
+                        @foreach ($diasSemanaCaptacao as $dia => $label)
+                            <div class="form-check">
+                                <input type="checkbox" class="form-check-input" name="dias_criacao_pedido[]" id="dia_criacao_{{ $dia }}" value="{{ $dia }}"
+                                       @checked(in_array($dia, old('dias_criacao_pedido', $diasCriacaoPedido ?? []), true))>
+                                <label class="form-check-label" for="dia_criacao_{{ $dia }}">{{ $label }}</label>
+                            </div>
+                        @endforeach
+                    </div>
+                    <div class="col-md-6">
+                        <span class="form-label d-block">Dias de envio do pedido</span>
+                        @foreach ($diasSemanaCaptacao as $dia => $label)
+                            <div class="form-check">
+                                <input type="checkbox" class="form-check-input" name="dias_envio_pedido[]" id="dia_envio_{{ $dia }}" value="{{ $dia }}"
+                                       @checked(in_array($dia, old('dias_envio_pedido', $diasEnvioPedido ?? []), true))>
+                                <label class="form-check-label" for="dia_envio_{{ $dia }}">{{ $label }}</label>
+                            </div>
+                        @endforeach
+                    </div>
+                </div>
+            </div>
+        </div>
+    @endisset
 
     <div class="card-footer d-flex gap-2 justify-content-end">
         <a href="{{ route('admin.clientes.index') }}" class="btn btn-light">

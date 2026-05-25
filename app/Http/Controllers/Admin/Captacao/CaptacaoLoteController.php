@@ -4,8 +4,8 @@ namespace App\Http\Controllers\Admin\Captacao;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Admin\Captacao\StoreCaptacaoLoteRequest;
+use App\Models\Captacao\CaptacaoCarteira;
 use App\Models\Captacao\CaptacaoLote;
-use App\Models\UnidadeNegocio;
 use App\Services\Captacao\CaptacaoLoteService;
 use App\Services\Captacao\RomaneioAbastecimentoService;
 use App\Services\Captacao\RomaneioCarregamentoService;
@@ -26,42 +26,32 @@ class CaptacaoLoteController extends Controller
     public function index(Request $request): View
     {
         $query = CaptacaoLote::query()
-            ->with(['unidadeFaturamento:id,nome', 'unidadeGalpao:id,nome'])
+            ->with(['carteira:id,nome', 'unidadeFaturamento:id,nome', 'unidadeGalpao:id,nome'])
             ->orderByDesc('data_referencia');
 
-        if ($request->filled('data_referencia')) {
-            $query->whereDate('data_referencia', $request->string('data_referencia'));
-        }
-
-        $lotes = $query->paginate(20)->withQueryString();
+        $lotes = $query->paginate(20);
 
         return view('admin.captacao.lotes.index', [
             'lotes' => $lotes,
-            'filtros' => $request->only(['data_referencia']),
-            'faturamentos' => UnidadeNegocio::query()
-                ->where('emite_nota_fiscal', true)
-                ->where('is_hub', false)
+            'carteiras' => CaptacaoCarteira::query()
+                ->where('ativo', true)
                 ->orderBy('nome')
-                ->get(['id', 'nome']),
-            'galpoes' => UnidadeNegocio::query()
-                ->where('is_galpao_operacional', true)
-                ->orderBy('nome')
-                ->get(['id', 'nome']),
+                ->get(['id', 'nome', 'id_unidade_negocio_faturamento', 'id_unidade_negocio_galpao']),
         ]);
     }
 
     public function store(StoreCaptacaoLoteRequest $request): RedirectResponse
     {
         $dados = $request->validated();
+        $carteira = CaptacaoCarteira::query()->findOrFail((int) $dados['id_captacao_carteira']);
 
-        if (! $this->unidadeAccess->canAccess($request->user(), (int) $dados['id_unidade_negocio_galpao'])) {
+        if (! $this->unidadeAccess->canAccess($request->user(), (int) $carteira->id_unidade_negocio_galpao)) {
             abort(403, UnidadeNegocioAccessService::MENSAGEM_SEM_ACESSO);
         }
 
-        $lote = $this->lotes->abrirOuRecuperarLote(
+        $lote = $this->lotes->abrirOuRecuperarLotePorCarteira(
             $dados['data_referencia'],
-            (int) $dados['id_unidade_negocio_faturamento'],
-            (int) $dados['id_unidade_negocio_galpao'],
+            (int) $carteira->id,
         );
 
         return redirect()
@@ -71,7 +61,8 @@ class CaptacaoLoteController extends Controller
 
     public function show(CaptacaoLote $lote): View
     {
-        $lote->load(['unidadeFaturamento', 'unidadeGalpao']);
+        $lote = $this->lotes->sincronizarStatusComFaturamentoFinalizado($lote);
+        $lote->load(['carteira', 'unidadeFaturamento', 'unidadeGalpao']);
 
         $romaneioCarregamento = $this->romaneioCarregamento->preview($lote);
 

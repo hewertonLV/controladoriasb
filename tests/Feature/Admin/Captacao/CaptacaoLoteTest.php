@@ -16,8 +16,7 @@ class CaptacaoLoteTest extends CaptacaoTestCase
 
         $response = $this->actingAs($user)->post(route('admin.captacao.lotes.store'), [
             'data_referencia' => '2026-05-29',
-            'id_unidade_negocio_faturamento' => $c['faturamento']->id,
-            'id_unidade_negocio_galpao' => $c['galpao']->id,
+            'id_captacao_carteira' => $c['carteira']->id,
         ]);
 
         $response->assertRedirect();
@@ -33,20 +32,16 @@ class CaptacaoLoteTest extends CaptacaoTestCase
         $user = $this->captacaoManager();
         $user->unidadesNegocio()->sync([$c['faturamento']->id, $c['galpao']->id]);
 
-        $lote = CaptacaoLote::query()->create([
-            'data_referencia' => '2026-05-29',
-            'id_unidade_negocio_faturamento' => $c['faturamento']->id,
-            'id_unidade_negocio_galpao' => $c['galpao']->id,
-            'tipo' => 'CAPTACAO_PEDIDOS',
-            'status' => CaptacaoLoteStatus::CaptacaoEmAndamento,
-        ]);
+        $lote = $this->criarLoteCaptacao($c);
 
         $this->actingAs($user)
             ->get(route('admin.captacao.lotes.index'))
             ->assertOk()
             ->assertSee(route('admin.captacao.lotes.show', $lote), false)
             ->assertSee(route('admin.captacao.matriz.index', ['lote' => $lote->id]), false)
-            ->assertSee('Editar', false);
+            ->assertSee('Matriz', false)
+            ->assertSee('captacao-lote-row--captacao', false)
+            ->assertSee('Captação em andamento', false);
     }
 
     public function test_lote_show_exibe_apenas_proxima_acao_pipeline(): void
@@ -55,13 +50,8 @@ class CaptacaoLoteTest extends CaptacaoTestCase
         $user = $this->captacaoManager();
         $user->unidadesNegocio()->sync([$c['faturamento']->id, $c['galpao']->id]);
 
-        $lote = CaptacaoLote::query()->create([
-            'data_referencia' => '2026-05-29',
-            'id_unidade_negocio_faturamento' => $c['faturamento']->id,
-            'id_unidade_negocio_galpao' => $c['galpao']->id,
-            'tipo' => 'CAPTACAO_PEDIDOS',
-            'status' => CaptacaoLoteStatus::AguardandoTransferenciaCigan,
-        ]);
+        $lote = $this->criarLoteCaptacao($c);
+        $lote->update(['status' => CaptacaoLoteStatus::AguardandoTransferenciaCigan]);
 
         $html = $this->actingAs($user)
             ->get(route('admin.captacao.lotes.show', $lote))
@@ -79,13 +69,8 @@ class CaptacaoLoteTest extends CaptacaoTestCase
         $user = $this->captacaoManager();
         $user->unidadesNegocio()->sync([$c['faturamento']->id, $c['galpao']->id]);
 
-        $lote = CaptacaoLote::query()->create([
-            'data_referencia' => '2026-05-29',
-            'id_unidade_negocio_faturamento' => $c['faturamento']->id,
-            'id_unidade_negocio_galpao' => $c['galpao']->id,
-            'tipo' => 'CAPTACAO_PEDIDOS',
-            'status' => CaptacaoLoteStatus::TransferenciaCiganIniciada,
-        ]);
+        $lote = $this->criarLoteCaptacao($c);
+        $lote->update(['status' => CaptacaoLoteStatus::TransferenciaCiganIniciada]);
 
         $this->actingAs($user)
             ->get(route('admin.captacao.lotes.show', $lote))
@@ -103,13 +88,7 @@ class CaptacaoLoteTest extends CaptacaoTestCase
         $user = $this->captacaoManager();
         $user->unidadesNegocio()->sync([$c['faturamento']->id, $c['galpao']->id]);
 
-        $lote = CaptacaoLote::query()->create([
-            'data_referencia' => '2026-05-29',
-            'id_unidade_negocio_faturamento' => $c['faturamento']->id,
-            'id_unidade_negocio_galpao' => $c['galpao']->id,
-            'tipo' => 'CAPTACAO_PEDIDOS',
-            'status' => CaptacaoLoteStatus::CaptacaoEmAndamento,
-        ]);
+        $lote = $this->criarLoteCaptacao($c);
 
         $html = $this->actingAs($user)
             ->get(route('admin.captacao.matriz.index', ['lote' => $lote->id]))
@@ -126,13 +105,7 @@ class CaptacaoLoteTest extends CaptacaoTestCase
         $user = $this->captacaoManager();
         $user->unidadesNegocio()->sync([$c['faturamento']->id, $c['galpao']->id]);
 
-        $lote = CaptacaoLote::query()->create([
-            'data_referencia' => '2026-05-29',
-            'id_unidade_negocio_faturamento' => $c['faturamento']->id,
-            'id_unidade_negocio_galpao' => $c['galpao']->id,
-            'tipo' => 'CAPTACAO_PEDIDOS',
-            'status' => CaptacaoLoteStatus::CaptacaoEmAndamento,
-        ]);
+        $lote = $this->criarLoteCaptacao($c);
 
         $antes = Movimentacao::query()->count();
 

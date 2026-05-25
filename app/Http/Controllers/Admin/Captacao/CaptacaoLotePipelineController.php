@@ -10,6 +10,7 @@ use App\Actions\Captacao\ValidarTransferenciasGerenciaisLoteAction;
 use App\Http\Controllers\Controller;
 use App\Models\Captacao\CaptacaoLote;
 use App\Models\Captacao\CaptacaoLoteCiganExport;
+use App\Services\Captacao\GerarArquivoCiganService;
 use App\Services\Permissoes\UnidadeNegocioAccessService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -61,6 +62,26 @@ class CaptacaoLotePipelineController extends Controller
     public function downloadCigan(CaptacaoLoteCiganExport $export): StreamedResponse
     {
         return Storage::disk('local')->download($export->caminho_arquivo);
+    }
+
+    public function downloadArquivoCiganTransferencia(Request $request, CaptacaoLote $lote): StreamedResponse
+    {
+        $this->assertGalpao($request, $lote);
+
+        if (! $lote->status->exibeAbaArquivoCiganTransferencia()) {
+            abort(404);
+        }
+
+        $conteudo = app(GerarArquivoCiganService::class)->conteudoTxtTransferencia($lote);
+        $nomeArquivo = sprintf('cigan-transferencia-lote-%d.txt', $lote->id);
+
+        return response()->streamDownload(
+            static function () use ($conteudo): void {
+                echo $conteudo;
+            },
+            $nomeArquivo,
+            ['Content-Type' => 'text/plain; charset=UTF-8'],
+        );
     }
 
     private function assertGalpao(Request $request, CaptacaoLote $lote): void

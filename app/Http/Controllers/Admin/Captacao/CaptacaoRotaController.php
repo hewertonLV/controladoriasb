@@ -5,8 +5,8 @@ namespace App\Http\Controllers\Admin\Captacao;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Admin\Captacao\StoreCaptacaoRotaRequest;
 use App\Http\Requests\Admin\Captacao\UpdateCaptacaoRotaRequest;
+use App\Models\Captacao\CaptacaoCarteira;
 use App\Models\Captacao\CaptacaoRota;
-use App\Models\UnidadeNegocio;
 use App\Models\Veiculo;
 use App\Services\Permissoes\UnidadeNegocioAccessService;
 use Illuminate\Http\RedirectResponse;
@@ -17,27 +17,33 @@ class CaptacaoRotaController extends Controller
 {
     public function index(Request $request): View
     {
-        $galpaoId = $request->integer('galpao') ?: null;
+        $carteiraId = $request->integer('carteira') ?: null;
 
-        $galpoes = UnidadeNegocio::query()
-            ->where('is_galpao_operacional', true)
+        $carteiras = CaptacaoCarteira::query()
+            ->with(['unidadeFaturamento:id,nome', 'unidadeGalpao:id,nome'])
+            ->where('ativo', true)
             ->orderBy('nome')
-            ->get(['id', 'nome']);
+            ->get(['id', 'nome', 'id_unidade_negocio_faturamento', 'id_unidade_negocio_galpao']);
 
         $query = CaptacaoRota::query()
-            ->with(['unidadeGalpao:id,nome', 'veiculo:id,nome,id_sbs'])
+            ->with([
+                'carteira:id,nome,id_unidade_negocio_faturamento,id_unidade_negocio_galpao',
+                'carteira.unidadeFaturamento:id,nome',
+                'carteira.unidadeGalpao:id,nome',
+                'veiculo:id,nome,id_sbs',
+            ])
             ->orderBy('nome');
 
-        if ($galpaoId !== null) {
-            $query->where('id_unidade_negocio_galpao', $galpaoId);
+        if ($carteiraId !== null) {
+            $query->where('id_captacao_carteira', $carteiraId);
         }
 
         $this->aplicarFiltroUnidadesPermitidas($request, $query);
 
         return view('admin.captacao.rotas.index', [
             'rotas' => $query->get(),
-            'galpoes' => $galpoes,
-            'galpaoId' => $galpaoId,
+            'carteiras' => $carteiras,
+            'carteiraId' => $carteiraId,
         ]);
     }
 
@@ -49,18 +55,18 @@ class CaptacaoRotaController extends Controller
     public function store(StoreCaptacaoRotaRequest $request): RedirectResponse
     {
         $dados = $this->normalizarDados($request->validated(), $request);
-        $this->assertAcessoGalpao($request, (int) $dados['id_unidade_negocio_galpao']);
+        $this->assertAcessoCarteira($request, (int) $dados['id_captacao_carteira']);
 
         $rota = CaptacaoRota::query()->create($dados);
 
         return redirect()
-            ->route('admin.captacao.rotas.index', ['galpao' => $rota->id_unidade_negocio_galpao])
+            ->route('admin.captacao.rotas.index', ['carteira' => $rota->id_captacao_carteira])
             ->with('success', "Rota «{$rota->nome}» cadastrada.");
     }
 
     public function edit(Request $request, CaptacaoRota $rota): View
     {
-        $this->assertAcessoGalpao($request, $rota->id_unidade_negocio_galpao);
+        $this->assertAcessoCarteira($request, $rota->id_captacao_carteira);
 
         return view('admin.captacao.rotas.edit', array_merge(
             ['rota' => $rota],
@@ -71,12 +77,12 @@ class CaptacaoRotaController extends Controller
     public function update(UpdateCaptacaoRotaRequest $request, CaptacaoRota $rota): RedirectResponse
     {
         $dados = $this->normalizarDados($request->validated(), $request);
-        $this->assertAcessoGalpao($request, (int) $dados['id_unidade_negocio_galpao']);
+        $this->assertAcessoCarteira($request, (int) $dados['id_captacao_carteira']);
 
         $rota->update($dados);
 
         return redirect()
-            ->route('admin.captacao.rotas.index', ['galpao' => $rota->id_unidade_negocio_galpao])
+            ->route('admin.captacao.rotas.index', ['carteira' => $rota->id_captacao_carteira])
             ->with('success', "Rota «{$rota->nome}» atualizada.");
     }
 
@@ -85,10 +91,11 @@ class CaptacaoRotaController extends Controller
      */
     private function dadosFormulario(Request $request, ?CaptacaoRota $rota = null): array
     {
-        $galpoes = UnidadeNegocio::query()
-            ->where('is_galpao_operacional', true)
+        $carteiras = CaptacaoCarteira::query()
+            ->with(['unidadeFaturamento:id,nome', 'unidadeGalpao:id,nome'])
+            ->where('ativo', true)
             ->orderBy('nome')
-            ->get(['id', 'nome']);
+            ->get(['id', 'nome', 'id_unidade_negocio_faturamento', 'id_unidade_negocio_galpao']);
 
         $veiculos = Veiculo::query()
             ->where('status', 'ATIVO')
@@ -96,9 +103,9 @@ class CaptacaoRotaController extends Controller
             ->get(['id', 'id_sbs', 'nome']);
 
         return [
-            'galpoes' => $galpoes,
+            'carteiras' => $carteiras,
             'veiculos' => $veiculos,
-            'galpaoId' => $rota?->id_unidade_negocio_galpao ?? $request->integer('galpao') ?: null,
+            'carteiraId' => $rota?->id_captacao_carteira ?? $request->integer('carteira') ?: null,
         ];
     }
 
@@ -114,9 +121,17 @@ class CaptacaoRotaController extends Controller
         return $dados;
     }
 
-    private function assertAcessoGalpao(Request $request, int $galpaoId): void
+    private function assertAcessoCarteira(Request $request, int $carteiraId): void
     {
-        if (! app(UnidadeNegocioAccessService::class)->canAccess($request->user(), $galpaoId)) {
+        $galpaoId = CaptacaoCarteira::query()
+            ->whereKey($carteiraId)
+            ->value('id_unidade_negocio_galpao');
+
+        if ($galpaoId === null) {
+            abort(404);
+        }
+
+        if (! app(UnidadeNegocioAccessService::class)->canAccess($request->user(), (int) $galpaoId)) {
             abort(403, UnidadeNegocioAccessService::MENSAGEM_SEM_ACESSO);
         }
     }
@@ -129,7 +144,9 @@ class CaptacaoRotaController extends Controller
         $permitidas = app(UnidadeNegocioAccessService::class)->unidadeIdsPermitidas($request->user());
 
         if ($permitidas !== null) {
-            $query->whereIn('id_unidade_negocio_galpao', $permitidas === [] ? [-1] : $permitidas);
+            $query->whereHas('carteira', function ($q) use ($permitidas): void {
+                $q->whereIn('id_unidade_negocio_galpao', $permitidas === [] ? [-1] : $permitidas);
+            });
         }
     }
 }

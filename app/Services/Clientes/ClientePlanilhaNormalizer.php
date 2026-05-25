@@ -16,7 +16,7 @@ use App\Support\TextoCadastro;
  *   E → desconto_nf
  *   F → praca (nome)
  *   G → grupo (nome, opcional)
- *   H → fantasia/nome fantasia/fantasia_cliente (opcional quando detectado por cabeçalho)
+ *   H → fantasia (opcional; também detectada por cabeçalho fantasia / nome fantasia)
  */
 class ClientePlanilhaNormalizer
 {
@@ -33,6 +33,8 @@ class ClientePlanilhaNormalizer
      *         desconto_nf: string,
      *         id_praca: int|null,
      *         grupo_id: int|null,
+     *         praca_nome: string,
+     *         grupo_nome: string|null,
      *     },
      *     erros: list<string>,
      * }
@@ -129,6 +131,8 @@ class ClientePlanilhaNormalizer
                 'desconto_nf' => $descontoNf ?? '0.00',
                 'id_praca' => $idPraca,
                 'grupo_id' => $grupoId,
+                'praca_nome' => $pracaNome,
+                'grupo_nome' => $grupoNome !== '' ? $grupoNome : null,
             ],
             'erros' => $erros,
         ];

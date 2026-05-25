@@ -9,15 +9,19 @@
     <div class="card mb-3">
         <div class="card-body">
             <p class="text-muted mb-3">
-                Rotas de carregamento por galpão. Vincule cada pedido/loja a uma rota antes de finalizar a captação (Romaneio 1).
+                Rotas de carregamento por carteira. Vincule cada pedido/loja a uma rota da mesma carteira do lote na matriz (abas Rotas e Por rota). A exigência de rota completa vale ao finalizar as vendas, não ao encerrar a captação.
             </p>
             <form method="get" class="row g-2 align-items-end">
-                <div class="col-md-6">
-                    <label class="form-label">Galpão</label>
-                    <select name="galpao" class="form-select" onchange="this.form.submit()">
-                        <option value="">Todos os galpões</option>
-                        @foreach ($galpoes as $galpao)
-                            <option value="{{ $galpao->id }}" @selected((int) $galpaoId === $galpao->id)>{{ $galpao->nome }}</option>
+                <div class="col-md-8">
+                    <label class="form-label">Carteira</label>
+                    <select name="carteira" class="form-select" onchange="this.form.submit()">
+                        <option value="">Todas as carteiras</option>
+                        @foreach ($carteiras as $carteira)
+                            <option value="{{ $carteira->id }}" @selected((int) $carteiraId === $carteira->id)>
+                                {{ $carteira->nome }}
+                                — {{ $carteira->unidadeFaturamento?->nome }}
+                                / {{ $carteira->unidadeGalpao?->nome }}
+                            </option>
                         @endforeach
                     </select>
                 </div>
@@ -29,7 +33,7 @@
         <div class="card-header d-flex flex-wrap gap-2 justify-content-between align-items-center">
             <strong>Rotas cadastradas</strong>
             @can('captacao.rota.editar')
-                <a href="{{ route('admin.captacao.rotas.create', $galpaoId ? ['galpao' => $galpaoId] : []) }}" class="btn btn-sm btn-primary">
+                <a href="{{ route('admin.captacao.rotas.create', $carteiraId ? ['carteira' => $carteiraId] : []) }}" class="btn btn-sm btn-primary">
                     <i class="ri-add-line me-1"></i> Nova rota
                 </a>
             @endcan
@@ -39,6 +43,8 @@
                 <thead>
                 <tr>
                     <th>Nome</th>
+                    <th>Carteira</th>
+                    <th>Faturamento</th>
                     <th>Galpão</th>
                     <th>Veículo</th>
                     <th>Status</th>
@@ -49,7 +55,9 @@
                 @forelse ($rotas as $rota)
                     <tr>
                         <td class="fw-semibold">{{ $rota->nome }}</td>
-                        <td>{{ $rota->unidadeGalpao?->nome ?? '—' }}</td>
+                        <td>{{ $rota->carteira?->nome ?? '—' }}</td>
+                        <td>{{ $rota->carteira?->unidadeFaturamento?->nome ?? '—' }}</td>
+                        <td>{{ $rota->carteira?->unidadeGalpao?->nome ?? '—' }}</td>
                         <td>
                             @if ($rota->veiculo)
                                 {{ $rota->veiculo->nome }}
@@ -75,10 +83,10 @@
                     </tr>
                 @empty
                     <tr>
-                        <td colspan="5" class="text-muted py-4 text-center">
+                        <td colspan="7" class="text-muted py-4 text-center">
                             Nenhuma rota cadastrada.
                             @can('captacao.rota.editar')
-                                <a href="{{ route('admin.captacao.rotas.create', $galpaoId ? ['galpao' => $galpaoId] : []) }}">Cadastrar primeira rota</a>
+                                <a href="{{ route('admin.captacao.rotas.create', $carteiraId ? ['carteira' => $carteiraId] : []) }}">Cadastrar primeira rota</a>
                             @endcan
                         </td>
                     </tr>

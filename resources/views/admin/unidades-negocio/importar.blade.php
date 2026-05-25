@@ -21,8 +21,12 @@
                     Layout fixo (linha 1 é cabeçalho e pode ter qualquer texto):
                     <code>A</code> ID CIGAM · <code>B</code> Razão social ·
                     <code>C</code> Nome · <code>D</code> CPF/CNPJ opcional ·
-                    <code>E</code> Custo operacional · <code>F</code> Possui estoque (SIM/NÃO) ·
-                    <code>G</code> Estado (abreviação ou nome cadastrado: CE, CEARA, PE, PERNAMBUCO)
+                    <code>E</code> Custo operacional ·
+                    <code>F</code> Controle estoque frutas · <code>G</code> Unidade produção ·
+                    <code>H</code> Unidade HUB · <code>I</code> Galpão operacional ·
+                    <code>J</code> Emite nota fiscal ·
+                    <code>K</code> Estado (CE, CEARA, PE, PERNAMBUCO).
+                    Colunas F–J: SIM/NÃO; célula vazia = NÃO.
                 </p>
             </div>
             <a href="{{ route('admin.unidades-negocio.index') }}" class="btn btn-light">
@@ -134,8 +138,16 @@
                                 </th>
                                 <th>Linha</th>
                                 <th>ID CIGAM</th>
+                                <th>Razão social</th>
                                 <th>Nome</th>
-                                <th>Estado (ICMS)</th>
+                                <th>CPF/CNPJ</th>
+                                <th>Custo op.</th>
+                                <th title="Controle estoque de frutas">Estoque</th>
+                                <th title="Unidade de produção (fazenda)">Produção</th>
+                                <th>HUB</th>
+                                <th title="Galpão operacional / centro resultado">Galpão</th>
+                                <th title="Emite nota fiscal / faturamento captação">NF</th>
+                                <th>Estado</th>
                             </tr>
                         </thead>
                         <tbody id="tbody-novas"></tbody>
@@ -161,8 +173,17 @@
                                 </th>
                                 <th>Linha</th>
                                 <th>ID CIGAM</th>
-                                <th>Unidade</th>
-                                <th>Campos alterados</th>
+                                <th>Razão social</th>
+                                <th>Nome</th>
+                                <th>CPF/CNPJ</th>
+                                <th>Custo op.</th>
+                                <th title="Controle estoque de frutas">Estoque</th>
+                                <th title="Unidade de produção (fazenda)">Produção</th>
+                                <th>HUB</th>
+                                <th title="Galpão operacional / centro resultado">Galpão</th>
+                                <th title="Emite nota fiscal / faturamento captação">NF</th>
+                                <th>Estado</th>
+                                <th>Alterações</th>
                             </tr>
                         </thead>
                         <tbody id="tbody-atualizacoes"></tbody>
@@ -334,6 +355,33 @@
             if (Number.isNaN(n)) return '0,00';
             return n.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
         }
+        const rotulosCampoUn = {
+            id_cigam: 'ID CIGAM',
+            razao_social: 'Razão social',
+            nome: 'Nome',
+            cpf_cnpj: 'CPF/CNPJ',
+            custo_operacional: 'Custo operacional',
+            possui_estoque: 'Controle estoque',
+            is_unidade_producao: 'Unidade produção',
+            is_hub: 'HUB',
+            is_galpao_operacional: 'Galpão operacional',
+            emite_nota_fiscal: 'Emite nota fiscal',
+            id_estado: 'Estado',
+        };
+
+        const chavesColunasPreview = [
+            'razao_social',
+            'nome',
+            'cpf_cnpj',
+            'custo_operacional',
+            'possui_estoque',
+            'is_unidade_producao',
+            'is_hub',
+            'is_galpao_operacional',
+            'emite_nota_fiscal',
+            'id_estado',
+        ];
+
         function fmtCampoUn(campo, v) {
             if (campo === 'id_estado') {
                 const id = parseInt(String(v), 10);
@@ -344,9 +392,30 @@
                 return escapeHtml(v);
             }
             if (campo === 'custo_operacional') return fmtDecimal(v);
-            if (campo === 'possui_estoque') return (v === true || v === 1 || v === '1') ? 'Sim' : 'Não';
+            if (campo === 'cpf_cnpj') {
+                const d = String(v || '').replace(/\D/g, '');
+                if (d.length === 11) {
+                    return escapeHtml(d.substr(0, 3) + '.' + d.substr(3, 3) + '.' + d.substr(6, 3) + '-' + d.substr(9, 2));
+                }
+                if (d.length === 14) {
+                    return escapeHtml(d.substr(0, 2) + '.' + d.substr(2, 3) + '.' + d.substr(5, 3) + '/' + d.substr(8, 4) + '-' + d.substr(12, 2));
+                }
+                if (d === '') return '—';
+                return escapeHtml(d);
+            }
+            if (['possui_estoque', 'is_unidade_producao', 'is_hub', 'is_galpao_operacional', 'emite_nota_fiscal'].includes(campo)) {
+                return (v === true || v === 1 || v === '1') ? 'Sim' : 'Não';
+            }
             if (v === null || v === undefined || v === '') return '—';
             return escapeHtml(v);
+        }
+
+        function celulasDadosUn(d, camposAlterados) {
+            const alterados = new Set((camposAlterados || []).map(c => c.campo));
+            return chavesColunasPreview.map(campo => {
+                const cls = alterados.has(campo) ? ' class="table-warning"' : '';
+                return `<td${cls}>${fmtCampoUn(campo, d[campo])}</td>`;
+            }).join('');
         }
         function showAlerta(tipo, mensagem) {
             alertaPreview.className = 'alert mt-3 alert-' + tipo;
@@ -421,14 +490,11 @@
                 const chk = podeConfirmar
                     ? `<input type="checkbox" class="form-check-input chk-nova" data-row="${item.row_id}" checked>`
                     : '<span class="text-muted">—</span>';
-                const idEst = d.id_estado;
-                const rotuloEst = (rotulosEstados[idEst] || rotulosEstados[String(idEst)]) || '—';
                 tr.innerHTML = `
                     <td>${chk}</td>
                     <td>${item.linha}</td>
                     <td><code>${escapeHtml(d.id_cigam)}</code></td>
-                    <td>${escapeHtml(d.nome)}</td>
-                    <td>${escapeHtml(rotuloEst)}</td>
+                    ${celulasDadosUn(d)}
                 `;
                 tbodyNovas.appendChild(tr);
             });
@@ -439,10 +505,10 @@
             tbodyAtual.innerHTML = '';
             countAtual.textContent = lista.length;
             lista.forEach(item => {
-                const da = item.dados_atuais || {};
+                const dn = item.dados_novos || {};
                 const diffs = (item.campos_alterados || []).map(c => `
                     <div class="small mb-1">
-                        <span class="text-muted">${escapeHtml(c.campo)}:</span>
+                        <span class="text-muted">${escapeHtml(rotulosCampoUn[c.campo] || c.campo)}:</span>
                         <span class="text-decoration-line-through text-danger">${fmtCampoUn(c.campo, c.atual)}</span>
                         <i class="ri-arrow-right-line text-muted mx-1"></i>
                         <span class="text-success fw-semibold">${fmtCampoUn(c.campo, c.novo)}</span>
@@ -456,8 +522,8 @@
                     <td>${chk}</td>
                     <td>${item.linha}</td>
                     <td><code>${escapeHtml(item.id_cigam)}</code></td>
-                    <td><span class="fw-semibold">${escapeHtml(da.nome || '')}</span></td>
-                    <td>${diffs}</td>
+                    ${celulasDadosUn(dn, item.campos_alterados)}
+                    <td class="small">${diffs || '<span class="text-muted">—</span>'}</td>
                 `;
                 tbodyAtual.appendChild(tr);
             });

@@ -2,8 +2,6 @@
 
 namespace Tests\Feature\Admin\Captacao;
 
-use App\Enums\CaptacaoLoteStatus;
-use App\Models\Captacao\CaptacaoLote;
 use App\Services\Captacao\RomaneioAbastecimentoService;
 use App\Services\Captacao\RomaneioCarregamentoService;
 
@@ -13,13 +11,7 @@ class RomaneioCaptacaoTest extends CaptacaoTestCase
     {
         $c = $this->cenarioCaptacaoBasico();
 
-        $lote = CaptacaoLote::query()->create([
-            'data_referencia' => '2026-05-29',
-            'id_unidade_negocio_faturamento' => $c['faturamento']->id,
-            'id_unidade_negocio_galpao' => $c['galpao']->id,
-            'tipo' => 'CAPTACAO_PEDIDOS',
-            'status' => CaptacaoLoteStatus::CaptacaoEmAndamento,
-        ]);
+        $lote = $this->criarLoteCaptacao($c);
 
         $user = $this->captacaoManager();
         $user->unidadesNegocio()->sync([$c['faturamento']->id, $c['galpao']->id]);
@@ -61,13 +53,7 @@ class RomaneioCaptacaoTest extends CaptacaoTestCase
             'kg_por_unidade_medicao' => '10.00',
         ]);
 
-        $lote = CaptacaoLote::query()->create([
-            'data_referencia' => '2026-05-29',
-            'id_unidade_negocio_faturamento' => $c['faturamento']->id,
-            'id_unidade_negocio_galpao' => $c['galpao']->id,
-            'tipo' => 'CAPTACAO_PEDIDOS',
-            'status' => CaptacaoLoteStatus::CaptacaoEmAndamento,
-        ]);
+        $lote = $this->criarLoteCaptacao($c);
 
         $user = $this->captacaoManager();
         $user->unidadesNegocio()->sync([$c['faturamento']->id, $c['galpao']->id]);

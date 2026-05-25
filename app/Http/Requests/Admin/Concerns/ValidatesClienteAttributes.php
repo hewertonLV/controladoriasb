@@ -57,6 +57,16 @@ trait ValidatesClienteAttributes
                 'min:0',
                 'regex:/^\\d+(\\.\\d{1,2})?$/',
             ],
+            'percentual_margem_alvo' => ['nullable', 'numeric', 'min:0', 'max:99.99'],
+            'id_captacao_carteira' => [
+                'nullable',
+                'integer',
+                Rule::exists('captacao_carteiras', 'id')->where('ativo', true),
+            ],
+            'dias_criacao_pedido' => ['nullable', 'array'],
+            'dias_criacao_pedido.*' => ['integer', 'min:0', 'max:6'],
+            'dias_envio_pedido' => ['nullable', 'array'],
+            'dias_envio_pedido.*' => ['integer', 'min:0', 'max:6'],
         ];
     }
 
@@ -74,6 +84,10 @@ trait ValidatesClienteAttributes
             'id_praca' => 'praça',
             'grupo_id' => 'grupo',
             'desconto_nf' => 'desconto NF',
+            'percentual_margem_alvo' => 'margem alvo captação',
+            'id_captacao_carteira' => 'carteira de captação',
+            'dias_criacao_pedido' => 'dias de criação do pedido',
+            'dias_envio_pedido' => 'dias de envio do pedido',
         ];
     }
 
@@ -106,7 +120,30 @@ trait ValidatesClienteAttributes
             'id_praca' => (int) $this->input('id_praca'),
             'grupo_id' => $grupoId === null || $grupoId === '' ? null : (int) $grupoId,
             'desconto_nf' => $descontoNf === null || $descontoNf === '' ? '0.00' : (string) $descontoNf,
+            'id_captacao_carteira' => $this->filled('id_captacao_carteira')
+                ? (int) $this->input('id_captacao_carteira')
+                : null,
+            'dias_criacao_pedido' => array_values(array_map('intval', (array) $this->input('dias_criacao_pedido', []))),
+            'dias_envio_pedido' => array_values(array_map('intval', (array) $this->input('dias_envio_pedido', []))),
         ]);
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function dadosClientePersistencia(): array
+    {
+        $dados = $this->validated();
+        unset($dados['dias_criacao_pedido'], $dados['dias_envio_pedido']);
+
+        if (! empty($dados['id_captacao_carteira'])) {
+            $carteira = \App\Models\Captacao\CaptacaoCarteira::query()->find((int) $dados['id_captacao_carteira']);
+            if ($carteira !== null) {
+                $dados['id_unidade_negocio'] = (int) $carteira->id_unidade_negocio_faturamento;
+            }
+        }
+
+        return $dados;
     }
 
     protected function cpfCnpjLengthRule(): Closure

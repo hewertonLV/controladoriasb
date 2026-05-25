@@ -58,9 +58,19 @@ class ClienteFrutaVinculoController extends Controller
         ]);
     }
 
+    public function show(Cliente $cliente): View
+    {
+        return $this->telaVinculoFrutas($cliente);
+    }
+
     public function index(Cliente $cliente): View
     {
-        $cliente->load('unidadeNegocio:id,nome');
+        return $this->telaVinculoFrutas($cliente);
+    }
+
+    private function telaVinculoFrutas(Cliente $cliente): View
+    {
+        $cliente->load(['unidadeNegocio:id,nome', 'captacaoCarteira:id,nome']);
 
         $vinculadas = ClienteFrutaVinculo::query()
             ->where('id_cliente', $cliente->id)
@@ -71,7 +81,7 @@ class ClienteFrutaVinculoController extends Controller
 
         $user = request()->user();
 
-        return view('admin.captacao.cliente-frutas.index', [
+        return view('admin.captacao.cliente-frutas.show', [
             'cliente' => $cliente,
             'frutas' => Fruta::query()->orderBy('nome')->get(['id', 'nome']),
             'vinculadas' => $vinculadas,
@@ -88,7 +98,7 @@ class ClienteFrutaVinculoController extends Controller
         $this->vinculos->sincronizarFrutas($cliente, $ids);
 
         return redirect()
-            ->route('admin.captacao.clientes.frutas.index', $cliente)
+            ->route('admin.captacao.frutas-por-loja.show', $cliente)
             ->with('success', count($ids).' fruta(s) vinculada(s) a esta loja.');
     }
 

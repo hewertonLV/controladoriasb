@@ -3,6 +3,7 @@
 namespace App\Http\Requests\Admin\Captacao;
 
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
 class StoreCaptacaoLoteRequest extends FormRequest
 {
@@ -18,8 +19,11 @@ class StoreCaptacaoLoteRequest extends FormRequest
     {
         return [
             'data_referencia' => ['required', 'date'],
-            'id_unidade_negocio_faturamento' => ['required', 'integer', 'exists:unidades_negocio,id'],
-            'id_unidade_negocio_galpao' => ['required', 'integer', 'exists:unidades_negocio,id'],
+            'id_captacao_carteira' => [
+                'required',
+                'integer',
+                Rule::exists('captacao_carteiras', 'id')->where('ativo', true),
+            ],
         ];
     }
 }

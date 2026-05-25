@@ -57,17 +57,31 @@ class UnidadeNegocioImportacaoTest extends UnidadeNegocioTestCase
         ]);
 
         $path = $this->storeSpreadsheet([
-            ['000103', 'UNIDADE NOVA', 'UNIDADE NOVA', '33333333000133', '100.00', 'NÃO', 'CEARA'],
-            [
+            $this->linhaPlanilha(['000103', 'UNIDADE NOVA', 'UNIDADE NOVA', '33333333000133', '100.00']),
+            $this->linhaPlanilha([
                 $existenteIgual->id_cigam,
                 $existenteIgual->razao_social,
                 $existenteIgual->nome,
                 $existenteIgual->cpf_cnpj,
                 number_format((float) $existenteIgual->custo_operacional, 2, '.', ''),
-                $existenteIgual->possui_estoque ? 'SIM' : 'NÃO',
-                'CEARA',
-            ],
-            [$existenteAlterada->id_cigam, 'RAZAO NOVA', 'NOME NOVO', $existenteAlterada->cpf_cnpj, '50.00', 'NÃO', 'CEARA'],
+                'NÃO',
+                'NÃO',
+                'NÃO',
+                'NÃO',
+                'SIM',
+            ]),
+            $this->linhaPlanilha([
+                $existenteAlterada->id_cigam,
+                'RAZAO NOVA',
+                'NOME NOVO',
+                $existenteAlterada->cpf_cnpj,
+                '50.00',
+                'NÃO',
+                'NÃO',
+                'NÃO',
+                'NÃO',
+                'SIM',
+            ]),
         ]);
 
         $importacao = UnidadeNegocioImportacao::create([
@@ -88,8 +102,63 @@ class UnidadeNegocioImportacaoTest extends UnidadeNegocioTestCase
         $this->assertSame(1, $importacao->sem_alteracoes_count);
         $this->assertSame(1, $importacao->atualizacoes_count);
         $this->assertSame('000103', $importacao->resultado['novas'][0]['dados']['id_cigam']);
+        $this->assertFalse($importacao->resultado['novas'][0]['dados']['emite_nota_fiscal']);
         $this->assertSame('000101', $importacao->resultado['sem_alteracoes'][0]['id_cigam']);
         $this->assertSame('000102', $importacao->resultado['atualizacoes'][0]['id_cigam']);
+    }
+
+    public function test_importacao_colunas_booleanas_vazias_usam_padrao_nao(): void
+    {
+        Storage::fake('local');
+
+        $path = $this->storeSpreadsheet([
+            ['000108', 'UNIDADE FLAGS VAZIAS', 'UNIDADE FLAGS VAZIAS', '', '0.00', '', '', '', '', '', 'CEARA'],
+        ]);
+
+        $importacao = UnidadeNegocioImportacao::create([
+            'uuid' => (string) Str::uuid(),
+            'user_id' => $this->unidadesNegocioManager()->id,
+            'arquivo_original' => 'unidades.xlsx',
+            'arquivo_path' => $path,
+            'status' => UnidadeNegocioImportacao::STATUS_AGUARDANDO,
+        ]);
+
+        (new ProcessarPreviewImportacaoUnidadesNegocioJob($importacao->id))
+            ->handle(app(UnidadeNegocioImportacaoProcessor::class));
+
+        $importacao->refresh();
+
+        $dados = $importacao->resultado['novas'][0]['dados'];
+        $this->assertFalse($dados['possui_estoque']);
+        $this->assertFalse($dados['is_unidade_producao']);
+        $this->assertFalse($dados['is_hub']);
+        $this->assertFalse($dados['is_galpao_operacional']);
+        $this->assertFalse($dados['emite_nota_fiscal']);
+    }
+
+    public function test_importacao_rejeita_galpao_sem_estoque(): void
+    {
+        Storage::fake('local');
+
+        $path = $this->storeSpreadsheet([
+            $this->linhaPlanilha(['000109', 'GALPAO SEM ESTOQUE', 'GALPAO SEM ESTOQUE', '', '0.00', 'NÃO', 'NÃO', 'NÃO', 'SIM', 'NÃO', 'CEARA']),
+        ]);
+
+        $importacao = UnidadeNegocioImportacao::create([
+            'uuid' => (string) Str::uuid(),
+            'user_id' => $this->unidadesNegocioManager()->id,
+            'arquivo_original' => 'unidades.xlsx',
+            'arquivo_path' => $path,
+            'status' => UnidadeNegocioImportacao::STATUS_AGUARDANDO,
+        ]);
+
+        (new ProcessarPreviewImportacaoUnidadesNegocioJob($importacao->id))
+            ->handle(app(UnidadeNegocioImportacaoProcessor::class));
+
+        $importacao->refresh();
+
+        $this->assertSame(1, $importacao->erros_count);
+        $this->assertStringContainsString('exige Controle estoque', $importacao->resultado['erros'][0]['erros'][0]);
     }
 
     public function test_importacao_resolve_estado_por_nome(): void
@@ -97,7 +166,7 @@ class UnidadeNegocioImportacaoTest extends UnidadeNegocioTestCase
         Storage::fake('local');
 
         $path = $this->storeSpreadsheet([
-            ['000104', 'UNIDADE CEARA', 'UNIDADE CEARA', '33333333000133', '100.00', 'NÃO', ' Ceará '],
+            $this->linhaPlanilha(['000104', 'UNIDADE CEARA', 'UNIDADE CEARA', '33333333000133', '100.00', 'NÃO', 'NÃO', 'NÃO', 'NÃO', 'NÃO', ' Ceará ']),
         ]);
 
         $importacao = UnidadeNegocioImportacao::create([
@@ -122,9 +191,9 @@ class UnidadeNegocioImportacaoTest extends UnidadeNegocioTestCase
         Storage::fake('local');
 
         $path = $this->storeSpreadsheet([
-            ['000105', 'UNIDADE DOC 1', 'UNIDADE DOC 1', '11.222.333/0001-81', '100.00', 'NÃO', 'CEARA'],
-            ['000106', 'UNIDADE DOC 2', 'UNIDADE DOC 2', '11222333000181', '100.00', 'NÃO', 'CEARA'],
-            ['000107', 'UNIDADE SEM DOC', 'UNIDADE SEM DOC', '', '100.00', 'NÃO', 'CEARA'],
+            $this->linhaPlanilha(['000105', 'UNIDADE DOC 1', 'UNIDADE DOC 1', '11.222.333/0001-81', '100.00']),
+            $this->linhaPlanilha(['000106', 'UNIDADE DOC 2', 'UNIDADE DOC 2', '11222333000181', '100.00']),
+            $this->linhaPlanilha(['000107', 'UNIDADE SEM DOC', 'UNIDADE SEM DOC', '', '100.00']),
         ]);
 
         $importacao = UnidadeNegocioImportacao::create([
@@ -169,15 +238,13 @@ class UnidadeNegocioImportacaoTest extends UnidadeNegocioTestCase
                     [
                         'row_id' => 1,
                         'linha' => 2,
-                        'dados' => [
+                        'dados' => $this->dadosImportacao([
                             'id_cigam' => '000202',
                             'razao_social' => 'CRIADA',
                             'nome' => 'CRIADA',
                             'cpf_cnpj' => '55555555000155',
                             'custo_operacional' => '25.00',
-                            'possui_estoque' => false,
-                            'id_estado' => Estado::ID_CEARA,
-                        ],
+                        ]),
                     ],
                 ],
                 'atualizacoes' => [[
@@ -185,24 +252,20 @@ class UnidadeNegocioImportacaoTest extends UnidadeNegocioTestCase
                     'unidade_negocio_id' => $existente->id,
                     'id_cigam' => '000201',
                     'linha' => 3,
-                    'dados_atuais' => [
+                    'dados_atuais' => $this->dadosImportacao([
                         'id_cigam' => '000201',
                         'razao_social' => 'ANTES',
                         'nome' => 'ANTES',
                         'cpf_cnpj' => $existente->cpf_cnpj,
                         'custo_operacional' => '0.00',
-                        'possui_estoque' => false,
-                        'id_estado' => Estado::ID_CEARA,
-                    ],
-                    'dados_novos' => [
+                    ]),
+                    'dados_novos' => $this->dadosImportacao([
                         'id_cigam' => '000201',
                         'razao_social' => 'DEPOIS',
                         'nome' => 'DEPOIS',
                         'cpf_cnpj' => $existente->cpf_cnpj,
                         'custo_operacional' => '0.00',
-                        'possui_estoque' => false,
-                        'id_estado' => Estado::ID_CEARA,
-                    ],
+                    ]),
                     'campos_alterados' => [['campo' => 'nome', 'atual' => 'ANTES', 'novo' => 'DEPOIS']],
                 ]],
                 'sem_alteracoes' => [],
@@ -219,7 +282,11 @@ class UnidadeNegocioImportacaoTest extends UnidadeNegocioTestCase
             ->assertJsonPath('resumo.criadas', 1)
             ->assertJsonPath('resumo.atualizadas', 1);
 
-        $this->assertDatabaseHas('unidades_negocio', ['id_cigam' => '000202', 'nome' => 'CRIADA']);
+        $this->assertDatabaseHas('unidades_negocio', [
+            'id_cigam' => '000202',
+            'nome' => 'CRIADA',
+            'emite_nota_fiscal' => false,
+        ]);
         $this->assertSame('DEPOIS', $existente->fresh()->nome);
     }
 
@@ -244,28 +311,24 @@ class UnidadeNegocioImportacaoTest extends UnidadeNegocioTestCase
                     [
                         'row_id' => 1,
                         'linha' => 2,
-                        'dados' => [
+                        'dados' => $this->dadosImportacao([
                             'id_cigam' => '000302',
                             'razao_social' => 'CRIADA DOC REPETIDO',
                             'nome' => 'CRIADA DOC REPETIDO',
                             'cpf_cnpj' => '11222333000181',
                             'custo_operacional' => '25.00',
-                            'possui_estoque' => false,
-                            'id_estado' => Estado::ID_CEARA,
-                        ],
+                        ]),
                     ],
                     [
                         'row_id' => 2,
                         'linha' => 3,
-                        'dados' => [
+                        'dados' => $this->dadosImportacao([
                             'id_cigam' => '000303',
                             'razao_social' => 'CRIADA SEM DOC',
                             'nome' => 'CRIADA SEM DOC',
                             'cpf_cnpj' => null,
                             'custo_operacional' => '25.00',
-                            'possui_estoque' => false,
-                            'id_estado' => Estado::ID_CEARA,
-                        ],
+                        ]),
                     ],
                 ],
                 'atualizacoes' => [],
@@ -316,24 +379,20 @@ class UnidadeNegocioImportacaoTest extends UnidadeNegocioTestCase
                     'unidade_negocio_id' => $inativa->id,
                     'id_cigam' => '000501',
                     'linha' => 2,
-                    'dados_atuais' => [
+                    'dados_atuais' => $this->dadosImportacao([
                         'id_cigam' => '000501',
                         'razao_social' => 'NOME ANTIGO',
                         'nome' => 'NOME ANTIGO',
                         'cpf_cnpj' => $inativa->cpf_cnpj,
                         'custo_operacional' => '0.00',
-                        'possui_estoque' => false,
-                        'id_estado' => Estado::ID_CEARA,
-                    ],
-                    'dados_novos' => [
+                    ]),
+                    'dados_novos' => $this->dadosImportacao([
                         'id_cigam' => '000501',
                         'razao_social' => 'NOME PLANILHA',
                         'nome' => 'NOME PLANILHA',
                         'cpf_cnpj' => $inativa->cpf_cnpj,
                         'custo_operacional' => '0.00',
-                        'possui_estoque' => false,
-                        'id_estado' => Estado::ID_CEARA,
-                    ],
+                    ]),
                     'campos_alterados' => [['campo' => 'nome', 'atual' => 'NOME ANTIGO', 'novo' => 'NOME PLANILHA']],
                 ]],
                 'sem_alteracoes' => [],
@@ -379,6 +438,61 @@ class UnidadeNegocioImportacaoTest extends UnidadeNegocioTestCase
     }
 
     /**
+     * @param  array<string, mixed>  $override
+     * @return array<string, mixed>
+     */
+    private function dadosImportacao(array $override = []): array
+    {
+        return array_merge([
+            'id_cigam' => '000001',
+            'razao_social' => 'RAZAO',
+            'nome' => 'NOME',
+            'cpf_cnpj' => null,
+            'custo_operacional' => '0.00',
+            'possui_estoque' => false,
+            'is_unidade_producao' => false,
+            'is_hub' => false,
+            'is_galpao_operacional' => false,
+            'emite_nota_fiscal' => false,
+            'id_estado' => Estado::ID_CEARA,
+        ], $override);
+    }
+
+    /**
+     * Monta linha completa da planilha (colunas A–K). Flags omitidas = NÃO; estado omitido = CEARA.
+     *
+     * @param  list<string|null>  $prefixo  [A..E] obrigatórios; F–J e K opcionais
+     * @return list<string|null>
+     */
+    private function linhaPlanilha(array $prefixo): array
+    {
+        if (count($prefixo) >= 11) {
+            return array_slice($prefixo, 0, 11);
+        }
+
+        $flags = array_slice($prefixo, 5, 5);
+        while (count($flags) < 5) {
+            $flags[] = 'NÃO';
+        }
+
+        $estado = $prefixo[10] ?? 'CEARA';
+
+        return [
+            $prefixo[0],
+            $prefixo[1],
+            $prefixo[2],
+            $prefixo[3] ?? '',
+            $prefixo[4] ?? '0.00',
+            $flags[0],
+            $flags[1],
+            $flags[2],
+            $flags[3],
+            $flags[4],
+            $estado,
+        ];
+    }
+
+    /**
      * @param  list<list<string|null>>  $rows
      */
     private function storeSpreadsheet(array $rows): string
@@ -386,7 +500,17 @@ class UnidadeNegocioImportacaoTest extends UnidadeNegocioTestCase
         $spreadsheet = new Spreadsheet;
         $sheet = $spreadsheet->getActiveSheet();
         $sheet->fromArray([
-            'ID CIGAM', 'Razão social', 'Nome', 'CPF/CNPJ', 'Custo operacional', 'Possui estoque', 'Estado',
+            'ID CIGAM',
+            'Razão social',
+            'Nome',
+            'CPF/CNPJ',
+            'Custo operacional',
+            'Controle estoque frutas',
+            'Unidade produção',
+            'Unidade HUB',
+            'Galpão operacional',
+            'Emite nota fiscal',
+            'Estado',
         ], null, 'A1');
 
         foreach ($rows as $index => $row) {

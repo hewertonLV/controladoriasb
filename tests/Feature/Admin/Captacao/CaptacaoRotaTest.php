@@ -3,13 +3,15 @@
 namespace Tests\Feature\Admin\Captacao;
 
 use App\Enums\Permissions;
+use App\Models\Captacao\CaptacaoCarteira;
 use App\Models\Captacao\CaptacaoRota;
+use App\Services\Captacao\PedidoService;
 
 class CaptacaoRotaTest extends CaptacaoTestCase
 {
     public function test_listagem_rotas_exige_permissao(): void
     {
-        $c = $this->cenarioCaptacaoBasico();
+        $this->cenarioCaptacaoBasico();
 
         $this->actingAs($this->userWithPermissions([]))
             ->get(route('admin.captacao.rotas.index'))
@@ -34,11 +36,11 @@ class CaptacaoRotaTest extends CaptacaoTestCase
 
         $this->actingAs($user)
             ->post(route('admin.captacao.rotas.store'), [
-                'id_unidade_negocio_galpao' => $c['galpao']->id,
+                'id_captacao_carteira' => $c['carteira']->id,
                 'nome' => 'Rota Norte',
                 'ativo' => '1',
             ])
-            ->assertRedirect(route('admin.captacao.rotas.index', ['galpao' => $c['galpao']->id]));
+            ->assertRedirect(route('admin.captacao.rotas.index', ['carteira' => $c['carteira']->id]));
 
         $nova = CaptacaoRota::query()->where('nome', 'Rota Norte')->first();
         $this->assertNotNull($nova);
@@ -46,7 +48,7 @@ class CaptacaoRotaTest extends CaptacaoTestCase
 
         $this->actingAs($user)
             ->put(route('admin.captacao.rotas.update', $nova), [
-                'id_unidade_negocio_galpao' => $c['galpao']->id,
+                'id_captacao_carteira' => $c['carteira']->id,
                 'nome' => 'Rota Norte Atualizada',
                 'ativo' => '0',
             ])
@@ -65,9 +67,43 @@ class CaptacaoRotaTest extends CaptacaoTestCase
 
         $this->actingAs($this->userWithPermissions([Permissions::CAPTACAO_LOTE_VISUALIZAR]))
             ->post(route('admin.captacao.rotas.store'), [
-                'id_unidade_negocio_galpao' => $c['galpao']->id,
+                'id_captacao_carteira' => $c['carteira']->id,
                 'nome' => 'Rota Bloqueada',
             ])
             ->assertForbidden();
+    }
+
+    public function test_pedido_rejeita_rota_de_outra_carteira(): void
+    {
+        $c = $this->cenarioCaptacaoBasico();
+        $lote = $this->criarLoteCaptacao($c);
+
+        $outraCarteira = CaptacaoCarteira::query()->create([
+            'nome' => 'Carteira Outra',
+            'id_unidade_negocio_faturamento' => $c['faturamento']->id,
+            'id_unidade_negocio_galpao' => $c['galpao']->id,
+            'ativo' => true,
+        ]);
+
+        $rotaOutra = CaptacaoRota::query()->create([
+            'id_captacao_carteira' => $outraCarteira->id,
+            'nome' => 'Rota Outra Carteira',
+            'ativo' => true,
+        ]);
+
+        $this->expectException(\Illuminate\Validation\ValidationException::class);
+
+        app(PedidoService::class)->salvarPedidoComItens(
+            $lote,
+            [
+                'id_cliente' => $c['cliente']->id,
+                'id_captacao_rota' => $rotaOutra->id,
+                'itens' => [
+                    ['id_fruta' => $c['fruta']->id, 'quantidade' => '1'],
+                ],
+            ],
+            \App\Enums\PedidoOrigem::Web,
+            null,
+        );
     }
 }

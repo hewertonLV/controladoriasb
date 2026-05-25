@@ -78,7 +78,7 @@ class StoreVendaMovimentacaoRequest extends FormRequest
             if ($centro !== null) {
                 $this->validarAcessoUnidade($v, 'id_unidade_negocio_centro_resultado', (int) $centro->id, 'Centro de resultado');
 
-                if ($centro->is_hub) {
+                if ($centro->is_hub && ! $centro->is_galpao_operacional) {
                     $v->errors()->add('id_unidade_negocio_centro_resultado', 'Centro de resultado não pode ser HUB.');
                 }
             }

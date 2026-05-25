@@ -121,11 +121,6 @@ trait ValidatesUnidadeNegocioAttributes
             $isGalpao = $this->boolean('is_galpao_operacional');
             $isHub = $this->boolean('is_hub');
 
-            if ($isGalpao && $isHub) {
-                $v->errors()->add('is_galpao_operacional', 'Galpão operacional não pode ser HUB.');
-                $v->errors()->add('is_hub', 'Unidade HUB não pode ser galpão operacional.');
-            }
-
             if ($isGalpao && ! $this->boolean('possui_estoque')) {
                 $v->errors()->add('is_galpao_operacional', 'Galpão operacional deve controlar estoque.');
             }

@@ -13,7 +13,7 @@
                 @include('admin.captacao.rotas._form', ['rota' => new \App\Models\Captacao\CaptacaoRota(['ativo' => true])])
                 <div class="d-flex gap-2 mt-3">
                     <button type="submit" class="btn btn-primary">Salvar rota</button>
-                    <a href="{{ route('admin.captacao.rotas.index', $galpaoId ? ['galpao' => $galpaoId] : []) }}" class="btn btn-light">Cancelar</a>
+                    <a href="{{ route('admin.captacao.rotas.index', $carteiraId ? ['carteira' => $carteiraId] : []) }}" class="btn btn-light">Cancelar</a>
                 </div>
             </form>
         </div>

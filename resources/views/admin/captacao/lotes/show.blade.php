@@ -10,19 +10,26 @@
 
     <div class="card mb-3">
         <div class="card-body">
-            <p><strong>Data:</strong> {{ $lote->data_referencia->format('d/m/Y') }}</p>
-            <p><strong>Faturamento:</strong> {{ $lote->unidadeFaturamento->nome }}</p>
-            <p><strong>Galpão:</strong> {{ $lote->unidadeGalpao->nome }}</p>
-            <p class="mb-0"><strong>Status atual:</strong> {{ $lote->status->label() }}</p>
+            <p class="mb-2 small text-muted d-flex flex-nowrap align-items-center gap-3 overflow-x-auto text-nowrap">
+                <span><strong class="text-body">Data:</strong> {{ $lote->data_referencia->format('d/m/Y') }}</span>
+                <span class="text-secondary" aria-hidden="true">·</span>
+                <span><strong class="text-body">Faturamento:</strong> {{ $lote->unidadeFaturamento->nome }}</span>
+                <span class="text-secondary" aria-hidden="true">·</span>
+                <span><strong class="text-body">Galpão:</strong> {{ $lote->unidadeGalpao->nome }}</span>
+                <span class="text-secondary" aria-hidden="true">·</span>
+                <span><strong class="text-body">Status atual:</strong> {{ $lote->status->label() }}</span>
+            </p>
             <div class="d-flex flex-wrap gap-2 mt-2 align-items-center">
-                @if ($lote->tipo === \App\Enums\CaptacaoLoteTipo::CaptacaoPedidos && $lote->status === \App\Enums\CaptacaoLoteStatus::CaptacaoEmAndamento)
+                @if ($lote->tipo === \App\Enums\CaptacaoLoteTipo::CaptacaoPedidos && ($lote->status === \App\Enums\CaptacaoLoteStatus::CaptacaoEmAndamento || $lote->status->permiteEdicaoPreco()))
                     <a href="{{ route('admin.captacao.matriz.index', ['lote' => $lote->id]) }}" class="btn btn-primary btn-sm">
-                        <i class="ri-pencil-line me-1"></i> Editar captação (matriz)
+                        <i class="ri-pencil-line me-1"></i> {{ $lote->status === \App\Enums\CaptacaoLoteStatus::CaptacaoEmAndamento ? 'Editar captação (matriz)' : 'Editar preços (matriz)' }}
                     </a>
                 @endif
-                @canany(['captacao.cliente_fruta.vincular', 'captacao.pedido.editar', 'captacao.lote.visualizar'])
-                    <a href="{{ route('admin.captacao.frutas-por-loja.index', ['faturamento' => $lote->id_unidade_negocio_faturamento]) }}" class="btn btn-soft-primary btn-sm">Frutas por loja</a>
-                @endcanany
+                @if ($lote->tipo === \App\Enums\CaptacaoLoteTipo::CaptacaoPedidos && $lote->status->exibeAbaArquivoCiganTransferencia())
+                    <a href="{{ route('admin.captacao.matriz.index', ['lote' => $lote->id, 'aba' => 'arquivo-cigan']) }}" class="btn btn-soft-info btn-sm">
+                        <i class="ri-download-2-line me-1"></i> Arquivo Cigan (matriz)
+                    </a>
+                @endif
                 @if ($lote->status === \App\Enums\CaptacaoLoteStatus::AguardandoVinculoFrete)
                     @can('captacao.lote.frete.vincular')
                         <a href="{{ route('admin.captacao.lotes.fretes.index', $lote) }}" class="btn btn-sm btn-soft-warning">Vincular frete (opcional)</a>

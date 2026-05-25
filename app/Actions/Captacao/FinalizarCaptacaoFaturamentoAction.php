@@ -7,13 +7,19 @@ use App\Enums\CaptacaoLoteStatus;
 use App\Enums\CaptacaoLoteTipo;
 use App\Models\Captacao\CaptacaoFaturamentoDia;
 use App\Models\Captacao\CaptacaoLote;
-use App\Models\Captacao\Pedido;
 use App\Models\User;
+use App\Services\Captacao\CaptacaoLoteService;
+use App\Services\Captacao\PedidoCaptacaoEstadoService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
 final class FinalizarCaptacaoFaturamentoAction
 {
+    public function __construct(
+        private readonly PedidoCaptacaoEstadoService $estadoCaptacao,
+        private readonly CaptacaoLoteService $lotes,
+    ) {}
+
     public function executar(string $dataReferencia, int $idUnidadeFaturamento, User $user): CaptacaoFaturamentoDia
     {
         $lotes = CaptacaoLote::query()
@@ -21,7 +27,7 @@ final class FinalizarCaptacaoFaturamentoAction
             ->where('id_unidade_negocio_faturamento', $idUnidadeFaturamento)
             ->where('tipo', CaptacaoLoteTipo::CaptacaoPedidos->value)
             ->where('status', CaptacaoLoteStatus::CaptacaoEmAndamento->value)
-            ->with(['unidadeGalpao:id,nome', 'pedidos.cliente', 'pedidos.itens'])
+            ->with(['carteira:id,nome', 'unidadeGalpao:id,nome', 'pedidos.cliente', 'pedidos.itens'])
             ->get();
 
         if ($lotes->isEmpty()) {
@@ -31,24 +37,16 @@ final class FinalizarCaptacaoFaturamentoAction
         }
 
         foreach ($lotes as $lote) {
-            $this->assertPedidosComQuantidadeTemRota($lote);
+            $this->assertTodasLojasConcluidas($lote);
         }
 
         return DB::transaction(function () use ($dataReferencia, $idUnidadeFaturamento, $user, $lotes): CaptacaoFaturamentoDia {
-            $dia = CaptacaoFaturamentoDia::query()->firstOrCreate(
-                [
-                    'data_referencia' => $dataReferencia,
-                    'id_unidade_negocio_faturamento' => $idUnidadeFaturamento,
-                ],
-                [
-                    'status' => CaptacaoFaturamentoDiaStatus::CaptacaoAberta,
-                ],
-            );
+            $dia = $this->lotes->resolverFaturamentoDia($dataReferencia, $idUnidadeFaturamento);
 
             if ($dia->status === CaptacaoFaturamentoDiaStatus::CaptacaoFaturamentoFinalizada) {
-                throw ValidationException::withMessages([
-                    'data_referencia' => 'Captação já finalizada para esta data e faturamento.',
-                ]);
+                $this->lotes->sincronizarLotesEmAndamentoQuandoDiaFinalizado($dataReferencia, $idUnidadeFaturamento);
+
+                return $dia->refresh();
             }
 
             foreach ($lotes as $lote) {
@@ -65,31 +63,19 @@ final class FinalizarCaptacaoFaturamentoAction
         });
     }
 
-    private function assertPedidosComQuantidadeTemRota(CaptacaoLote $lote): void
+    private function assertTodasLojasConcluidas(CaptacaoLote $lote): void
     {
-        foreach ($lote->pedidos as $pedido) {
-            if (! $this->pedidoTemQuantidadeCaptada($pedido)) {
-                continue;
-            }
-
-            if ($pedido->id_captacao_rota === null) {
-                $nomeLoja = $pedido->cliente?->fantasia ?: $pedido->cliente?->razao_social ?: "#{$pedido->id_cliente}";
-
-                throw ValidationException::withMessages([
-                    'pedidos' => "A loja «{$nomeLoja}» (galpão {$lote->unidadeGalpao?->nome}) tem quantidade na matriz, mas está sem rota. Vincule a rota no pedido antes de finalizar.",
-                ]);
-            }
-        }
-    }
-
-    private function pedidoTemQuantidadeCaptada(Pedido $pedido): bool
-    {
-        foreach ($pedido->itens as $item) {
-            if ((float) $item->quantidade > 0) {
-                return true;
-            }
+        if ($this->estadoCaptacao->todasLojasElegiveisConcluidas($lote)) {
+            return;
         }
 
-        return false;
+        $pendentes = $this->estadoCaptacao->lojasComPedidoNaoConcluido($lote)
+            ->take(5)
+            ->map(fn ($c) => $c->fantasia ?: $c->razao_social)
+            ->implode(', ');
+
+        throw ValidationException::withMessages([
+            'pedidos' => "Conclua a captação de todas as lojas da carteira «{$lote->carteira?->nome}» antes de finalizar. Pendentes: {$pendentes}.",
+        ]);
     }
 }

@@ -14,6 +14,31 @@ final class ClienteFrutaVinculoService
     /**
      * @param  list<int>  $idFrutas
      */
+    /**
+     * Adiciona frutas ao vínculo da loja sem remover as já cadastradas.
+     *
+     * @param  list<int>  $idFrutas
+     */
+    public function adicionarFrutas(Cliente $cliente, array $idFrutas): void
+    {
+        foreach (collect($idFrutas)->map(fn ($id) => (int) $id)->unique() as $idFruta) {
+            if ($idFruta < 1) {
+                continue;
+            }
+
+            ClienteFrutaVinculo::query()->updateOrCreate(
+                [
+                    'id_cliente' => $cliente->id,
+                    'id_fruta' => $idFruta,
+                ],
+                ['ativo' => true],
+            );
+        }
+    }
+
+    /**
+     * @param  list<int>  $idFrutas
+     */
     public function sincronizarFrutas(Cliente $cliente, array $idFrutas): void
     {
         $idFrutas = collect($idFrutas)->map(fn ($id) => (int) $id)->unique()->values();
@@ -49,6 +74,29 @@ final class ClienteFrutaVinculoService
             ->where('id_fruta', $idFruta)
             ->where('ativo', true)
             ->exists();
+    }
+
+    /**
+     * @return Collection<int, Fruta>
+     */
+    public function frutasVinculadasDoCliente(int $idCliente): Collection
+    {
+        $ids = ClienteFrutaVinculo::query()
+            ->where('id_cliente', $idCliente)
+            ->where('ativo', true)
+            ->pluck('id_fruta')
+            ->map(fn ($id) => (int) $id)
+            ->unique()
+            ->values();
+
+        if ($ids->isEmpty()) {
+            return collect();
+        }
+
+        return Fruta::query()
+            ->whereIn('id', $ids->all())
+            ->orderBy('nome')
+            ->get();
     }
 
     /**
@@ -117,19 +165,30 @@ final class ClienteFrutaVinculoService
 
         $idsNoLote = $lote->pedidos->pluck('id_cliente')->unique();
 
-        return Cliente::query()
-            ->where('id_unidade_negocio', $lote->id_unidade_negocio_faturamento)
+        $query = Cliente::query()
             ->when($idsNoLote->isNotEmpty(), fn ($q) => $q->whereNotIn('id', $idsNoLote))
-            ->whereHas('frutaVinculos', fn ($q) => $q->where('ativo', true))
-            ->orderBy('razao_social')
-            ->get(['id', 'razao_social', 'fantasia']);
+            ->orderBy('razao_social');
+
+        if ($lote->id_captacao_carteira !== null) {
+            $query->where('id_captacao_carteira', $lote->id_captacao_carteira);
+        } else {
+            $query->where('id_unidade_negocio', $lote->id_unidade_negocio_faturamento);
+        }
+
+        return $query->get(['id', 'razao_social', 'fantasia']);
     }
 
     public function assertClienteElegivelParaMatriz(CaptacaoLote $lote, int $idCliente): Cliente
     {
         $cliente = Cliente::query()->findOrFail($idCliente);
 
-        if ((int) $cliente->id_unidade_negocio !== (int) $lote->id_unidade_negocio_faturamento) {
+        if ($lote->id_captacao_carteira !== null) {
+            if ((int) $cliente->id_captacao_carteira !== (int) $lote->id_captacao_carteira) {
+                throw ValidationException::withMessages([
+                    'id_cliente' => 'A loja não pertence à carteira deste lote.',
+                ]);
+            }
+        } elseif ((int) $cliente->id_unidade_negocio !== (int) $lote->id_unidade_negocio_faturamento) {
             throw ValidationException::withMessages([
                 'id_cliente' => 'A loja não pertence à unidade de faturamento deste lote.',
             ]);

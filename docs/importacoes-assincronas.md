@@ -31,8 +31,10 @@ As migrations padrão do projeto criam:
 ## Worker Local
 
 ```bash
-php artisan queue:work --queue=imports --sleep=3 --tries=3 --timeout=300
+php artisan queue:work --queue=imports,grupos-importacao,pracas-importacao,captacao-importacao --sleep=3 --tries=3 --timeout=900
 ```
+
+Importação **Frutas por loja** usa a fila `captacao-importacao` — ela precisa estar na lista do `queue:work` (já incluída no `worker-importacao` do `docker-compose.yml`).
 
 Para validar sem deixar o terminal preso quando não há jobs:
 

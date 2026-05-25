@@ -50,9 +50,9 @@
                                 @endcan
 
                                 @canany(['captacao.cliente_fruta.vincular', 'captacao.pedido.editar', 'captacao.lote.visualizar'])
-                                    <a href="{{ route('admin.captacao.clientes.frutas.index', $cliente) }}"
+                                    <a href="{{ route('admin.captacao.frutas-por-loja.show', $cliente) }}"
                                        class="admin-datatable-action-link text-success"
-                                       title="Frutas da loja (captação)">
+                                       title="Detalhe — frutas da loja (captação)">
                                         <i class="ri-apple-line"></i>
                                     </a>
                                 @endcanany

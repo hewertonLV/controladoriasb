@@ -5,12 +5,14 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Admin\StoreVeiculoRequest;
 use App\Http\Requests\Admin\UpdateVeiculoRequest;
+use App\Models\UnidadeNegocio;
 use App\Models\Veiculo;
 use App\Models\VeiculoHistorico;
 use App\Queries\VeiculoQuery;
 use App\Services\Veiculos\VeiculoAuditoriaService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
 
@@ -38,6 +40,7 @@ class VeiculoController extends Controller
             'veiculo' => new Veiculo([
                 'status' => 'ATIVO',
             ]),
+            'unidadesNegocio' => $this->unidadesParaSelect(),
         ]);
     }
 
@@ -67,6 +70,7 @@ class VeiculoController extends Controller
     {
         return view('admin.veiculos.edit', [
             'veiculo' => $veiculo,
+            'unidadesNegocio' => $this->unidadesParaSelect(),
         ]);
     }
 
@@ -148,5 +152,15 @@ class VeiculoController extends Controller
             'veiculo' => $veiculo,
             'historicos' => $historicos,
         ]);
+    }
+
+    /**
+     * @return Collection<int, UnidadeNegocio>
+     */
+    private function unidadesParaSelect(): Collection
+    {
+        return UnidadeNegocio::query()
+            ->orderBy('nome')
+            ->get(['id', 'nome', 'id_cigam']);
     }
 }

@@ -23,8 +23,11 @@ class Pedido extends Model
         'id_captacao_lote',
         'id_cliente',
         'id_captacao_rota',
+        'numero_pedido',
+        'ordem_carregamento',
         'data_entrega',
         'origem',
+        'captacao_concluida',
         'created_by_user_id',
     ];
 
@@ -36,6 +39,7 @@ class Pedido extends Model
         return [
             'data_entrega' => 'date',
             'origem' => PedidoOrigem::class,
+            'captacao_concluida' => 'boolean',
         ];
     }
 

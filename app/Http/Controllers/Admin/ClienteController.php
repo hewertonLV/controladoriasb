@@ -11,7 +11,10 @@ use App\Models\Grupo;
 use App\Models\Praca;
 use App\Models\UnidadeNegocio;
 use App\Queries\ClienteQuery;
+use App\Models\Captacao\CaptacaoCarteira;
+use App\Services\Captacao\ClienteCaptacaoAgendaService;
 use App\Services\Clientes\ClienteAuditoriaService;
+use App\Support\Captacao\DiasSemanaCaptacao;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -48,16 +51,26 @@ class ClienteController extends Controller
             'unidadesNegocio' => $this->unidadesParaFormulario(),
             'pracas' => $this->pracasParaFormulario(),
             'grupos' => $this->gruposParaFormulario(),
+            'carteirasCaptacao' => $this->carteirasParaFormulario(),
+            'diasSemanaCaptacao' => DiasSemanaCaptacao::labels(),
+            'diasCriacaoPedido' => [],
+            'diasEnvioPedido' => [],
         ]);
     }
 
     public function store(StoreClienteRequest $request): RedirectResponse
     {
         $user = $request->user();
-        $dados = $request->validated();
+        $dados = $request->dadosClientePersistencia();
 
-        $cliente = DB::transaction(function () use ($dados, $user) {
+        $cliente = DB::transaction(function () use ($dados, $user, $request) {
             $cliente = Cliente::create($dados);
+
+            app(ClienteCaptacaoAgendaService::class)->sincronizar(
+                $cliente,
+                (array) $request->input('dias_criacao_pedido', []),
+                (array) $request->input('dias_envio_pedido', []),
+            );
 
             $this->auditoria->registrarCriacao(
                 $cliente,
@@ -75,23 +88,35 @@ class ClienteController extends Controller
 
     public function edit(Cliente $cliente): View
     {
+        $agenda = app(ClienteCaptacaoAgendaService::class)->diasPorCliente($cliente);
+
         return view('admin.clientes.edit', [
             'cliente' => $cliente->load(['praca', 'grupo']),
             'unidadesNegocio' => $this->unidadesParaFormulario(),
             'pracas' => $this->pracasParaFormulario(),
             'grupos' => $this->gruposParaFormulario(),
+            'carteirasCaptacao' => $this->carteirasParaFormulario(),
+            'diasSemanaCaptacao' => DiasSemanaCaptacao::labels(),
+            'diasCriacaoPedido' => $agenda['criacao'],
+            'diasEnvioPedido' => $agenda['envio'],
         ]);
     }
 
     public function update(UpdateClienteRequest $request, Cliente $cliente): RedirectResponse
     {
         $user = $request->user();
-        $dados = $request->validated();
+        $dados = $request->dadosClientePersistencia();
 
-        DB::transaction(function () use ($cliente, $dados, $user) {
+        DB::transaction(function () use ($cliente, $dados, $user, $request) {
             $antes = $this->auditoria->snapshot($cliente);
 
             $cliente->update($dados);
+
+            app(ClienteCaptacaoAgendaService::class)->sincronizar(
+                $cliente,
+                (array) $request->input('dias_criacao_pedido', []),
+                (array) $request->input('dias_envio_pedido', []),
+            );
 
             $depois = $this->auditoria->snapshot($cliente->fresh());
 
@@ -149,6 +174,17 @@ class ClienteController extends Controller
     private function gruposParaFormulario()
     {
         return Grupo::query()
+            ->orderBy('nome')
+            ->get(['id', 'nome']);
+    }
+
+    /**
+     * @return Collection<int, CaptacaoCarteira>
+     */
+    private function carteirasParaFormulario()
+    {
+        return CaptacaoCarteira::query()
+            ->where('ativo', true)
             ->orderBy('nome')
             ->get(['id', 'nome']);
     }

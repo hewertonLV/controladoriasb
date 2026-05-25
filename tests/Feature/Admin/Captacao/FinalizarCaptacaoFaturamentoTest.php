@@ -16,18 +16,13 @@ class FinalizarCaptacaoFaturamentoTest extends CaptacaoTestCase
         $user = $this->captacaoManager();
         $user->unidadesNegocio()->sync([$c['faturamento']->id, $c['galpao']->id]);
 
-        $lote = CaptacaoLote::query()->create([
-            'data_referencia' => '2026-05-29',
-            'id_unidade_negocio_faturamento' => $c['faturamento']->id,
-            'id_unidade_negocio_galpao' => $c['galpao']->id,
-            'tipo' => 'CAPTACAO_PEDIDOS',
-            'status' => CaptacaoLoteStatus::CaptacaoEmAndamento,
-        ]);
+        $lote = $this->criarLoteCaptacao($c);
 
         $pedido = Pedido::query()->create([
             'id_captacao_lote' => $lote->id,
             'id_cliente' => $c['cliente']->id,
             'id_captacao_rota' => $c['rota']->id,
+            'captacao_concluida' => true,
             'origem' => PedidoOrigem::Web,
         ]);
 
@@ -53,24 +48,19 @@ class FinalizarCaptacaoFaturamentoTest extends CaptacaoTestCase
         );
     }
 
-    public function test_finalizar_bloqueia_loja_com_quantidade_sem_rota_e_exibe_erro(): void
+    public function test_finalizar_permite_loja_com_quantidade_sem_rota(): void
     {
         $c = $this->cenarioCaptacaoBasico();
         $user = $this->captacaoManager();
         $user->unidadesNegocio()->sync([$c['faturamento']->id, $c['galpao']->id]);
 
-        $lote = CaptacaoLote::query()->create([
-            'data_referencia' => '2026-05-29',
-            'id_unidade_negocio_faturamento' => $c['faturamento']->id,
-            'id_unidade_negocio_galpao' => $c['galpao']->id,
-            'tipo' => 'CAPTACAO_PEDIDOS',
-            'status' => CaptacaoLoteStatus::CaptacaoEmAndamento,
-        ]);
+        $lote = $this->criarLoteCaptacao($c);
 
         $pedido = Pedido::query()->create([
             'id_captacao_lote' => $lote->id,
             'id_cliente' => $c['cliente']->id,
             'id_captacao_rota' => null,
+            'captacao_concluida' => true,
             'origem' => PedidoOrigem::Web,
         ]);
 
@@ -81,17 +71,19 @@ class FinalizarCaptacaoFaturamentoTest extends CaptacaoTestCase
             'version' => 1,
         ]);
 
-        $response = $this->actingAs($user)
-            ->from(route('admin.captacao.lotes.show', $lote))
+        $this->actingAs($user)
             ->post(route('admin.captacao.faturamento.finalizar'), [
                 'data_referencia' => '2026-05-29',
                 'id_unidade_negocio_faturamento' => $c['faturamento']->id,
                 'id_captacao_lote' => $lote->id,
-            ]);
+            ])
+            ->assertRedirect(route('admin.captacao.lotes.show', $lote))
+            ->assertSessionHas('success');
 
-        $response->assertRedirect(route('admin.captacao.lotes.show', $lote));
-        $response->assertSessionHasErrors('pedidos');
-        $this->assertSame(CaptacaoLoteStatus::CaptacaoEmAndamento, $lote->fresh()->status);
+        $this->assertSame(
+            CaptacaoLoteStatus::AguardandoTransferenciaCigan,
+            $lote->fresh()->status,
+        );
     }
 
     public function test_finalizar_permite_loja_na_matriz_sem_rota_se_sem_quantidade(): void
@@ -100,18 +92,13 @@ class FinalizarCaptacaoFaturamentoTest extends CaptacaoTestCase
         $user = $this->captacaoManager();
         $user->unidadesNegocio()->sync([$c['faturamento']->id, $c['galpao']->id]);
 
-        $lote = CaptacaoLote::query()->create([
-            'data_referencia' => '2026-05-29',
-            'id_unidade_negocio_faturamento' => $c['faturamento']->id,
-            'id_unidade_negocio_galpao' => $c['galpao']->id,
-            'tipo' => 'CAPTACAO_PEDIDOS',
-            'status' => CaptacaoLoteStatus::CaptacaoEmAndamento,
-        ]);
+        $lote = $this->criarLoteCaptacao($c);
 
         Pedido::query()->create([
             'id_captacao_lote' => $lote->id,
             'id_cliente' => $c['cliente']->id,
             'id_captacao_rota' => null,
+            'captacao_concluida' => true,
             'origem' => PedidoOrigem::Web,
         ]);
 
@@ -123,5 +110,91 @@ class FinalizarCaptacaoFaturamentoTest extends CaptacaoTestCase
             ])
             ->assertRedirect(route('admin.captacao.lotes.show', $lote))
             ->assertSessionHas('success');
+    }
+
+    public function test_finalizar_permite_loja_sem_pedido_no_dia(): void
+    {
+        $c = $this->cenarioCaptacaoBasico();
+        $user = $this->captacaoManager();
+        $user->unidadesNegocio()->sync([$c['faturamento']->id, $c['galpao']->id]);
+
+        $lote = $this->criarLoteCaptacao($c);
+
+        $clienteSemPedido = \App\Models\Cliente::factory()->create([
+            'id_unidade_negocio' => $c['faturamento']->id,
+            'id_captacao_carteira' => $c['carteira']->id,
+            'razao_social' => 'LOJA SEM PEDIDO HOJE',
+        ]);
+        app(\App\Services\Captacao\ClienteFrutaVinculoService::class)->sincronizarFrutas($clienteSemPedido, [$c['fruta']->id]);
+
+        $pedido = Pedido::query()->create([
+            'id_captacao_lote' => $lote->id,
+            'id_cliente' => $c['cliente']->id,
+            'captacao_concluida' => true,
+            'origem' => PedidoOrigem::Web,
+        ]);
+
+        PedidoItem::query()->create([
+            'id_pedido' => $pedido->id,
+            'id_fruta' => $c['fruta']->id,
+            'quantidade' => 4,
+            'version' => 1,
+        ]);
+
+        $this->actingAs($user)
+            ->post(route('admin.captacao.faturamento.finalizar'), [
+                'data_referencia' => '2026-05-29',
+                'id_unidade_negocio_faturamento' => $c['faturamento']->id,
+                'id_captacao_lote' => $lote->id,
+            ])
+            ->assertRedirect(route('admin.captacao.lotes.show', $lote))
+            ->assertSessionHas('success');
+    }
+
+    public function test_finalizar_reconcilia_lote_quando_dia_ja_finalizado(): void
+    {
+        $c = $this->cenarioCaptacaoBasico();
+        $user = $this->captacaoManager();
+        $user->unidadesNegocio()->sync([$c['faturamento']->id, $c['galpao']->id]);
+
+        $lote = $this->criarLoteCaptacao($c, '2026-05-25');
+
+        $pedido = Pedido::query()->create([
+            'id_captacao_lote' => $lote->id,
+            'id_cliente' => $c['cliente']->id,
+            'captacao_concluida' => true,
+            'origem' => PedidoOrigem::Web,
+        ]);
+
+        PedidoItem::query()->create([
+            'id_pedido' => $pedido->id,
+            'id_fruta' => $c['fruta']->id,
+            'quantidade' => 2,
+            'version' => 1,
+        ]);
+
+        \App\Models\Captacao\CaptacaoFaturamentoDia::query()->create([
+            'data_referencia' => '2026-05-25',
+            'id_unidade_negocio_faturamento' => $c['faturamento']->id,
+            'status' => \App\Enums\CaptacaoFaturamentoDiaStatus::CaptacaoFaturamentoFinalizada,
+            'finalizado_em' => now(),
+            'finalizado_por_user_id' => $user->id,
+        ]);
+
+        $this->assertSame(CaptacaoLoteStatus::CaptacaoEmAndamento, $lote->fresh()->status);
+
+        $this->actingAs($user)
+            ->post(route('admin.captacao.faturamento.finalizar'), [
+                'data_referencia' => '2026-05-25',
+                'id_unidade_negocio_faturamento' => $c['faturamento']->id,
+                'id_captacao_lote' => $lote->id,
+            ])
+            ->assertRedirect(route('admin.captacao.lotes.show', $lote))
+            ->assertSessionHas('success');
+
+        $this->assertSame(
+            CaptacaoLoteStatus::AguardandoTransferenciaCigan,
+            $lote->fresh()->status,
+        );
     }
 }

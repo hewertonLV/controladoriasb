@@ -20,8 +20,12 @@ use PhpOffice\PhpSpreadsheet\Spreadsheet;
  *  - C: nome
  *  - D: cpf_cnpj
  *  - E: custo_operacional
- *  - F: possui_estoque (SIM/NÃO, S/N, 1/0, VERDADEIRO/FALSO)
- *  - G: estado (abreviação ou nome cadastrado, ex.: CE ou CEARA)
+ *  - F: possui_estoque — controla estoque de frutas (vazio = NÃO)
+ *  - G: is_unidade_producao — fazenda (vazio = NÃO)
+ *  - H: is_hub (vazio = NÃO)
+ *  - I: is_galpao_operacional — galpão / centro resultado regional (vazio = NÃO)
+ *  - J: emite_nota_fiscal — NF e faturamento na captação (vazio = NÃO)
+ *  - K: estado (abreviação ou nome cadastrado, ex.: CE ou CEARA)
  *
  * @see UnidadeNegocioImportacaoController::confirmar para persistência.
  */
@@ -89,6 +93,10 @@ class UnidadeNegocioImportacaoProcessor
                 $sheet->getCell('E'.$r)->getValue(),
                 $sheet->getCell('F'.$r)->getValue(),
                 $sheet->getCell('G'.$r)->getValue(),
+                $sheet->getCell('H'.$r)->getValue(),
+                $sheet->getCell('I'.$r)->getValue(),
+                $sheet->getCell('J'.$r)->getValue(),
+                $sheet->getCell('K'.$r)->getValue(),
             ];
 
             $linhasProcessadas++;
@@ -229,7 +237,7 @@ class UnidadeNegocioImportacaoProcessor
 
     /**
      * @param  list<mixed>  $dadosBrutos
-     * @return array{dados: array{id_cigam: string, razao_social: string, nome: string, cpf_cnpj: string|null, custo_operacional: string, possui_estoque: bool, id_estado: int}, erros: list<string>}
+     * @return array{dados: array{id_cigam: string, razao_social: string, nome: string, cpf_cnpj: string|null, custo_operacional: string, possui_estoque: bool, is_unidade_producao: bool, is_hub: bool, is_galpao_operacional: bool, emite_nota_fiscal: bool, id_estado: int}, erros: list<string>}
      */
     private function normalizeRow(array $dadosBrutos): array
     {
@@ -239,9 +247,13 @@ class UnidadeNegocioImportacaoProcessor
         $cpfCnpj = TextoCadastro::somenteDigitos((string) ($dadosBrutos[3] ?? ''));
         $custoOperacional = TextoCadastro::normalizarValorMonetarioBrasileiro($dadosBrutos[4] ?? '0');
 
-        $possuiParsed = $this->parsePossuiEstoquePlanilha($dadosBrutos[5] ?? null);
+        $possuiParsed = $this->parseSimNaoPlanilha($dadosBrutos[5] ?? null, 'Controle estoque de frutas', 'F');
+        $producaoParsed = $this->parseSimNaoPlanilha($dadosBrutos[6] ?? null, 'Unidade de produção', 'G');
+        $hubParsed = $this->parseSimNaoPlanilha($dadosBrutos[7] ?? null, 'Unidade HUB', 'H');
+        $galpaoParsed = $this->parseSimNaoPlanilha($dadosBrutos[8] ?? null, 'Galpão operacional', 'I');
+        $emiteNfParsed = $this->parseSimNaoPlanilha($dadosBrutos[9] ?? null, 'Emite nota fiscal', 'J');
 
-        $estadoBusca = TextoCadastro::normalizarBuscaEstado(trim((string) ($dadosBrutos[6] ?? '')));
+        $estadoBusca = TextoCadastro::normalizarBuscaEstado(trim((string) ($dadosBrutos[10] ?? '')));
         $idEstado = $estadoBusca === '' ? null : ($this->idsEstadoPorBusca()[$estadoBusca] ?? null);
 
         $erros = [];
@@ -268,13 +280,27 @@ class UnidadeNegocioImportacaoProcessor
             $erros[] = 'CPF/CNPJ deve ter 11 dígitos (CPF) ou 14 dígitos (CNPJ).';
         }
 
-        $erros = array_merge($erros, $possuiParsed['erros']);
+        $erros = array_merge(
+            $erros,
+            $possuiParsed['erros'],
+            $producaoParsed['erros'],
+            $hubParsed['erros'],
+            $galpaoParsed['erros'],
+            $emiteNfParsed['erros'],
+        );
 
         if ($estadoBusca === '') {
-            $erros[] = 'Estado (coluna G) é obrigatório. Informe a abreviação ou o nome cadastrado (ex.: CE ou CEARA).';
+            $erros[] = 'Estado (coluna K) é obrigatório. Informe a abreviação ou o nome cadastrado (ex.: CE ou CEARA).';
         } elseif ($idEstado === null) {
-            $erros[] = 'Estado inválido na coluna G. Valores aceitos: '.implode(', ', array_keys($this->idsEstadoPorBusca())).'.';
+            $erros[] = 'Estado inválido na coluna K. Valores aceitos: '.implode(', ', array_keys($this->idsEstadoPorBusca())).'.';
         }
+
+        $erros = array_merge($erros, $this->errosCombinacaoFlags(
+            $possuiParsed['valor'],
+            $hubParsed['valor'],
+            $galpaoParsed['valor'],
+            $emiteNfParsed['valor'],
+        ));
 
         return [
             'dados' => [
@@ -284,10 +310,36 @@ class UnidadeNegocioImportacaoProcessor
                 'cpf_cnpj' => $cpfCnpj === '' ? null : $cpfCnpj,
                 'custo_operacional' => $custoOperacional,
                 'possui_estoque' => $possuiParsed['valor'],
+                'is_unidade_producao' => $producaoParsed['valor'],
+                'is_hub' => $hubParsed['valor'],
+                'is_galpao_operacional' => $galpaoParsed['valor'],
+                'emite_nota_fiscal' => $emiteNfParsed['valor'],
                 'id_estado' => (int) ($idEstado ?? 0),
             ],
             'erros' => $erros,
         ];
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function errosCombinacaoFlags(
+        bool $possuiEstoque,
+        bool $isHub,
+        bool $isGalpao,
+        bool $emiteNotaFiscal,
+    ): array {
+        $erros = [];
+
+        if ($isGalpao && ! $possuiEstoque) {
+            $erros[] = 'Galpão operacional (coluna I) exige Controle estoque de frutas = SIM (coluna F).';
+        }
+
+        if ($isHub && $emiteNotaFiscal) {
+            $erros[] = 'Unidade HUB (coluna H) não pode ter Emite nota fiscal = SIM (coluna J).';
+        }
+
+        return $erros;
     }
 
     /**
@@ -320,24 +372,20 @@ class UnidadeNegocioImportacaoProcessor
     }
 
     /**
+     * Célula vazia → NÃO (false). Valores aceitos: SIM/NÃO, S/N, 1/0, VERDADEIRO/FALSO.
+     *
      * @return array{valor: bool, erros: list<string>}
      */
-    private function parsePossuiEstoquePlanilha(mixed $raw): array
+    private function parseSimNaoPlanilha(mixed $raw, string $rotulo, string $coluna): array
     {
         if ($raw === null) {
-            return [
-                'valor' => false,
-                'erros' => ['Possui estoque (coluna F) é obrigatório: use SIM ou NÃO.'],
-            ];
+            return ['valor' => false, 'erros' => []];
         }
 
         $t = TextoCadastro::normalizarMaiusculas(trim((string) $raw));
 
         if ($t === '') {
-            return [
-                'valor' => false,
-                'erros' => ['Possui estoque (coluna F) é obrigatório: use SIM ou NÃO.'],
-            ];
+            return ['valor' => false, 'erros' => []];
         }
 
         if (in_array($t, ['1', 'S', 'SIM', 'Y', 'YES', 'TRUE', 'VERDADEIRO'], true)) {
@@ -350,7 +398,7 @@ class UnidadeNegocioImportacaoProcessor
 
         return [
             'valor' => false,
-            'erros' => ['Possui estoque (coluna F): valor inválido. Use SIM ou NÃO.'],
+            'erros' => ["{$rotulo} (coluna {$coluna}): valor inválido. Use SIM ou NÃO."],
         ];
     }
 
@@ -507,14 +555,31 @@ class UnidadeNegocioImportacaoProcessor
     private function diffCampos(UnidadeNegocio $unidade, array $dados): array
     {
         $diff = [];
-        $campos = ['razao_social', 'nome', 'cpf_cnpj', 'custo_operacional', 'possui_estoque', 'id_estado'];
+        $campos = [
+            'razao_social',
+            'nome',
+            'cpf_cnpj',
+            'custo_operacional',
+            'possui_estoque',
+            'is_unidade_producao',
+            'is_hub',
+            'is_galpao_operacional',
+            'emite_nota_fiscal',
+            'id_estado',
+        ];
 
         foreach ($campos as $campo) {
             if ($campo === 'custo_operacional') {
                 $atual = number_format((float) $unidade->custo_operacional, 2, '.', '');
                 $novo = number_format((float) ($dados[$campo] ?? 0), 2, '.', '');
-            } elseif ($campo === 'possui_estoque') {
-                $atual = (bool) $unidade->possui_estoque ? '1' : '0';
+            } elseif (in_array($campo, [
+                'possui_estoque',
+                'is_unidade_producao',
+                'is_hub',
+                'is_galpao_operacional',
+                'emite_nota_fiscal',
+            ], true)) {
+                $atual = (bool) $unidade->{$campo} ? '1' : '0';
                 $novo = ! empty($dados[$campo]) ? '1' : '0';
             } elseif ($campo === 'id_estado') {
                 $atual = (string) (int) $unidade->id_estado;
@@ -527,7 +592,7 @@ class UnidadeNegocioImportacaoProcessor
             if ($atual !== $novo) {
                 $atualValor = match ($campo) {
                     'custo_operacional' => $atual,
-                    'possui_estoque' => (bool) $unidade->possui_estoque,
+                    'possui_estoque', 'is_unidade_producao', 'is_hub', 'is_galpao_operacional', 'emite_nota_fiscal' => (bool) $unidade->{$campo},
                     'id_estado' => (int) $unidade->id_estado,
                     default => $unidade->{$campo},
                 };
@@ -555,6 +620,10 @@ class UnidadeNegocioImportacaoProcessor
             'cpf_cnpj' => $unidade->cpf_cnpj,
             'custo_operacional' => number_format((float) $unidade->custo_operacional, 2, '.', ''),
             'possui_estoque' => (bool) $unidade->possui_estoque,
+            'is_unidade_producao' => (bool) $unidade->is_unidade_producao,
+            'is_hub' => (bool) $unidade->is_hub,
+            'is_galpao_operacional' => (bool) $unidade->is_galpao_operacional,
+            'emite_nota_fiscal' => (bool) $unidade->emite_nota_fiscal,
             'id_estado' => (int) $unidade->id_estado,
         ];
     }

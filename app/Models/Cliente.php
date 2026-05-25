@@ -2,6 +2,8 @@
 
 namespace App\Models;
 
+use App\Models\Captacao\CaptacaoCarteira;
+use App\Models\Captacao\ClienteCaptacaoAgenda;
 use App\Models\Captacao\ClienteFrutaVinculo;
 use App\Support\TextoCadastro;
 use Illuminate\Database\Eloquent\Casts\Attribute;
@@ -46,7 +48,9 @@ class Cliente extends Model
         'id_praca',
         'grupo_id',
         'id_unidade_negocio',
+        'id_captacao_carteira',
         'desconto_nf',
+        'percentual_margem_alvo',
     ];
 
     /**
@@ -58,8 +62,10 @@ class Cliente extends Model
             'id_praca' => 'integer',
             'grupo_id' => 'integer',
             'id_unidade_negocio' => 'integer',
+            'id_captacao_carteira' => 'integer',
             'fantasia' => 'string',
             'desconto_nf' => 'decimal:2',
+            'percentual_margem_alvo' => 'decimal:2',
         ];
     }
 
@@ -144,6 +150,19 @@ class Cliente extends Model
     public function unidadeNegocio(): BelongsTo
     {
         return $this->belongsTo(UnidadeNegocio::class, 'id_unidade_negocio');
+    }
+
+    public function captacaoCarteira(): BelongsTo
+    {
+        return $this->belongsTo(CaptacaoCarteira::class, 'id_captacao_carteira');
+    }
+
+    /**
+     * @return HasMany<ClienteCaptacaoAgenda, $this>
+     */
+    public function captacaoAgenda(): HasMany
+    {
+        return $this->hasMany(ClienteCaptacaoAgenda::class, 'id_cliente');
     }
 
     /**

@@ -19,6 +19,8 @@ class UnidadeNegocioAuditoriaService
         'possui_estoque',
         'is_unidade_producao',
         'is_hub',
+        'is_galpao_operacional',
+        'emite_nota_fiscal',
     ];
 
     public function registrarCriacao(UnidadeNegocio $unidade, ?User $user, string $origem): UnidadeNegocioHistorico
@@ -121,6 +123,8 @@ class UnidadeNegocioAuditoriaService
             'possui_estoque' => (bool) $unidade->possui_estoque,
             'is_unidade_producao' => (bool) $unidade->is_unidade_producao,
             'is_hub' => (bool) $unidade->is_hub,
+            'is_galpao_operacional' => (bool) $unidade->is_galpao_operacional,
+            'emite_nota_fiscal' => (bool) $unidade->emite_nota_fiscal,
         ];
     }
 
@@ -137,7 +141,14 @@ class UnidadeNegocioAuditoriaService
             $valorAntes = $antes[$campo] ?? null;
             $valorDepois = $depois[$campo] ?? null;
 
-            if ($campo === 'status' || $campo === 'possui_estoque' || $campo === 'is_unidade_producao' || $campo === 'is_hub') {
+            if (in_array($campo, [
+                'status',
+                'possui_estoque',
+                'is_unidade_producao',
+                'is_hub',
+                'is_galpao_operacional',
+                'emite_nota_fiscal',
+            ], true)) {
                 $a = (bool) $valorAntes;
                 $b = (bool) $valorDepois;
             } elseif ($campo === 'id_estado') {

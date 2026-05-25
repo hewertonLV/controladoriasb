@@ -1,5 +1,6 @@
 @php
     /** @var \App\Models\Veiculo $veiculo */
+    /** @var \Illuminate\Support\Collection<int, \App\Models\UnidadeNegocio> $unidadesNegocio */
 @endphp
 
 <div class="card">
@@ -56,15 +57,18 @@
             </div>
             <div class="col-md-6">
                 <label for="id_unidade_negocio" class="form-label">Unidade de Negócio <span class="text-danger">*</span></label>
-                <input type="number"
-                       id="id_unidade_negocio"
-                       name="id_unidade_negocio"
-                       value="{{ old('id_unidade_negocio', $veiculo->id_unidade_negocio) }}"
-                       class="form-control @error('id_unidade_negocio') is-invalid @enderror"
-                       min="1"
-                       step="1"
-                       required
-                       placeholder="Ex.: 1">
+                <select id="id_unidade_negocio"
+                        name="id_unidade_negocio"
+                        class="form-select @error('id_unidade_negocio') is-invalid @enderror"
+                        required>
+                    <option value="">Selecione...</option>
+                    @foreach ($unidadesNegocio as $unidade)
+                        <option value="{{ $unidade->id }}"
+                            @selected((int) old('id_unidade_negocio', $veiculo->id_unidade_negocio) === (int) $unidade->id)>
+                            {{ $unidade->nome }} ({{ $unidade->id_cigam }})
+                        </option>
+                    @endforeach
+                </select>
                 @error('id_unidade_negocio')
                     <div class="invalid-feedback">{{ $message }}</div>
                 @enderror
@@ -97,4 +101,3 @@
         </button>
     </div>
 </div>
-

@@ -18,10 +18,10 @@ class StoreCaptacaoRotaRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'id_unidade_negocio_galpao' => [
+            'id_captacao_carteira' => [
                 'required',
                 'integer',
-                Rule::exists('unidades_negocio', 'id')->where('is_galpao_operacional', true),
+                Rule::exists('captacao_carteiras', 'id')->where('ativo', true),
             ],
             'nome' => ['required', 'string', 'max:120'],
             'id_veiculo' => ['nullable', 'integer', 'exists:veiculos,id'],

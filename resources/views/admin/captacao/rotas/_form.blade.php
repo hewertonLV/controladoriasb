@@ -5,20 +5,22 @@
 
 <div class="row g-3">
     <div class="col-md-6">
-        <label class="form-label" for="id_unidade_negocio_galpao">Galpão</label>
-        <select name="id_unidade_negocio_galpao"
-                id="id_unidade_negocio_galpao"
-                class="form-select @error('id_unidade_negocio_galpao') is-invalid @enderror"
+        <label class="form-label" for="id_captacao_carteira">Carteira</label>
+        <select name="id_captacao_carteira"
+                id="id_captacao_carteira"
+                class="form-select @error('id_captacao_carteira') is-invalid @enderror"
                 required>
             <option value="">Selecione…</option>
-            @foreach ($galpoes as $galpao)
-                <option value="{{ $galpao->id }}"
-                        @selected((int) old('id_unidade_negocio_galpao', $rota->id_unidade_negocio_galpao ?? $galpaoId) === $galpao->id)>
-                    {{ $galpao->nome }}
+            @foreach ($carteiras as $carteira)
+                <option value="{{ $carteira->id }}"
+                        @selected((int) old('id_captacao_carteira', $rota->id_captacao_carteira ?? $carteiraId) === $carteira->id)>
+                    {{ $carteira->nome }}
+                    — {{ $carteira->unidadeFaturamento?->nome }}
+                    / {{ $carteira->unidadeGalpao?->nome }}
                 </option>
             @endforeach
         </select>
-        @error('id_unidade_negocio_galpao')<div class="invalid-feedback">{{ $message }}</div>@enderror
+        @error('id_captacao_carteira')<div class="invalid-feedback">{{ $message }}</div>@enderror
     </div>
     <div class="col-md-6">
         <label class="form-label" for="nome">Nome da rota</label>

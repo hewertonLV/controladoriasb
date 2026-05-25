@@ -3,6 +3,7 @@
 namespace Tests\Feature\Admin\Veiculos;
 
 use App\Enums\Permissions;
+use App\Models\UnidadeNegocio;
 use App\Models\Veiculo;
 
 class VeiculoTest extends VeiculoTestCase
@@ -70,6 +71,21 @@ class VeiculoTest extends VeiculoTestCase
         $this->actingAs($this->userWithPermissions([Permissions::VEICULOS_CRIAR]))
             ->post(route('admin.veiculos.store'), $payload)
             ->assertSessionHasErrors('status');
+    }
+
+    public function test_formulario_criacao_exibe_select_de_unidades(): void
+    {
+        $unidade = UnidadeNegocio::factory()->create([
+            'nome' => 'UNIDADE VEICULO TESTE',
+            'id_cigam' => '000123',
+        ]);
+
+        $this->actingAs($this->userWithPermissions([Permissions::VEICULOS_CRIAR]))
+            ->get(route('admin.veiculos.create'))
+            ->assertOk()
+            ->assertSee('id="id_unidade_negocio"', false)
+            ->assertSee('UNIDADE VEICULO TESTE (000123)', false)
+            ->assertDontSee('placeholder="Ex.: 1"', false);
     }
 
     public function test_edicao_atualiza_registro(): void

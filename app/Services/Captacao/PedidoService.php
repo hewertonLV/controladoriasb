@@ -6,9 +6,11 @@ use App\Enums\CaptacaoLoteStatus;
 use App\Enums\PedidoOrigem;
 use App\Exceptions\Captacao\CaptacaoEdicaoBloqueadaException;
 use App\Models\Captacao\CaptacaoLote;
+use App\Models\Captacao\CaptacaoRota;
 use App\Models\Captacao\Pedido;
 use App\Models\Captacao\PedidoItem;
 use App\Models\Cliente;
+use App\Models\Fruta;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -41,6 +43,7 @@ final class PedidoService
         ?User $user,
     ): Pedido {
         $this->assertLotePermiteCaptacao($lote);
+        $this->assertRotaPertenceCarteiraDoLote($dados['id_captacao_rota'] ?? null, $lote);
 
         return DB::transaction(function () use ($lote, $dados, $origem, $user): Pedido {
             $pedido = Pedido::query()->updateOrCreate(
@@ -102,7 +105,12 @@ final class PedidoService
         PedidoOrigem $origem,
         ?User $user,
     ): PedidoItem {
-        $this->assertLotePermiteCaptacao($lote);
+        $permiteQuantidade = $lote->status->permiteEdicaoQuantidadeCaptacao();
+        $permitePreco = $lote->status->permiteEdicaoPreco();
+
+        if (! $permiteQuantidade && ! $permitePreco) {
+            throw new CaptacaoEdicaoBloqueadaException('O lote não permite mais alterações de captação.');
+        }
 
         $pedido = Pedido::query()->firstOrCreate(
             [
@@ -114,6 +122,21 @@ final class PedidoService
                 'created_by_user_id' => $user?->id,
             ],
         );
+
+        if ($permiteQuantidade) {
+            if ($pedido->captacao_concluida) {
+                if ($permitePreco) {
+                    $dados = $this->dadosSomentePreco($pedido, $dados);
+                } else {
+                    throw ValidationException::withMessages([
+                        'quantidade' => 'Captação desta loja já está concluída. Reabra para alterar.',
+                    ]);
+                }
+            }
+        } else {
+            $this->assertLotePermiteEdicaoPreco($lote);
+            $dados = $this->dadosSomentePreco($pedido, $dados);
+        }
 
         return $this->upsertItem($lote, $pedido, $dados, $origem, $user);
     }
@@ -147,9 +170,10 @@ final class PedidoService
 
         $this->frutaVinculos->assertFrutaVinculadaAoCliente($pedido->id_cliente, (int) $dados['id_fruta']);
 
-        $custo = $this->precificacao->custoReferenciaPorKg(
-            $lote->id_unidade_negocio_galpao,
-            $dados['id_fruta'],
+        $fruta = Fruta::query()->findOrFail((int) $dados['id_fruta']);
+        $custo = $this->precificacao->custoReferenciaPorUm(
+            (int) $lote->id_unidade_negocio_galpao,
+            $fruta,
         );
 
         $quantidade = $this->resolverQuantidade($existente, $dados);
@@ -197,10 +221,310 @@ final class PedidoService
         return number_format((float) ($dados['quantidade'] ?? 0), 3, '.', '');
     }
 
+    public function definirCaptacaoConcluida(
+        CaptacaoLote $lote,
+        int $idCliente,
+        bool $concluida,
+        PedidoOrigem $origem,
+        ?User $user,
+    ): Pedido {
+        $this->assertLotePermiteCaptacao($lote);
+
+        $pedido = Pedido::query()->firstOrCreate(
+            [
+                'id_captacao_lote' => $lote->id,
+                'id_cliente' => $idCliente,
+            ],
+            [
+                'origem' => $origem,
+                'created_by_user_id' => $user?->id,
+            ],
+        );
+
+        if ($concluida && ! $this->pedidoTemQuantidadeCaptada($pedido)) {
+            throw ValidationException::withMessages([
+                'captacao_concluida' => 'Informe ao menos uma quantidade antes de concluir a captação desta loja.',
+            ]);
+        }
+
+        $pedido->captacao_concluida = $concluida;
+        $pedido->save();
+
+        $this->historico->registrarPedido(
+            $pedido,
+            $concluida ? 'concluir_captacao' : 'reabrir_captacao',
+            $origem,
+            $user,
+        );
+
+        return $pedido->refresh();
+    }
+
+    public function atualizarNumeroPedido(
+        CaptacaoLote $lote,
+        int $idCliente,
+        ?string $numeroPedido,
+        PedidoOrigem $origem,
+        ?User $user,
+    ): Pedido {
+        $this->assertLotePermiteCaptacao($lote);
+
+        $pedido = Pedido::query()->firstOrCreate(
+            [
+                'id_captacao_lote' => $lote->id,
+                'id_cliente' => $idCliente,
+            ],
+            [
+                'origem' => $origem,
+                'created_by_user_id' => $user?->id,
+            ],
+        );
+
+        if ($pedido->captacao_concluida) {
+            throw ValidationException::withMessages([
+                'numero_pedido' => 'Captação desta loja já está concluída. Reabra para alterar o número do pedido.',
+            ]);
+        }
+
+        $numero = $numeroPedido !== null ? trim($numeroPedido) : null;
+        $pedido->numero_pedido = $numero !== '' ? $numero : null;
+        $pedido->save();
+
+        $this->historico->registrarPedido($pedido, 'atualizar_numero_pedido', $origem, $user);
+
+        return $pedido->refresh();
+    }
+
+    public function atualizarRotaPedido(
+        CaptacaoLote $lote,
+        int $idCliente,
+        ?int $rotaId,
+        PedidoOrigem $origem,
+        ?User $user,
+    ): Pedido {
+        $this->assertLotePermiteVinculoRota($lote);
+        $this->assertRotaPertenceCarteiraDoLote($rotaId, $lote);
+
+        $pedido = Pedido::query()->firstOrCreate(
+            [
+                'id_captacao_lote' => $lote->id,
+                'id_cliente' => $idCliente,
+            ],
+            [
+                'origem' => $origem,
+                'created_by_user_id' => $user?->id,
+            ],
+        );
+
+        $pedido->id_captacao_rota = $rotaId;
+        $pedido->ordem_carregamento = null;
+        $pedido->save();
+
+        $this->historico->registrarPedido($pedido, 'atualizar_rota', $origem, $user);
+
+        return $pedido->refresh();
+    }
+
+    /**
+     * @return list<array{id_cliente: int, ordem_carregamento: int|null}>
+     */
+    public function atualizarOrdemCarregamento(
+        CaptacaoLote $lote,
+        int $idCliente,
+        ?int $novaOrdem,
+        PedidoOrigem $origem,
+        ?User $user,
+    ): array {
+        $this->assertLotePermiteVinculoRota($lote);
+
+        $pedido = Pedido::query()
+            ->where('id_captacao_lote', $lote->id)
+            ->where('id_cliente', $idCliente)
+            ->first();
+
+        if ($pedido === null || $pedido->id_captacao_rota === null) {
+            throw ValidationException::withMessages([
+                'ordem_carregamento' => 'Vincule a loja a uma rota antes de definir a ordem de carregamento.',
+            ]);
+        }
+
+        if (! $this->pedidoTemQuantidadeCaptada($pedido)) {
+            throw ValidationException::withMessages([
+                'ordem_carregamento' => 'Informe ao menos uma quantidade antes de definir a ordem de carregamento.',
+            ]);
+        }
+
+        $rotaId = (int) $pedido->id_captacao_rota;
+
+        $pedidosRota = Pedido::query()
+            ->where('id_captacao_lote', $lote->id)
+            ->where('id_captacao_rota', $rotaId)
+            ->with('itens')
+            ->get()
+            ->filter(fn (Pedido $p) => $this->pedidoTemQuantidadeCaptada($p))
+            ->values();
+
+        $ordenados = $pedidosRota
+            ->sortBy(fn (Pedido $p) => [
+                $p->ordem_carregamento ?? 9999,
+                $p->id_cliente === $idCliente ? 0 : 1,
+                $p->id,
+            ])
+            ->values();
+
+        $target = $ordenados->firstWhere('id_cliente', $idCliente);
+        if ($target === null) {
+            throw ValidationException::withMessages([
+                'ordem_carregamento' => 'Pedido não encontrado na rota.',
+            ]);
+        }
+
+        $demais = $ordenados->filter(fn (Pedido $p) => $p->id !== $target->id)->values();
+
+        if ($novaOrdem === null || $novaOrdem < 1) {
+            $target->ordem_carregamento = null;
+            $target->save();
+            $sequencia = $demais;
+        } else {
+            $novaOrdem = min($novaOrdem, $demais->count() + 1);
+            $sequencia = $demais->slice(0, $novaOrdem - 1)
+                ->concat([$target])
+                ->concat($demais->slice($novaOrdem - 1))
+                ->values();
+        }
+
+        foreach ($sequencia as $indice => $item) {
+            $item->ordem_carregamento = $indice + 1;
+            $item->save();
+        }
+
+        if ($novaOrdem === null || $novaOrdem < 1) {
+            $target->refresh();
+            $target->ordem_carregamento = null;
+            $target->save();
+        }
+
+        $this->historico->registrarPedido($target, 'atualizar_ordem_carregamento', $origem, $user);
+
+        return Pedido::query()
+            ->where('id_captacao_lote', $lote->id)
+            ->where('id_captacao_rota', $rotaId)
+            ->whereIn('id_cliente', $pedidosRota->pluck('id_cliente'))
+            ->orderBy('ordem_carregamento')
+            ->orderBy('id_cliente')
+            ->get(['id_cliente', 'ordem_carregamento'])
+            ->map(fn (Pedido $p) => [
+                'id_cliente' => $p->id_cliente,
+                'ordem_carregamento' => $p->ordem_carregamento !== null ? (int) $p->ordem_carregamento : null,
+            ])
+            ->values()
+            ->all();
+    }
+
+    private function pedidoTemQuantidadeCaptada(Pedido $pedido): bool
+    {
+        $pedido->loadMissing('itens');
+
+        foreach ($pedido->itens as $item) {
+            if ((float) $item->quantidade > 0) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * @throws ValidationException
+     */
+    public function assertPedidosComQuantidadeTemRota(CaptacaoLote $lote): void
+    {
+        $lote->loadMissing(['pedidos.cliente', 'pedidos.itens', 'unidadeGalpao']);
+
+        foreach ($lote->pedidos as $pedido) {
+            if (! $this->pedidoTemQuantidadeCaptada($pedido)) {
+                continue;
+            }
+
+            if ($pedido->id_captacao_rota === null) {
+                $nomeLoja = $pedido->cliente?->fantasia ?: $pedido->cliente?->razao_social ?: "#{$pedido->id_cliente}";
+
+                throw ValidationException::withMessages([
+                    'pedidos' => "A loja «{$nomeLoja}» (galpão {$lote->unidadeGalpao?->nome}) tem quantidade na matriz, mas está sem rota. Vincule a rota antes de finalizar as vendas.",
+                ]);
+            }
+        }
+    }
+
     private function assertLotePermiteCaptacao(CaptacaoLote $lote): void
     {
         if ($lote->status !== CaptacaoLoteStatus::CaptacaoEmAndamento) {
             throw new CaptacaoEdicaoBloqueadaException('O lote não está em captação.');
+        }
+    }
+
+    private function assertLotePermiteEdicaoPreco(CaptacaoLote $lote): void
+    {
+        if (! $lote->status->permiteEdicaoPreco()) {
+            throw new CaptacaoEdicaoBloqueadaException('O preço não pode mais ser alterado neste lote.');
+        }
+    }
+
+    /**
+     * @param  array<string, mixed>  $dados
+     * @return array<string, mixed>
+     */
+    private function dadosSomentePreco(Pedido $pedido, array $dados): array
+    {
+        $existente = PedidoItem::query()
+            ->where('id_pedido', $pedido->id)
+            ->where('id_fruta', $dados['id_fruta'])
+            ->first();
+
+        if ($existente === null) {
+            throw ValidationException::withMessages([
+                'preco_venda' => 'Informe a quantidade na captação antes de alterar o preço.',
+            ]);
+        }
+
+        $quantidadeEnviada = isset($dados['incremento'])
+            ? null
+            : number_format((float) ($dados['quantidade'] ?? 0), 3, '.', '');
+
+        if (isset($dados['incremento']) || ($quantidadeEnviada !== null && $quantidadeEnviada !== (string) $existente->quantidade)) {
+            throw ValidationException::withMessages([
+                'quantidade' => 'A quantidade está travada após a captação. Apenas o preço pode ser alterado.',
+            ]);
+        }
+
+        $dados['quantidade'] = $existente->quantidade;
+        unset($dados['incremento']);
+
+        return $dados;
+    }
+
+    private function assertLotePermiteVinculoRota(CaptacaoLote $lote): void
+    {
+        if (! $lote->status->permiteEdicaoVinculoRota()) {
+            throw new CaptacaoEdicaoBloqueadaException('O vínculo de rota deste lote já foi concluído (vendas finalizadas).');
+        }
+    }
+
+    private function assertRotaPertenceCarteiraDoLote(?int $rotaId, CaptacaoLote $lote): void
+    {
+        if ($rotaId === null) {
+            return;
+        }
+
+        $valida = CaptacaoRota::query()
+            ->whereKey($rotaId)
+            ->where('id_captacao_carteira', $lote->id_captacao_carteira)
+            ->exists();
+
+        if (! $valida) {
+            throw ValidationException::withMessages([
+                'id_captacao_rota' => 'A rota selecionada não pertence à carteira deste lote.',
+            ]);
         }
     }
 }

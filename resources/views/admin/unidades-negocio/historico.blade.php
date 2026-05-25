@@ -14,9 +14,11 @@
         'cpf_cnpj' => 'CPF/CNPJ',
         'custo_operacional' => 'Custo operacional',
         'status' => 'Status',
-        'possui_estoque' => 'Possui estoque',
-        'is_hub' => 'Hub',
+        'possui_estoque' => 'Controle estoque de frutas',
+        'is_hub' => 'Unidade HUB',
         'is_unidade_producao' => 'Unidade de produção',
+        'is_galpao_operacional' => 'Galpão operacional',
+        'emite_nota_fiscal' => 'Emite nota fiscal',
     ];
 
     $formatValor = function (string $campo, mixed $valor) use ($estadosPorId) {
@@ -43,7 +45,7 @@
         if ($campo === 'status') {
             return $valor ? 'Ativa' : 'Inativa';
         }
-        if (in_array($campo, ['possui_estoque', 'is_hub', 'is_unidade_producao'], true)) {
+        if (in_array($campo, ['possui_estoque', 'is_hub', 'is_unidade_producao', 'is_galpao_operacional', 'emite_nota_fiscal'], true)) {
             return $valor ? 'Sim' : 'Não';
         }
         return (string) $valor;

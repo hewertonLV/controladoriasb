@@ -21,6 +21,7 @@ class CaptacaoLote extends Model
      */
     protected $fillable = [
         'data_referencia',
+        'id_captacao_carteira',
         'id_unidade_negocio_faturamento',
         'id_unidade_negocio_galpao',
         'tipo',
@@ -37,6 +38,11 @@ class CaptacaoLote extends Model
             'tipo' => CaptacaoLoteTipo::class,
             'status' => CaptacaoLoteStatus::class,
         ];
+    }
+
+    public function carteira(): BelongsTo
+    {
+        return $this->belongsTo(CaptacaoCarteira::class, 'id_captacao_carteira');
     }
 
     public function unidadeFaturamento(): BelongsTo

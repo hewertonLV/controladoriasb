@@ -194,6 +194,10 @@ class UnidadeNegocioImportacaoController extends Controller
                         'cpf_cnpj' => $dados['cpf_cnpj'],
                         'custo_operacional' => $dados['custo_operacional'],
                         'possui_estoque' => (bool) ($dados['possui_estoque'] ?? false),
+                        'is_unidade_producao' => (bool) ($dados['is_unidade_producao'] ?? false),
+                        'is_hub' => (bool) ($dados['is_hub'] ?? false),
+                        'is_galpao_operacional' => (bool) ($dados['is_galpao_operacional'] ?? false),
+                        'emite_nota_fiscal' => (bool) ($dados['emite_nota_fiscal'] ?? false),
                         'status' => true,
                     ]);
 
@@ -249,6 +253,10 @@ class UnidadeNegocioImportacaoController extends Controller
                         'cpf_cnpj' => $dados['cpf_cnpj'],
                         'custo_operacional' => $dados['custo_operacional'],
                         'possui_estoque' => (bool) ($dados['possui_estoque'] ?? false),
+                        'is_unidade_producao' => (bool) ($dados['is_unidade_producao'] ?? false),
+                        'is_hub' => (bool) ($dados['is_hub'] ?? false),
+                        'is_galpao_operacional' => (bool) ($dados['is_galpao_operacional'] ?? false),
+                        'emite_nota_fiscal' => (bool) ($dados['emite_nota_fiscal'] ?? false),
                         'id_estado' => (int) $dados['id_estado'],
                     ]);
 
@@ -348,9 +356,26 @@ class UnidadeNegocioImportacaoController extends Controller
         if ($cpfCnpj !== '' && ! in_array(strlen($cpfCnpj), [11, 14], true)) {
             return 'CPF/CNPJ deve ter 11 dígitos (CPF) ou 14 dígitos (CNPJ).';
         }
-        if (! array_key_exists('possui_estoque', $dados)) {
-            return 'Possui estoque é obrigatório.';
+        foreach ([
+            'possui_estoque',
+            'is_unidade_producao',
+            'is_hub',
+            'is_galpao_operacional',
+            'emite_nota_fiscal',
+        ] as $flag) {
+            if (! array_key_exists($flag, $dados)) {
+                return 'Dados da planilha incompletos (flags de unidade). Reprocesse a importação.';
+            }
         }
+
+        if (($dados['is_galpao_operacional'] ?? false) && ! ($dados['possui_estoque'] ?? false)) {
+            return 'Galpão operacional deve controlar estoque de frutas.';
+        }
+
+        if (($dados['is_hub'] ?? false) && ($dados['emite_nota_fiscal'] ?? false)) {
+            return 'Unidade HUB não emite nota fiscal.';
+        }
+
         $idEstado = (int) ($dados['id_estado'] ?? 0);
         if ($idEstado < 1) {
             return 'Estado (ICMS) é obrigatório.';

@@ -123,6 +123,16 @@ class CaptacaoIntegracaoMovimentacoesTest extends CaptacaoTestCase
             ])
             ->assertOk()
             ->assertJsonPath('item.quantidade', '2.000');
+
+        $this->actingAs($user)
+            ->patchJson(route('admin.captacao.lotes.celula.update', $lote), [
+                'id_cliente' => $c['cliente']->id,
+                'id_fruta' => $c['fruta']->id,
+                'quantidade' => 2,
+                'preco_venda' => '15.75',
+            ])
+            ->assertOk()
+            ->assertJsonPath('item.preco_venda', '15.7500');
     }
 
     public function test_telas_romaneio_manual_e_frete(): void

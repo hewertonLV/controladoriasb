@@ -32,7 +32,15 @@
         <div class="card">
             <div class="card-header d-flex flex-wrap gap-2 justify-content-between align-items-center">
                 <strong>Lojas do faturamento</strong>
-                <span class="text-muted small">{{ $clientes->count() }} loja(s)</span>
+                <div class="d-flex flex-wrap gap-2 align-items-center">
+                    <span class="text-muted small">{{ $clientes->count() }} loja(s)</span>
+                    @can('captacao.cliente_fruta.vincular')
+                        <a href="{{ route('admin.captacao.frutas-por-loja.importar', ['faturamento' => $faturamentoId]) }}"
+                           class="btn btn-sm btn-soft-success">
+                            <i class="ri-file-excel-2-line me-1"></i> Importar vínculos
+                        </a>
+                    @endcan
+                </div>
             </div>
             <div class="card-body table-responsive">
                 <table class="table table-sm align-middle mb-0">
@@ -64,11 +72,10 @@
                             </td>
                             <td class="text-end text-nowrap">
                                 @canany(['captacao.cliente_fruta.vincular', 'captacao.pedido.editar', 'captacao.lote.visualizar'])
-                                    <a href="{{ route('admin.captacao.clientes.frutas.index', $cliente) }}"
-                                       class="btn btn-sm {{ ($podeSalvarVinculos ?? false) ? 'btn-primary' : 'btn-soft-primary' }}"
-                                       title="{{ ($podeSalvarVinculos ?? false) ? 'Marcar frutas que esta loja compra' : 'Consultar frutas vinculadas' }}">
-                                        <i class="ri-links-line me-1"></i>
-                                        {{ ($podeSalvarVinculos ?? false) ? 'Vincular frutas' : 'Ver frutas' }}
+                                    <a href="{{ route('admin.captacao.frutas-por-loja.show', $cliente) }}"
+                                       class="btn btn-sm btn-light"
+                                       title="{{ ($podeSalvarVinculos ?? false) ? 'Abrir detalhe e vincular frutas' : 'Abrir detalhe (somente consulta)' }}">
+                                        <i class="ri-file-list-3-line"></i> Detalhe
                                     </a>
                                 @endcanany
                             </td>
