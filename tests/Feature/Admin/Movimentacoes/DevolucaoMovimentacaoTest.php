@@ -46,10 +46,11 @@ class DevolucaoMovimentacaoTest extends TestCase
             ->get(route('admin.movimentacoes.devolucoes.create'))
             ->assertOk()
             ->getContent();
+        $htmlDecodificado = html_entity_decode((string) $html, ENT_QUOTES | ENT_HTML5, 'UTF-8');
 
         $this->assertStringContainsString('#'.$venda->id, (string) $html);
         $this->assertStringContainsString('NF-VENDA', (string) $html);
-        $this->assertStringContainsString($c['unidade']->nome, (string) $html);
+        $this->assertStringContainsString($c['unidade']->nome, $htmlDecodificado);
     }
 
     public function test_cria_devolucao_com_retorno_aumenta_estoque_e_usa_custo_historico_da_venda(): void
