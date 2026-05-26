@@ -21,6 +21,7 @@ abstract class UnidadeNegocioTestCase extends TestCase
         /** @var array{id_cigam: string, id_estado: int, razao_social: string, nome: string, cpf_cnpj: string|null, custo_operacional: string, possui_estoque: bool} */
         return array_replace([
             'id_cigam' => '009001',
+            'centro_armazenagem' => '001',
             'id_estado' => Estado::ID_CEARA,
             'razao_social' => 'Unidade de Negócio Teste',
             'nome' => 'Unidade de Negócio Teste',

@@ -20,4 +20,13 @@ class CiganEdiLinhaTest extends TestCase
         $this->assertSame('1    ', substr($linha, 2, 5));
         $this->assertSame('0000000042', substr($linha, 8, 10));
     }
+
+    public function test_colocar_exato_preserva_espacos_a_esquerda(): void
+    {
+        $linha = (new CiganEdiLinha(10))
+            ->colocarExato(3, 7, '  001')
+            ->linha();
+
+        $this->assertSame('  001', substr($linha, 2, 5));
+    }
 }

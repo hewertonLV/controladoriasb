@@ -188,6 +188,7 @@ class UnidadeNegocioImportacaoController extends Controller
 
                     $unidade = UnidadeNegocio::create([
                         'id_cigam' => $dados['id_cigam'],
+                        'centro_armazenagem' => $dados['centro_armazenagem'] ?? '001',
                         'id_estado' => (int) $dados['id_estado'],
                         'razao_social' => $dados['razao_social'],
                         'nome' => $dados['nome'],
@@ -247,7 +248,7 @@ class UnidadeNegocioImportacaoController extends Controller
 
                     $antes = $this->auditoria->snapshot($unidade);
 
-                    $unidade->update([
+                    $payloadAtualizacao = [
                         'razao_social' => $dados['razao_social'],
                         'nome' => $dados['nome'],
                         'cpf_cnpj' => $dados['cpf_cnpj'],
@@ -258,7 +259,17 @@ class UnidadeNegocioImportacaoController extends Controller
                         'is_galpao_operacional' => (bool) ($dados['is_galpao_operacional'] ?? false),
                         'emite_nota_fiscal' => (bool) ($dados['emite_nota_fiscal'] ?? false),
                         'id_estado' => (int) $dados['id_estado'],
-                    ]);
+                    ];
+
+                    if (array_key_exists('id_cliente', $dados)) {
+                        $payloadAtualizacao['id_cliente'] = $dados['id_cliente'];
+                    }
+
+                    if (array_key_exists('centro_armazenagem', $dados)) {
+                        $payloadAtualizacao['centro_armazenagem'] = $dados['centro_armazenagem'];
+                    }
+
+                    $unidade->update($payloadAtualizacao);
 
                     $depois = $this->auditoria->snapshot($unidade->fresh());
 

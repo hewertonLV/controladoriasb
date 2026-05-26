@@ -19,7 +19,9 @@ use Illuminate\Support\Carbon;
 /**
  * @property int $id
  * @property string $id_cigam
+ * @property string $centro_armazenagem
  * @property int $id_estado
+ * @property int|null $id_cliente
  * @property string $razao_social
  * @property string $nome
  * @property string|null $cpf_cnpj
@@ -35,6 +37,8 @@ use Illuminate\Support\Carbon;
  * @property-read string $cpf_cnpj_formatado
  * @property-read HistoricoCOUnNg|null $historicoCustoOperacionalAtual
  * @property-read Estado|null $estado
+ * @property-read Cliente|null $clientePrincipal
+ * @property-read string|null $codigo_cliente
  */
 class UnidadeNegocio extends Model
 {
@@ -51,7 +55,9 @@ class UnidadeNegocio extends Model
      */
     protected $fillable = [
         'id_cigam',
+        'centro_armazenagem',
         'id_estado',
+        'id_cliente',
         'razao_social',
         'nome',
         'cpf_cnpj',
@@ -71,6 +77,7 @@ class UnidadeNegocio extends Model
     {
         return [
             'id_estado' => 'integer',
+            'id_cliente' => 'integer',
             'status' => 'boolean',
             'possui_estoque' => 'boolean',
             'is_hub' => 'boolean',
@@ -102,6 +109,18 @@ class UnidadeNegocio extends Model
     {
         $this->attributes['id_cigam'] = TextoCadastro::normalizarIdCigamAteSeisDigitos(
             $value === null ? '' : (string) $value,
+        );
+    }
+
+    protected function setCentroArmazenagemAttribute(mixed $value): void
+    {
+        $digitos = TextoCadastro::somenteDigitos($value === null ? '' : (string) $value);
+
+        $this->attributes['centro_armazenagem'] = str_pad(
+            substr($digitos === '' ? '001' : $digitos, 0, 3),
+            3,
+            '0',
+            STR_PAD_LEFT,
         );
     }
 
@@ -176,6 +195,26 @@ class UnidadeNegocio extends Model
     public function estado(): BelongsTo
     {
         return $this->belongsTo(Estado::class, 'id_estado');
+    }
+
+    /**
+     * Cliente principal da unidade (código CIGAM da loja no ERP).
+     *
+     * @return BelongsTo<Cliente, $this>
+     */
+    public function clientePrincipal(): BelongsTo
+    {
+        return $this->belongsTo(Cliente::class, 'id_cliente');
+    }
+
+    protected function codigoCliente(): Attribute
+    {
+        return Attribute::get(fn (): ?string => $this->clientePrincipal?->id_cigam);
+    }
+
+    protected function setIdClienteAttribute(mixed $value): void
+    {
+        $this->attributes['id_cliente'] = $value === null || $value === '' ? null : (int) $value;
     }
 
     public function historicosCustoOperacional(): HasMany

@@ -42,7 +42,7 @@ class CaptacaoMatrizController extends Controller
         $loteId = $request->integer('lote');
         $lote = CaptacaoLote::query()->with([
             'unidadeGalpao',
-            'unidadeFaturamento',
+            'unidadeFaturamento.clientePrincipal:id,id_cigam,razao_social',
             'unidadeHubOrigem:id,nome,id_cigam',
             'carteira:id,nome',
         ])->findOrFail($loteId);

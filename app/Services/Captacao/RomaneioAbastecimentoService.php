@@ -5,8 +5,10 @@ namespace App\Services\Captacao;
 use App\Enums\CaptacaoLoteTipo;
 use App\Models\Captacao\CaptacaoLote;
 use App\Models\Captacao\CaptacaoRomaneioManualLinha;
+use App\Models\Captacao\Pedido;
 use App\Models\Estoque;
 use App\Models\Fruta;
+use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Support\Collection;
 
 final class RomaneioAbastecimentoService
@@ -14,6 +16,7 @@ final class RomaneioAbastecimentoService
     /**
      * @return Collection<int, array{
      *     id_fruta: int,
+     *     id_cigam: string,
      *     fruta_nome: string,
      *     unidade_medicao: string,
      *     demanda_kg: string,
@@ -32,12 +35,12 @@ final class RomaneioAbastecimentoService
      */
     public function preview(CaptacaoLote $lote): Collection
     {
-        $lote->load(['pedidos.itens.fruta:id,nome,unidade_medicao,kg_por_unidade_medicao']);
+        $pedidos = $this->pedidosDoLote($lote);
 
         /** @var array<int, array{um: float, kg: float}> $demandaPorFruta */
         $demandaPorFruta = [];
 
-        foreach ($lote->pedidos as $pedido) {
+        foreach ($pedidos as $pedido) {
             foreach ($pedido->itens as $item) {
                 $qtdUm = (float) $item->quantidade;
                 $kg = $qtdUm * (float) $item->fruta->kg_por_unidade_medicao;
@@ -62,8 +65,8 @@ final class RomaneioAbastecimentoService
             }
         }
 
-        $frutasPorId = $lote->pedidos->flatMap->itens
-            ->mapWithKeys(fn ($item) => [$item->id_fruta => $item->fruta])
+        $frutasPorId = $pedidos->flatMap->itens
+            ->mapWithKeys(fn ($item) => [(int) $item->id_fruta => $item->fruta])
             ->all();
 
         if ($lote->tipo === CaptacaoLoteTipo::RomaneioManual) {
@@ -95,6 +98,7 @@ final class RomaneioAbastecimentoService
 
                 return [
                     'id_fruta' => $idFruta,
+                    'id_cigam' => trim((string) ($fruta?->id_cigam ?? '')),
                     'fruta_nome' => $fruta?->nome ?? '—',
                     'unidade_medicao' => $unidadeMedicao,
                     'demanda_kg' => $this->formatarNumero($demandaKg, $casasKg),
@@ -113,6 +117,22 @@ final class RomaneioAbastecimentoService
             })
             ->sortBy('fruta_nome')
             ->values();
+    }
+
+    /**
+     * Pedidos sempre filtrados pelo lote informado (evita relação `pedidos` já carregada de outro contexto).
+     *
+     * @return EloquentCollection<int, Pedido>
+     */
+    private function pedidosDoLote(CaptacaoLote $lote): EloquentCollection
+    {
+        $lote->unsetRelation('pedidos');
+
+        return Pedido::query()
+            ->where('id_captacao_lote', $lote->id)
+            ->with(['itens.fruta:id,nome,id_cigam,unidade_medicao,kg_por_unidade_medicao'])
+            ->orderBy('id')
+            ->get();
     }
 
     private function formatarNumero(float $valor, int $casas): string

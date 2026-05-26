@@ -25,7 +25,9 @@
                     <code>F</code> Controle estoque frutas · <code>G</code> Unidade produção ·
                     <code>H</code> Unidade HUB · <code>I</code> Galpão operacional ·
                     <code>J</code> Emite nota fiscal ·
-                    <code>K</code> Estado (CE, CEARA, PE, PERNAMBUCO).
+                    <code>K</code> Estado (CE, CEARA, PE, PERNAMBUCO) ·
+                    <code>L</code> Código do cliente (opcional, só em atualizações) ·
+                    <code>M</code> Centro armazenagem (opcional, 3 dígitos; vazio = 001 em novas).
                     Colunas F–J: SIM/NÃO; célula vazia = NÃO.
                 </p>
             </div>

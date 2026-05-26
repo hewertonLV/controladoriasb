@@ -8,6 +8,9 @@
 
     $rotuloCampo = [
         'id_cigam' => 'ID CIGAM',
+        'centro_armazenagem' => 'Centro de armazenagem',
+        'codigo_cliente' => 'Código do cliente',
+        'id_cliente' => 'Código do cliente',
         'id_estado' => 'Estado (ICMS)',
         'razao_social' => 'Razão social',
         'nome' => 'Nome',
@@ -68,6 +71,7 @@
                 <h4 class="header-title mb-1">{{ $unidadeNegocio->razao_social }}</h4>
                 <div class="text-muted small">
                     <code>{{ $unidadeNegocio->id_cigam }}</code> ·
+                    Cliente: <code>{{ $unidadeNegocio->codigo_cliente ?? '—' }}</code> ·
                     Estado (ICMS): <span class="fw-semibold">{{ $unidadeNegocio->estado?->nome ?? '—' }}</span> ·
                     {{ $unidadeNegocio->cpf_cnpj_formatado }}
                     @if ($unidadeNegocio->nome && $unidadeNegocio->nome !== $unidadeNegocio->razao_social)

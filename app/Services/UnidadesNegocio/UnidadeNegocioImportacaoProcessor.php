@@ -2,6 +2,7 @@
 
 namespace App\Services\UnidadesNegocio;
 
+use App\Models\Cliente;
 use App\Models\Estado;
 use App\Models\UnidadeNegocio;
 use App\Models\UnidadeNegocioImportacao;
@@ -26,6 +27,8 @@ use PhpOffice\PhpSpreadsheet\Spreadsheet;
  *  - I: is_galpao_operacional — galpão / centro resultado regional (vazio = NÃO)
  *  - J: emite_nota_fiscal — NF e faturamento na captação (vazio = NÃO)
  *  - K: estado (abreviação ou nome cadastrado, ex.: CE ou CEARA)
+ *  - L: codigo_cliente — ID CIGAM do cliente principal (opcional; só em atualizações)
+ *  - M: centro_armazenagem — 3 dígitos (opcional; vazio = 001 em novas; em atualização não altera)
  *
  * @see UnidadeNegocioImportacaoController::confirmar para persistência.
  */
@@ -97,6 +100,8 @@ class UnidadeNegocioImportacaoProcessor
                 $sheet->getCell('I'.$r)->getValue(),
                 $sheet->getCell('J'.$r)->getValue(),
                 $sheet->getCell('K'.$r)->getValue(),
+                $sheet->getCell('L'.$r)->getValue(),
+                $sheet->getCell('M'.$r)->getValue(),
             ];
 
             $linhasProcessadas++;
@@ -256,6 +261,21 @@ class UnidadeNegocioImportacaoProcessor
         $estadoBusca = TextoCadastro::normalizarBuscaEstado(trim((string) ($dadosBrutos[10] ?? '')));
         $idEstado = $estadoBusca === '' ? null : ($this->idsEstadoPorBusca()[$estadoBusca] ?? null);
 
+        $codigoClienteBruto = trim((string) ($dadosBrutos[11] ?? ''));
+        $codigoCliente = $codigoClienteBruto === ''
+            ? null
+            : TextoCadastro::normalizarIdCigamAteSeisDigitos($codigoClienteBruto);
+
+        $centroArmazenagemBruto = trim((string) ($dadosBrutos[12] ?? ''));
+        $centroArmazenagem = $centroArmazenagemBruto === ''
+            ? null
+            : str_pad(
+                substr(TextoCadastro::somenteDigitos($centroArmazenagemBruto), 0, 3),
+                3,
+                '0',
+                STR_PAD_LEFT,
+            );
+
         $erros = [];
 
         if ($idCigam === '') {
@@ -295,6 +315,14 @@ class UnidadeNegocioImportacaoProcessor
             $erros[] = 'Estado inválido na coluna K. Valores aceitos: '.implode(', ', array_keys($this->idsEstadoPorBusca())).'.';
         }
 
+        if ($codigoCliente !== null && $codigoCliente !== '' && ! preg_match('/^\d{6}$/', $codigoCliente)) {
+            $erros[] = 'Código do cliente (coluna L) deve ter no máximo 6 dígitos numéricos.';
+        }
+
+        if ($centroArmazenagem !== null && ! preg_match('/^\d{3}$/', $centroArmazenagem)) {
+            $erros[] = 'Centro de armazenagem (coluna M) deve ter até 3 dígitos numéricos.';
+        }
+
         $erros = array_merge($erros, $this->errosCombinacaoFlags(
             $possuiParsed['valor'],
             $hubParsed['valor'],
@@ -315,6 +343,8 @@ class UnidadeNegocioImportacaoProcessor
                 'is_galpao_operacional' => $galpaoParsed['valor'],
                 'emite_nota_fiscal' => $emiteNfParsed['valor'],
                 'id_estado' => (int) ($idEstado ?? 0),
+                'codigo_cliente' => $codigoCliente,
+                'centro_armazenagem' => $centroArmazenagem,
             ],
             'erros' => $erros,
         ];
@@ -448,9 +478,25 @@ class UnidadeNegocioImportacaoProcessor
             $existente = $existentes->get($idCigam);
 
             if ($existente === null) {
+                unset($dados['codigo_cliente']);
+                $dados['centro_armazenagem'] = $dados['centro_armazenagem'] ?? '001';
                 $novas[] = [
                     'row_id' => $rowId,
                     'linha' => $linha,
+                    'dados' => $dados,
+                ];
+
+                continue;
+            }
+
+            [$dados, $errosCliente] = $this->aplicarCodigoClienteNaUnidade($dados, $existente);
+            $dados = $this->aplicarCentroArmazenagemNaUnidade($dados, $existente);
+            if ($errosCliente !== []) {
+                $erros[] = [
+                    'row_id' => $rowId,
+                    'linha' => $linha,
+                    'id_cigam' => $idCigam,
+                    'erros' => $errosCliente,
                     'dados' => $dados,
                 ];
 
@@ -566,6 +612,8 @@ class UnidadeNegocioImportacaoProcessor
             'is_galpao_operacional',
             'emite_nota_fiscal',
             'id_estado',
+            'id_cliente',
+            'centro_armazenagem',
         ];
 
         foreach ($campos as $campo) {
@@ -584,6 +632,16 @@ class UnidadeNegocioImportacaoProcessor
             } elseif ($campo === 'id_estado') {
                 $atual = (string) (int) $unidade->id_estado;
                 $novo = (string) (int) ($dados[$campo] ?? 0);
+            } elseif ($campo === 'id_cliente') {
+                $atual = (string) (int) ($unidade->id_cliente ?? 0);
+                $novo = array_key_exists('id_cliente', $dados)
+                    ? (string) (int) ($dados['id_cliente'] ?? 0)
+                    : $atual;
+            } elseif ($campo === 'centro_armazenagem') {
+                $atual = (string) ($unidade->centro_armazenagem ?? '001');
+                $novo = array_key_exists('centro_armazenagem', $dados)
+                    ? (string) ($dados['centro_armazenagem'] ?? $atual)
+                    : $atual;
             } else {
                 $atual = (string) ($unidade->{$campo} ?? '');
                 $novo = (string) ($dados[$campo] ?? '');
@@ -594,6 +652,8 @@ class UnidadeNegocioImportacaoProcessor
                     'custo_operacional' => $atual,
                     'possui_estoque', 'is_unidade_producao', 'is_hub', 'is_galpao_operacional', 'emite_nota_fiscal' => (bool) $unidade->{$campo},
                     'id_estado' => (int) $unidade->id_estado,
+                    'id_cliente' => $unidade->id_cliente,
+                    'centro_armazenagem' => $unidade->centro_armazenagem,
                     default => $unidade->{$campo},
                 };
 
@@ -625,6 +685,61 @@ class UnidadeNegocioImportacaoProcessor
             'is_galpao_operacional' => (bool) $unidade->is_galpao_operacional,
             'emite_nota_fiscal' => (bool) $unidade->emite_nota_fiscal,
             'id_estado' => (int) $unidade->id_estado,
+            'id_cliente' => $unidade->id_cliente,
+            'centro_armazenagem' => $unidade->centro_armazenagem,
         ];
+    }
+
+    /**
+     * @param  array<string, mixed>  $dados
+     */
+    private function aplicarCentroArmazenagemNaUnidade(array $dados, UnidadeNegocio $unidade): array
+    {
+        if (! array_key_exists('centro_armazenagem', $dados) || $dados['centro_armazenagem'] === null) {
+            unset($dados['centro_armazenagem']);
+
+            return $dados;
+        }
+
+        return $dados;
+    }
+
+    /**
+     * @param  array<string, mixed>  $dados
+     * @return array{0: array<string, mixed>, 1: list<string>}
+     */
+    private function aplicarCodigoClienteNaUnidade(array $dados, UnidadeNegocio $unidade): array
+    {
+        if (! array_key_exists('codigo_cliente', $dados)) {
+            return [$dados, []];
+        }
+
+        $codigoCliente = $dados['codigo_cliente'];
+        unset($dados['codigo_cliente']);
+
+        if ($codigoCliente === null || $codigoCliente === '') {
+            return [$dados, []];
+        }
+
+        $cliente = Cliente::query()->where('id_cigam', $codigoCliente)->first();
+        if ($cliente === null) {
+            return [$dados, ["Código do cliente {$codigoCliente} (coluna L) não encontrado no cadastro."]];
+        }
+
+        if ((int) $cliente->id_unidade_negocio !== (int) $unidade->id) {
+            return [$dados, ["O cliente {$codigoCliente} não pertence à unidade de negócio {$unidade->id_cigam}."]];
+        }
+
+        $outraUnidade = UnidadeNegocio::query()
+            ->where('id_cliente', $cliente->id)
+            ->where('id', '!=', $unidade->id)
+            ->exists();
+        if ($outraUnidade) {
+            return [$dados, ["O cliente {$codigoCliente} já é o cliente principal de outra unidade de negócio."]];
+        }
+
+        $dados['id_cliente'] = $cliente->id;
+
+        return [$dados, []];
     }
 }

@@ -19,6 +19,7 @@ class UnidadeNegocioFactory extends Factory
 
         return [
             'id_cigam' => str_pad((string) $this->faker->unique()->numberBetween(1, 999999), 6, '0', STR_PAD_LEFT),
+            'centro_armazenagem' => '001',
             'id_estado' => Estado::ID_CEARA,
             'razao_social' => $razaoSocial,
             'nome' => $razaoSocial,

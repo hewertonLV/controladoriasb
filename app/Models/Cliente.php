@@ -19,8 +19,12 @@ use Illuminate\Support\Carbon;
 /**
  * @property int $id
  * @property string $id_cigam
+ * @property string $numero_divisao
  * @property string $razao_social
  * @property string|null $fantasia
+ * @property string|null $contato_nome
+ * @property string|null $contato_telefone
+ * @property string|null $contato_email
  * @property string $cnpj_cpf
  * @property int $id_praca
  * @property int|null $grupo_id
@@ -42,8 +46,12 @@ class Cliente extends Model
      */
     protected $fillable = [
         'id_cigam',
+        'numero_divisao',
         'razao_social',
         'fantasia',
+        'contato_nome',
+        'contato_telefone',
+        'contato_email',
         'cnpj_cpf',
         'id_praca',
         'grupo_id',
@@ -76,6 +84,18 @@ class Cliente extends Model
         );
     }
 
+    protected function setNumeroDivisaoAttribute(mixed $value): void
+    {
+        $digitos = TextoCadastro::somenteDigitos($value === null ? '' : (string) $value);
+
+        $this->attributes['numero_divisao'] = str_pad(
+            substr($digitos === '' ? '10' : $digitos, 0, 2),
+            2,
+            '0',
+            STR_PAD_LEFT,
+        );
+    }
+
     protected function setRazaoSocialAttribute(mixed $value): void
     {
         $this->attributes['razao_social'] = TextoCadastro::normalizarMaiusculas(
@@ -90,6 +110,27 @@ class Cliente extends Model
         $this->attributes['fantasia'] = TextoCadastro::normalizarMaiusculasOuNulo(
             $texto,
         );
+    }
+
+    protected function setContatoNomeAttribute(mixed $value): void
+    {
+        $texto = preg_replace('/\s+/u', ' ', (string) ($value ?? '')) ?? '';
+
+        $this->attributes['contato_nome'] = TextoCadastro::normalizarMaiusculasOuNulo($texto);
+    }
+
+    protected function setContatoTelefoneAttribute(mixed $value): void
+    {
+        $digitos = TextoCadastro::somenteDigitos($value === null ? '' : (string) $value);
+
+        $this->attributes['contato_telefone'] = $digitos === '' ? null : $digitos;
+    }
+
+    protected function setContatoEmailAttribute(mixed $value): void
+    {
+        $email = mb_strtolower(trim((string) ($value ?? '')));
+
+        $this->attributes['contato_email'] = $email === '' ? null : $email;
     }
 
     protected function setCnpjCpfAttribute(mixed $value): void

@@ -20,7 +20,10 @@ class StoreUnidadeNegocioRequest extends FormRequest
      */
     public function rules(): array
     {
-        return $this->unidadeNegocioRules();
+        $rules = $this->unidadeNegocioRules();
+        $rules['id_cliente'] = ['prohibited'];
+
+        return $rules;
     }
 
     /**

@@ -67,6 +67,51 @@ class ClienteTest extends ClienteTestCase
         $this->assertSame('10.50', (string) $cliente->desconto_nf);
     }
 
+    public function test_cadastro_normaliza_numero_divisao(): void
+    {
+        $this->actingAs($this->userWithPermissions([Permissions::CLIENTES_CRIAR]))
+            ->post(route('admin.clientes.store'), $this->clientePayload([
+                'id_cigam' => '000777',
+                'numero_divisao' => '5',
+            ]))
+            ->assertStatus(302)
+            ->assertSessionHasNoErrors();
+
+        $this->assertDatabaseHas('clientes', [
+            'id_cigam' => '000777',
+            'numero_divisao' => '05',
+        ]);
+    }
+
+    public function test_cadastro_persiste_dados_de_contato(): void
+    {
+        $this->actingAs($this->userWithPermissions([Permissions::CLIENTES_CRIAR]))
+            ->post(route('admin.clientes.store'), $this->clientePayload([
+                'id_cigam' => '000888',
+                'contato_nome' => 'maria gerente',
+                'contato_telefone' => '(85) 98877-6655',
+                'contato_email' => 'Maria@Loja.COM',
+            ]))
+            ->assertStatus(302)
+            ->assertSessionHasNoErrors();
+
+        $this->assertDatabaseHas('clientes', [
+            'id_cigam' => '000888',
+            'contato_nome' => 'MARIA GERENTE',
+            'contato_telefone' => '85988776655',
+            'contato_email' => 'maria@loja.com',
+        ]);
+    }
+
+    public function test_cadastro_rejeita_telefone_contato_invalido(): void
+    {
+        $this->actingAs($this->userWithPermissions([Permissions::CLIENTES_CRIAR]))
+            ->post(route('admin.clientes.store'), $this->clientePayload([
+                'contato_telefone' => '12345',
+            ]))
+            ->assertSessionHasErrors('contato_telefone');
+    }
+
     public function test_cadastro_aceita_fantasia_null(): void
     {
         $this->actingAs($this->userWithPermissions([Permissions::CLIENTES_CRIAR]))

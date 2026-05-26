@@ -18,6 +18,26 @@ final class CiganEdiLinha
     {
         $tamanho = $fim - $inicio + 1;
         $valor = $this->normalizar($valor, $tamanho, $numerico);
+
+        return $this->escrever($inicio, $tamanho, $valor);
+    }
+
+    /**
+     * Grava o valor sem trim — necessário para campos com espaços significativos à esquerda (ex.: série «  001»).
+     */
+    public function colocarExato(int $inicio, int $fim, string $valor): self
+    {
+        $tamanho = $fim - $inicio + 1;
+        if (strlen($valor) > $tamanho) {
+            $valor = substr($valor, 0, $tamanho);
+        }
+        $valor = str_pad($valor, $tamanho, ' ', STR_PAD_RIGHT);
+
+        return $this->escrever($inicio, $tamanho, $valor);
+    }
+
+    private function escrever(int $inicio, int $tamanho, string $valor): self
+    {
         $offset = $inicio - 1;
         $base = str_pad(substr($this->buffer, 0, $this->comprimento), $this->comprimento, ' ', STR_PAD_RIGHT);
         $cauda = substr($base, $offset + $tamanho);

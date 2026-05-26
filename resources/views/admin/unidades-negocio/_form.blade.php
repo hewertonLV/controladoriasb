@@ -1,6 +1,9 @@
 @php
     /** @var \Illuminate\Support\Collection<int, \App\Models\Estado>|\App\Models\Estado[] $estados */
     /** @var \App\Models\UnidadeNegocio $unidadeNegocio */
+    /** @var \Illuminate\Support\Collection<int, \App\Models\Cliente>|\App\Models\Cliente[]|null $clientesDaUnidade */
+    $clientesDaUnidade = $clientesDaUnidade ?? collect();
+    $exibeCliente = $unidadeNegocio->exists;
 @endphp
 
 <div class="card">
@@ -26,6 +29,49 @@
                 @enderror
                 <small class="text-muted">Código no ERP CIGAM (até 6 dígitos; zeros à esquerda ao salvar).</small>
             </div>
+            <div class="col-md-2">
+                <label for="centro_armazenagem" class="form-label">Centro armazenagem <span class="text-danger">*</span></label>
+                <input type="text"
+                       id="centro_armazenagem"
+                       name="centro_armazenagem"
+                       value="{{ old('centro_armazenagem', $unidadeNegocio->centro_armazenagem ?? '001') }}"
+                       class="form-control @error('centro_armazenagem') is-invalid @enderror"
+                       maxlength="3"
+                       required
+                       inputmode="numeric"
+                       pattern="[0-9]{1,3}"
+                       placeholder="001"
+                       autocomplete="off">
+                @error('centro_armazenagem')
+                    <div class="invalid-feedback">{{ $message }}</div>
+                @enderror
+                <small class="text-muted">3 dígitos (Cigam).</small>
+            </div>
+            @if ($exibeCliente)
+                <div class="col-md-4">
+                    <label for="id_cliente" class="form-label">Código do cliente</label>
+                    <select id="id_cliente"
+                            name="id_cliente"
+                            class="form-select @error('id_cliente') is-invalid @enderror">
+                        <option value="">Nenhum</option>
+                        @foreach ($clientesDaUnidade as $cliente)
+                            @php
+                                $rotuloCliente = trim(($cliente->fantasia ?: $cliente->razao_social).' ('.$cliente->id_cigam.')');
+                            @endphp
+                            <option value="{{ $cliente->id }}"
+                                @selected((string) old('id_cliente', $unidadeNegocio->id_cliente ?? '') === (string) $cliente->id)>
+                                {{ $rotuloCliente }}
+                            </option>
+                        @endforeach
+                    </select>
+                    @error('id_cliente')
+                        <div class="invalid-feedback">{{ $message }}</div>
+                    @enderror
+                    <small class="text-muted">
+                        Cliente principal desta unidade no CIGAM. Liste apenas clientes já vinculados a esta unidade no cadastro de clientes.
+                    </small>
+                </div>
+            @endif
             <div class="col-md-4">
                 <label for="id_estado" class="form-label">Estado (ICMS) <span class="text-danger">*</span></label>
                 <select id="id_estado"

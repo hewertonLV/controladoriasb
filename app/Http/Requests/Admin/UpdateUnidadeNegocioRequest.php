@@ -50,6 +50,10 @@ class UpdateUnidadeNegocioRequest extends FormRequest
 
     public function withValidator(Validator $validator): void
     {
+        /** @var UnidadeNegocio $unidade */
+        $unidade = $this->route('unidadeNegocio');
+
         $this->validarCombinacaoFlagsUnidadeNegocio($validator);
+        $this->validarClienteDaUnidadeNegocio($validator, $unidade->id);
     }
 }

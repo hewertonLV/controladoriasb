@@ -17,6 +17,7 @@ use App\Services\Permissoes\UnidadeNegocioAccessService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Validation\ValidationException;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class CaptacaoLotePipelineController extends Controller
@@ -88,7 +89,21 @@ class CaptacaoLotePipelineController extends Controller
             abort(404);
         }
 
-        $conteudo = app(GerarArquivoCiganService::class)->conteudoTxtTransferencia($lote);
+        if ($lote->id_unidade_negocio_hub_origem === null) {
+            return redirect()
+                ->route('admin.captacao.matriz.index', ['lote' => $lote->id, 'aba' => 'arquivo-cigan'])
+                ->withErrors([
+                    'id_unidade_negocio_hub_origem' => 'Informe a unidade HUB de origem antes de baixar o arquivo Cigan.',
+                ]);
+        }
+
+        try {
+            $conteudo = app(GerarArquivoCiganService::class)->conteudoTxtTransferencia($lote);
+        } catch (ValidationException $exception) {
+            return redirect()
+                ->route('admin.captacao.matriz.index', ['lote' => $lote->id, 'aba' => 'arquivo-cigan'])
+                ->withErrors($exception->errors());
+        }
         $nomeArquivo = sprintf('cigan-transferencia-lote-%d.txt', $lote->id);
 
         return response()->streamDownload(

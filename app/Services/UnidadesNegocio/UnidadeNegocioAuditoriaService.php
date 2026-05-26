@@ -10,11 +10,13 @@ class UnidadeNegocioAuditoriaService
 {
     private const COMPARABLE_FIELDS = [
         'id_cigam',
+        'centro_armazenagem',
         'razao_social',
         'nome',
         'cpf_cnpj',
         'custo_operacional',
         'id_estado',
+        'codigo_cliente',
         'status',
         'possui_estoque',
         'is_unidade_producao',
@@ -114,11 +116,13 @@ class UnidadeNegocioAuditoriaService
     {
         return [
             'id_cigam' => $unidade->id_cigam,
+            'centro_armazenagem' => $unidade->centro_armazenagem,
             'razao_social' => $unidade->razao_social,
             'nome' => $unidade->nome,
             'cpf_cnpj' => $unidade->cpf_cnpj,
             'custo_operacional' => (string) $unidade->custo_operacional,
             'id_estado' => (int) $unidade->id_estado,
+            'codigo_cliente' => $unidade->codigo_cliente,
             'status' => (bool) $unidade->status,
             'possui_estoque' => (bool) $unidade->possui_estoque,
             'is_unidade_producao' => (bool) $unidade->is_unidade_producao,

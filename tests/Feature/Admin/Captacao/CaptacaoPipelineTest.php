@@ -4,6 +4,9 @@ namespace Tests\Feature\Admin\Captacao;
 
 use App\Enums\CaptacaoLoteStatus;
 use App\Models\Captacao\CaptacaoLote;
+use App\Models\Fruta;
+use App\Services\Captacao\ClienteFrutaVinculoService;
+use Illuminate\Support\Carbon;
 
 class CaptacaoPipelineTest extends CaptacaoTestCase
 {
@@ -135,9 +138,16 @@ class CaptacaoPipelineTest extends CaptacaoTestCase
 
     public function test_download_arquivo_cigan_transferencia_txt_layout_edi(): void
     {
+        Carbon::setTestNow(Carbon::parse('2026-06-10 12:00:00'));
+
         $c = $this->cenarioCaptacaoBasico();
-        $c['faturamento']->update(['id_cigam' => '881001']);
+        $c['faturamento']->update([
+            'id_cigam' => '881001',
+            'id_cliente' => $c['cliente']->id,
+        ]);
+        $c['cliente']->update(['id_cigam' => '770099']);
         $c['galpao']->update(['id_cigam' => '882002']);
+        $c['fruta']->update(['id_cigam' => '000042']);
         $hub = $this->criarHubComEstoque($c['fruta']);
         $hub->update(['id_cigam' => '883003']);
         $lote = $this->criarLoteCaptacao($c);
@@ -172,15 +182,144 @@ class CaptacaoPipelineTest extends CaptacaoTestCase
         $this->assertGreaterThanOrEqual(2, count($linhas));
         $this->assertSame(688, strlen($linhas[0]));
         $this->assertSame('N', $linhas[0][0]);
-        $this->assertSame('881001', substr($linhas[0], 51, 6), 'Cliente/cobrança deve ser o faturamento da carteira');
-        $this->assertSame('883003', substr($linhas[0], 131, 6), 'Transportadora deve ser o HUB de origem');
-        $this->assertNotSame('882002', substr($linhas[0], 51, 6), 'Galpão não é o destino fiscal do registro N');
+
+        $gerador = app(\App\Services\Captacao\CiganEdiNfTransferenciaGerador::class);
+
+        $serieNumero = $gerador->serieENumeroNotaFiscalCigam('883003');
+        $this->assertSame($serieNumero['serie'], substr($linhas[0], 2, 5), 'Série (pos. 3–7) = NF + id_cigam HUB sem zeros à esquerda');
+        $this->assertSame($serieNumero['numero'], substr($linhas[0], 8, 7), 'Número NF (pos. 9–15) = continuação quando passar de 5 caracteres');
+        $this->assertSame('NF883', substr($linhas[0], 2, 5));
+        $this->assertSame('003    ', substr($linhas[0], 8, 7));
+        $this->assertSame('10062026', substr($linhas[0], 25, 8), 'Data emissão nas pos. 26–33 = dia atual');
+        $this->assertSame('10062026', substr($linhas[0], 34, 8), 'Data entrada nas pos. 35–42 = dia atual');
+        $this->assertSame('5152A', substr($linhas[0], 19, 5), 'Tipo de operação (pos. 20–24) = 5152A');
+        $this->assertSame('5152A', substr($linhas[1], 371, 5), 'Tipo de operação (pos. 372–376) = 5152A');
+
+        $this->assertSame('770099', substr($linhas[0], 51, 6), 'Cliente (pos. 52–57) = id_cigam do cliente da UN');
+        $this->assertSame('770099', substr($linhas[0], 58, 6), 'Cobrança (pos. 59–64) = mesmo código do cliente');
+        $this->assertSame('000488', substr($linhas[0], 131, 6), 'Transportadora fixa (pos. 132–137)');
+        $this->assertNotSame('881001', substr($linhas[0], 51, 6), 'Código da UN de faturamento não é cliente/cobrança');
+        $this->assertSame('R', substr($linhas[0], 43, 1), 'Via transporte (pos. 44)');
+        $this->assertSame('1', substr($linhas[0], 265, 1), 'Tipo frete (pos. 266)');
+        $this->assertSame('S', substr($linhas[0], 282, 1), 'Entrada/Saída (pos. 283) = saída');
+        $this->assertSame(str_repeat(' ', 3), substr($linhas[0], 315, 3), 'Condição pagamento (pos. 316–318) em branco');
+        $this->assertNotSame('', trim(substr($linhas[0], 321, 60)), 'Nome cliente (pos. 322–381)');
+        $this->assertSame(str_repeat(' ', 30), substr($linhas[0], 382, 30), 'Contato (pos. 383–412) em branco');
+        $this->assertSame(str_repeat(' ', 20), substr($linhas[0], 413, 20), 'Fone (pos. 414–433) em branco');
+        $this->assertSame(str_repeat(' ', 40), substr($linhas[0], 455, 40), 'Endereço (pos. 456–495) em branco');
+        $this->assertSame(str_repeat(' ', 20), substr($linhas[0], 496, 20), 'Bairro (pos. 497–516) em branco');
+        $this->assertSame(str_repeat(' ', 30), substr($linhas[0], 517, 30), 'Cidade (pos. 518–547) em branco');
+        $this->assertSame(
+            $gerador->ufClienteCigam($c['cliente']->fresh(['unidadeNegocio.estado'])),
+            substr($linhas[0], 548, 2),
+            'UF (pos. 549–550) da unidade do cliente',
+        );
+        $this->assertSame(str_repeat(' ', 8), substr($linhas[0], 551, 8), 'CEP (pos. 552–559) em branco');
+        $this->assertNotSame('', trim(substr($linhas[0], 560, 14)), 'CNPJ (pos. 561–574)');
+        $this->assertSame(str_repeat(' ', 20), substr($linhas[0], 575, 20), 'Inscrição estadual (pos. 576–595) em branco');
+        $this->assertContains(substr($linhas[0], 596, 1), ['F', 'J'], 'Pessoa F/J (pos. 597)');
         $this->assertSame('I', $linhas[1][0]);
         $this->assertSame(719, strlen($linhas[1]));
+        $this->assertSame(
+            $gerador->codigoMaterialCigam('000042'),
+            substr($linhas[1], 2, 20),
+            'Código material (pos. 3–22) = 14 espaços + 6 dígitos finais do id_cigam da fruta',
+        );
+        $this->assertSame(
+            $gerador->codigoUnidadeNegocioCigam('883003', 'unidade HUB de origem'),
+            substr($linhas[0], 601, 3),
+            'Unidade negócio (pos. 602–604) = id_cigam do HUB de origem',
+        );
+        $this->assertSame('001', substr($linhas[0], 604, 3), 'Centro armazenagem (pos. 605–607) do HUB');
+        $this->assertSame('S', substr($linhas[0], 607, 1), 'Espécie estoque (pos. 608) = S');
+        $this->assertSame(
+            $gerador->codigoUnidadeNegocioCigam('883003', 'unidade HUB de origem'),
+            substr($linhas[1], 655, 3),
+            'Unidade negócio no item (pos. 656–658) = HUB de origem',
+        );
+        $this->assertSame(str_repeat(' ', 20), substr($linhas[1], 658, 20), 'Centro/separador no item (pos. 659–678) em branco — só no N');
+        $this->assertSame('S', substr($linhas[1], 678, 1), 'Espécie estoque no item (pos. 679) = S');
+        $this->assertSame(str_repeat(' ', 5), substr($linhas[1], 680, 5), 'Sequência item (pos. 681–685) em branco');
+        $this->assertSame(' ', substr($linhas[1], 38, 1), 'Separador entre quantidade e peças (pos. 39)');
+        $this->assertSame(str_repeat(' ', 14), substr($linhas[1], 39, 14), 'Peças (pos. 40–53) em branco');
+        $this->assertSame(
+            $gerador->formatarQuantidadeUmCigam(5.0),
+            substr($linhas[1], 23, 15),
+            'Quantidade UM (pos. 24–38) máscara N8.6 (× 1.000.000)',
+        );
+        $this->assertStringEndsWith(
+            '000000',
+            substr($linhas[1], 23, 15),
+            'Quantidade deve terminar com 6 zeros decimais implícitos (N8.6)',
+        );
+        $this->assertSame(
+            str_repeat(' ', 15),
+            substr($linhas[1], 55, 15),
+            'Preço unitário (pos. 56–70) em branco',
+        );
+        $this->assertNotSame('000000000000000', substr($linhas[1], 55, 15), 'Preço não deve ser zeros');
+        $this->assertNotSame('', trim(substr($linhas[1], 114, 200)), 'Descrição item (pos. 115–314)');
+        $this->assertSame('0', substr($linhas[1], 94, 1), 'IPI (pos. 95) = não considera');
         $this->assertStringContainsString(
             'cigan-transferencia-lote-'.$lote->id.'.txt',
             (string) $response->headers->get('content-disposition'),
         );
+
+        Carbon::setTestNow();
+    }
+
+    public function test_download_arquivo_cigan_usa_id_cigam_apenas_das_frutas_do_lote(): void
+    {
+        $c = $this->cenarioCaptacaoBasico();
+        $c['faturamento']->update(['id_cliente' => $c['cliente']->id]);
+        $c['cliente']->update(['id_cigam' => '770099']);
+
+        $frutaLoteA = $c['fruta'];
+        $frutaLoteA->update(['id_cigam' => '001111', 'nome' => 'FRUTA LOTE A']);
+
+        $frutaLoteB = Fruta::factory()->create(['id_cigam' => '002222', 'nome' => 'FRUTA LOTE B']);
+        app(ClienteFrutaVinculoService::class)->sincronizarFrutas($c['cliente'], [$frutaLoteA->id, $frutaLoteB->id]);
+
+        $hub = $this->criarHubComEstoque($frutaLoteA);
+        $hub->update(['id_cigam' => '883003']);
+
+        $loteA = $this->criarLoteCaptacao($c, '2026-05-27');
+        $loteB = $this->criarLoteCaptacao($c, '2026-05-28');
+
+        $user = $this->captacaoManager();
+        $user->unidadesNegocio()->sync([$c['faturamento']->id, $c['galpao']->id, $hub->id]);
+
+        foreach ([[$loteA, $frutaLoteA], [$loteB, $frutaLoteB]] as [$lote, $fruta]) {
+            $this->actingAs($user)->postJson(route('admin.captacao.lotes.matriz.adicionar-loja', $lote), [
+                'id_cliente' => $c['cliente']->id,
+            ])->assertOk();
+
+            $this->actingAs($user)->patchJson(route('admin.captacao.lotes.celula.update', $lote), [
+                'id_cliente' => $c['cliente']->id,
+                'id_fruta' => $fruta->id,
+                'quantidade' => 10,
+                'preco_venda' => 12,
+            ])->assertOk();
+
+            $lote->update([
+                'status' => CaptacaoLoteStatus::TransferenciaCiganIniciada,
+                'id_unidade_negocio_hub_origem' => $hub->id,
+            ]);
+        }
+
+        $gerador = app(\App\Services\Captacao\CiganEdiNfTransferenciaGerador::class);
+        $materialA = $gerador->codigoMaterialCigam('001111');
+        $materialB = $gerador->codigoMaterialCigam('002222');
+
+        $conteudoB = $this->actingAs($user)
+            ->get(route('admin.captacao.lotes.arquivo-cigan-transferencia', $loteB))
+            ->assertOk()
+            ->streamedContent();
+
+        $linhaItemB = array_values(array_filter(explode("\n", rtrim($conteudoB, "\r\n"))))[1];
+
+        $this->assertStringContainsString($materialB, $linhaItemB);
+        $this->assertStringNotContainsString($materialA, $conteudoB);
     }
 
     public function test_definir_hub_origem_cigan_na_matriz(): void

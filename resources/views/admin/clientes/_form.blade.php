@@ -31,7 +31,25 @@
                 @enderror
                 <small class="text-muted">Armazenado somente com dígitos (6 caracteres, com zeros à esquerda).</small>
             </div>
-            <div class="col-md-8">
+            <div class="col-md-2">
+                <label for="numero_divisao" class="form-label">Nº divisão <span class="text-danger">*</span></label>
+                <input type="text"
+                       id="numero_divisao"
+                       name="numero_divisao"
+                       value="{{ old('numero_divisao', $cliente->numero_divisao ?? '10') }}"
+                       class="form-control @error('numero_divisao') is-invalid @enderror"
+                       maxlength="2"
+                       required
+                       inputmode="numeric"
+                       pattern="[0-9]{1,2}"
+                       placeholder="10"
+                       autocomplete="off">
+                @error('numero_divisao')
+                    <div class="invalid-feedback">{{ $message }}</div>
+                @enderror
+                <small class="text-muted">2 dígitos (Cigam, pos. 599–600 da NF).</small>
+            </div>
+            <div class="col-md-6">
                 <label for="razao_social" class="form-label">Razão social <span class="text-danger">*</span></label>
                 <input type="text"
                        id="razao_social"
@@ -175,6 +193,53 @@
                        placeholder="Ex.: 30">
                 <div class="form-text">Sobre o preço de venda; usado para sugerir preço ideal na captação por loja.</div>
                 @error('percentual_margem_alvo')
+                    <div class="invalid-feedback">{{ $message }}</div>
+                @enderror
+            </div>
+        </div>
+
+        <hr class="my-4">
+        <h5 class="mb-3">Contato</h5>
+        <div class="row g-3">
+            <div class="col-md-4">
+                <label for="contato_nome" class="form-label">Nome do contato</label>
+                <input type="text"
+                       id="contato_nome"
+                       name="contato_nome"
+                       value="{{ old('contato_nome', $cliente->contato_nome) }}"
+                       class="form-control @error('contato_nome') is-invalid @enderror"
+                       maxlength="255"
+                       placeholder="Pessoa de contato na loja"
+                       autocomplete="off">
+                @error('contato_nome')
+                    <div class="invalid-feedback">{{ $message }}</div>
+                @enderror
+            </div>
+            <div class="col-md-4">
+                <label for="contato_telefone" class="form-label">Telefone</label>
+                <input type="text"
+                       id="contato_telefone"
+                       name="contato_telefone"
+                       value="{{ old('contato_telefone', $cliente->contato_telefone) }}"
+                       class="form-control @error('contato_telefone') is-invalid @enderror"
+                       maxlength="15"
+                       placeholder="DDD + número (somente dígitos ou com máscara)"
+                       autocomplete="off">
+                @error('contato_telefone')
+                    <div class="invalid-feedback">{{ $message }}</div>
+                @enderror
+            </div>
+            <div class="col-md-4">
+                <label for="contato_email" class="form-label">E-mail</label>
+                <input type="email"
+                       id="contato_email"
+                       name="contato_email"
+                       value="{{ old('contato_email', $cliente->contato_email) }}"
+                       class="form-control @error('contato_email') is-invalid @enderror"
+                       maxlength="255"
+                       placeholder="contato@loja.com.br"
+                       autocomplete="off">
+                @error('contato_email')
                     <div class="invalid-feedback">{{ $message }}</div>
                 @enderror
             </div>

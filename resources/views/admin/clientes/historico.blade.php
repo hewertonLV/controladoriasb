@@ -6,8 +6,12 @@
 @php
     $rotuloCampo = [
         'id_cigam' => 'ID CIGAM',
+        'numero_divisao' => 'Número de divisão',
         'razao_social' => 'Razão social',
         'fantasia' => 'Fantasia',
+        'contato_nome' => 'Nome do contato',
+        'contato_telefone' => 'Telefone do contato',
+        'contato_email' => 'E-mail do contato',
         'cnpj_cpf' => 'CPF/CNPJ',
         'id_unidade_negocio' => 'Unidade de negócio',
         'desconto_nf' => 'Desconto NF',

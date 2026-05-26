@@ -479,7 +479,16 @@
                         <p class="text-muted small mb-3">
                             Arquivo TXT no layout <strong>EDI NF Cigam</strong> (registros <code>N</code> + <code>I</code>),
                             com as quantidades <strong>a receber</strong> do Romaneio 2 — Abastecimento.
-                            Informe o <strong>HUB de origem</strong> (saída física) antes do download. No arquivo, o <strong>destino</strong> (cliente/cobrança) é a unidade de <strong>faturamento da carteira</strong> ({{ $lote->unidadeFaturamento?->nome ?? '—' }}).
+                            Informe o <strong>HUB de origem</strong> (saída física) antes do download. Cliente/cobrança no TXT = código Cigam do <strong>cliente vinculado</strong> à unidade de faturamento
+                            @if ($lote->unidadeFaturamento?->clientePrincipal)
+                                (<strong>{{ $lote->unidadeFaturamento->clientePrincipal->razao_social }}</strong>, Cigam {{ $lote->unidadeFaturamento->clientePrincipal->id_cigam }}).
+                            @else
+                                — cadastre o <strong>código do cliente</strong> em {{ $lote->unidadeFaturamento?->nome ?? 'faturamento' }}.
+                            @endif
+                            Número da NF (pos. 9–15): <strong>em branco</strong> (Cigan numera pela série). Tipo de operação (20–24 / 372–376): <strong>{{ app(\App\Services\Captacao\CiganEdiNfTransferenciaGerador::class)->tipoOperacaoCigam() }}</strong> (transferência).
+                            Transportadora (132–137): <strong>{{ app(\App\Services\Captacao\CiganEdiNfTransferenciaGerador::class)->codigoTransportadoraCigam() }}</strong>.
+                            Entrada/Saída (283): <strong>S</strong>. Condição de pagamento (316–318): <strong>em branco</strong>.
+                            Data emissão e entrada (26–33 e 35–42): <strong>{{ now()->format('d/m/Y') }}</strong>.
                         </p>
 
                         <div class="row g-3 mb-3">
@@ -510,7 +519,7 @@
                                 @if ($lote->unidadeHubOrigem)
                                     <p class="small mb-0 mt-2 text-success">
                                         HUB atual: <strong>{{ $lote->unidadeHubOrigem->nome }}</strong>
-                                        (Cigam {{ $lote->unidadeHubOrigem->id_cigam }}) — transportadora no TXT; destino fiscal = faturamento {{ $lote->unidadeFaturamento?->nome }}.
+                                        (Cigam {{ $lote->unidadeHubOrigem->id_cigam }}) — saída física da operação; destino fiscal = faturamento {{ $lote->unidadeFaturamento?->nome }}.
                                     </p>
                                 @endif
                             </div>

@@ -4,6 +4,7 @@ namespace Tests\Feature\Admin\UnidadesNegocio;
 
 use App\Enums\Permissions;
 use App\Jobs\UnidadesNegocio\ProcessarPreviewImportacaoUnidadesNegocioJob;
+use App\Models\Cliente;
 use App\Models\Estado;
 use App\Models\UnidadeNegocio;
 use App\Models\UnidadeNegocioImportacao;
@@ -290,6 +291,52 @@ class UnidadeNegocioImportacaoTest extends UnidadeNegocioTestCase
         $this->assertSame('DEPOIS', $existente->fresh()->nome);
     }
 
+    public function test_job_detecta_atualizacao_de_codigo_cliente(): void
+    {
+        Storage::fake('local');
+        $unidade = UnidadeNegocio::factory()->create([
+            'id_cigam' => '000401',
+            'nome' => 'LOJA COM CLIENTE',
+            'razao_social' => 'LOJA COM CLIENTE',
+        ]);
+        $cliente = Cliente::factory()->create([
+            'id_cigam' => '000402',
+            'id_unidade_negocio' => $unidade->id,
+        ]);
+
+        $path = $this->storeSpreadsheet([
+            $this->linhaPlanilha([
+                $unidade->id_cigam,
+                $unidade->razao_social,
+                $unidade->nome,
+                $unidade->cpf_cnpj,
+                number_format((float) $unidade->custo_operacional, 2, '.', ''),
+                'NÃO',
+                'NÃO',
+                'NÃO',
+                'NÃO',
+                'SIM',
+                'CEARA',
+                '402',
+            ]),
+        ]);
+
+        $importacao = UnidadeNegocioImportacao::create([
+            'uuid' => (string) Str::uuid(),
+            'user_id' => $this->unidadesNegocioManager()->id,
+            'arquivo_original' => 'u.xlsx',
+            'arquivo_path' => $path,
+            'status' => UnidadeNegocioImportacao::STATUS_AGUARDANDO,
+        ]);
+
+        (new UnidadeNegocioImportacaoProcessor)->processar($importacao->fresh());
+
+        $importacao->refresh();
+        $atualizacoes = $importacao->resultado['atualizacoes'] ?? [];
+        $this->assertCount(1, $atualizacoes);
+        $this->assertSame($cliente->id, $atualizacoes[0]['dados_novos']['id_cliente'] ?? null);
+    }
+
     public function test_confirmacao_permite_cpf_cnpj_repetido_e_vazio(): void
     {
         $user = $this->userWithPermissions([
@@ -466,6 +513,14 @@ class UnidadeNegocioImportacaoTest extends UnidadeNegocioTestCase
      */
     private function linhaPlanilha(array $prefixo): array
     {
+        if (count($prefixo) >= 13) {
+            return array_slice($prefixo, 0, 13);
+        }
+
+        if (count($prefixo) >= 12) {
+            return array_slice($prefixo, 0, 12);
+        }
+
         if (count($prefixo) >= 11) {
             return array_slice($prefixo, 0, 11);
         }
@@ -511,6 +566,8 @@ class UnidadeNegocioImportacaoTest extends UnidadeNegocioTestCase
             'Galpão operacional',
             'Emite nota fiscal',
             'Estado',
+            'Código do cliente',
+            'Centro armazenagem',
         ], null, 'A1');
 
         foreach ($rows as $index => $row) {

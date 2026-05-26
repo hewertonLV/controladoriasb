@@ -1,20 +1,14 @@
 <?php
 
 return [
-    /*
-    | Tipo de operação Cigan (pos. 20–24 registro N e 372–376 registro I).
-    | Deve existir no cadastro Cigan do cliente.
-    */
-    'tipo_operacao' => env('CAPTACAO_CIGAN_TIPO_OPERACAO', '51101'),
+    /** Série NF (pos. 3–7 registro N; 3 dígitos com 2 espaços à esquerda no TXT). */
+    'serie' => env('CAPTACAO_CIGAN_SERIE') ?: '1',
 
-    /** Série NF (pos. 3–7 registro N). */
-    'serie' => env('CAPTACAO_CIGAN_SERIE', '1'),
-
-    /** Condição de pagamento (pos. 316–318 registro N). */
-    'condicao_pagamento' => env('CAPTACAO_CIGAN_CONDICAO_PAGAMENTO', '001'),
+    /** Transportadora (pos. 132–137 registro N) — código fixo Cigam. */
+    'transportadora' => env('CAPTACAO_CIGAN_TRANSPORTADORA') ?: '000488',
 
     /** Divisão (pos. 599–600 registro N). */
-    'divisao' => env('CAPTACAO_CIGAN_DIVISAO', '10'),
+    'divisao' => env('CAPTACAO_CIGAN_DIVISAO') ?: '10',
 
     /** Via transporte: R rodoviária (pos. 44). */
     'via_transporte' => 'R',
@@ -23,9 +17,17 @@ return [
     'tipo_frete' => '1',
 
     /**
-     * Entrada/Saída (pos. 283): E = NF entrada (módulo Compras / transferência para o galpão).
+     * Tipo de operação (pos. 20–24 no N; 372–376 no I): transferência HUB (CFOP 5152).
      */
-    'entrada_saida' => 'E',
+    'tipo_operacao' => env('CAPTACAO_CIGAN_TIPO_OPERACAO') ?: '5152A',
+
+    /**
+     * Entrada/Saída/Nula (pos. 283): S = saída (Faturamento), conforme operação da carteira.
+     */
+    'entrada_saida' => 'S',
+
+    /** Espécie estoque (pos. 608 no N; 679 no I): S = saída. */
+    'especie_estoque' => 'S',
 
     /** Comprimento fixo das linhas conforme layout Cigam revisão 15/05/2015. */
     'comprimento_linha_n' => 688,

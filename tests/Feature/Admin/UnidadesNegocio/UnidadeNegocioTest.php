@@ -3,6 +3,7 @@
 namespace Tests\Feature\Admin\UnidadesNegocio;
 
 use App\Enums\Permissions;
+use App\Models\Cliente;
 use App\Models\Estado;
 use App\Models\UnidadeNegocio;
 
@@ -265,6 +266,72 @@ class UnidadeNegocioTest extends UnidadeNegocioTestCase
             'is_galpao_operacional' => true,
             'emite_nota_fiscal' => true,
         ]);
+    }
+
+    public function test_cadastro_normaliza_centro_armazenagem(): void
+    {
+        $this->actingAs($this->userWithPermissions([Permissions::UNIDADES_NEGOCIO_CRIAR]))
+            ->post(route('admin.unidades-negocio.store'), $this->unidadePayload([
+                'id_cigam' => '77020',
+                'centro_armazenagem' => '12',
+            ]))
+            ->assertRedirect(route('admin.unidades-negocio.index'))
+            ->assertSessionHasNoErrors();
+
+        $this->assertDatabaseHas('unidades_negocio', [
+            'id_cigam' => '077020',
+            'centro_armazenagem' => '012',
+        ]);
+    }
+
+    public function test_edicao_vincula_codigo_do_cliente_da_unidade(): void
+    {
+        $unidade = UnidadeNegocio::factory()->create(['id_cigam' => '077010']);
+        $cliente = Cliente::factory()->create([
+            'id_cigam' => '000555',
+            'id_unidade_negocio' => $unidade->id,
+        ]);
+
+        $this->actingAs($this->userWithPermissions([Permissions::UNIDADES_NEGOCIO_EDITAR]))
+            ->put(route('admin.unidades-negocio.update', $unidade), $this->unidadePayload([
+                'id_cigam' => '77010',
+                'id_cliente' => $cliente->id,
+            ]))
+            ->assertRedirect(route('admin.unidades-negocio.index'))
+            ->assertSessionHasNoErrors();
+
+        $unidade->refresh();
+        $this->assertSame($cliente->id, $unidade->id_cliente);
+        $this->assertSame('000555', $unidade->codigo_cliente);
+    }
+
+    public function test_edicao_rejeita_cliente_de_outra_unidade(): void
+    {
+        $unidade = UnidadeNegocio::factory()->create(['id_cigam' => '077011']);
+        $outra = UnidadeNegocio::factory()->create(['id_cigam' => '077012']);
+        $cliente = Cliente::factory()->create([
+            'id_cigam' => '000556',
+            'id_unidade_negocio' => $outra->id,
+        ]);
+
+        $this->actingAs($this->userWithPermissions([Permissions::UNIDADES_NEGOCIO_EDITAR]))
+            ->put(route('admin.unidades-negocio.update', $unidade), $this->unidadePayload([
+                'id_cigam' => '77011',
+                'id_cliente' => $cliente->id,
+            ]))
+            ->assertSessionHasErrors('id_cliente');
+    }
+
+    public function test_cadastro_nao_aceita_id_cliente(): void
+    {
+        $cliente = Cliente::factory()->create(['id_cigam' => '000557']);
+
+        $this->actingAs($this->userWithPermissions([Permissions::UNIDADES_NEGOCIO_CRIAR]))
+            ->post(route('admin.unidades-negocio.store'), $this->unidadePayload([
+                'id_cigam' => '77012',
+                'id_cliente' => $cliente->id,
+            ]))
+            ->assertSessionHasErrors('id_cliente');
     }
 
     public function test_unidade_pode_ser_hub_e_galpao_operacional(): void

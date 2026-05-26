@@ -30,8 +30,12 @@ trait ValidatesClienteAttributes
                 'regex:/^\\d{6}$/',
                 $uniqueIdCigam(),
             ],
+            'numero_divisao' => ['required', 'string', 'regex:/^\\d{1,2}$/'],
             'razao_social' => ['required', 'string', 'max:255'],
             'fantasia' => ['nullable', 'string', 'max:255'],
+            'contato_nome' => ['nullable', 'string', 'max:255'],
+            'contato_telefone' => ['nullable', 'string', $this->contatoTelefoneRule()],
+            'contato_email' => ['nullable', 'string', 'email', 'max:255'],
             'cnpj_cpf' => [
                 'required',
                 'string',
@@ -77,8 +81,12 @@ trait ValidatesClienteAttributes
     {
         return [
             'id_cigam' => 'ID CIGAM',
+            'numero_divisao' => 'número de divisão',
             'razao_social' => 'razão social',
             'fantasia' => 'fantasia',
+            'contato_nome' => 'nome do contato',
+            'contato_telefone' => 'telefone do contato',
+            'contato_email' => 'e-mail do contato',
             'cnpj_cpf' => 'CPF/CNPJ',
             'id_unidade_negocio' => 'unidade de negócio',
             'id_praca' => 'praça',
@@ -98,6 +106,7 @@ trait ValidatesClienteAttributes
     {
         return [
             'desconto_nf.min' => 'O desconto não pode ser negativo.',
+            'numero_divisao.regex' => 'O número de divisão deve ter 1 ou 2 dígitos numéricos (ex.: 10).',
             'id_unidade_negocio.exists' => 'Selecione uma unidade de negócio válida (unidades HUB não são permitidas).',
         ];
     }
@@ -105,16 +114,24 @@ trait ValidatesClienteAttributes
     protected function prepareClienteForValidation(): void
     {
         $idCigam = TextoCadastro::normalizarIdCigamAteSeisDigitos((string) $this->input('id_cigam', ''));
+        $numeroDivisao = TextoCadastro::somenteDigitos((string) $this->input('numero_divisao', '10'));
         $documento = TextoCadastro::somenteDigitos((string) $this->input('cnpj_cpf', ''));
         $descontoNf = $this->input('desconto_nf');
         $fantasia = preg_replace('/\s+/u', ' ', (string) $this->input('fantasia', '')) ?? '';
+        $contatoNome = preg_replace('/\s+/u', ' ', (string) $this->input('contato_nome', '')) ?? '';
+        $contatoTelefone = TextoCadastro::somenteDigitos((string) $this->input('contato_telefone', ''));
+        $contatoEmail = mb_strtolower(trim((string) $this->input('contato_email', '')));
 
         $grupoId = $this->input('grupo_id');
 
         $this->merge([
             'id_cigam' => $idCigam,
+            'numero_divisao' => str_pad(substr($numeroDivisao === '' ? '10' : $numeroDivisao, 0, 2), 2, '0', STR_PAD_LEFT),
             'razao_social' => trim((string) $this->input('razao_social')),
             'fantasia' => TextoCadastro::normalizarMaiusculasOuNulo($fantasia),
+            'contato_nome' => TextoCadastro::normalizarMaiusculasOuNulo($contatoNome),
+            'contato_telefone' => $contatoTelefone === '' ? null : $contatoTelefone,
+            'contato_email' => $contatoEmail === '' ? null : $contatoEmail,
             'cnpj_cpf' => $documento,
             'id_unidade_negocio' => (int) $this->input('id_unidade_negocio'),
             'id_praca' => (int) $this->input('id_praca'),
@@ -144,6 +161,21 @@ trait ValidatesClienteAttributes
         }
 
         return $dados;
+    }
+
+    protected function contatoTelefoneRule(): Closure
+    {
+        return function (string $attribute, mixed $value, Closure $fail): void {
+            if ($value === null || $value === '') {
+                return;
+            }
+
+            $len = strlen((string) $value);
+
+            if (! in_array($len, [10, 11], true)) {
+                $fail('O telefone do contato deve ter 10 dígitos (fixo) ou 11 dígitos (celular).');
+            }
+        };
     }
 
     protected function cpfCnpjLengthRule(): Closure

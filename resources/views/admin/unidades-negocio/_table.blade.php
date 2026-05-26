@@ -8,6 +8,8 @@
             <thead>
                 <tr>
                     <th>ID CIGAM</th>
+                    <th>C. armaz.</th>
+                    <th>Cód. cliente</th>
                     <th>UF</th>
                     <th>Unidade</th>
                     <th>CPF/CNPJ</th>
@@ -25,6 +27,16 @@
                         data-possui-estoque="{{ $unidade->possui_estoque ? '1' : '0' }}">
                         <td data-order="{{ (int) ltrim((string) $unidade->id_cigam, '0') ?: 0 }}">
                             <code class="small">{{ $unidade->id_cigam }}</code>
+                        </td>
+                        <td data-order="{{ (int) ltrim((string) $unidade->centro_armazenagem, '0') ?: 0 }}">
+                            <code class="small">{{ $unidade->centro_armazenagem }}</code>
+                        </td>
+                        <td data-order="{{ (int) ltrim((string) ($unidade->codigo_cliente ?? ''), '0') ?: 0 }}">
+                            @if ($unidade->codigo_cliente)
+                                <code class="small">{{ $unidade->codigo_cliente }}</code>
+                            @else
+                                <span class="text-muted">—</span>
+                            @endif
                         </td>
                         <td>{{ $unidade->estado?->abreviacao ?? '—' }}</td>
                         <td><span class="fw-semibold">{{ $unidade->nome ?: $unidade->razao_social }}</span></td>
@@ -106,7 +118,7 @@
                     </tr>
                 @empty
                     <tr>
-                        <td colspan="9" class="text-center text-muted py-4">Nenhuma unidade de negócio cadastrada.</td>
+                        <td colspan="11" class="text-center text-muted py-4">Nenhuma unidade de negócio cadastrada.</td>
                     </tr>
                 @endforelse
             </tbody>

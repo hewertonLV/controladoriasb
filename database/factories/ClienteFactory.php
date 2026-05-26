@@ -25,6 +25,7 @@ class ClienteFactory extends Factory
 
         return [
             'id_cigam' => $id,
+            'numero_divisao' => '10',
             'razao_social' => $this->faker->company(),
             'fantasia' => $this->faker->optional()->company(),
             'cnpj_cpf' => $cnpjCpf,

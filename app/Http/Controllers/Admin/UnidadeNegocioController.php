@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Admin\StoreUnidadeNegocioRequest;
 use App\Http\Requests\Admin\UpdateUnidadeNegocioRequest;
+use App\Models\Cliente;
 use App\Models\Estado;
 use App\Models\UnidadeNegocio;
 use App\Models\UnidadeNegocioHistorico;
@@ -26,7 +27,7 @@ class UnidadeNegocioController extends Controller
     {
         $filtros = $this->unidadeNegocioQuery->filtrosFromRequest($request);
         $unidadesNegocio = $this->unidadeNegocioQuery->aplicarFiltros(
-            UnidadeNegocio::query(),
+            UnidadeNegocio::query()->with('clientePrincipal:id,id_cigam'),
             $filtros,
         )->get();
 
@@ -45,6 +46,7 @@ class UnidadeNegocioController extends Controller
                 'status' => true,
                 'possui_estoque' => false,
                 'custo_operacional' => '0.00',
+                'centro_armazenagem' => '001',
                 'id_estado' => Estado::ID_CEARA,
                 'emite_nota_fiscal' => true,
             ]),
@@ -80,11 +82,18 @@ class UnidadeNegocioController extends Controller
         $unidadeNegocio->load([
             'historicoCustoOperacionalAtual',
             'historicosCustoOperacional',
+            'clientePrincipal:id,id_cigam,razao_social,fantasia',
         ]);
+
+        $clientesDaUnidade = Cliente::query()
+            ->where('id_unidade_negocio', $unidadeNegocio->id)
+            ->orderBy('razao_social')
+            ->get(['id', 'id_cigam', 'razao_social', 'fantasia']);
 
         return view('admin.unidades-negocio.edit', [
             'estados' => Estado::query()->orderBy('nome')->get(['id', 'nome', 'abreviacao']),
             'unidadeNegocio' => $unidadeNegocio,
+            'clientesDaUnidade' => $clientesDaUnidade,
         ]);
     }
 
