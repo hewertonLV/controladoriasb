@@ -4,6 +4,7 @@ namespace App\Models\Captacao;
 
 use App\Enums\PedidoOrigem;
 use App\Models\Cliente;
+use App\Models\UnidadeNegocio;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -22,6 +23,7 @@ class Pedido extends Model
     protected $fillable = [
         'id_captacao_lote',
         'id_cliente',
+        'id_unidade_negocio_saida_venda',
         'id_captacao_rota',
         'numero_pedido',
         'ordem_carregamento',
@@ -51,6 +53,11 @@ class Pedido extends Model
     public function cliente(): BelongsTo
     {
         return $this->belongsTo(Cliente::class, 'id_cliente');
+    }
+
+    public function unidadeSaidaVenda(): BelongsTo
+    {
+        return $this->belongsTo(UnidadeNegocio::class, 'id_unidade_negocio_saida_venda');
     }
 
     public function rota(): BelongsTo

@@ -335,6 +335,7 @@ trait CreatesUsersWithRoles
     {
         return $this->userWithPermissions(array_values(array_unique(array_merge([
             Permissions::CAPTACAO_LOTE_VISUALIZAR,
+            Permissions::CAPTACAO_LOTE_EXCLUIR,
             Permissions::CAPTACAO_PEDIDO_EDITAR,
             Permissions::CAPTACAO_CLIENTE_FRUTA_VINCULAR,
             Permissions::CAPTACAO_ROTA_EDITAR,

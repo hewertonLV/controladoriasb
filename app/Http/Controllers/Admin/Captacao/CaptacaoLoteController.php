@@ -2,8 +2,11 @@
 
 namespace App\Http\Controllers\Admin\Captacao;
 
+use App\Actions\Captacao\ExcluirCaptacaoLoteAction;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Admin\Captacao\StoreCaptacaoLoteRequest;
+use App\Enums\CaptacaoLoteStatus;
+use App\Enums\CaptacaoLoteTipo;
 use App\Models\Captacao\CaptacaoCarteira;
 use App\Models\Captacao\CaptacaoLote;
 use App\Services\Captacao\CaptacaoLoteService;
@@ -18,6 +21,7 @@ class CaptacaoLoteController extends Controller
 {
     public function __construct(
         private readonly CaptacaoLoteService $lotes,
+        private readonly ExcluirCaptacaoLoteAction $excluirLote,
         private readonly RomaneioCarregamentoService $romaneioCarregamento,
         private readonly RomaneioAbastecimentoService $romaneioAbastecimento,
         private readonly UnidadeNegocioAccessService $unidadeAccess,
@@ -49,14 +53,32 @@ class CaptacaoLoteController extends Controller
             abort(403, UnidadeNegocioAccessService::MENSAGEM_SEM_ACESSO);
         }
 
+        $jaEmAndamento = $this->lotes->possuiCaptacaoEmAndamento(
+            $dados['data_referencia'],
+            (int) $carteira->id,
+            CaptacaoLoteTipo::CaptacaoPedidos,
+        );
+
+        $complementar = ! $jaEmAndamento && $this->lotes->possuiOutroLoteNaCarteiraData(
+            $dados['data_referencia'],
+            (int) $carteira->id,
+            CaptacaoLoteTipo::CaptacaoPedidos,
+        );
+
         $lote = $this->lotes->abrirOuRecuperarLotePorCarteira(
             $dados['data_referencia'],
             (int) $carteira->id,
         );
 
+        $mensagem = match (true) {
+            $jaEmAndamento => 'Já existe captação em andamento para esta carteira e data — lote recuperado.',
+            $complementar => 'Captação complementar aberta com sucesso.',
+            default => 'Nova captação aberta com sucesso.',
+        };
+
         return redirect()
             ->route('admin.captacao.lotes.show', $lote)
-            ->with('success', 'Lote de captação aberto com sucesso.');
+            ->with('success', $mensagem);
     }
 
     public function show(CaptacaoLote $lote): View
@@ -72,5 +94,24 @@ class CaptacaoLoteController extends Controller
             'romaneioCarregamentoTotaisGerais' => $this->romaneioCarregamento->totaisGerais($romaneioCarregamento),
             'romaneioAbastecimento' => $this->romaneioAbastecimento->preview($lote),
         ]);
+    }
+
+    public function destroy(Request $request, CaptacaoLote $lote): RedirectResponse
+    {
+        if (! $this->unidadeAccess->canAccess($request->user(), (int) $lote->id_unidade_negocio_galpao)) {
+            abort(403, UnidadeNegocioAccessService::MENSAGEM_SEM_ACESSO);
+        }
+
+        if ($lote->status !== CaptacaoLoteStatus::CaptacaoEmAndamento) {
+            return redirect()
+                ->route('admin.captacao.lotes.index')
+                ->with('error', 'Só é possível excluir captações em andamento.');
+        }
+
+        $this->excluirLote->executar($lote);
+
+        return redirect()
+            ->route('admin.captacao.lotes.index')
+            ->with('success', 'Captação excluída com sucesso.');
     }
 }

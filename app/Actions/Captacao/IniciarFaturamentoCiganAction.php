@@ -21,7 +21,7 @@ final class IniciarFaturamentoCiganAction
     {
         if ($lote->tipo === CaptacaoLoteTipo::RomaneioManual) {
             throw ValidationException::withMessages([
-                'tipo' => 'Romaneio manual não possui etapa de faturamento.',
+                'tipo' => 'Solicitação de transferência não possui etapa de faturamento.',
             ]);
         }
 

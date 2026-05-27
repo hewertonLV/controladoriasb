@@ -6,6 +6,7 @@ use App\Models\Estoque;
 use App\Models\Fruta;
 use App\Models\MovimentacaoEstoque;
 use App\Models\UnidadeNegocio;
+use App\Support\TextoCadastro;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
 
@@ -27,6 +28,37 @@ class EstoqueMovimentacaoService
         }
 
         return $kg;
+    }
+
+    /**
+     * Entrada manual informando quantidade e preço na unidade de medição da fruta.
+     */
+    public function movimentarEntradaPorUnidadeMedicao(
+        UnidadeNegocio $unidade,
+        Fruta $fruta,
+        string $qtdFrutaUm,
+        string $precoFrutaUm,
+    ): MovimentacaoEstoque {
+        $kgPorUm = $this->kgPorUnidadeMedicaoSeguro($fruta);
+
+        $qtdUm = round((float) TextoCadastro::normalizarDecimalNaoNegativo($qtdFrutaUm), 2);
+        if ($qtdUm <= 0) {
+            throw new \InvalidArgumentException('Informe uma quantidade maior que zero.');
+        }
+
+        $precoUm = round((float) TextoCadastro::normalizarValorMonetarioBrasileiro($precoFrutaUm), 2);
+        if ($precoUm < 0) {
+            throw new \InvalidArgumentException('O preço por unidade de medição não pode ser negativo.');
+        }
+
+        $qtdKg = round($qtdUm * $kgPorUm, 2);
+        if ($qtdKg <= 0) {
+            throw new \InvalidArgumentException('Quantidade em KG calculada inválida.');
+        }
+
+        $precoMedioKg = round($precoUm / $kgPorUm, 2);
+
+        return $this->movimentarPorTipo($unidade, $fruta, 'entrada', (string) $qtdKg, (string) $precoMedioKg);
     }
 
     /**

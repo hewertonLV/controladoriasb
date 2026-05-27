@@ -283,10 +283,10 @@
                         </li>
                     @endcan
                     <li class="side-nav-item">
-                        <a href="{{ route('admin.captacao.consulta.sem-pedido') }}"
-                           class="side-nav-link {{ request()->routeIs('admin.captacao.consulta.*') ? 'active' : '' }}">
+                        <a href="{{ route('admin.captacao.consulta.lojas-pendentes') }}"
+                           class="side-nav-link {{ request()->routeIs('admin.captacao.consulta.lojas-pendentes', 'admin.captacao.consulta.sem-pedido') ? 'active' : '' }}">
                             <span class="menu-icon"><i class="ri-user-search-line"></i></span>
-                            <span class="menu-text">Sem pedido (consulta)</span>
+                            <span class="menu-text">Lojas pendentes</span>
                         </a>
                     </li>
                     <li class="side-nav-item">
@@ -302,7 +302,7 @@
                         <a href="{{ route('admin.captacao.rotas.index') }}"
                            class="side-nav-link {{ request()->routeIs('admin.captacao.rotas.*') ? 'active' : '' }}">
                             <span class="menu-icon"><i class="ri-route-line"></i></span>
-                            <span class="menu-text">Rotas de captação</span>
+                            <span class="menu-text">Rotas</span>
                         </a>
                     </li>
                 @endcanany
@@ -320,7 +320,7 @@
                         <a href="{{ route('admin.captacao.romaneio-manual.create') }}"
                            class="side-nav-link {{ request()->routeIs('admin.captacao.romaneio-manual.*') ? 'active' : '' }}">
                             <span class="menu-icon"><i class="ri-truck-line"></i></span>
-                            <span class="menu-text">Romaneio manual</span>
+                            <span class="menu-text">Solicitar transferência</span>
                         </a>
                     </li>
                 @endcan

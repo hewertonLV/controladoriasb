@@ -38,7 +38,7 @@ class StoreRomaneioManualRequest extends FormRequest
     public function messages(): array
     {
         return [
-            'id_unidade_negocio_faturamento.exists' => 'Selecione uma unidade de faturamento que emite nota fiscal (usada na exportação Cigan).',
+            'id_unidade_negocio_faturamento.exists' => 'Selecione uma unidade de faturamento que emite nota fiscal (usada na exportação Cigam).',
             'id_unidade_negocio_galpao.exists' => 'Selecione um galpão operacional de destino.',
         ];
     }

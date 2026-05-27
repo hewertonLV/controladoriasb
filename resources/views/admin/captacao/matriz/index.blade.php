@@ -1,7 +1,7 @@
 @extends('layouts.app')
 
-@section('title', 'Matriz de captação')
-@section('page-title', 'Matriz — '.$lote->unidadeGalpao->nome)
+@section('title', 'Captação')
+@section('page-title', 'Captação — '.$lote->unidadeGalpao->nome)
 
 @push('head')
     <style>
@@ -217,6 +217,7 @@
     @include('admin.captacao._lote-timeline-status', [
         'lote' => $lote,
         'modoCabecalho' => 'matriz',
+        'proximaAcao' => $proximaAcao ?? null,
     ])
 
 
@@ -235,7 +236,7 @@
                     <a class="nav-link {{ $aba === 'quantidade' ? 'active' : '' }}"
                        href="{{ route('admin.captacao.matriz.index', ['lote' => $lote->id, 'aba' => 'quantidade']) }}"
                        role="tab">
-                        Quantidade
+                        Captação
                     </a>
                 </li>
                 <li class="nav-item" role="presentation">
@@ -252,14 +253,49 @@
                         Por rota
                     </a>
                 </li>
-                @if ($lote->status->exibeAbaArquivoCiganTransferencia())
+                @if ($lote->status->exibeAbaArquivoCigan())
                     <li class="nav-item" role="presentation">
                         <a class="nav-link {{ $aba === 'arquivo-cigan' ? 'active' : '' }}"
                            href="{{ route('admin.captacao.matriz.index', ['lote' => $lote->id, 'aba' => 'arquivo-cigan']) }}"
                            role="tab">
-                            Arquivo Cigan
+                            @if ($lote->status->exibeAbaArquivoCiganVendas())
+                                Arquivo Cigam Venda
+                            @else
+                                Arquivo Cigam
+                            @endif
                         </a>
                     </li>
+                @endif
+                @if ($lote->status->exibeAbaSaidaEstoqueFisico())
+                    <li class="nav-item" role="presentation">
+                        <a class="nav-link {{ $aba === 'saida-estoque-fisico' ? 'active' : '' }}"
+                           href="{{ route('admin.captacao.matriz.index', ['lote' => $lote->id, 'aba' => 'saida-estoque-fisico']) }}"
+                           role="tab">
+                            Saída estoque físico
+                        </a>
+                    </li>
+                @endif
+                @if ($lote->status->exibeAbaFreteHub())
+                    @can(\App\Enums\Permissions::CAPTACAO_LOTE_FRETE_VINCULAR)
+                        <li class="nav-item" role="presentation">
+                            <a class="nav-link {{ $aba === 'frete-hub' ? 'active' : '' }}"
+                               href="{{ route('admin.captacao.matriz.index', ['lote' => $lote->id, 'aba' => 'frete-hub']) }}"
+                               role="tab">
+                                Frete HUB x CD
+                            </a>
+                        </li>
+                    @endcan
+                @endif
+                @if ($lote->status->exibeAbaFreteVendas())
+                    @can(\App\Enums\Permissions::CAPTACAO_LOTE_FRETE_VINCULAR)
+                        <li class="nav-item" role="presentation">
+                            <a class="nav-link {{ $aba === 'frete-vendas' ? 'active' : '' }}"
+                               href="{{ route('admin.captacao.matriz.index', ['lote' => $lote->id, 'aba' => 'frete-vendas']) }}"
+                               role="tab">
+                                Frete Vendas
+                            </a>
+                        </li>
+                    @endcan
                 @endif
             </ul>
         </div>
@@ -389,12 +425,30 @@
 
                 <tr id="matriz-row-adicionar">
                     <td>
-                        <select id="select-nova-loja" class="form-select form-select-sm" @disabled($clientesDisponiveis->isEmpty())>
-                            <option value="">Selecione a loja…</option>
-                            @foreach ($clientesDisponiveis as $disponivel)
-                                <option value="{{ $disponivel->id }}">{{ $disponivel->fantasia ?: $disponivel->razao_social }}</option>
-                            @endforeach
-                        </select>
+                        <div class="d-flex flex-column gap-1">
+                            <select id="select-nova-loja"
+                                    class="form-select form-select-sm"
+                                    data-search-select
+                                    data-placeholder="Adicionar loja"
+                                    @disabled($clientesDisponiveis->isEmpty())>
+                                <option value="">Adicionar loja…</option>
+                                @foreach ($clientesDisponiveis as $disponivel)
+                                    <option value="{{ $disponivel->id }}">{{ $disponivel->fantasia ?: $disponivel->razao_social }}</option>
+                                @endforeach
+                            </select>
+                            @if ($lote->status === \App\Enums\CaptacaoLoteStatus::CaptacaoEmAndamento)
+                                <select id="select-remover-loja"
+                                        class="form-select form-select-sm"
+                                        data-search-select
+                                        data-placeholder="Remover loja"
+                                        @disabled($clientes->isEmpty())>
+                                    <option value="">Remover loja…</option>
+                                    @foreach ($clientes as $naMatriz)
+                                        <option value="{{ $naMatriz->id }}">{{ $naMatriz->fantasia ?: $naMatriz->razao_social }}</option>
+                                    @endforeach
+                                </select>
+                            @endif
+                        </div>
                     </td>
                     @foreach ($frutas as $fruta)
                         <td @class(['captacao-matriz-celula-bloqueada', 'captacao-matriz-col-zebra' => $loop->odd])></td>
@@ -411,7 +465,7 @@
             <div class="tab-pane fade {{ $aba === 'rotas' ? 'show active' : '' }}" id="matriz-tab-rotas" role="tabpanel">
                 <div class="card-body table-responsive border-top-0 pt-3">
                     <p class="text-muted small mb-2">
-                        Itens com quantidade captada na aba Quantidade. A rota é vinculada por loja (mesma rota para todos os itens da loja).
+                        Itens com quantidade captada na aba Captação. A rota é vinculada por loja (mesma rota para todos os itens da loja).
                         Pode ser preenchida a qualquer momento até as vendas serem finalizadas.
                         @if ($lote->carteira)
                             <span class="d-block mt-1">Carteira do lote: <strong>{{ $lote->carteira->nome }}</strong> — só aparecem rotas cadastradas nesta carteira.</span>
@@ -473,73 +527,145 @@
                 </div>
             </div>
 
-            @if ($lote->status->exibeAbaArquivoCiganTransferencia())
+            @if ($lote->status->exibeAbaArquivoCigan())
                 <div class="tab-pane fade {{ $aba === 'arquivo-cigan' ? 'show active' : '' }}" id="matriz-tab-arquivo-cigan" role="tabpanel">
                     <div class="card-body border-top-0 pt-4 pb-4">
-                        <p class="text-muted small mb-3">
-                            Arquivo TXT no layout <strong>EDI NF Cigam</strong> (registros <code>N</code> + <code>I</code>),
-                            com as quantidades <strong>a receber</strong> do Romaneio 2 — Abastecimento.
-                            Informe o <strong>HUB de origem</strong> (saída física) antes do download. Cliente/cobrança no TXT = código Cigam do <strong>cliente vinculado</strong> à unidade de faturamento
-                            @if ($lote->unidadeFaturamento?->clientePrincipal)
-                                (<strong>{{ $lote->unidadeFaturamento->clientePrincipal->razao_social }}</strong>, Cigam {{ $lote->unidadeFaturamento->clientePrincipal->id_cigam }}).
-                            @else
-                                — cadastre o <strong>código do cliente</strong> em {{ $lote->unidadeFaturamento?->nome ?? 'faturamento' }}.
-                            @endif
-                            Número da NF (pos. 9–15): <strong>em branco</strong> (Cigan numera pela série). Tipo de operação (20–24 / 372–376): <strong>{{ app(\App\Services\Captacao\CiganEdiNfTransferenciaGerador::class)->tipoOperacaoCigam() }}</strong> (transferência).
-                            Transportadora (132–137): <strong>{{ app(\App\Services\Captacao\CiganEdiNfTransferenciaGerador::class)->codigoTransportadoraCigam() }}</strong>.
-                            Entrada/Saída (283): <strong>S</strong>. Condição de pagamento (316–318): <strong>em branco</strong>.
-                            Data emissão e entrada (26–33 e 35–42): <strong>{{ now()->format('d/m/Y') }}</strong>.
-                        </p>
+                        @if ($lote->status->exibeAbaArquivoCiganVendas())
+                            @include('admin.captacao.matriz._arquivo-cigan-vendas', ['lote' => $lote])
+                        @endif
 
-                        <div class="row g-3 mb-3">
-                            <div class="col-lg-6">
-                                @can(\App\Enums\Permissions::CAPTACAO_LOTE_TRANSFERENCIA_INICIAR)
-                                    <form method="post" action="{{ route('admin.captacao.lotes.hub-origem-cigan.update', $lote) }}" class="row g-2 align-items-end">
-                                        @csrf
-                                        @method('PUT')
-                                        <div class="col-12">
+                        @if ($lote->status->exibeAbaArquivoCiganTransferencia())
+                        <div class="border rounded p-3 mb-3">
+                            <h6 class="mb-1">Transferência — arquivo para o Cigam</h6>
+                            <p class="text-muted small mb-3 mb-md-3">
+                                TXT com as quantidades <strong>a receber</strong> do Romaneio 2. Selecione o HUB de origem, salve e baixe o arquivo para importar no Cigam.
+                            </p>
+
+                            @can(\App\Enums\Permissions::CAPTACAO_LOTE_TRANSFERENCIA_INICIAR)
+                                <div class="row g-2 align-items-end">
+                                    <div class="col-md">
+                                        <form method="post" action="{{ route('admin.captacao.lotes.hub-origem-cigan.update', $lote) }}">
+                                            @csrf
+                                            @method('PUT')
                                             <label class="form-label" for="hub-origem-cigan">Unidade HUB de origem</label>
-                                            <select name="id_unidade_negocio_hub_origem" id="hub-origem-cigan" class="form-select @error('id_unidade_negocio_hub_origem') is-invalid @enderror" required>
-                                                <option value="">Selecione o HUB…</option>
-                                                @foreach ($hubsDisponiveis as $hub)
-                                                    <option value="{{ $hub->id }}" @selected((int) old('id_unidade_negocio_hub_origem', $lote->id_unidade_negocio_hub_origem) === $hub->id)>
-                                                        {{ $hub->nome }} (Cigam {{ $hub->id_cigam }})
-                                                    </option>
-                                                @endforeach
-                                            </select>
+                                            <div class="d-flex flex-column flex-sm-row gap-2">
+                                                <select name="id_unidade_negocio_hub_origem"
+                                                        id="hub-origem-cigan"
+                                                        class="form-select form-select-sm flex-grow-1 @error('id_unidade_negocio_hub_origem') is-invalid @enderror"
+                                                        data-search-select
+                                                        data-placeholder="Selecione ou pesquise o HUB"
+                                                        required>
+                                                    <option value="">Selecione o HUB…</option>
+                                                    @foreach ($hubsDisponiveis as $hub)
+                                                        <option value="{{ $hub->id }}" @selected((int) old('id_unidade_negocio_hub_origem', $lote->id_unidade_negocio_hub_origem) === $hub->id)>
+                                                            {{ $hub->nome }} (Cigam {{ $hub->id_cigam }})
+                                                        </option>
+                                                    @endforeach
+                                                </select>
+                                                <button type="submit" class="btn btn-soft-primary btn-sm flex-shrink-0">
+                                                    Salvar HUB
+                                                </button>
+                                            </div>
                                             @error('id_unidade_negocio_hub_origem')
-                                                <div class="invalid-feedback">{{ $message }}</div>
+                                                <div class="invalid-feedback d-block">{{ $message }}</div>
                                             @enderror
-                                        </div>
-                                        <div class="col-auto">
-                                            <button type="submit" class="btn btn-soft-primary btn-sm">Salvar HUB</button>
-                                        </div>
-                                    </form>
-                                @endcan
+                                        </form>
+                                    </div>
+                                    <div class="col-md-auto">
+                                        <label class="form-label d-md-none" for="btn-download-cigan-txt">Download</label>
+                                        <label class="form-label d-none d-md-block invisible user-select-none mb-2" aria-hidden="true">&nbsp;</label>
+                                        @if ($lote->id_unidade_negocio_hub_origem)
+                                            <a id="btn-download-cigan-txt"
+                                               href="{{ route('admin.captacao.lotes.arquivo-cigan-transferencia', $lote) }}"
+                                               class="btn btn-primary btn-sm d-block d-md-inline-block text-nowrap">
+                                                <i class="ri-download-2-line me-1"></i> Baixar arquivo Cigam
+                                            </a>
+                                        @else
+                                            <button id="btn-download-cigan-txt"
+                                                    type="button"
+                                                    class="btn btn-primary btn-sm d-block d-md-inline-block text-nowrap"
+                                                    disabled
+                                                    title="Selecione e salve o HUB de origem">
+                                                <i class="ri-download-2-line me-1"></i> Baixar arquivo Cigam
+                                            </button>
+                                        @endif
+                                    </div>
+                                </div>
                                 @if ($lote->unidadeHubOrigem)
                                     <p class="small mb-0 mt-2 text-success">
-                                        HUB atual: <strong>{{ $lote->unidadeHubOrigem->nome }}</strong>
-                                        (Cigam {{ $lote->unidadeHubOrigem->id_cigam }}) — saída física da operação; destino fiscal = faturamento {{ $lote->unidadeFaturamento?->nome }}.
+                                        HUB salvo: <strong>{{ $lote->unidadeHubOrigem->nome }}</strong>
+                                        (Cigam {{ $lote->unidadeHubOrigem->id_cigam }})
                                     </p>
+                                @elseif (! $lote->id_unidade_negocio_hub_origem)
+                                    <p class="small text-muted mb-0 mt-2">Salve o HUB de origem para habilitar o download.</p>
                                 @endif
-                            </div>
-                            <div class="col-lg-6">
-                                @can(\App\Enums\Permissions::CAPTACAO_LOTE_TRANSFERENCIA_INICIAR)
-                                    @if ($lote->id_unidade_negocio_hub_origem)
-                                        <a href="{{ route('admin.captacao.lotes.arquivo-cigan-transferencia', $lote) }}"
-                                           class="btn btn-primary btn-sm">
-                                            <i class="ri-download-2-line me-1"></i> Baixar arquivo TXT (Cigan)
+                            @else
+                                <p class="small text-warning mb-0">Sem permissão para configurar o HUB ou baixar o arquivo.</p>
+                            @endcan
+                        </div>
+
+                        <div class="border rounded p-3 mb-3 bg-light-subtle">
+                            <h6 class="mb-2">NF de transferência</h6>
+                            <p class="text-muted small mb-3">
+                                Após importar o TXT no Cigam, envie aqui a NF gerada (XML, PDF ou TXT). O sistema registra as
+                                <strong>transferências</strong> do HUB salvo para o galpão do lote e avança para
+                                <strong>Aguardando vínculo de frete</strong>.
+                            </p>
+                            @if ($lote->possuiNfTransferencia())
+                                <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
+                                    @can(\App\Enums\Permissions::CAPTACAO_LOTE_TRANSFERENCIA_VALIDAR)
+                                        <a href="{{ route('admin.captacao.lotes.nf-transferencia-cigan.download', $lote) }}"
+                                           class="btn btn-soft-success btn-sm">
+                                            <i class="ri-file-download-line me-1"></i>
+                                            Baixar NF enviada
+                                            @if ($lote->arquivo_nf_transferencia_nome)
+                                                ({{ $lote->arquivo_nf_transferencia_nome }})
+                                            @endif
                                         </a>
-                                    @else
-                                        <button type="button" class="btn btn-primary btn-sm" disabled title="Selecione e salve o HUB de origem">
-                                            <i class="ri-download-2-line me-1"></i> Baixar arquivo TXT (Cigan)
-                                        </button>
-                                        <p class="small text-muted mb-0 mt-1">Salve o HUB de origem para habilitar o download.</p>
+                                    @endcan
+                                    @if ($lote->nf_transferencia_enviada_em)
+                                        <span class="small text-muted">
+                                            Enviada em {{ $lote->nf_transferencia_enviada_em->format('d/m/Y H:i') }}
+                                        </span>
                                     @endif
+                                </div>
+                            @endif
+                            @if ($lote->status->permiteUploadNfTransferenciaCigan())
+                                @can(\App\Enums\Permissions::CAPTACAO_LOTE_TRANSFERENCIA_VALIDAR)
+                                    <form method="post"
+                                          action="{{ route('admin.captacao.lotes.nf-transferencia-cigan.upload', $lote) }}"
+                                          enctype="multipart/form-data"
+                                          class="row g-2 align-items-end">
+                                        @csrf
+                                        <div class="col-md-8">
+                                            <label class="form-label" for="arquivo-nf-transferencia">Arquivo da NF</label>
+                                            <input type="file"
+                                                   name="arquivo_nf_transferencia"
+                                                   id="arquivo-nf-transferencia"
+                                                   class="form-control form-control-sm @error('arquivo_nf_transferencia') is-invalid @enderror"
+                                                   accept=".xml,.pdf,.txt,application/xml,text/xml,application/pdf,text/plain"
+                                                   required>
+                                            @error('arquivo_nf_transferencia')
+                                                <div class="invalid-feedback d-block">{{ $message }}</div>
+                                            @enderror
+                                            @error('status')
+                                                <div class="text-danger small mt-1">{{ $message }}</div>
+                                            @enderror
+                                        </div>
+                                        <div class="col-md-4">
+                                            <button type="submit" class="btn btn-success btn-sm w-100">
+                                                <i class="ri-upload-2-line me-1"></i> Enviar NF e avançar
+                                            </button>
+                                        </div>
+                                    </form>
                                 @else
-                                    <p class="small text-warning mb-0">Sem permissão para baixar o arquivo de transferência.</p>
+                                    <p class="small text-warning mb-0">Sem permissão para enviar a NF de transferência.</p>
                                 @endcan
-                            </div>
+                            @elseif ($lote->status === \App\Enums\CaptacaoLoteStatus::AguardandoVinculoFrete)
+                                <p class="small text-success mb-0">
+                                    Etapa concluída. Use o botão acima para baixar a NF ou prossiga com o vínculo de frete na aba <strong>Frete</strong>.
+                                </p>
+                            @endif
                         </div>
 
                         <div class="table-responsive">
@@ -567,25 +693,96 @@
                             </table>
                         </div>
                         <p class="text-muted small mt-2 mb-0">
-                            Somente itens com «a receber» &gt; 0 entram no TXT. Impostos podem ser calculados pelo Cigan na importação.
+                            Apenas frutas com quantidade a receber &gt; 0 entram no arquivo.
                         </p>
+                        @endif
                     </div>
                 </div>
             @endif
+
+            @if ($lote->status->exibeAbaSaidaEstoqueFisico())
+                <div class="tab-pane fade {{ $aba === 'saida-estoque-fisico' ? 'show active' : '' }}" id="matriz-tab-saida-estoque-fisico" role="tabpanel">
+                    <div class="card-body border-top-0 pt-3">
+                        <p class="text-muted small">
+                            Romaneio 1 — carregamento. Escolha de onde debitar o estoque na <strong>venda</strong> (padrão: galpão).
+                            Ao concluir a etapa, o SB efetiva as transferências HUB → galpão.
+                        </p>
+                        <div class="table-responsive">
+                            @include('admin.captacao._romaneio-carregamento-saida-fisico', [
+                                'lote' => $lote,
+                                'romaneioCarregamento' => $romaneioCarregamento,
+                                'romaneioCarregamentoTotaisGerais' => $romaneioCarregamentoTotaisGerais,
+                                'pedidosPorCliente' => $pedidosPorCliente,
+                            ])
+                        </div>
+                    </div>
+                </div>
+            @endif
+
+            @if ($dadosFreteHub !== null)
+                @can(\App\Enums\Permissions::CAPTACAO_LOTE_FRETE_VINCULAR)
+                    <div class="tab-pane fade {{ $aba === 'frete-hub' ? 'show active' : '' }}" id="matriz-tab-frete-hub" role="tabpanel">
+                        @include('admin.captacao.matriz._frete-hub-lote', [
+                            'lote' => $lote,
+                            'transferencias' => $dadosFreteHub['transferencias'],
+                            'fretesAbertos' => $dadosFreteHub['fretesAbertos'],
+                        ])
+                    </div>
+                @endcan
+            @endif
+            @if ($dadosFreteVendas !== null)
+                @can(\App\Enums\Permissions::CAPTACAO_LOTE_FRETE_VINCULAR)
+                    <div class="tab-pane fade {{ $aba === 'frete-vendas' ? 'show active' : '' }}" id="matriz-tab-frete-vendas" role="tabpanel">
+                        @include('admin.captacao.matriz._frete-vendas-lote', [
+                            'lote' => $lote,
+                            'lojas' => $dadosFreteVendas['lojas'],
+                            'fretesAbertos' => $dadosFreteVendas['fretesAbertos'],
+                        ])
+                    </div>
+                @endcan
+            @endif
         </div>
     </div>
+
+    @php
+        $nfEstoqueHubFaltas = session('nf_transferencia_estoque_hub_insuficiente');
+    @endphp
+    @if (is_array($nfEstoqueHubFaltas) && ! empty($nfEstoqueHubFaltas['frutas']))
+        @include('admin.captacao.matriz._modal-nf-estoque-hub-insuficiente', [
+            'nfEstoqueHubFaltas' => $nfEstoqueHubFaltas,
+        ])
+    @endif
 @endsection
 
+@include('admin.captacao._search-select-scripts')
+
 @push('scripts')
+@if (is_array($nfEstoqueHubFaltas ?? null) && ! empty($nfEstoqueHubFaltas['frutas']))
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    const modalEl = document.getElementById('modal-nf-estoque-hub-insuficiente');
+    if (!modalEl || typeof bootstrap === 'undefined') {
+        return;
+    }
+    bootstrap.Modal.getOrCreateInstance(modalEl).show();
+});
+</script>
+@endif
 <script>
 (function () {
     const urlCelula = @json(route('admin.captacao.lotes.celula.update', $lote));
     const urlEstado = @json(route('admin.captacao.lotes.matriz.estado', $lote));
     const urlAdicionarLoja = @json(route('admin.captacao.lotes.matriz.adicionar-loja', $lote));
+    const urlRemoverLoja = @json(route('admin.captacao.lotes.matriz.remover-loja', $lote));
+    const urlPedidoBase = @json(url('admin/captacao/lotes/'.$lote->id.'/pedidos'));
     const urlRotasCadastro = @json($urlRotasCadastro);
     let rotasOptions = @json($rotas->map(fn ($r) => ['id' => $r->id, 'nome' => $r->nome, 'id_veiculo' => $r->id_veiculo])->values());
     let veiculosOptions = @json($veiculos->map(fn ($v) => ['id' => $v->id, 'id_sbs' => $v->id_sbs, 'nome' => $v->nome])->values());
     const loteId = @json($lote->id);
+    const idUnidadeGalpaoSaida = @json((int) $lote->id_unidade_negocio_galpao);
+    const idUnidadeHubSaida = @json($lote->id_unidade_negocio_hub_origem);
+    const nomeUnidadeGalpaoSaida = @json($lote->unidadeGalpao?->nome ?? 'Galpão');
+    const nomeUnidadeHubSaida = @json($lote->unidadeHubOrigem?->nome);
     const emCaptacao = @json($lote->status === \App\Enums\CaptacaoLoteStatus::CaptacaoEmAndamento);
     const permiteEdicaoQuantidade = @json($lote->status->permiteEdicaoQuantidadeCaptacao());
     const permiteEdicaoPreco = @json($lote->status->permiteEdicaoPreco());
@@ -593,9 +790,33 @@
     const token = document.querySelector('meta[name="csrf-token"]')?.content;
     const badge = document.getElementById('matriz-sync-badge');
     const selectLoja = document.getElementById('select-nova-loja');
+    const selectRemoverLoja = document.getElementById('select-remover-loja');
     let matrizVersion = null;
+    let adicionandoLoja = false;
+    let removendoLoja = false;
+    const salvandoSaidaFisica = new Set();
+    let pollTimer = null;
+
+    function initCaptacaoSearchSelects(root) {
+        if (typeof window.AdminSearchSelect?.init === 'function') {
+            window.AdminSearchSelect.init(root || document);
+        }
+    }
+
+    function destroyCaptacaoSearchSelect(selectEl) {
+        if (!selectEl || !window.jQuery?.fn?.select2) {
+            return;
+        }
+
+        const $select = window.jQuery(selectEl);
+        if ($select.hasClass('select2-hidden-accessible')) {
+            $select.select2('destroy');
+        }
+    }
     let layoutHash = @json($layoutHash);
     let salvando = false;
+    let ignorarOrdemChange = false;
+    const ordemSaveTimers = new Map();
 
     function setBadge(estado) {
         if (!badge) return;
@@ -646,41 +867,289 @@
         };
     }
 
-    document.querySelectorAll('.btn-matriz-concluir').forEach((btn) => {
-        btn.addEventListener('click', async function () {
-            const novaConclusao = this.dataset.concluida === '1' ? '0' : '1';
-            const row = this.closest('tr.matriz-row-loja');
-            const clienteId = row?.dataset.clienteId;
-            setBadge('sincronizando');
-            try {
-                const res = await fetch(this.dataset.url, {
-                    method: 'POST',
-                    headers: headersJson(),
-                    body: JSON.stringify({ captacao_concluida: novaConclusao === '1' }),
-                });
-                if (!res.ok) {
-                    mostrarErro(await mensagemErroResposta(res));
+    function bindConcluirButtons(root) {
+        (root || document).querySelectorAll('.btn-matriz-concluir:not([data-bound-concluir])').forEach((btn) => {
+            btn.dataset.boundConcluir = '1';
+            btn.addEventListener('click', async function () {
+                const novaConclusao = this.dataset.concluida === '1' ? '0' : '1';
+                const row = this.closest('tr.matriz-row-loja');
+                const clienteId = row?.dataset.clienteId;
+                setBadge('sincronizando');
+                try {
+                    const res = await fetch(this.dataset.url, {
+                        method: 'POST',
+                        headers: headersJson(),
+                        body: JSON.stringify({ captacao_concluida: novaConclusao === '1' }),
+                    });
+                    if (!res.ok) {
+                        mostrarErro(await mensagemErroResposta(res));
+                        setBadge('erro');
+                        return;
+                    }
+                    const data = await res.json();
+                    if (clienteId) {
+                        aplicarConclusaoLinha(clienteId, !!data.captacao_concluida);
+                    }
+                    setBadge('sincronizado');
+                } catch (e) {
+                    mostrarErro('Erro ao atualizar conclusão.');
                     setBadge('erro');
-                    return;
                 }
-                const data = await res.json();
-                if (clienteId) {
-                    aplicarConclusaoLinha(clienteId, !!data.captacao_concluida);
-                }
-                setBadge('sincronizado');
-            } catch (e) {
-                mostrarErro('Erro ao atualizar conclusão.');
-                setBadge('erro');
+            });
+        });
+    }
+
+    bindConcluirButtons();
+
+    function frutasDoCliente(frutasPorCliente, clienteId) {
+        return frutasPorCliente?.[clienteId]
+            || frutasPorCliente?.[String(clienteId)]
+            || [];
+    }
+
+    function clienteTemFruta(frutasPorCliente, clienteId, frutaId) {
+        return frutasDoCliente(frutasPorCliente, clienteId)
+            .some((id) => Number(id) === Number(frutaId));
+    }
+
+    function buildLinhaLojaHtml(cliente, frutas, frutasPorCliente, data) {
+        const pedido = data.pedidos?.[String(cliente.id)] || {};
+        const concluida = !!pedido.captacao_concluida;
+        const rowClass = concluida ? ' matriz-row-loja-concluida' : '';
+
+        let html = `<tr class="matriz-row-loja${rowClass}" data-cliente-id="${cliente.id}" data-captacao-concluida="${concluida ? '1' : '0'}">`;
+        html += '<td class="text-nowrap">';
+        html += `<p class="mb-0 captacao-matriz-loja-nome fw-semibold">${escHtml(cliente.nome)}</p>`;
+        if (emCaptacao) {
+            html += `<input type="text" class="form-control form-control-sm captacao-numero-pedido" maxlength="60" placeholder="Nº pedido" data-cliente="${cliente.id}" data-url="${urlPedidoBase}/${cliente.id}/numero-pedido" value="${escHtml(pedido.numero_pedido ?? '')}"${concluida ? ' disabled' : ''}>`;
+        } else if (pedido.numero_pedido) {
+            html += `<span class="text-muted small d-block mt-1">Pedido ${escHtml(pedido.numero_pedido)}</span>`;
+        }
+        html += '</td>';
+
+        frutas.forEach((fruta, idx) => {
+            const zebra = idx % 2 === 1 ? ' captacao-matriz-col-zebra' : '';
+            const temVinculo = clienteTemFruta(frutasPorCliente, cliente.id, fruta.id);
+            const cel = data.celulas?.[`${cliente.id}_${fruta.id}`] || {};
+            const podeEditarQty = temVinculo && !concluida && permiteEdicaoQuantidade;
+            const podeEditarPreco = temVinculo && permiteEdicaoPreco;
+            const bloqueada = !temVinculo || (concluida && !permiteEdicaoPreco);
+
+            html += `<td class="${bloqueada ? 'captacao-matriz-celula-bloqueada' : ''}${zebra}">`;
+            if (temVinculo) {
+                const precoDigitos = cel.preco_venda && parseFloat(cel.preco_venda) > 0
+                    ? String(Math.round(parseFloat(cel.preco_venda) * 100))
+                    : '';
+                const precoExib = precoDigitos ? formatarPrecoBr(precoDigitos) : '';
+                const qtyVal = cel.quantidade && parseFloat(cel.quantidade) > 0
+                    ? String(parseInt(cel.quantidade, 10))
+                    : '';
+
+                html += '<div class="captacao-matriz-celula-stack">';
+                html += `<input type="number" class="form-control form-control-sm captacao-celula captacao-celula-qty" step="1" min="0" data-lote="${loteId}" data-cliente="${cliente.id}" data-fruta="${fruta.id}" data-version="${cel.version ?? ''}" value="${qtyVal}" title="Quantidade"${podeEditarQty ? '' : ' disabled readonly'}>`;
+                html += `<input type="text" class="form-control form-control-sm captacao-celula captacao-celula-preco" inputmode="numeric" autocomplete="off" placeholder="0,00" data-lote="${loteId}" data-cliente="${cliente.id}" data-fruta="${fruta.id}" data-version="${cel.version ?? ''}" data-raw-digitos="${precoDigitos}" value="${escHtml(precoExib)}" title="Preço (R$)"${podeEditarPreco ? '' : ' disabled readonly'}>`;
+                html += '</div>';
+            } else {
+                html += '<span class="captacao-matriz-sem-vinculo" title="Fruta não vinculada a esta loja" aria-label="Sem vínculo">×</span>';
+            }
+            html += '</td>';
+        });
+
+        if (emCaptacao) {
+            const btnClass = concluida ? 'btn-success' : 'btn-outline-secondary';
+            html += '<td class="text-center align-middle">';
+            html += `<button type="button" class="btn btn-sm ${btnClass} btn-matriz-concluir" data-url="${urlPedidoBase}/${cliente.id}/captacao-concluida" data-concluida="${concluida ? '1' : '0'}" title="${concluida ? 'Reabrir captação desta loja' : 'Concluir captação desta loja'}">${concluida ? 'Reabrir' : 'Concluir'}</button>`;
+            html += '</td>';
+        }
+
+        html += '</tr>';
+        return html;
+    }
+
+    function atualizarSelectLojasDisponiveis(clientes) {
+        if (!selectLoja) {
+            return;
+        }
+
+        destroyCaptacaoSearchSelect(selectLoja);
+        selectLoja.innerHTML = '<option value="">Adicionar loja…</option>';
+        (clientes || []).forEach((cliente) => {
+            const opt = document.createElement('option');
+            opt.value = String(cliente.id);
+            opt.textContent = cliente.nome;
+            selectLoja.appendChild(opt);
+        });
+        selectLoja.disabled = (clientes || []).length === 0;
+        initCaptacaoSearchSelects(selectLoja.closest('td') || document);
+        bindSelectNovaLoja();
+    }
+
+    function atualizarSelectRemoverLoja(clientes) {
+        if (!selectRemoverLoja) {
+            return;
+        }
+
+        destroyCaptacaoSearchSelect(selectRemoverLoja);
+        selectRemoverLoja.innerHTML = '<option value="">Remover loja…</option>';
+        (clientes || []).forEach((cliente) => {
+            const opt = document.createElement('option');
+            opt.value = String(cliente.id);
+            opt.textContent = cliente.nome;
+            selectRemoverLoja.appendChild(opt);
+        });
+        selectRemoverLoja.disabled = (clientes || []).length === 0;
+        initCaptacaoSearchSelects(selectRemoverLoja.closest('td') || document);
+        bindSelectRemoverLoja();
+    }
+
+    function resetSelectRemoverLoja() {
+        if (!selectRemoverLoja) {
+            return;
+        }
+
+        if (window.jQuery?.fn?.select2 && window.jQuery(selectRemoverLoja).hasClass('select2-hidden-accessible')) {
+            const $select = window.jQuery(selectRemoverLoja);
+            $select.prop('disabled', false);
+            $select.val(null).trigger('change');
+            return;
+        }
+
+        selectRemoverLoja.disabled = false;
+        selectRemoverLoja.value = '';
+    }
+
+    function atualizarLinhaAdicionar(frutas) {
+        const row = document.getElementById('matriz-row-adicionar');
+        if (!row) {
+            return;
+        }
+
+        const celulaSelect = row.querySelector('td');
+        row.querySelectorAll('td').forEach((td) => {
+            if (td !== celulaSelect) {
+                td.remove();
             }
         });
-    });
 
-    selectLoja?.addEventListener('change', async function () {
-        const idCliente = this.value;
-        if (!idCliente) return;
+        frutas.forEach((fruta, idx) => {
+            const td = document.createElement('td');
+            td.classList.add('captacao-matriz-celula-bloqueada');
+            if (idx % 2 === 1) {
+                td.classList.add('captacao-matriz-col-zebra');
+            }
+            row.appendChild(td);
+        });
 
+        if (emCaptacao) {
+            row.appendChild(document.createElement('td'));
+        }
+    }
+
+    function reconstruirMatrizCaptacao(data) {
+        if (!data?.frutas) {
+            return;
+        }
+
+        layoutHash = data.layout_hash ?? layoutHash;
+
+        const headerRow = document.getElementById('matriz-header-row');
+        if (headerRow) {
+            let headerHtml = '<th class="captacao-matriz-col-loja">Loja</th>';
+            data.frutas.forEach((fruta, idx) => {
+                const zebra = idx % 2 === 1 ? ' captacao-matriz-col-zebra' : '';
+                headerHtml += `<th class="captacao-matriz-col-fruta${zebra}" data-fruta-id="${fruta.id}">`;
+                headerHtml += `<span class="captacao-matriz-fruta-nome" title="${escHtml(fruta.nome)}">${escHtml(fruta.nome)}</span></th>`;
+            });
+            if (emCaptacao) {
+                headerHtml += '<th class="text-center text-nowrap" style="min-width:7rem">Conclusão</th>';
+            }
+            headerRow.innerHTML = headerHtml;
+        }
+
+        const tbody = document.getElementById('matriz-body');
+        const rowAdicionar = document.getElementById('matriz-row-adicionar');
+        if (!tbody || !rowAdicionar) {
+            return;
+        }
+
+        tbody.querySelectorAll('tr.matriz-row-loja, #matriz-row-totais').forEach((tr) => tr.remove());
+
+        const frutasPorCliente = data.frutas_por_cliente || {};
+        const fragment = document.createDocumentFragment();
+
+        (data.clientes || []).forEach((cliente) => {
+            const wrap = document.createElement('tbody');
+            wrap.innerHTML = buildLinhaLojaHtml(cliente, data.frutas, frutasPorCliente, data);
+            fragment.appendChild(wrap.firstElementChild);
+        });
+
+        if ((data.clientes || []).length > 0) {
+            const trTotais = document.createElement('tr');
+            trTotais.id = 'matriz-row-totais';
+            let totaisHtml = '<td class="text-nowrap">Total</td>';
+            data.frutas.forEach((fruta, idx) => {
+                const zebra = idx % 2 === 1 ? ' captacao-matriz-col-zebra' : '';
+                totaisHtml += `<td class="matriz-total-celula${zebra}" data-fruta-id="${fruta.id}"></td>`;
+            });
+            if (emCaptacao) {
+                totaisHtml += '<td></td>';
+            }
+            trTotais.innerHTML = totaisHtml;
+            fragment.appendChild(trTotais);
+        }
+
+        tbody.insertBefore(fragment, rowAdicionar);
+        atualizarLinhaAdicionar(data.frutas);
+
+        bindCelulas();
+        bindNumeroPedido();
+        bindConcluirButtons(tbody);
+        atualizarTotais();
+
+        if (data.linhas_rotas) {
+            renderRotasTabela(data.linhas_rotas);
+        }
+        if (data.grupos_ordem_carregamento) {
+            renderOrdemCarregamento(data.grupos_ordem_carregamento);
+        }
+        if (Array.isArray(data.rotas)) {
+            rotasOptions = data.rotas;
+        }
+        if (Array.isArray(data.veiculos)) {
+            veiculosOptions = data.veiculos;
+        }
+
+        matrizVersion = data.version ?? matrizVersion;
+    }
+
+    function resetSelectNovaLoja() {
+        if (!selectLoja) {
+            return;
+        }
+
+        if (window.jQuery?.fn?.select2 && window.jQuery(selectLoja).hasClass('select2-hidden-accessible')) {
+            const $select = window.jQuery(selectLoja);
+            $select.prop('disabled', false);
+            $select.val(null).trigger('change');
+            return;
+        }
+
+        selectLoja.disabled = false;
+        selectLoja.value = '';
+    }
+
+    async function adicionarLojaNaMatriz(idCliente) {
+        if (!idCliente || !selectLoja || adicionandoLoja) {
+            return;
+        }
+
+        adicionandoLoja = true;
         setBadge('sincronizando');
-        this.disabled = true;
+        if (window.jQuery?.fn?.select2 && window.jQuery(selectLoja).hasClass('select2-hidden-accessible')) {
+            window.jQuery(selectLoja).prop('disabled', true);
+        } else {
+            selectLoja.disabled = true;
+        }
 
         try {
             const res = await fetch(urlAdicionarLoja, {
@@ -691,25 +1160,156 @@
 
             if (!res.ok) {
                 mostrarErro(await mensagemErroResposta(res), 'Não foi possível adicionar a loja');
-                this.disabled = false;
-                this.value = '';
+                resetSelectNovaLoja();
                 setBadge('erro');
                 return;
             }
 
-            window.location.reload();
+            const data = await res.json();
+            aplicarRespostaAlteracaoLoja(data);
         } catch (e) {
             mostrarErro('Erro ao adicionar loja.');
-            this.disabled = false;
-            this.value = '';
+            resetSelectNovaLoja();
             setBadge('erro');
+        } finally {
+            adicionandoLoja = false;
         }
-    });
+    }
+
+    function aplicarRespostaAlteracaoLoja(data) {
+        reconstruirMatrizCaptacao(data);
+        if (data.clientes_disponiveis) {
+            atualizarSelectLojasDisponiveis(data.clientes_disponiveis);
+        }
+        if (data.clientes_na_matriz) {
+            atualizarSelectRemoverLoja(data.clientes_na_matriz);
+        }
+        resetSelectNovaLoja();
+        resetSelectRemoverLoja();
+        setBadge('sincronizado');
+    }
+
+    async function removerLojaNaMatriz(idCliente) {
+        if (!idCliente || !selectRemoverLoja || removendoLoja) {
+            return;
+        }
+
+        const nomeLoja = selectRemoverLoja.options[selectRemoverLoja.selectedIndex]?.text?.trim() || 'esta loja';
+        const confirmar = typeof window.AdminConfirm?.confirm === 'function'
+            ? await window.AdminConfirm.confirm({
+                title: 'Remover loja',
+                message: `Remover «${nomeLoja}» da matriz? As quantidades e preços desta loja no lote serão excluídos.`,
+                variant: 'warning',
+                confirmLabel: 'Remover',
+                cancelLabel: 'Cancelar',
+            })
+            : window.confirm(`Remover «${nomeLoja}» da matriz?`);
+
+        if (!confirmar) {
+            resetSelectRemoverLoja();
+            return;
+        }
+
+        removendoLoja = true;
+        setBadge('sincronizando');
+        if (window.jQuery?.fn?.select2 && window.jQuery(selectRemoverLoja).hasClass('select2-hidden-accessible')) {
+            window.jQuery(selectRemoverLoja).prop('disabled', true);
+        } else {
+            selectRemoverLoja.disabled = true;
+        }
+
+        try {
+            const res = await fetch(urlRemoverLoja, {
+                method: 'POST',
+                headers: headersJson(),
+                body: JSON.stringify({ id_cliente: Number(idCliente) }),
+            });
+
+            if (!res.ok) {
+                mostrarErro(await mensagemErroResposta(res), 'Não foi possível remover a loja');
+                resetSelectRemoverLoja();
+                setBadge('erro');
+                return;
+            }
+
+            const data = await res.json();
+            aplicarRespostaAlteracaoLoja(data);
+        } catch (e) {
+            mostrarErro('Erro ao remover loja.');
+            resetSelectRemoverLoja();
+            setBadge('erro');
+        } finally {
+            removendoLoja = false;
+        }
+    }
+
+    function bindSelectNovaLoja() {
+        if (!selectLoja) {
+            return;
+        }
+
+        if (window.jQuery?.fn?.select2) {
+            const $select = window.jQuery(selectLoja);
+            $select.off('select2:select.adicionarLoja');
+            $select.on('select2:select.adicionarLoja', function (event) {
+                const id = event?.params?.data?.id ?? this.value;
+                adicionarLojaNaMatriz(id);
+            });
+            return;
+        }
+
+        selectLoja.addEventListener('change', function () {
+            adicionarLojaNaMatriz(this.value);
+        });
+    }
+
+    function bindSelectRemoverLoja() {
+        if (!selectRemoverLoja) {
+            return;
+        }
+
+        if (window.jQuery?.fn?.select2) {
+            const $select = window.jQuery(selectRemoverLoja);
+            $select.off('select2:select.removerLoja');
+            $select.on('select2:select.removerLoja', function (event) {
+                const id = event?.params?.data?.id ?? this.value;
+                removerLojaNaMatriz(id);
+            });
+            return;
+        }
+
+        selectRemoverLoja.addEventListener('change', function () {
+            removerLojaNaMatriz(this.value);
+        });
+    }
+
+    function celulaQtyBloqueada(qty) {
+        return !qty || qty.disabled || qty.readOnly;
+    }
+
+    function celulaPrecoBloqueada(preco) {
+        return !preco || preco.disabled || preco.readOnly;
+    }
 
     async function salvarCelula(origem, payload) {
         const stack = stackFromInput(origem);
         const qty = stack?.querySelector('.captacao-celula-qty');
-        if (!qty || qty.disabled || qty.readOnly) {
+        const preco = stack?.querySelector('.captacao-celula-preco');
+        const editandoPreco = origem?.classList?.contains('captacao-celula-preco');
+
+        if (!qty) {
+            return;
+        }
+
+        if (celulaQtyBloqueada(qty) && celulaPrecoBloqueada(preco)) {
+            return;
+        }
+
+        if (celulaQtyBloqueada(qty) && !editandoPreco) {
+            return;
+        }
+
+        if (editandoPreco && celulaPrecoBloqueada(preco)) {
             return;
         }
         setBadge('sincronizando');
@@ -976,7 +1576,7 @@
         }
 
         if (!linhasRotas?.length) {
-            tbody.innerHTML = '<tr><td colspan="5" class="text-muted text-center py-4">Nenhum item com quantidade informada. Use a aba <strong>Quantidade</strong> para captar pedidos.</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="5" class="text-muted text-center py-4">Nenhum item com quantidade informada. Use a aba <strong>Captação</strong> para captar pedidos.</td></tr>';
             return;
         }
 
@@ -999,7 +1599,7 @@
                     if (permiteVinculoRota) {
                         const url = @json(url('admin/captacao/lotes/'.$lote->id.'/pedidos')) + `/${grupo.id_cliente}/rota`;
                         html += `<td rowspan="${rowspan}" class="align-top">`;
-                        html += `<select class="form-select form-select-sm matriz-rota-select" data-cliente="${grupo.id_cliente}" data-url="${url}">`;
+                        html += `<select class="form-select form-select-sm matriz-rota-select" data-search-select data-placeholder="Selecione ou pesquise a rota" data-cliente="${grupo.id_cliente}" data-url="${url}">`;
                         html += optionsRotasHtml(grupo.id_captacao_rota);
                         html += '</select></td>';
                     } else {
@@ -1012,6 +1612,7 @@
         });
 
         tbody.innerHTML = html;
+        initCaptacaoSearchSelects(tbody);
         atualizarAlertaRotasVazias();
     }
 
@@ -1051,8 +1652,10 @@
             }
 
             const valorAtual = select.value === '' ? null : Number(select.value);
+            destroyCaptacaoSearchSelect(select);
             select.innerHTML = optionsVeiculosHtml(valorAtual, rotaId);
             select.value = valorAtual ? String(valorAtual) : '';
+            initCaptacaoSearchSelects(select);
         });
     }
 
@@ -1066,14 +1669,46 @@
         return html;
     }
 
+    function bindOrdemCarregamentoHandlers() {
+        const tbody = document.getElementById('matriz-ordem-body');
+        if (!tbody || !window.jQuery) {
+            return;
+        }
+
+        const $tbody = window.jQuery(tbody);
+        $tbody.off('change.matrizOrdem select2:select.matrizOrdem', '.matriz-ordem-select');
+        $tbody.on('change.matrizOrdem select2:select.matrizOrdem', '.matriz-ordem-select', function () {
+            if (ignorarOrdemChange) {
+                return;
+            }
+            agendarSalvarOrdemCarregamento(this);
+        });
+    }
+
+    function agendarSalvarOrdemCarregamento(select) {
+        const clienteId = select.dataset.cliente || select.getAttribute('data-cliente');
+        if (!clienteId) {
+            return;
+        }
+
+        clearTimeout(ordemSaveTimers.get(clienteId));
+        ordemSaveTimers.set(clienteId, setTimeout(() => {
+            ordemSaveTimers.delete(clienteId);
+            salvarOrdemCarregamento(select);
+        }, 80));
+    }
+
     function renderOrdemCarregamento(grupos) {
         const tbody = document.getElementById('matriz-ordem-body');
         if (!tbody) {
             return;
         }
 
+        ignorarOrdemChange = true;
+
         if (!grupos?.length) {
-            tbody.innerHTML = '<tr><td colspan="5" class="text-muted text-center py-4">Nenhuma loja com rota e quantidade informada. Use as abas <strong>Quantidade</strong> e <strong>Rotas</strong> primeiro.</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="5" class="text-muted text-center py-4">Nenhuma loja com rota e quantidade informada. Use as abas <strong>Captação</strong> e <strong>Rotas</strong> primeiro.</td></tr>';
+            ignorarOrdemChange = false;
             return;
         }
 
@@ -1102,7 +1737,7 @@
                         if (permiteVinculoRota) {
                             html += '<div class="matriz-rota-cabecalho-campos">';
                             html += `<input type="text" class="form-control form-control-sm matriz-rota-motorista" maxlength="120" placeholder="Motorista" data-rota="${grupoRota.id_captacao_rota}" data-url="${urlMotorista}" value="${escHtml(grupoRota.motorista_nome ?? '')}">`;
-                            html += `<select class="form-select form-select-sm matriz-rota-veiculo" data-rota="${grupoRota.id_captacao_rota}" data-url="${urlVeiculo}">`;
+                            html += `<select class="form-select form-select-sm matriz-rota-veiculo" data-search-select data-placeholder="Selecione ou pesquise o veículo" data-rota="${grupoRota.id_captacao_rota}" data-url="${urlVeiculo}">`;
                             html += optionsVeiculosHtml(grupoRota.id_veiculo, grupoRota.id_captacao_rota);
                             html += '</select></div>';
                         } else {
@@ -1120,7 +1755,7 @@
                         if (permiteVinculoRota) {
                             const url = @json(url('admin/captacao/lotes/'.$lote->id.'/pedidos')) + `/${loja.id_cliente}/ordem-carregamento`;
                             html += `<td rowspan="${lojaRowspan}" class="align-top">`;
-                            html += `<select class="form-select form-select-sm matriz-ordem-select" data-cliente="${loja.id_cliente}" data-rota="${grupoRota.id_captacao_rota}" data-total-lojas="${grupoRota.total_lojas}" data-url="${url}">`;
+                            html += `<select class="form-select form-select-sm matriz-ordem-select" data-search-select data-placeholder="Ordem de carregamento" data-cliente="${loja.id_cliente}" data-rota="${grupoRota.id_captacao_rota}" data-total-lojas="${grupoRota.total_lojas}" data-url="${url}">`;
                             html += optionsOrdemHtml(grupoRota.total_lojas, loja.ordem_carregamento);
                             html += '</select></td>';
                         } else {
@@ -1136,6 +1771,9 @@
         });
 
         tbody.innerHTML = html;
+        initCaptacaoSearchSelects(tbody);
+        bindOrdemCarregamentoHandlers();
+        ignorarOrdemChange = false;
 
         if (rotaMotoristaEmEdicao) {
             const input = tbody.querySelector(`.matriz-rota-motorista[data-rota="${rotaMotoristaEmEdicao}"]`);
@@ -1250,11 +1888,12 @@
     });
 
     async function salvarOrdemCarregamento(select) {
-        if (select.disabled) {
+        if (ignorarOrdemChange || select.disabled || select.dataset.salvandoOrdem === '1') {
             return;
         }
 
         const ordem = select.value === '' ? null : Number(select.value);
+        select.dataset.salvandoOrdem = '1';
         setBadge('sincronizando');
 
         try {
@@ -1271,33 +1910,42 @@
                 return;
             }
 
+            const payload = await res.json().catch(() => ({}));
+
             select.classList.remove('is-invalid');
             select.classList.add('is-valid');
-            select.blur();
 
-            const estadoRes = await fetch(urlEstado, { headers: { 'Accept': 'application/json' } });
+            const estadoRes = await fetch(urlEstado, {
+                headers: { 'Accept': 'application/json' },
+                cache: 'no-store',
+            });
             if (estadoRes.ok) {
                 const data = await estadoRes.json();
                 matrizVersion = data.version;
                 if (data.grupos_ordem_carregamento) {
                     renderOrdemCarregamento(data.grupos_ordem_carregamento);
                 }
+            } else if (Array.isArray(payload.pedidos_rota)) {
+                aplicarOrdemCarregamentoPedidos(payload.pedidos_rota);
             }
 
             setBadge('sincronizado');
         } catch (e) {
             select.classList.add('is-invalid');
             setBadge('erro');
+        } finally {
+            delete select.dataset.salvandoOrdem;
         }
     }
 
-    document.getElementById('matriz-ordem-body')?.addEventListener('change', (event) => {
-        const select = event.target.closest('.matriz-ordem-select');
-        if (!select) {
-            return;
-        }
-        salvarOrdemCarregamento(select);
-    });
+    function aplicarOrdemCarregamentoPedidos(pedidosRota) {
+        pedidosRota.forEach((pedido) => {
+            document.querySelectorAll(`.matriz-ordem-select[data-cliente="${pedido.id_cliente}"]`).forEach((sel) => {
+                sel.value = pedido.ordem_carregamento ? String(pedido.ordem_carregamento) : '';
+                window.AdminSearchSelect?.refresh(sel);
+            });
+        });
+    }
 
     async function salvarRota(select) {
         if (select.disabled) {
@@ -1411,7 +2059,7 @@
             const data = await res.json();
 
             if (data.layout_hash && data.layout_hash !== layoutHash) {
-                window.location.reload();
+                reconstruirMatrizCaptacao(data);
                 return;
             }
 
@@ -1433,13 +2081,15 @@
             const preco = document.querySelector(
                 `.captacao-celula-preco[data-cliente="${clienteId}"][data-fruta="${frutaId}"]`
             );
-            if (!qty || qty.disabled || qty.readOnly) return;
+            if (!qty) return;
             if (document.activeElement === qty || document.activeElement === preco) return;
 
-            qty.value = cel.quantidade > 0 ? Number(cel.quantidade) : '';
-            qty.dataset.version = cel.version;
+            if (!celulaQtyBloqueada(qty)) {
+                qty.value = cel.quantidade > 0 ? Number(cel.quantidade) : '';
+                qty.dataset.version = cel.version;
+            }
 
-            if (preco) {
+            if (preco && !celulaPrecoBloqueada(preco)) {
                 if (cel.preco_venda !== null && parseFloat(cel.preco_venda) > 0) {
                     const digitos = String(Math.round(parseFloat(cel.preco_venda) * 100));
                     preco.dataset.rawDigitos = digitos;
@@ -1449,6 +2099,8 @@
                     preco.value = '';
                 }
                 preco.dataset.version = cel.version;
+            } else if (!celulaQtyBloqueada(qty)) {
+                qty.dataset.version = cel.version;
             }
         });
 
@@ -1509,12 +2161,182 @@
         }
 
         atualizarTotais();
+        aplicarSaidaFisicaVenda(data);
+    }
+
+    function abaSaidaEstoqueFisicoVisivel() {
+        const tab = document.getElementById('matriz-tab-saida-estoque-fisico');
+        return tab !== null && tab.classList.contains('show');
+    }
+
+    function nomeSaidaFisicaPorUnidade(idUnidade) {
+        if (idUnidade === null || idUnidade === undefined) {
+            return nomeUnidadeGalpaoSaida;
+        }
+
+        const id = Number(idUnidade);
+        if (id === idUnidadeGalpaoSaida) {
+            return nomeUnidadeGalpaoSaida;
+        }
+        if (idUnidadeHubSaida !== null && id === Number(idUnidadeHubSaida)) {
+            return nomeUnidadeHubSaida || 'HUB';
+        }
+
+        return '—';
+    }
+
+    function aplicarSaidaFisicaVenda(data) {
+        Object.entries(data.pedidos || {}).forEach(([clienteId, pedido]) => {
+            if (!Object.prototype.hasOwnProperty.call(pedido, 'id_unidade_negocio_saida_venda')) {
+                return;
+            }
+
+            const celVendas = document.querySelector(`[data-arquivo-cigan-vendas-saida="${clienteId}"]`);
+            if (celVendas && !salvandoSaidaFisica.has(clienteId)) {
+                celVendas.textContent = nomeSaidaFisicaPorUnidade(pedido.id_unidade_negocio_saida_venda);
+            }
+
+            if (!abaSaidaEstoqueFisicoVisivel()) {
+                return;
+            }
+
+            const wrap = document.querySelector(`[data-saida-fisica-loja="${clienteId}"]`);
+            if (!wrap) {
+                return;
+            }
+
+            if (salvandoSaidaFisica.has(clienteId)) {
+                return;
+            }
+
+            if (wrap.contains(document.activeElement)) {
+                return;
+            }
+
+            const valorRemoto = pedido.id_unidade_negocio_saida_venda !== null
+                ? String(pedido.id_unidade_negocio_saida_venda)
+                : '';
+            const selecionado = wrap.querySelector('.captacao-saida-fisica-radio:checked');
+            if (selecionado && selecionado.value === valorRemoto) {
+                return;
+            }
+
+            wrap.querySelectorAll('.captacao-saida-fisica-radio').forEach((radio) => {
+                radio.checked = radio.value === valorRemoto;
+            });
+        });
     }
 
     bindCelulas();
 
+    initCaptacaoSearchSelects();
+    bindSelectNovaLoja();
+    bindSelectRemoverLoja();
+    bindOrdemCarregamentoHandlers();
+    bindSaidaFisicaVendaRadios();
+
+    function bindSaidaFisicaVendaRadios() {
+        document.querySelectorAll('.captacao-saida-fisica-radio').forEach((radio) => {
+            if (radio.dataset.boundSaidaFisica === '1') {
+                return;
+            }
+            radio.dataset.boundSaidaFisica = '1';
+            radio.addEventListener('change', function () {
+                if (!this.checked) {
+                    return;
+                }
+                salvarSaidaFisicaVenda(this);
+            });
+        });
+    }
+
+    async function salvarSaidaFisicaVenda(radio) {
+        const wrap = radio.closest('[data-saida-fisica-loja]');
+        const statusEl = wrap?.querySelector('.captacao-saida-fisica-status');
+        const url = radio.dataset.url;
+        const idUnidade = Number(radio.value);
+        const clienteId = radio.dataset.cliente ? String(radio.dataset.cliente) : null;
+
+        if (!url || !idUnidade) {
+            return;
+        }
+
+        if (clienteId) {
+            salvandoSaidaFisica.add(clienteId);
+        }
+
+        if (statusEl) {
+            statusEl.textContent = 'Salvando…';
+        }
+
+        try {
+            const res = await fetch(url, {
+                method: 'PATCH',
+                headers: headersJson(),
+                body: JSON.stringify({ id_unidade_negocio_saida_venda: idUnidade }),
+            });
+
+            if (!res.ok) {
+                mostrarErro(await mensagemErroResposta(res), 'Não foi possível salvar');
+                if (statusEl) {
+                    statusEl.textContent = 'Erro ao salvar';
+                }
+                return;
+            }
+
+            if (statusEl) {
+                statusEl.textContent = 'Salvo';
+                window.setTimeout(() => {
+                    if (statusEl.textContent === 'Salvo') {
+                        statusEl.textContent = '';
+                    }
+                }, 2000);
+            }
+        } catch (e) {
+            mostrarErro('Erro ao salvar saída física.');
+            if (statusEl) {
+                statusEl.textContent = 'Erro ao salvar';
+            }
+        } finally {
+            if (clienteId) {
+                window.setTimeout(() => salvandoSaidaFisica.delete(clienteId), 400);
+            }
+        }
+    }
+
+    function intervaloPollMs() {
+        if (document.hidden) {
+            return 8000;
+        }
+
+        return abaSaidaEstoqueFisicoVisivel() ? 2000 : 3000;
+    }
+
+    function agendarPollEstado() {
+        if (pollTimer !== null) {
+            clearTimeout(pollTimer);
+        }
+
+        pollTimer = window.setTimeout(async () => {
+            await pollEstado();
+            agendarPollEstado();
+        }, intervaloPollMs());
+    }
+
+    const linkAbaSaidaFisico = document.querySelector(
+        'a.nav-link[href*="aba=saida-estoque-fisico"]',
+    );
+    if (linkAbaSaidaFisico) {
+        linkAbaSaidaFisico.addEventListener('shown.bs.tab', () => {
+            pollEstado();
+        });
+    }
+
     pollEstado();
-    setInterval(pollEstado, 2000);
+    agendarPollEstado();
+    document.addEventListener('visibilitychange', () => {
+        agendarPollEstado();
+    });
 })();
 </script>
 @endpush

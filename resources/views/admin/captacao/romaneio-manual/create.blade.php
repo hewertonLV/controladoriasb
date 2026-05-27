@@ -1,7 +1,7 @@
 @extends('layouts.app')
 
-@section('title', 'Romaneio manual')
-@section('page-title', 'Romaneio manual de abastecimento')
+@section('title', 'Solicitar transferência')
+@section('page-title', 'Solicitar transferência')
 
 @section('content')
     <x-admin.flash-messages />
@@ -27,10 +27,12 @@
                     @error('data_referencia')<div class="invalid-feedback">{{ $message }}</div>@enderror
                 </div>
                 <div class="col-md-5">
-                    <label class="form-label" for="id_unidade_negocio_faturamento">Unidade de faturamento (Cigan)</label>
+                    <label class="form-label" for="id_unidade_negocio_faturamento">Unidade de faturamento (Cigam)</label>
                     <select id="id_unidade_negocio_faturamento"
                             name="id_unidade_negocio_faturamento"
                             class="form-select @error('id_unidade_negocio_faturamento') is-invalid @enderror"
+                            data-search-select
+                            data-placeholder="Selecione ou pesquise o faturamento"
                             required>
                         <option value="">Selecione…</option>
                         @foreach ($faturamentos as $un)
@@ -46,6 +48,8 @@
                     <select id="id_unidade_negocio_galpao"
                             name="id_unidade_negocio_galpao"
                             class="form-select @error('id_unidade_negocio_galpao') is-invalid @enderror"
+                            data-search-select
+                            data-placeholder="Selecione ou pesquise o galpão"
                             required>
                         <option value="">Selecione…</option>
                         @foreach ($galpoes as $un)
@@ -65,3 +69,5 @@
         </div>
     </form>
 @endsection
+
+@include('admin.captacao._search-select-scripts')

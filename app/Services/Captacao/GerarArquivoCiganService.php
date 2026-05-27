@@ -34,6 +34,16 @@ final class GerarArquivoCiganService
         return $gerador->paraIso88591($gerador->gerar($lote));
     }
 
+    /**
+     * Conteúdo TXT EDI NF Cigam (vendas faturamento → loja).
+     */
+    public function conteudoTxtVendas(CaptacaoLote $lote): string
+    {
+        $gerador = app(CiganEdiNfVendaGerador::class);
+
+        return $gerador->paraIso88591($gerador->gerar($lote));
+    }
+
     private function gerar(CaptacaoLote $lote, User $user, string $tipo, string $conteudo): CaptacaoLoteCiganExport
     {
         $path = sprintf(

@@ -19,14 +19,31 @@ class CaptacaoLoteTimelineUiTest extends TestCase
 
         $passos = CaptacaoLoteTimelineUi::passos($lote);
 
-        $this->assertCount(7, $passos);
+        $this->assertCount(9, $passos);
         $this->assertSame('concluido', $passos[0]['estado']);
         $this->assertSame('concluido', $passos[1]['estado']);
         $this->assertSame('atual', $passos[2]['estado']);
         $this->assertSame('pendente', $passos[3]['estado']);
         $descricao = CaptacaoLoteTimelineUi::descricaoAtual($lote);
         $this->assertStringContainsString('HUB', $descricao);
-        $this->assertStringContainsString('Cigan', $descricao);
+        $this->assertStringContainsString('Cigam', $descricao);
+        $this->assertStringNotContainsString('Lucas', $descricao);
+    }
+
+    public function test_faturamento_cigan_iniciado_descreve_aguardando_sem_nomes_e_preco_travado(): void
+    {
+        $lote = new CaptacaoLote([
+            'tipo' => CaptacaoLoteTipo::CaptacaoPedidos,
+            'status' => CaptacaoLoteStatus::FaturamentoCiganIniciado,
+        ]);
+
+        $descricao = CaptacaoLoteTimelineUi::descricaoAtual($lote);
+
+        $this->assertStringContainsString('Arquivo Cigam Venda', $descricao);
+        $this->assertStringContainsString('NF', $descricao);
+        $this->assertStringContainsString('movimentações', $descricao);
+        $this->assertStringContainsString('travados', $descricao);
+        $this->assertStringNotContainsString('Jefferson', $descricao);
         $this->assertStringNotContainsString('Lucas', $descricao);
     }
 

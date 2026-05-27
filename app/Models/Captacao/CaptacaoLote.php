@@ -25,6 +25,14 @@ class CaptacaoLote extends Model
         'id_unidade_negocio_faturamento',
         'id_unidade_negocio_galpao',
         'id_unidade_negocio_hub_origem',
+        'arquivo_nf_transferencia_path',
+        'arquivo_nf_transferencia_nome',
+        'nf_transferencia_enviada_em',
+        'nf_transferencia_user_id',
+        'arquivo_nf_venda_path',
+        'arquivo_nf_venda_nome',
+        'nf_venda_enviada_em',
+        'nf_venda_user_id',
         'tipo',
         'status',
     ];
@@ -38,6 +46,8 @@ class CaptacaoLote extends Model
             'data_referencia' => 'date',
             'tipo' => CaptacaoLoteTipo::class,
             'status' => CaptacaoLoteStatus::class,
+            'nf_transferencia_enviada_em' => 'datetime',
+            'nf_venda_enviada_em' => 'datetime',
         ];
     }
 
@@ -59,6 +69,28 @@ class CaptacaoLote extends Model
     public function unidadeHubOrigem(): BelongsTo
     {
         return $this->belongsTo(UnidadeNegocio::class, 'id_unidade_negocio_hub_origem');
+    }
+
+    public function usuarioNfTransferencia(): BelongsTo
+    {
+        return $this->belongsTo(\App\Models\User::class, 'nf_transferencia_user_id');
+    }
+
+    public function possuiNfTransferencia(): bool
+    {
+        return $this->arquivo_nf_transferencia_path !== null
+            && $this->arquivo_nf_transferencia_path !== '';
+    }
+
+    public function usuarioNfVenda(): BelongsTo
+    {
+        return $this->belongsTo(\App\Models\User::class, 'nf_venda_user_id');
+    }
+
+    public function possuiNfVenda(): bool
+    {
+        return $this->arquivo_nf_venda_path !== null
+            && $this->arquivo_nf_venda_path !== '';
     }
 
     public function pedidos(): HasMany

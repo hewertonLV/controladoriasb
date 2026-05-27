@@ -33,7 +33,10 @@
                             <form method="post" action="{{ route('admin.captacao.lotes.fretes.transferencia', $lote) }}" class="d-flex gap-2">
                                 @csrf
                                 <input type="hidden" name="transferencia_origem_id" value="{{ $row['vinculo']->transferencia_origem_id }}">
-                                <select name="id_frete" class="form-select form-select-sm">
+                                <select name="id_frete"
+                                        class="form-select form-select-sm"
+                                        data-search-select
+                                        data-placeholder="Selecione ou pesquise o frete">
                                     <option value="">Sem frete</option>
                                     @foreach ($fretesAbertos as $frete)
                                         <option value="{{ $frete->id }}" @selected((int) $row['id_frete_atual'] === $frete->id)>
@@ -61,7 +64,11 @@
                 @csrf
                 <div class="col-md-4">
                     <label class="form-label">Fruta</label>
-                    <select name="id_fruta" class="form-select" required>
+                    <select name="id_fruta"
+                            class="form-select"
+                            data-search-select
+                            data-placeholder="Selecione ou pesquise a fruta"
+                            required>
                         @foreach ($transferencias->pluck('vinculo.fruta')->filter()->unique('id') as $fruta)
                             <option value="{{ $fruta->id }}">{{ $fruta->nome }}</option>
                         @endforeach
@@ -69,7 +76,10 @@
                 </div>
                 <div class="col-md-5">
                     <label class="form-label">Frete</label>
-                    <select name="id_frete" class="form-select">
+                    <select name="id_frete"
+                            class="form-select"
+                            data-search-select
+                            data-placeholder="Selecione ou pesquise o frete">
                         <option value="">Sem frete</option>
                         @foreach ($fretesAbertos as $frete)
                             <option value="{{ $frete->id }}">{{ $frete->nome }}</option>
@@ -83,3 +93,5 @@
         </div>
     </div>
 @endsection
+
+@include('admin.captacao._search-select-scripts')

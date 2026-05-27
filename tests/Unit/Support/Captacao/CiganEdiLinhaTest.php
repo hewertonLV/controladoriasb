@@ -29,4 +29,19 @@ class CiganEdiLinhaTest extends TestCase
 
         $this->assertSame('  001', substr($linha, 2, 5));
     }
+
+    public function test_texto_com_acento_nao_desloca_campos_posteriores(): void
+    {
+        $linha = (new CiganEdiLinha(719))
+            ->colocar(1, 1, 'I')
+            ->colocar(115, 314, 'MAÇA PACOTE 1 KG')
+            ->colocar(656, 658, '125', true)
+            ->colocarExato(679, 679, 'S')
+            ->linha();
+
+        $this->assertSame(719, strlen($linha));
+        $this->assertSame('125', substr($linha, 655, 3));
+        $this->assertSame('S', substr($linha, 678, 1));
+        $this->assertStringContainsString('MA', substr($linha, 114, 20));
+    }
 }

@@ -5,8 +5,11 @@ namespace Tests\Feature\Admin\Captacao;
 use App\Enums\CaptacaoLoteStatus;
 use App\Models\Captacao\CaptacaoLote;
 use App\Models\Fruta;
+use App\Models\UnidadeNegocio;
 use App\Services\Captacao\ClienteFrutaVinculoService;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Storage;
 
 class CaptacaoPipelineTest extends CaptacaoTestCase
 {
@@ -31,8 +34,24 @@ class CaptacaoPipelineTest extends CaptacaoTestCase
         $lote->refresh();
         $this->assertSame(CaptacaoLoteStatus::TransferenciaCiganIniciada, $lote->status);
 
+        $hub = UnidadeNegocio::factory()->create(['is_hub' => true, 'possui_estoque' => true]);
+        $lote->update(['id_unidade_negocio_hub_origem' => $hub->id]);
+
+        Storage::fake('local');
+
         $this->actingAs($user)
-            ->post(route('admin.captacao.lotes.pipeline.validar-transferencias', $lote))
+            ->post(route('admin.captacao.lotes.nf-transferencia-cigan.upload', $lote), [
+                'arquivo_nf_transferencia' => UploadedFile::fake()->create('nf-128286.xml', 50, 'application/xml'),
+            ])
+            ->assertRedirect(route('admin.captacao.matriz.index', ['lote' => $lote->id, 'aba' => 'saida-estoque-fisico']))
+            ->assertSessionHas('success');
+
+        $lote->refresh();
+        $this->assertSame(CaptacaoLoteStatus::SaidaEstoqueFisico, $lote->status);
+        $this->assertTrue($lote->possuiNfTransferencia());
+
+        $this->actingAs($user)
+            ->post(route('admin.captacao.lotes.pipeline.concluir-saida-estoque-fisico', $lote))
             ->assertRedirect();
 
         $lote->refresh();
@@ -52,15 +71,14 @@ class CaptacaoPipelineTest extends CaptacaoTestCase
         $lote->refresh();
         $this->assertSame(CaptacaoLoteStatus::FaturamentoCiganIniciado, $lote->status);
 
-        $this->actingAs($user)
-            ->post(route('admin.captacao.lotes.pipeline.finalizar-vendas', $lote))
-            ->assertRedirect();
+        $this->enviarNfVendaPipeline($user, $lote);
 
         $lote->refresh();
         $this->assertSame(CaptacaoLoteStatus::VendasFinalizadas, $lote->status);
+        $this->assertTrue($lote->possuiNfVenda());
     }
 
-    public function test_finalizar_vendas_bloqueia_pedido_com_quantidade_sem_rota(): void
+    public function test_concluir_vinculo_rotas_bloqueia_pedido_com_quantidade_sem_rota(): void
     {
         $this->seedCaptacaoMovimentacao();
 
@@ -73,7 +91,7 @@ class CaptacaoPipelineTest extends CaptacaoTestCase
             'id_unidade_negocio_faturamento' => $c['faturamento']->id,
             'id_unidade_negocio_galpao' => $c['galpao']->id,
             'tipo' => 'CAPTACAO_PEDIDOS',
-            'status' => CaptacaoLoteStatus::FaturamentoCiganIniciado,
+            'status' => CaptacaoLoteStatus::VincularRotasNosPedidos,
         ]);
 
         $pedido = \App\Models\Captacao\Pedido::query()->create([
@@ -96,12 +114,62 @@ class CaptacaoPipelineTest extends CaptacaoTestCase
         $user->unidadesNegocio()->sync([$c['faturamento']->id, $c['galpao']->id, $hub->id]);
 
         $this->actingAs($user)
-            ->from(route('admin.captacao.lotes.show', $lote))
-            ->post(route('admin.captacao.lotes.pipeline.finalizar-vendas', $lote))
-            ->assertRedirect(route('admin.captacao.lotes.show', $lote))
+            ->from(route('admin.captacao.matriz.index', ['lote' => $lote->id]))
+            ->post(route('admin.captacao.lotes.pipeline.concluir-vinculo-rotas', $lote))
+            ->assertRedirect(route('admin.captacao.matriz.index', ['lote' => $lote->id]))
             ->assertSessionHasErrors('pedidos');
 
-        $this->assertSame(CaptacaoLoteStatus::FaturamentoCiganIniciado, $lote->fresh()->status);
+        $this->assertSame(CaptacaoLoteStatus::VincularRotasNosPedidos, $lote->fresh()->status);
+    }
+
+    public function test_upload_nf_venda_sem_rota_movimenta_e_aguarda_vinculo_rotas(): void
+    {
+        $this->seedCaptacaoMovimentacao();
+
+        $c = $this->cenarioCaptacaoBasico();
+        $hub = $this->criarHubComEstoque($c['fruta'], '200.00', '20.00');
+        $this->criarCoGalpao($c['galpao']);
+
+        $lote = CaptacaoLote::query()->create([
+            'data_referencia' => '2026-05-29',
+            'id_unidade_negocio_faturamento' => $c['faturamento']->id,
+            'id_unidade_negocio_galpao' => $c['galpao']->id,
+            'tipo' => 'CAPTACAO_PEDIDOS',
+            'status' => CaptacaoLoteStatus::FaturamentoCiganIniciado,
+        ]);
+
+        $pedido = \App\Models\Captacao\Pedido::query()->create([
+            'id_captacao_lote' => $lote->id,
+            'id_cliente' => $c['cliente']->id,
+            'id_captacao_rota' => null,
+            'id_unidade_negocio_saida_venda' => $c['galpao']->id,
+            'captacao_concluida' => true,
+            'origem' => \App\Enums\PedidoOrigem::Web,
+        ]);
+
+        \App\Models\Captacao\PedidoItem::query()->create([
+            'id_pedido' => $pedido->id,
+            'id_fruta' => $c['fruta']->id,
+            'quantidade' => 5,
+            'preco_venda' => '12.50',
+            'version' => 1,
+        ]);
+
+        $user = $this->captacaoManager();
+        $user->unidadesNegocio()->sync([$c['faturamento']->id, $c['galpao']->id, $hub->id]);
+
+        Storage::fake('local');
+        $this->actingAs($user)->post(route('admin.captacao.lotes.nf-venda-cigan.upload', $lote), [
+            'arquivo_nf_venda' => UploadedFile::fake()->create('nf-venda.xml', 50, 'application/xml'),
+        ])->assertRedirect(route('admin.captacao.matriz.index', ['lote' => $lote->id, 'aba' => 'rotas']));
+
+        $lote->refresh();
+        $this->assertSame(CaptacaoLoteStatus::VincularRotasNosPedidos, $lote->status);
+        $this->assertTrue($lote->possuiNfVenda());
+        $this->assertDatabaseHas('captacao_lote_movimentacoes', [
+            'id_captacao_lote' => $lote->id,
+            'tipo' => \App\Models\Captacao\CaptacaoLoteMovimentacao::TIPO_VENDA_NOTA,
+        ]);
     }
 
     public function test_matriz_exibe_aba_arquivo_cigan_na_transferencia_iniciada(): void
@@ -116,9 +184,9 @@ class CaptacaoPipelineTest extends CaptacaoTestCase
         $this->actingAs($user)
             ->get(route('admin.captacao.matriz.index', ['lote' => $lote->id]))
             ->assertOk()
-            ->assertSee('Arquivo Cigan', false)
+            ->assertSee('Arquivo Cigam', false)
             ->assertSee('matriz-tab-arquivo-cigan', false)
-            ->assertSee('Baixar arquivo TXT (Cigan)', false);
+            ->assertSee('Baixar arquivo Cigam', false);
     }
 
     public function test_download_arquivo_cigan_exige_hub_origem(): void
@@ -340,6 +408,187 @@ class CaptacaoPipelineTest extends CaptacaoTestCase
             ->assertSessionHas('success');
 
         $this->assertSame($hub->id, $lote->fresh()->id_unidade_negocio_hub_origem);
+    }
+
+    public function test_upload_nf_transferencia_disponibiliza_download_e_muda_status(): void
+    {
+        $c = $this->cenarioCaptacaoBasico();
+        $lote = $this->criarLoteCaptacao($c);
+        $hub = UnidadeNegocio::factory()->create(['is_hub' => true, 'possui_estoque' => true]);
+        $user = $this->captacaoManager();
+        $user->unidadesNegocio()->sync([$c['faturamento']->id, $c['galpao']->id]);
+
+        $lote->update([
+            'status' => CaptacaoLoteStatus::TransferenciaCiganIniciada,
+            'id_unidade_negocio_hub_origem' => $hub->id,
+        ]);
+
+        Storage::fake('local');
+
+        $this->actingAs($user)
+            ->post(route('admin.captacao.lotes.nf-transferencia-cigan.upload', $lote), [
+                'arquivo_nf_transferencia' => UploadedFile::fake()->create('nf-transferencia.pdf', 100, 'application/pdf'),
+            ])
+            ->assertRedirect(route('admin.captacao.matriz.index', ['lote' => $lote->id, 'aba' => 'saida-estoque-fisico']))
+            ->assertSessionHas('success');
+
+        $lote->refresh();
+        $this->assertSame(CaptacaoLoteStatus::SaidaEstoqueFisico, $lote->status);
+        $this->assertSame('nf-transferencia.pdf', $lote->arquivo_nf_transferencia_nome);
+        Storage::disk('local')->assertExists($lote->arquivo_nf_transferencia_path);
+
+        $this->actingAs($user)
+            ->get(route('admin.captacao.lotes.nf-transferencia-cigan.download', $lote))
+            ->assertOk();
+    }
+
+    public function test_upload_nf_exige_hub_origem_salvo(): void
+    {
+        $c = $this->cenarioCaptacaoBasico();
+        $lote = $this->criarLoteCaptacao($c);
+        $user = $this->captacaoManager();
+        $user->unidadesNegocio()->sync([$c['faturamento']->id, $c['galpao']->id]);
+
+        $lote->update(['status' => CaptacaoLoteStatus::TransferenciaCiganIniciada]);
+
+        Storage::fake('local');
+
+        $this->actingAs($user)
+            ->from(route('admin.captacao.matriz.index', ['lote' => $lote->id, 'aba' => 'arquivo-cigan']))
+            ->post(route('admin.captacao.lotes.nf-transferencia-cigan.upload', $lote), [
+                'arquivo_nf_transferencia' => UploadedFile::fake()->create('nf.pdf', 50, 'application/pdf'),
+            ])
+            ->assertRedirect()
+            ->assertSessionHasErrors('id_unidade_negocio_hub_origem');
+    }
+
+    public function test_matriz_exibe_aba_arquivo_cigan_aguardando_vinculo_frete(): void
+    {
+        $c = $this->cenarioCaptacaoBasico();
+        $lote = $this->criarLoteCaptacao($c);
+        $user = $this->captacaoManager();
+        $user->unidadesNegocio()->sync([$c['faturamento']->id, $c['galpao']->id]);
+
+        $lote->update([
+            'status' => CaptacaoLoteStatus::AguardandoVinculoFrete,
+            'arquivo_nf_transferencia_path' => 'captacao/cigan/nf-transferencia/lote-test.xml',
+            'arquivo_nf_transferencia_nome' => 'nf-test.xml',
+        ]);
+
+        $this->actingAs($user)
+            ->get(route('admin.captacao.matriz.index', ['lote' => $lote->id, 'aba' => 'arquivo-cigan']))
+            ->assertOk()
+            ->assertSee('Baixar NF enviada', false)
+            ->assertDontSee('Enviar NF e avançar', false);
+    }
+
+    public function test_upload_nf_venda_efetiva_movimentacoes_e_avanca_status(): void
+    {
+        $this->seedCaptacaoMovimentacao();
+
+        $c = $this->cenarioCaptacaoBasico();
+        $hub = $this->criarHubComEstoque($c['fruta'], '200.00', '20.00');
+        $this->criarCoGalpao($c['galpao']);
+
+        $lote = $this->criarLoteComPedido($c, 5, '12.50');
+        $user = $this->captacaoManager();
+        $user->unidadesNegocio()->sync([$c['faturamento']->id, $c['galpao']->id, $hub->id]);
+
+        $this->actingAs($user)->post(route('admin.captacao.lotes.pipeline.iniciar-transferencia', $lote));
+        $lote->update(['id_unidade_negocio_hub_origem' => $hub->id]);
+        Storage::fake('local');
+        $this->actingAs($user)->post(route('admin.captacao.lotes.nf-transferencia-cigan.upload', $lote), [
+            'arquivo_nf_transferencia' => UploadedFile::fake()->create('nf.xml', 50, 'application/xml'),
+        ]);
+        $this->concluirSaidaEstoqueFisicoPipeline($user, $lote->fresh());
+        $this->actingAs($user)->post(route('admin.captacao.lotes.pipeline.concluir-frete', $lote->fresh()));
+        $this->actingAs($user)->post(route('admin.captacao.lotes.pipeline.iniciar-faturamento', $lote->fresh()));
+
+        $this->enviarNfVendaPipeline($user, $lote->fresh());
+
+        $lote->refresh();
+        $this->assertSame(CaptacaoLoteStatus::VendasFinalizadas, $lote->status);
+        $this->assertTrue($lote->possuiNfVenda());
+
+        $this->assertDatabaseHas('captacao_lote_movimentacoes', [
+            'id_captacao_lote' => $lote->id,
+            'tipo' => \App\Models\Captacao\CaptacaoLoteMovimentacao::TIPO_VENDA_NOTA,
+        ]);
+    }
+
+    public function test_download_arquivo_cigan_vendas_apos_iniciar_faturamento(): void
+    {
+        $this->seedCaptacaoMovimentacao();
+        $this->seed(\Database\Seeders\EstadoSeeder::class);
+
+        $c = $this->cenarioCaptacaoBasico();
+        $faturamento = $c['faturamento'];
+        $faturamento->update(['id_cigam' => '881001', 'centro_armazenagem' => '001']);
+
+        $c['cliente']->update([
+            'id_cigam' => '770099',
+            'cnpj_cpf' => '12345678000199',
+        ]);
+        $unidadeLoja = UnidadeNegocio::factory()->create([
+            'id_estado' => \App\Models\Estado::query()->firstOrFail()->id,
+        ]);
+        $c['cliente']->update(['id_unidade_negocio' => $unidadeLoja->id]);
+
+        $c['fruta']->update(['id_cigam' => '990011']);
+
+        $lote = $this->criarLoteCaptacao($c);
+        $lote->update(['status' => CaptacaoLoteStatus::TransferenciaFinalizada]);
+
+        $pedido = \App\Models\Captacao\Pedido::query()->create([
+            'id_captacao_lote' => $lote->id,
+            'id_cliente' => $c['cliente']->id,
+            'id_captacao_rota' => $c['rota']->id,
+            'captacao_concluida' => true,
+            'origem' => \App\Enums\PedidoOrigem::Web,
+        ]);
+
+        \App\Models\Captacao\PedidoItem::query()->create([
+            'id_pedido' => $pedido->id,
+            'id_fruta' => $c['fruta']->id,
+            'quantidade' => 3,
+            'preco_venda' => '10.00',
+            'version' => 1,
+        ]);
+
+        $user = $this->captacaoManager();
+        $user->unidadesNegocio()->sync([$c['faturamento']->id, $c['galpao']->id]);
+
+        $this->actingAs($user)
+            ->post(route('admin.captacao.lotes.pipeline.iniciar-faturamento', $lote))
+            ->assertRedirect();
+
+        $hub = UnidadeNegocio::factory()->create(['is_hub' => true, 'possui_estoque' => true, 'nome' => 'HUB MV TESTE']);
+        $pedido->update(['id_unidade_negocio_saida_venda' => $hub->id]);
+
+        $this->actingAs($user)
+            ->get(route('admin.captacao.matriz.index', ['lote' => $lote->id, 'aba' => 'arquivo-cigan']))
+            ->assertOk()
+            ->assertSee('Saída física', false)
+            ->assertSee('HUB MV TESTE', false)
+            ->assertSee($c['galpao']->nome, false);
+
+        $response = $this->actingAs($user)
+            ->get(route('admin.captacao.lotes.arquivo-cigan-vendas', $lote));
+
+        $response->assertOk();
+        $response->assertHeader('content-type', 'text/plain; charset=ISO-8859-1');
+        $conteudo = $response->streamedContent();
+        $this->assertStringStartsWith('N', $conteudo);
+
+        $linhas = array_values(array_filter(explode("\n", trim($conteudo))));
+        $gerador = app(\App\Services\Captacao\CiganEdiNfTransferenciaGerador::class);
+        $linhaI = collect($linhas)->first(fn (string $l) => str_starts_with($l, 'I'));
+        $this->assertNotNull($linhaI);
+        $this->assertSame(
+            $gerador->formatarPrecoUnitarioCigam(10.0),
+            substr($linhaI, 55, 15),
+            'Preço unitário vendas (pos. 56–70) = preco_venda da matriz',
+        );
     }
 
     public function test_download_arquivo_cigan_transferencia_indisponivel_fora_da_fase(): void

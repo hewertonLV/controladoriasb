@@ -49,6 +49,13 @@
                     {{ $proximaAcao->label() }}
                 </button>
             </form>
+        @elseif ($proximaAcao === \App\Enums\CaptacaoLoteAcaoPipeline::ConcluirSaidaEstoqueFisico)
+            <form method="post" action="{{ route('admin.captacao.lotes.pipeline.concluir-saida-estoque-fisico', $lote) }}" class="d-inline">
+                @csrf
+                <button type="submit" class="btn btn-{{ $proximaAcao->variant() }} btn-sm">
+                    {{ $proximaAcao->label() }}
+                </button>
+            </form>
         @elseif ($proximaAcao === \App\Enums\CaptacaoLoteAcaoPipeline::ConcluirFrete)
             <form method="post" action="{{ route('admin.captacao.lotes.pipeline.concluir-frete', $lote) }}" class="d-inline">
                 @csrf
@@ -65,6 +72,13 @@
             </form>
         @elseif ($proximaAcao === \App\Enums\CaptacaoLoteAcaoPipeline::FinalizarVendas)
             <form method="post" action="{{ route('admin.captacao.lotes.pipeline.finalizar-vendas', $lote) }}" class="d-inline">
+                @csrf
+                <button type="submit" class="btn btn-{{ $proximaAcao->variant() }} btn-sm">
+                    {{ $proximaAcao->label() }}
+                </button>
+            </form>
+        @elseif ($proximaAcao === \App\Enums\CaptacaoLoteAcaoPipeline::ConcluirVinculoRotas)
+            <form method="post" action="{{ route('admin.captacao.lotes.pipeline.concluir-vinculo-rotas', $lote) }}" class="d-inline">
                 @csrf
                 <button type="submit" class="btn btn-{{ $proximaAcao->variant() }} btn-sm">
                     {{ $proximaAcao->label() }}

@@ -32,7 +32,10 @@
                     <input type="hidden" name="faturamento" id="faturamento" value="{{ $faturamentoId }}">
                     <div class="col-md-4">
                         <label for="faturamento_select" class="form-label">Unidade de faturamento</label>
-                        <select id="faturamento_select" class="form-select">
+                        <select id="faturamento_select"
+                                class="form-select"
+                                data-search-select
+                                data-placeholder="Selecione ou pesquise o faturamento">
                             @foreach ($faturamentos as $un)
                                 <option value="{{ $un->id }}" @selected((int) $faturamentoId === $un->id)>{{ $un->nome }}</option>
                             @endforeach
@@ -226,6 +229,8 @@
             </div>
         </div>
     </div>
+
+    @include('admin.captacao._search-select-scripts')
 
     @push('scripts')
     <script>

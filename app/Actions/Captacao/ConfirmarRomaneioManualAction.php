@@ -19,13 +19,13 @@ final class ConfirmarRomaneioManualAction
     {
         if ($lote->tipo !== CaptacaoLoteTipo::RomaneioManual) {
             throw ValidationException::withMessages([
-                'tipo' => 'Este lote não é romaneio manual.',
+                'tipo' => 'Este lote não é uma solicitação de transferência.',
             ]);
         }
 
         if ($lote->status !== CaptacaoLoteStatus::CaptacaoEmAndamento) {
             throw ValidationException::withMessages([
-                'status' => 'Romaneio manual já confirmado ou em outro status.',
+                'status' => 'A solicitação de transferência já foi confirmada ou está em outro status.',
             ]);
         }
 

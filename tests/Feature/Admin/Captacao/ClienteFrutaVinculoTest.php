@@ -144,7 +144,151 @@ class ClienteFrutaVinculoTest extends CaptacaoTestCase
             ->get(route('admin.captacao.matriz.index', ['lote' => $lote->id]))
             ->assertOk()
             ->assertSee($c['fruta']->nome, false)
-            ->assertSee('Selecione a loja', false);
+            ->assertSee('Adicionar loja', false)
+            ->assertSee('Remover loja', false);
+    }
+
+    public function test_remover_loja_da_matriz_retorna_snapshot_e_atualiza_listas(): void
+    {
+        $c = $this->cenarioCaptacaoBasico();
+        $cliente2 = \App\Models\Cliente::factory()->create([
+            'id_unidade_negocio' => $c['faturamento']->id,
+        ]);
+        app(ClienteFrutaVinculoService::class)->sincronizarFrutas($cliente2, [$c['fruta']->id]);
+
+        $lote = CaptacaoLote::query()->create([
+            'data_referencia' => '2026-05-29',
+            'id_unidade_negocio_faturamento' => $c['faturamento']->id,
+            'id_unidade_negocio_galpao' => $c['galpao']->id,
+            'tipo' => 'CAPTACAO_PEDIDOS',
+            'status' => CaptacaoLoteStatus::CaptacaoEmAndamento,
+        ]);
+
+        $user = $this->captacaoManager();
+        $user->unidadesNegocio()->sync([$c['faturamento']->id, $c['galpao']->id]);
+
+        $this->actingAs($user)->postJson(route('admin.captacao.lotes.matriz.adicionar-loja', $lote), [
+            'id_cliente' => $c['cliente']->id,
+        ]);
+        $this->actingAs($user)->postJson(route('admin.captacao.lotes.matriz.adicionar-loja', $lote), [
+            'id_cliente' => $cliente2->id,
+        ]);
+
+        $resposta = $this->actingAs($user)
+            ->postJson(route('admin.captacao.lotes.matriz.remover-loja', $lote), [
+                'id_cliente' => $cliente2->id,
+            ])
+            ->assertOk()
+            ->assertJsonPath('ok', true)
+            ->assertJsonStructure([
+                'layout_hash',
+                'clientes_disponiveis',
+                'clientes_na_matriz',
+            ]);
+
+        $payload = $resposta->json();
+        $this->assertContains($cliente2->id, collect($payload['clientes_disponiveis'])->pluck('id')->all());
+        $this->assertSame(
+            [$c['cliente']->id],
+            collect($payload['clientes_na_matriz'])->pluck('id')->all(),
+        );
+
+        $this->actingAs($user)
+            ->postJson(route('admin.captacao.lotes.matriz.remover-loja', $lote), [
+                'id_cliente' => $cliente2->id,
+            ])
+            ->assertUnprocessable();
+
+        $dados = app(ClienteFrutaVinculoService::class)->dadosMatriz($lote->fresh());
+        $this->assertCount(1, $dados['clientes']);
+        $this->assertSame($c['cliente']->id, $dados['clientes']->first()->id);
+        $this->assertDatabaseMissing('pedidos', [
+            'id_captacao_lote' => $lote->id,
+            'id_cliente' => $cliente2->id,
+            'deleted_at' => null,
+        ]);
+    }
+
+    public function test_readicionar_loja_apos_remover_restaura_pedido_sem_duplicar(): void
+    {
+        $c = $this->cenarioCaptacaoBasico();
+
+        $lote = CaptacaoLote::query()->create([
+            'data_referencia' => '2026-05-29',
+            'id_unidade_negocio_faturamento' => $c['faturamento']->id,
+            'id_unidade_negocio_galpao' => $c['galpao']->id,
+            'tipo' => 'CAPTACAO_PEDIDOS',
+            'status' => CaptacaoLoteStatus::CaptacaoEmAndamento,
+        ]);
+
+        $user = $this->captacaoManager();
+        $user->unidadesNegocio()->sync([$c['faturamento']->id, $c['galpao']->id]);
+
+        $this->actingAs($user)->postJson(route('admin.captacao.lotes.matriz.adicionar-loja', $lote), [
+            'id_cliente' => $c['cliente']->id,
+        ])->assertOk();
+
+        $pedidoId = \App\Models\Captacao\Pedido::query()
+            ->where('id_captacao_lote', $lote->id)
+            ->where('id_cliente', $c['cliente']->id)
+            ->value('id');
+
+        $this->actingAs($user)->postJson(route('admin.captacao.lotes.matriz.remover-loja', $lote), [
+            'id_cliente' => $c['cliente']->id,
+        ])->assertOk();
+
+        $this->actingAs($user)
+            ->postJson(route('admin.captacao.lotes.matriz.adicionar-loja', $lote), [
+                'id_cliente' => $c['cliente']->id,
+            ])
+            ->assertOk()
+            ->assertJsonPath('ok', true);
+
+        $this->assertSame(
+            $pedidoId,
+            \App\Models\Captacao\Pedido::query()
+                ->where('id_captacao_lote', $lote->id)
+                ->where('id_cliente', $c['cliente']->id)
+                ->value('id'),
+        );
+        $this->assertDatabaseHas('pedidos', [
+            'id' => $pedidoId,
+            'id_captacao_lote' => $lote->id,
+            'id_cliente' => $c['cliente']->id,
+            'deleted_at' => null,
+        ]);
+    }
+
+    public function test_remover_loja_rejeitado_quando_lote_nao_esta_em_captacao(): void
+    {
+        $c = $this->cenarioCaptacaoBasico();
+        $lote = CaptacaoLote::query()->create([
+            'data_referencia' => '2026-05-29',
+            'id_unidade_negocio_faturamento' => $c['faturamento']->id,
+            'id_unidade_negocio_galpao' => $c['galpao']->id,
+            'tipo' => 'CAPTACAO_PEDIDOS',
+            'status' => CaptacaoLoteStatus::CaptacaoEmAndamento,
+        ]);
+
+        $user = $this->captacaoManager();
+        $user->unidadesNegocio()->sync([$c['faturamento']->id, $c['galpao']->id]);
+
+        app(\App\Services\Captacao\PedidoService::class)->adicionarLojaNaMatriz(
+            $lote,
+            $c['cliente'],
+            \App\Enums\PedidoOrigem::Web,
+            $user,
+        );
+
+        $lote->update(['status' => CaptacaoLoteStatus::AguardandoTransferenciaCigan]);
+
+        $this->actingAs($user)
+            ->postJson(route('admin.captacao.lotes.matriz.remover-loja', $lote), [
+                'id_cliente' => $c['cliente']->id,
+            ])
+            ->assertUnprocessable()
+            ->assertJsonPath('message', 'O lote não está em captação.')
+            ->assertJsonPath('code', 'captacao_edicao_bloqueada');
     }
 
     public function test_adicionar_segunda_loja_mescla_colunas_de_frutas(): void

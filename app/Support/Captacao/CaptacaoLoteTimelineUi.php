@@ -51,9 +51,11 @@ final class CaptacaoLoteTimelineUi
             CaptacaoLoteStatus::CaptacaoEmAndamento,
             CaptacaoLoteStatus::AguardandoTransferenciaCigan,
             CaptacaoLoteStatus::TransferenciaCiganIniciada,
+            CaptacaoLoteStatus::SaidaEstoqueFisico,
             CaptacaoLoteStatus::AguardandoVinculoFrete,
             CaptacaoLoteStatus::TransferenciaFinalizada,
             CaptacaoLoteStatus::FaturamentoCiganIniciado,
+            CaptacaoLoteStatus::VincularRotasNosPedidos,
             CaptacaoLoteStatus::VendasFinalizadas,
         ];
     }
@@ -102,9 +104,9 @@ final class CaptacaoLoteTimelineUi
     {
         if ($tipo === CaptacaoLoteTipo::RomaneioManual) {
             return match ($status) {
-                CaptacaoLoteStatus::CaptacaoEmAndamento => 'Monte as frutas e as quantidades em caixas. Quando terminar, feche o romaneio para liberar a transferência.',
-                CaptacaoLoteStatus::AguardandoTransferenciaCigan => 'Romaneio fechado. Inicie a transferência no SB e gere o arquivo Cigan para o HUB efetuar no sistema fiscal.',
-                CaptacaoLoteStatus::TransferenciaCiganIniciada => 'Arquivo Cigan disponível. Aguardando o HUB efetuar as transferências no Cigan. Depois, conclua a transferência no SB.',
+                CaptacaoLoteStatus::CaptacaoEmAndamento => 'Monte as frutas e as quantidades em caixas. Quando terminar, confirme a solicitação para liberar a transferência.',
+                CaptacaoLoteStatus::AguardandoTransferenciaCigan => 'Solicitação confirmada. Pronto para iniciar a transferência no SB e gerar o arquivo Cigam para o HUB efetuar no sistema fiscal.',
+                CaptacaoLoteStatus::TransferenciaCiganIniciada => 'Arquivo Cigam disponível. Aguardando o HUB efetuar as transferências no Cigam. Depois, conclua a transferência no SB.',
                 CaptacaoLoteStatus::TransferenciaFinalizada => 'Abastecimento e transferências concluídos. Este lote manual não possui etapa de vendas.',
                 default => $status->label(),
             };
@@ -112,11 +114,13 @@ final class CaptacaoLoteTimelineUi
 
         return match ($status) {
             CaptacaoLoteStatus::CaptacaoEmAndamento => 'Pedidos, rotas e quantidades podem ser editados na matriz ou no app. Finalize a captação do faturamento quando o dia estiver completo.',
-            CaptacaoLoteStatus::AguardandoTransferenciaCigan => 'Captação do faturamento finalizada. Inicie a transferência no SB (arquivo Cigan); em seguida o HUB efetua no Cigan.',
-            CaptacaoLoteStatus::TransferenciaCiganIniciada => 'Arquivo Cigan gerado. Aguardando o HUB efetuar as transferências no Cigan. As quantidades do romaneio estão travadas no SB.',
-            CaptacaoLoteStatus::AguardandoVinculoFrete => 'Transferências gerenciais validadas no SB. Vincule fretes se necessário (opcional) e conclua a etapa de frete.',
-            CaptacaoLoteStatus::TransferenciaFinalizada => 'Transferência encerrada. Romaneio principal imutável. Ajuste preços na matriz até Jefferson iniciar o faturamento no Cigan.',
-            CaptacaoLoteStatus::FaturamentoCiganIniciado => 'Aguardando Jefferson finalizar as vendas no Cigan antes de efetivar no SB.',
+            CaptacaoLoteStatus::AguardandoTransferenciaCigan => 'Captação do faturamento finalizada. Pronto para iniciar a transferência no SB (arquivo Cigam); em seguida o HUB efetua no Cigam.',
+            CaptacaoLoteStatus::TransferenciaCiganIniciada => 'Arquivo Cigam gerado. Aguardando o HUB efetuar as transferências no Cigam e o envio da NF. As quantidades do romaneio estão travadas no SB.',
+            CaptacaoLoteStatus::SaidaEstoqueFisico => 'NF recebida. Defina por loja se a saída física na venda será do galpão ou do HUB (aba Saída estoque físico) e conclua para efetivar as transferências no SB.',
+            CaptacaoLoteStatus::AguardandoVinculoFrete => 'Transferências gerenciais efetivadas no SB. Vincule fretes na aba Frete HUB x CD (opcional) e conclua a etapa de frete.',
+            CaptacaoLoteStatus::TransferenciaFinalizada => 'Transferência encerrada. Romaneio principal imutável. Ajuste preços na matriz até iniciar o faturamento no Cigam.',
+            CaptacaoLoteStatus::FaturamentoCiganIniciado => 'Baixe o TXT de vendas na aba Arquivo Cigam Venda, importe no Cigam e envie a NF no SB para efetivar as movimentações de venda. Preços travados na matriz.',
+            CaptacaoLoteStatus::VincularRotasNosPedidos => 'NF recebida e vendas movimentadas no SB. Vincule a rota de cada loja com quantidade na aba Rotas. Se todas já estiverem vinculadas, o lote avança automaticamente; caso contrário, clique em Concluído.',
             CaptacaoLoteStatus::VendasFinalizadas => 'Vendas efetivadas no SB. Ciclo do lote concluído.',
             default => $status->label(),
         };

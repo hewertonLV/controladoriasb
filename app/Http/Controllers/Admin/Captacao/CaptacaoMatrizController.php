@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Admin\Captacao;
 use App\Enums\PedidoOrigem;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Admin\Captacao\AdicionarLojaMatrizRequest;
+use App\Http\Requests\Admin\Captacao\RemoverLojaMatrizRequest;
 use App\Http\Requests\Admin\Captacao\ToggleCaptacaoConcluidaRequest;
 use App\Http\Requests\Admin\Captacao\UpdateCaptacaoCelulaRequest;
 use App\Http\Requests\Admin\Captacao\UpdateCaptacaoNumeroPedidoRequest;
@@ -12,16 +13,19 @@ use App\Http\Requests\Admin\Captacao\UpdateCaptacaoOrdemCarregamentoRequest;
 use App\Http\Requests\Admin\Captacao\UpdateCaptacaoRotaMotoristaRequest;
 use App\Http\Requests\Admin\Captacao\UpdateCaptacaoRotaPedidoRequest;
 use App\Http\Requests\Admin\Captacao\UpdateCaptacaoRotaVeiculoRequest;
+use App\Http\Requests\Admin\Captacao\UpdateCaptacaoSaidaFisicaVendaRequest;
 use App\Models\Captacao\CaptacaoLote;
 use App\Models\Captacao\CaptacaoRota;
 use App\Models\Cliente;
 use App\Models\UnidadeNegocio;
+use App\Services\Captacao\CaptacaoLoteFreteService;
 use App\Services\Captacao\CaptacaoLoteService;
 use App\Services\Captacao\CaptacaoMatrizRotasService;
 use App\Services\Captacao\CaptacaoMatrizEstadoService;
 use App\Services\Captacao\ClienteFrutaVinculoService;
 use App\Services\Captacao\PedidoService;
 use App\Services\Captacao\RomaneioAbastecimentoService;
+use App\Services\Captacao\RomaneioCarregamentoService;
 use App\Services\Permissoes\UnidadeNegocioAccessService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -35,6 +39,7 @@ class CaptacaoMatrizController extends Controller
         private readonly CaptacaoMatrizRotasService $matrizRotas,
         private readonly ClienteFrutaVinculoService $vinculos,
         private readonly CaptacaoLoteService $lotes,
+        private readonly CaptacaoLoteFreteService $freteLote,
     ) {}
 
     public function index(Request $request): View
@@ -69,13 +74,31 @@ class CaptacaoMatrizController extends Controller
         $veiculos = $this->matrizRotas->veiculosDisponiveis();
 
         $abasPermitidas = ['quantidade', 'rotas', 'por-rota'];
-        if ($lote->status->exibeAbaArquivoCiganTransferencia()) {
+        if ($lote->status->exibeAbaArquivoCigan()) {
             $abasPermitidas[] = 'arquivo-cigan';
+        }
+        if ($lote->status->exibeAbaFreteHub()) {
+            $abasPermitidas[] = 'frete-hub';
+        }
+        if ($lote->status->exibeAbaFreteVendas()) {
+            $abasPermitidas[] = 'frete-vendas';
+        }
+        if ($lote->status->exibeAbaSaidaEstoqueFisico()) {
+            $abasPermitidas[] = 'saida-estoque-fisico';
         }
 
         $aba = $request->string('aba', 'quantidade')->toString();
+        if ($aba === 'frete') {
+            $aba = 'frete-hub';
+        }
         if (! in_array($aba, $abasPermitidas, true)) {
-            $aba = $lote->status->exibeAbaArquivoCiganTransferencia() ? 'arquivo-cigan' : 'quantidade';
+            $aba = match (true) {
+                $lote->status->exibeAbaSaidaEstoqueFisico() => 'saida-estoque-fisico',
+                $lote->status->exibeAbaFreteHub() => 'frete-hub',
+                $lote->status->exibeAbaFreteVendas() => 'frete-vendas',
+                $lote->status->exibeAbaArquivoCigan() => 'arquivo-cigan',
+                default => 'quantidade',
+            };
         }
 
         $hubsDisponiveis = UnidadeNegocio::query()
@@ -87,6 +110,22 @@ class CaptacaoMatrizController extends Controller
         $romaneioAbastecimento = $lote->status->exibeAbaArquivoCiganTransferencia()
             ? app(RomaneioAbastecimentoService::class)->preview($lote)
             : collect();
+
+        $dadosFreteHub = $lote->status->exibeAbaFreteHub()
+            ? $this->freteLote->dadosFreteHub($lote)
+            : null;
+
+        $dadosFreteVendas = $lote->status->exibeAbaFreteVendas()
+            ? $this->freteLote->dadosFreteVendas($lote)
+            : null;
+
+        $romaneioCarregamento = collect();
+        $romaneioCarregamentoTotaisGerais = null;
+        if ($lote->status->exibeAbaSaidaEstoqueFisico()) {
+            $romaneioCarregamento = app(RomaneioCarregamentoService::class)->preview($lote);
+            $romaneioCarregamentoTotaisGerais = app(RomaneioCarregamentoService::class)
+                ->totaisGerais($romaneioCarregamento);
+        }
 
         return view('admin.captacao.matriz.index', [
             'lote' => $lote,
@@ -104,6 +143,10 @@ class CaptacaoMatrizController extends Controller
             'gruposOrdemCarregamento' => $gruposOrdemCarregamento,
             'veiculos' => $veiculos,
             'aba' => $aba,
+            'dadosFreteHub' => $dadosFreteHub,
+            'dadosFreteVendas' => $dadosFreteVendas,
+            'romaneioCarregamento' => $romaneioCarregamento,
+            'romaneioCarregamentoTotaisGerais' => $romaneioCarregamentoTotaisGerais,
             'urlRotasCadastro' => $lote->id_captacao_carteira
                 ? route('admin.captacao.rotas.create', ['carteira' => $lote->id_captacao_carteira])
                 : route('admin.captacao.rotas.create'),
@@ -271,14 +314,47 @@ class CaptacaoMatrizController extends Controller
 
         $this->pedidos->adicionarLojaNaMatriz($lote, $cliente, PedidoOrigem::Web, $request->user());
 
-        $lote->refresh()->load(['pedidos.itens']);
-        $matriz = $this->vinculos->dadosMatriz($lote);
+        return $this->respostaMatrizAposAlteracaoLoja($lote);
+    }
+
+    public function updateSaidaFisicaVenda(
+        UpdateCaptacaoSaidaFisicaVendaRequest $request,
+        CaptacaoLote $lote,
+        Cliente $cliente,
+    ): JsonResponse {
+        if (! app(UnidadeNegocioAccessService::class)->canAccess($request->user(), $lote->id_unidade_negocio_galpao)) {
+            abort(403);
+        }
+
+        $pedido = $this->pedidos->atualizarSaidaFisicaVenda(
+            $lote,
+            $cliente->id,
+            (int) $request->validated('id_unidade_negocio_saida_venda'),
+            PedidoOrigem::Web,
+            $request->user(),
+        );
 
         return response()->json([
             'ok' => true,
-            'redirect' => route('admin.captacao.matriz.index', ['lote' => $lote->id]),
-            'layout_hash' => $matriz['layout_hash'],
+            'id_cliente' => $cliente->id,
+            'id_unidade_negocio_saida_venda' => $pedido->id_unidade_negocio_saida_venda,
         ]);
+    }
+
+    public function removerLoja(RemoverLojaMatrizRequest $request, CaptacaoLote $lote): JsonResponse
+    {
+        if (! app(UnidadeNegocioAccessService::class)->canAccess($request->user(), $lote->id_unidade_negocio_galpao)) {
+            abort(403);
+        }
+
+        $this->pedidos->removerLojaDaMatriz(
+            $lote,
+            (int) $request->validated('id_cliente'),
+            PedidoOrigem::Web,
+            $request->user(),
+        );
+
+        return $this->respostaMatrizAposAlteracaoLoja($lote);
     }
 
     public function estado(Request $request, CaptacaoLote $lote): JsonResponse
@@ -314,5 +390,35 @@ class CaptacaoMatrizController extends Controller
                 'custo_referencia' => $item->custo_referencia,
             ],
         ]);
+    }
+
+    private function respostaMatrizAposAlteracaoLoja(CaptacaoLote $lote): JsonResponse
+    {
+        $lote->refresh()->load(['pedidos.itens', 'pedidos.cliente']);
+        $matriz = $this->vinculos->dadosMatriz($lote);
+
+        return response()->json(array_merge(
+            $this->matrizEstado->snapshot($lote),
+            [
+                'ok' => true,
+                'clientes_disponiveis' => $this->clientesParaSelect($matriz['clientesDisponiveis']),
+                'clientes_na_matriz' => $this->clientesParaSelect($matriz['clientes']),
+            ],
+        ));
+    }
+
+    /**
+     * @param  \Illuminate\Support\Collection<int, Cliente>  $clientes
+     * @return list<array{id: int, nome: string}>
+     */
+    private function clientesParaSelect(\Illuminate\Support\Collection $clientes): array
+    {
+        return $clientes
+            ->map(fn (Cliente $c) => [
+                'id' => $c->id,
+                'nome' => $c->fantasia ?: $c->razao_social,
+            ])
+            ->values()
+            ->all();
     }
 }

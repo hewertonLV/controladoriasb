@@ -11,7 +11,7 @@ enum CaptacaoLoteTipo: string
     {
         return match ($this) {
             self::CaptacaoPedidos => 'Captação de pedidos',
-            self::RomaneioManual => 'Romaneio manual (abastecimento)',
+            self::RomaneioManual => 'Solicitar transferência',
         };
     }
 

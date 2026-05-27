@@ -57,7 +57,7 @@ class RomaneioManualController extends Controller
 
         return redirect()
             ->route('admin.captacao.romaneio-manual.edit', $lote)
-            ->with('success', 'Romaneio manual aberto. Adicione as frutas e as quantidades em caixas.');
+            ->with('success', 'Solicitação de transferência aberta. Adicione as frutas e as quantidades em caixas.');
     }
 
     public function edit(Request $request, CaptacaoLote $lote): View|RedirectResponse
@@ -142,7 +142,7 @@ class RomaneioManualController extends Controller
 
         return redirect()
             ->route('admin.captacao.romaneio-manual.show', $lote)
-            ->with('success', 'Romaneio fechado. Você pode iniciar a transferência.');
+            ->with('success', 'Solicitação confirmada. Você pode iniciar a transferência.');
     }
 
     public function iniciarTransferencia(Request $request, CaptacaoLote $lote): RedirectResponse
@@ -152,7 +152,7 @@ class RomaneioManualController extends Controller
 
         return redirect()
             ->route('admin.captacao.romaneio-manual.show', $lote)
-            ->with('success', 'Transferência Cigan iniciada.');
+            ->with('success', 'Transferência Cigam iniciada.');
     }
 
     public function concluirTransferencia(Request $request, CaptacaoLote $lote): RedirectResponse

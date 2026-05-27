@@ -37,16 +37,16 @@ final class RomaneioAbastecimentoService
     {
         $pedidos = $this->pedidosDoLote($lote);
 
-        /** @var array<int, array{um: float, kg: float}> $demandaPorFruta */
-        $demandaPorFruta = [];
+        /** @var array<int, array{um: float, kg: float}> $demandaGalpaoPorFruta */
+        $demandaGalpaoPorFruta = [];
 
         foreach ($pedidos as $pedido) {
+            if (! $this->pedidoContaParaAbastecimentoGalpao($pedido, $lote)) {
+                continue;
+            }
+
             foreach ($pedido->itens as $item) {
-                $qtdUm = (float) $item->quantidade;
-                $kg = $qtdUm * (float) $item->fruta->kg_por_unidade_medicao;
-                $demandaPorFruta[$item->id_fruta] ??= ['um' => 0.0, 'kg' => 0.0];
-                $demandaPorFruta[$item->id_fruta]['um'] += $qtdUm;
-                $demandaPorFruta[$item->id_fruta]['kg'] += $kg;
+                $this->acumularDemandaFruta($demandaGalpaoPorFruta, $item->id_fruta, (float) $item->quantidade, (float) $item->fruta->kg_por_unidade_medicao);
             }
         }
 
@@ -57,11 +57,12 @@ final class RomaneioAbastecimentoService
                 ->get();
 
             foreach ($linhasManuais as $linha) {
-                $qtdUm = (float) $linha->quantidade;
-                $kg = $qtdUm * (float) $linha->fruta->kg_por_unidade_medicao;
-                $demandaPorFruta[$linha->id_fruta] ??= ['um' => 0.0, 'kg' => 0.0];
-                $demandaPorFruta[$linha->id_fruta]['um'] += $qtdUm;
-                $demandaPorFruta[$linha->id_fruta]['kg'] += $kg;
+                $this->acumularDemandaFruta(
+                    $demandaGalpaoPorFruta,
+                    $linha->id_fruta,
+                    (float) $linha->quantidade,
+                    (float) $linha->fruta->kg_por_unidade_medicao,
+                );
             }
         }
 
@@ -75,7 +76,7 @@ final class RomaneioAbastecimentoService
             }
         }
 
-        return collect($demandaPorFruta)
+        return collect($demandaGalpaoPorFruta)
             ->map(function (array $demanda, int $idFruta) use ($lote, $frutasPorId): array {
                 /** @var Fruta|null $fruta */
                 $fruta = $frutasPorId[$idFruta] ?? null;
@@ -120,8 +121,107 @@ final class RomaneioAbastecimentoService
     }
 
     /**
-     * Pedidos sempre filtrados pelo lote informado (evita relação `pedidos` já carregada de outro contexto).
+     * Quantidade que o HUB precisa possuir: transferência ao galpão + venda direta no HUB.
      *
+     * @return Collection<int, array{
+     *     id_fruta: int,
+     *     fruta_nome: string,
+     *     unidade_medicao: string,
+     *     necessidade_kg: float,
+     *     necessidade_um: float,
+     *     necessidade_kg_formatado: string,
+     *     necessidade_um_formatado: string,
+     * }>
+     */
+    public function necessidadeEstoqueHub(CaptacaoLote $lote): Collection
+    {
+        $pedidos = $this->pedidosDoLote($lote);
+        $linhasAbastecimento = $this->preview($lote)->keyBy('id_fruta');
+
+        /** @var array<int, array{um: float, kg: float}> $demandaHubPorFruta */
+        $demandaHubPorFruta = [];
+
+        foreach ($pedidos as $pedido) {
+            if (! $this->pedidoVendeDiretoDoHub($pedido, $lote)) {
+                continue;
+            }
+
+            foreach ($pedido->itens as $item) {
+                $this->acumularDemandaFruta($demandaHubPorFruta, $item->id_fruta, (float) $item->quantidade, (float) $item->fruta->kg_por_unidade_medicao);
+            }
+        }
+
+        $frutasPorId = $pedidos->flatMap->itens
+            ->mapWithKeys(fn ($item) => [(int) $item->id_fruta => $item->fruta])
+            ->all();
+
+        $idsFruta = collect($linhasAbastecimento->keys())
+            ->merge(array_keys($demandaHubPorFruta))
+            ->unique()
+            ->map(fn ($id) => (int) $id);
+
+        return $idsFruta
+            ->map(function (int $idFruta) use ($linhasAbastecimento, $demandaHubPorFruta, $frutasPorId): ?array {
+                $fruta = $frutasPorId[$idFruta] ?? Fruta::query()->find($idFruta);
+                $casasKg = $fruta?->casasDecimaisKgPorUnidadeMedicao() ?? 3;
+
+                $linhaAbast = $linhasAbastecimento->get($idFruta);
+                $aReceberKg = $linhaAbast !== null ? (float) $linhaAbast['a_receber_kg'] : 0.0;
+                $aReceberUm = $linhaAbast !== null ? (float) $linhaAbast['a_receber_um'] : 0.0;
+
+                $demandaHub = $demandaHubPorFruta[$idFruta] ?? ['um' => 0.0, 'kg' => 0.0];
+                $necessidadeKg = round($aReceberKg + $demandaHub['kg'], $casasKg);
+                $necessidadeUm = round($aReceberUm + $demandaHub['um'], 2);
+
+                if ($necessidadeKg <= 0 && $necessidadeUm <= 0) {
+                    return null;
+                }
+
+                $unidadeMedicao = mb_strtoupper(trim((string) ($fruta?->unidade_medicao ?? '—')), 'UTF-8');
+
+                return [
+                    'id_fruta' => $idFruta,
+                    'fruta_nome' => $fruta?->nome ?? '—',
+                    'unidade_medicao' => $unidadeMedicao,
+                    'necessidade_kg' => $necessidadeKg,
+                    'necessidade_um' => $necessidadeUm,
+                    'necessidade_kg_formatado' => $this->formatarBr($necessidadeKg, $casasKg),
+                    'necessidade_um_formatado' => $this->formatarBr($necessidadeUm, 2),
+                ];
+            })
+            ->filter()
+            ->sortBy('fruta_nome')
+            ->values();
+    }
+
+    /**
+     * @param  array<int, array{um: float, kg: float}>  $demandaPorFruta
+     */
+    private function acumularDemandaFruta(array &$demandaPorFruta, int $idFruta, float $qtdUm, float $kgPorUm): void
+    {
+        $kg = $qtdUm * $kgPorUm;
+        $demandaPorFruta[$idFruta] ??= ['um' => 0.0, 'kg' => 0.0];
+        $demandaPorFruta[$idFruta]['um'] += $qtdUm;
+        $demandaPorFruta[$idFruta]['kg'] += $kg;
+    }
+
+    private function pedidoContaParaAbastecimentoGalpao(Pedido $pedido, CaptacaoLote $lote): bool
+    {
+        return ! $this->pedidoVendeDiretoDoHub($pedido, $lote);
+    }
+
+    private function pedidoVendeDiretoDoHub(Pedido $pedido, CaptacaoLote $lote): bool
+    {
+        $idHub = $lote->id_unidade_negocio_hub_origem;
+
+        if ($idHub === null || $pedido->id_unidade_negocio_saida_venda === null) {
+            return false;
+        }
+
+        return (int) $pedido->id_unidade_negocio_saida_venda === (int) $idHub;
+    }
+
+    /**
      * @return EloquentCollection<int, Pedido>
      */
     private function pedidosDoLote(CaptacaoLote $lote): EloquentCollection

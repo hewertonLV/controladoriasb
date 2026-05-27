@@ -4,6 +4,7 @@ namespace App\Http\Requests\Admin;
 
 use App\Models\UnidadeNegocio;
 use App\Services\Permissoes\UnidadeNegocioAccessService;
+use App\Support\TextoCadastro;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Validator;
@@ -26,10 +27,16 @@ class StoreMovimentacaoEstoqueRequest extends FormRequest
                 'integer',
                 Rule::exists('unidades_negocio', 'id'),
             ],
-            'id_fruta' => ['required', 'integer', 'exists:frutas,id'],
-            'tipo' => ['required', Rule::in(['entrada', 'saida'])],
-            'quantidade_kg' => ['required', 'numeric', 'min:0.01', 'decimal:0,2'],
-            'preco_medio_kg' => ['nullable', 'numeric', 'min:0', 'decimal:0,2', 'required_if:tipo,entrada'],
+            'itens' => ['required', 'array', 'min:1'],
+            'itens.*.id_fruta' => [
+                'required',
+                'integer',
+                Rule::exists('frutas', 'id')->where(
+                    fn ($query) => $query->where('kg_por_unidade_medicao', '>', 0),
+                ),
+            ],
+            'itens.*.qtd_fruta_um' => ['required', 'numeric', 'min:0.01', 'decimal:0,2'],
+            'itens.*.preco_fruta_um' => ['required', 'numeric', 'min:0', 'decimal:0,2'],
         ];
     }
 
@@ -40,10 +47,10 @@ class StoreMovimentacaoEstoqueRequest extends FormRequest
     {
         return [
             'id_unidade_negocio' => 'unidade de negócio',
-            'id_fruta' => 'fruta',
-            'tipo' => 'tipo de movimentação',
-            'quantidade_kg' => 'quantidade (kg)',
-            'preco_medio_kg' => 'preço médio (kg)',
+            'itens' => 'itens',
+            'itens.*.id_fruta' => 'fruta',
+            'itens.*.qtd_fruta_um' => 'quantidade (UM)',
+            'itens.*.preco_fruta_um' => 'preço (UM)',
         ];
     }
 
@@ -68,8 +75,26 @@ class StoreMovimentacaoEstoqueRequest extends FormRequest
 
     protected function prepareForValidation(): void
     {
-        $this->merge([
-            'tipo' => mb_strtolower(trim((string) $this->input('tipo', ''))),
-        ]);
+        $itens = $this->input('itens', []);
+        if (! is_array($itens)) {
+            return;
+        }
+
+        foreach ($itens as $key => $item) {
+            if (! is_array($item)) {
+                continue;
+            }
+            if (array_key_exists('qtd_fruta_um', $item)) {
+                $itens[$key]['qtd_fruta_um'] = TextoCadastro::normalizarDecimalNaoNegativo($item['qtd_fruta_um']);
+            }
+            if (array_key_exists('preco_fruta_um', $item)) {
+                $precoRaw = $item['preco_fruta_um'];
+                $itens[$key]['preco_fruta_um'] = is_string($precoRaw) && str_contains($precoRaw, ',')
+                    ? TextoCadastro::normalizarValorMonetarioBrasileiro($precoRaw)
+                    : TextoCadastro::normalizarDecimalNaoNegativo($precoRaw);
+            }
+        }
+
+        $this->merge(['itens' => $itens]);
     }
 }

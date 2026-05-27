@@ -14,7 +14,7 @@ final class RomaneioManualService
     {
         if ($lote->tipo !== CaptacaoLoteTipo::RomaneioManual) {
             throw ValidationException::withMessages([
-                'tipo' => 'Este lote não é romaneio manual.',
+                'tipo' => 'Este lote não é uma solicitação de transferência.',
             ]);
         }
     }
@@ -24,7 +24,7 @@ final class RomaneioManualService
         $this->assertLoteRomaneioManual($lote);
 
         if (! $lote->status->permiteEdicaoQuantidadeCaptacao()) {
-            throw new CaptacaoEdicaoBloqueadaException('O romaneio manual não está em edição.');
+            throw new CaptacaoEdicaoBloqueadaException('A solicitação de transferência não está em edição.');
         }
     }
 

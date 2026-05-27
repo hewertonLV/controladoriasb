@@ -129,4 +129,48 @@ abstract class CaptacaoTestCase extends TestCase
             'status_position' => true,
         ]);
     }
+
+    protected function concluirSaidaEstoqueFisicoPipeline(\App\Models\User $user, CaptacaoLote $lote): void
+    {
+        $this->actingAs($user)
+            ->post(route('admin.captacao.lotes.pipeline.concluir-saida-estoque-fisico', $lote))
+            ->assertRedirect();
+    }
+
+    protected function criarLoteComPedido(array $c, int $quantidade, ?string $precoVenda = null): \App\Models\Captacao\CaptacaoLote
+    {
+        $lote = $this->criarLoteCaptacao($c);
+
+        $item = [
+            'id_fruta' => $c['fruta']->id,
+            'quantidade' => $quantidade,
+        ];
+        if ($precoVenda !== null) {
+            $item['preco_venda'] = $precoVenda;
+        }
+
+        $user = $this->captacaoManager();
+        $user->unidadesNegocio()->sync([$c['faturamento']->id, $c['galpao']->id]);
+
+        $this->actingAs($user)->post(route('admin.captacao.lotes.pedidos.store', $lote), [
+            'id_cliente' => $c['cliente']->id,
+            'id_captacao_rota' => $c['rota']->id,
+            'itens' => [$item],
+        ])->assertRedirect()->assertSessionHasNoErrors();
+
+        $lote->update(['status' => \App\Enums\CaptacaoLoteStatus::AguardandoTransferenciaCigan]);
+
+        return $lote->fresh();
+    }
+
+    protected function enviarNfVendaPipeline(\App\Models\User $user, CaptacaoLote $lote): void
+    {
+        \Illuminate\Support\Facades\Storage::fake('local');
+
+        $this->actingAs($user)
+            ->post(route('admin.captacao.lotes.nf-venda-cigan.upload', $lote), [
+                'arquivo_nf_venda' => \Illuminate\Http\UploadedFile::fake()->create('nf-venda.xml', 50, 'application/xml'),
+            ])
+            ->assertRedirect();
+    }
 }

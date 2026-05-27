@@ -82,21 +82,25 @@ class EstoqueController extends Controller
 
     public function movimentarForm(Request $request): View
     {
-        $unidadeId = $request->query('id_unidade_negocio');
+        $unidadeId = $request->integer('id_unidade_negocio');
+        abort_if($unidadeId <= 0, 404);
+
+        $unidade = UnidadeNegocio::query()
+            ->where('possui_estoque', true)
+            ->findOrFail($unidadeId);
+
+        abort_unless(app(UnidadeNegocioAccessService::class)->canAccess($request->user(), $unidade->id), 403);
+
         $frutaId = $request->query('id_fruta');
+        $idFrutaPreselecionada = $frutaId !== null && $frutaId !== '' ? (int) $frutaId : null;
 
         return view('admin.estoques.movimentar', [
-            'unidades' => UnidadeNegocio::query()
-                ->where('possui_estoque', true)
-                ->permitidasPara($request->user())
-                ->orderBy('nome')
-                ->get(['id', 'nome', 'id_cigam']),
+            'unidade' => $unidade,
             'frutas' => Fruta::query()
                 ->whereRaw('CAST(kg_por_unidade_medicao AS DECIMAL(15,2)) > 0')
                 ->orderBy('nome')
-                ->get(['id', 'nome', 'id_cigam', 'unidade_medicao']),
-            'idUnidadeSelecionada' => $unidadeId !== null && $unidadeId !== '' ? (int) $unidadeId : null,
-            'idFrutaSelecionada' => $frutaId !== null && $frutaId !== '' ? (int) $frutaId : null,
+                ->get(['id', 'nome', 'id_cigam', 'unidade_medicao', 'kg_por_unidade_medicao']),
+            'idFrutaPreselecionada' => $idFrutaPreselecionada,
         ]);
     }
 
@@ -104,30 +108,35 @@ class EstoqueController extends Controller
     {
         $dados = $request->validated();
         $unidade = UnidadeNegocio::query()->findOrFail((int) $dados['id_unidade_negocio']);
-        $fruta = Fruta::query()->findOrFail((int) $dados['id_fruta']);
+        $itens = $dados['itens'];
+        $registrados = 0;
 
         try {
-            $this->movimentacaoService->movimentarPorTipo(
-                $unidade,
-                $fruta,
-                (string) $dados['tipo'],
-                (string) $dados['quantidade_kg'],
-                isset($dados['preco_medio_kg']) ? (string) $dados['preco_medio_kg'] : null,
-            );
+            DB::transaction(function () use ($unidade, $itens, &$registrados): void {
+                foreach ($itens as $item) {
+                    $fruta = Fruta::query()->findOrFail((int) $item['id_fruta']);
+                    $this->movimentacaoService->movimentarEntradaPorUnidadeMedicao(
+                        $unidade,
+                        $fruta,
+                        (string) $item['qtd_fruta_um'],
+                        (string) $item['preco_fruta_um'],
+                    );
+                    $registrados++;
+                }
+            });
         } catch (\InvalidArgumentException $e) {
             return back()
                 ->withInput()
                 ->withErrors(['movimentacao' => $e->getMessage()]);
         }
 
-        $estoque = Estoque::query()
-            ->where('id_unidade_negocio', $unidade->id)
-            ->where('id_fruta', $fruta->id)
-            ->firstOrFail();
+        $mensagem = $registrados === 1
+            ? 'Entrada de estoque registrada com sucesso.'
+            : "{$registrados} entradas de estoque registradas com sucesso.";
 
         return redirect()
-            ->route('admin.estoques.show', $estoque)
-            ->with('success', 'Movimentação registrada com sucesso.');
+            ->route('admin.estoques.unidade', $unidade)
+            ->with('success', $mensagem);
     }
 
     private function unidadesParaListagem()

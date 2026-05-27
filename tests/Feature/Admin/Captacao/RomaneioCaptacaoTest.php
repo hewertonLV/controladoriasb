@@ -75,4 +75,42 @@ class RomaneioCaptacaoTest extends CaptacaoTestCase
         $this->assertSame('50.00', $linha['a_receber_kg']);
         $this->assertSame('5.00', $linha['a_receber_um']);
     }
+
+    public function test_romaneio_abastecimento_exclui_pedido_com_saida_fisica_no_hub(): void
+    {
+        $c = $this->cenarioCaptacaoBasico();
+        $c['fruta']->update([
+            'unidade_medicao' => 'CAIXA',
+            'kg_por_unidade_medicao' => '10.00',
+        ]);
+
+        $hub = \App\Models\UnidadeNegocio::factory()->create([
+            'is_hub' => true,
+            'possui_estoque' => true,
+        ]);
+
+        $lote = $this->criarLoteCaptacao($c);
+        $lote->update(['id_unidade_negocio_hub_origem' => $hub->id]);
+
+        $user = $this->captacaoManager();
+        $user->unidadesNegocio()->sync([$c['faturamento']->id, $c['galpao']->id]);
+
+        $this->actingAs($user)->post(route('admin.captacao.lotes.pedidos.store', $lote), [
+            'id_cliente' => $c['cliente']->id,
+            'id_captacao_rota' => $c['rota']->id,
+            'itens' => [['id_fruta' => $c['fruta']->id, 'quantidade' => 5]],
+        ]);
+
+        $pedido = $lote->fresh()->pedidos()->firstOrFail();
+        $pedido->update(['id_unidade_negocio_saida_venda' => $hub->id]);
+
+        $linha = app(RomaneioAbastecimentoService::class)->preview($lote->fresh())->first();
+
+        $this->assertNull($linha);
+
+        $necessidade = app(RomaneioAbastecimentoService::class)->necessidadeEstoqueHub($lote->fresh())->first();
+        $this->assertNotNull($necessidade);
+        $this->assertSame('50.00', number_format($necessidade['necessidade_kg'], 2, '.', ''));
+        $this->assertSame('5.00', number_format($necessidade['necessidade_um'], 2, '.', ''));
+    }
 }

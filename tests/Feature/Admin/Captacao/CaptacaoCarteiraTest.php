@@ -31,11 +31,12 @@ class CaptacaoCarteiraTest extends CaptacaoTestCase
         );
     }
 
-    public function test_consulta_clientes_sem_pedido_na_carteira(): void
+    public function test_lojas_pendentes_lista_programadas_e_destaca_status(): void
     {
         $c = $this->cenarioCaptacaoBasico();
         $user = $this->captacaoManager();
         $data = '2026-06-15';
+        $diaSemana = \Illuminate\Support\Carbon::parse($data)->dayOfWeek;
 
         $outro = Cliente::factory()->create([
             'id_unidade_negocio' => $c['faturamento']->id,
@@ -43,27 +44,42 @@ class CaptacaoCarteiraTest extends CaptacaoTestCase
             'razao_social' => 'LOJA SEM PEDIDO TESTE',
         ]);
 
+        foreach ([$c['cliente'], $outro] as $cliente) {
+            ClienteCaptacaoAgenda::query()->create([
+                'id_cliente' => $cliente->id,
+                'dia_semana' => $diaSemana,
+                'tipo' => ClienteCaptacaoAgendaTipo::CriacaoPedido->value,
+            ]);
+        }
+
         $lote = $this->criarLoteCaptacao($c, $data);
         app(PedidoService::class)->adicionarLojaNaMatriz($lote, $c['cliente'], PedidoOrigem::Web, $user);
 
-        $semPedido = app(\App\Services\Captacao\Alertas\ClientesSemPedidoCarteiraQuery::class)
-            ->executar($data, $c['carteira']->id);
+        $resultado = app(\App\Services\Captacao\Alertas\LojasPendentesCaptacaoQuery::class)
+            ->executar($data, $user, $c['carteira']->id);
 
-        $this->assertCount(1, $semPedido);
-        $this->assertSame($outro->id, $semPedido->first()['id_cliente']);
-        $outro->refresh();
-        $this->assertSame(
-            (string) ($outro->fantasia ?: $outro->razao_social),
-            $semPedido->first()['cliente_nome'],
-        );
+        $this->assertSame(2, $resultado['totais']['programadas']);
+        $this->assertSame(1, $resultado['totais']['pendentes']);
+        $this->assertSame(1, $resultado['totais']['iniciadas']);
+        $this->assertSame('pendente', $resultado['linhas']->firstWhere('id_cliente', $outro->id)['status']);
+        $this->assertSame('iniciou', $resultado['linhas']->firstWhere('id_cliente', $c['cliente']->id)['status']);
+
+        $params = [
+            'data_referencia' => $data,
+            'id_captacao_carteira' => $c['carteira']->id,
+        ];
 
         $this->actingAs($user)
-            ->get(route('admin.captacao.consulta.sem-pedido', [
-                'data_referencia' => $data,
-                'id_captacao_carteira' => $c['carteira']->id,
-            ]))
+            ->get(route('admin.captacao.consulta.lojas-pendentes', $params))
             ->assertOk()
-            ->assertViewHas('clientesSemPedido', fn ($lista) => $lista->count() === 1);
+            ->assertSee('Lojas pendentes', false)
+            ->assertViewHas('linhas', fn ($linhas) => $linhas->count() === 2
+                && $linhas->where('status', 'pendente')->count() === 1
+                && $linhas->where('status', 'iniciou')->count() === 1);
+
+        $this->actingAs($user)
+            ->get(route('admin.captacao.consulta.sem-pedido', $params))
+            ->assertRedirect(route('admin.captacao.consulta.lojas-pendentes', $params));
     }
 
     public function test_matriz_lista_todos_clientes_da_carteira(): void

@@ -11,7 +11,12 @@
     </div>
     <div class="col-md-3">
         <label class="form-label" for="id_unidade_negocio_faturamento">Faturamento</label>
-        <select name="id_unidade_negocio_faturamento" id="id_unidade_negocio_faturamento" class="form-select @error('id_unidade_negocio_faturamento') is-invalid @enderror" required>
+        <select name="id_unidade_negocio_faturamento"
+                id="id_unidade_negocio_faturamento"
+                class="form-select @error('id_unidade_negocio_faturamento') is-invalid @enderror"
+                data-search-select
+                data-placeholder="Selecione ou pesquise o faturamento"
+                required>
             <option value="">Selecione…</option>
             @foreach ($faturamentos as $un)
                 <option value="{{ $un->id }}" @selected((int) old('id_unidade_negocio_faturamento', $carteira->id_unidade_negocio_faturamento) === $un->id)>{{ $un->nome }}</option>
@@ -21,7 +26,12 @@
     </div>
     <div class="col-md-3">
         <label class="form-label" for="id_unidade_negocio_galpao">Galpão / estoque físico</label>
-        <select name="id_unidade_negocio_galpao" id="id_unidade_negocio_galpao" class="form-select @error('id_unidade_negocio_galpao') is-invalid @enderror" required>
+        <select name="id_unidade_negocio_galpao"
+                id="id_unidade_negocio_galpao"
+                class="form-select @error('id_unidade_negocio_galpao') is-invalid @enderror"
+                data-search-select
+                data-placeholder="Selecione ou pesquise o galpão"
+                required>
             <option value="">Selecione…</option>
             @foreach ($galpoes as $un)
                 <option value="{{ $un->id }}" @selected((int) old('id_unidade_negocio_galpao', $carteira->id_unidade_negocio_galpao) === $un->id)>{{ $un->nome }}</option>

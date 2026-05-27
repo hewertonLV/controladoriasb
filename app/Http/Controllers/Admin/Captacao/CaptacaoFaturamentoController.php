@@ -37,13 +37,15 @@ class CaptacaoFaturamentoController extends Controller
             $request->user(),
         );
 
+        $mensagem = 'Captação do faturamento finalizada. Pronto para iniciar a transferência.';
+
         if ($loteContexto !== null) {
             return redirect()
-                ->route('admin.captacao.lotes.show', $loteContexto)
-                ->with('success', 'Captação do faturamento finalizada. Lucas pode iniciar transferências.');
+                ->route('admin.captacao.lotes.show', $loteContexto->fresh())
+                ->with('success', $mensagem);
         }
 
-        return back()->with('success', 'Captação do faturamento finalizada. Lucas pode iniciar transferências.');
+        return back()->with('success', $mensagem);
     }
 
     private function podeFinalizarCaptacao($user, int $idFaturamento, ?CaptacaoLote $loteContexto): bool

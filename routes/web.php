@@ -1170,6 +1170,10 @@ Route::middleware(['auth', 'verified', 'user.active', 'password.changed'])->grou
                 ->middleware('permission:captacao.lote.visualizar')
                 ->name('lotes.show');
 
+            Route::delete('/lotes/{lote}', [CaptacaoLoteController::class, 'destroy'])
+                ->middleware('permission:captacao.lote.excluir')
+                ->name('lotes.destroy');
+
             Route::post('/lotes/{lote}/pedidos', [PedidoCaptacaoController::class, 'store'])
                 ->middleware('permission:captacao.pedido.editar')
                 ->name('lotes.pedidos.store');
@@ -1185,6 +1189,14 @@ Route::middleware(['auth', 'verified', 'user.active', 'password.changed'])->grou
             Route::post('/lotes/{lote}/matriz/adicionar-loja', [CaptacaoMatrizController::class, 'adicionarLoja'])
                 ->middleware('permission:captacao.pedido.editar')
                 ->name('lotes.matriz.adicionar-loja');
+
+            Route::post('/lotes/{lote}/matriz/remover-loja', [CaptacaoMatrizController::class, 'removerLoja'])
+                ->middleware('permission:captacao.pedido.editar')
+                ->name('lotes.matriz.remover-loja');
+
+            Route::patch('/lotes/{lote}/pedidos/{cliente}/saida-fisica-venda', [CaptacaoMatrizController::class, 'updateSaidaFisicaVenda'])
+                ->middleware('permission:captacao.lote.transferencia.validar')
+                ->name('lotes.pedidos.saida-fisica-venda');
 
             Route::patch('/lotes/{lote}/celula', [CaptacaoMatrizController::class, 'updateCelula'])
                 ->middleware('permission:captacao.pedido.editar')
@@ -1246,6 +1258,10 @@ Route::middleware(['auth', 'verified', 'user.active', 'password.changed'])->grou
                 ->middleware('permission:captacao.lote.frete.vincular')
                 ->name('lotes.fretes.fruta-venda');
 
+            Route::post('/lotes/{lote}/fretes/venda-loja', [CaptacaoLoteFreteController::class, 'vincularFreteVendaLoja'])
+                ->middleware('permission:captacao.lote.frete.vincular')
+                ->name('lotes.fretes.venda-loja');
+
             Route::get('/romaneio-manual/criar', [RomaneioManualController::class, 'create'])
                 ->middleware('permission:captacao.romaneio.manual')
                 ->name('romaneio-manual.create');
@@ -1298,9 +1314,33 @@ Route::middleware(['auth', 'verified', 'user.active', 'password.changed'])->grou
                 ->middleware('permission:captacao.lote.transferencia.iniciar')
                 ->name('lotes.arquivo-cigan-transferencia');
 
+            Route::get('/lotes/{lote}/arquivo-cigan-vendas', [CaptacaoLotePipelineController::class, 'downloadArquivoCiganVendas'])
+                ->middleware('permission:captacao.lote.faturamento.iniciar')
+                ->name('lotes.arquivo-cigan-vendas');
+
+            Route::post('/lotes/{lote}/nf-venda-cigan', [CaptacaoLotePipelineController::class, 'uploadNfVenda'])
+                ->middleware('permission:captacao.lote.venda.finalizar')
+                ->name('lotes.nf-venda-cigan.upload');
+
+            Route::get('/lotes/{lote}/nf-venda-cigan', [CaptacaoLotePipelineController::class, 'downloadNfVenda'])
+                ->middleware('permission:captacao.lote.venda.finalizar')
+                ->name('lotes.nf-venda-cigan.download');
+
+            Route::post('/lotes/{lote}/nf-transferencia-cigan', [CaptacaoLotePipelineController::class, 'uploadNfTransferencia'])
+                ->middleware('permission:captacao.lote.transferencia.validar')
+                ->name('lotes.nf-transferencia-cigan.upload');
+
+            Route::get('/lotes/{lote}/nf-transferencia-cigan', [CaptacaoLotePipelineController::class, 'downloadNfTransferencia'])
+                ->middleware('permission:captacao.lote.transferencia.validar')
+                ->name('lotes.nf-transferencia-cigan.download');
+
             Route::post('/lotes/{lote}/pipeline/validar-transferencias', [CaptacaoLotePipelineController::class, 'validarTransferencias'])
                 ->middleware('permission:captacao.lote.transferencia.validar')
                 ->name('lotes.pipeline.validar-transferencias');
+
+            Route::post('/lotes/{lote}/pipeline/concluir-saida-estoque-fisico', [CaptacaoLotePipelineController::class, 'concluirSaidaEstoqueFisico'])
+                ->middleware('permission:captacao.lote.transferencia.validar')
+                ->name('lotes.pipeline.concluir-saida-estoque-fisico');
 
             Route::post('/lotes/{lote}/pipeline/concluir-frete', [CaptacaoLotePipelineController::class, 'concluirFrete'])
                 ->middleware('permission:captacao.lote.frete.concluir')
@@ -1313,6 +1353,10 @@ Route::middleware(['auth', 'verified', 'user.active', 'password.changed'])->grou
             Route::post('/lotes/{lote}/pipeline/finalizar-vendas', [CaptacaoLotePipelineController::class, 'finalizarVendas'])
                 ->middleware('permission:captacao.lote.venda.finalizar')
                 ->name('lotes.pipeline.finalizar-vendas');
+
+            Route::post('/lotes/{lote}/pipeline/concluir-vinculo-rotas', [CaptacaoLotePipelineController::class, 'concluirVinculoRotas'])
+                ->middleware('permission:captacao.lote.venda.finalizar')
+                ->name('lotes.pipeline.concluir-vinculo-rotas');
 
             Route::get('/alertas', [AlertasComerciaisController::class, 'index'])
                 ->middleware('permission:captacao.alertas.visualizar')
@@ -1362,7 +1406,13 @@ Route::middleware(['auth', 'verified', 'user.active', 'password.changed'])->grou
                 ->middleware('permission:captacao.cliente_fruta.vincular|captacao.pedido.editar')
                 ->name('clientes.frutas.destroy');
 
-            Route::get('/consulta/sem-pedido', [CaptacaoConsultaController::class, 'clientesSemPedido'])
+            Route::get('/consulta/lojas-pendentes', [CaptacaoConsultaController::class, 'lojasPendentes'])
+                ->middleware('permission:captacao.lote.visualizar|captacao.alertas.visualizar')
+                ->name('consulta.lojas-pendentes');
+
+            Route::get('/consulta/sem-pedido', function () {
+                return redirect()->route('admin.captacao.consulta.lojas-pendentes', request()->query());
+            })
                 ->middleware('permission:captacao.lote.visualizar|captacao.alertas.visualizar')
                 ->name('consulta.sem-pedido');
 

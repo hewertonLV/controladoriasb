@@ -280,6 +280,86 @@ final class VendaMovimentacaoService
     }
 
     /**
+     * Vincula, altera ou remove frete em todas as saídas ativas de uma NF de captação.
+     */
+    public function vincularFreteNotaCaptacao(string $numeroNf, ?int $idFrete): void
+    {
+        DB::transaction(function () use ($numeroNf, $idFrete): void {
+            $nota = VendaNota::query()->where('numero_nf', $numeroNf)->lockForUpdate()->firstOrFail();
+
+            $movimentacoes = Movimentacao::query()
+                ->where('venda_nota_id', $nota->id)
+                ->where('status_registro', MovimentacaoStatusRegistro::ATIVO->value)
+                ->where('status_movimentacao_id', StatusMovimentacao::ID_SAIDA)
+                ->lockForUpdate()
+                ->get();
+
+            if ($movimentacoes->isEmpty()) {
+                throw new InvalidArgumentException('Nenhuma movimentação de venda ativa encontrada para esta nota.');
+            }
+
+            $freteAntigos = $movimentacoes
+                ->pluck('id_frete')
+                ->filter()
+                ->map(static fn ($id): int => (int) $id)
+                ->unique()
+                ->values()
+                ->all();
+
+            $freteNovo = null;
+            if ($idFrete !== null && $idFrete > 0) {
+                $freteNovo = Frete::query()->whereKey($idFrete)->lockForUpdate()->firstOrFail();
+                if ($freteNovo->status_situacao !== FreteStatusSituacao::ABERTA->value) {
+                    throw new InvalidArgumentException('O frete da venda precisa estar ABERTO.');
+                }
+            }
+
+            $idFreteNovo = $freteNovo?->id;
+            $primeiroFreteAtual = $movimentacoes->first()?->id_frete;
+            if ((int) ($primeiroFreteAtual ?? 0) === (int) ($idFreteNovo ?? 0)) {
+                return;
+            }
+
+            foreach ($movimentacoes as $movimentacao) {
+                $movimentacao->forceFill(['id_frete' => $idFreteNovo])->saveQuietly();
+            }
+
+            if ($freteNovo === null) {
+                foreach ($movimentacoes as $movimentacao) {
+                    $this->aplicarFreteZeroVenda($movimentacao->fresh());
+                }
+            }
+
+            $idsRecalcular = array_values(array_unique(array_filter([
+                ...$freteAntigos,
+                $idFreteNovo,
+            ])));
+
+            foreach ($idsRecalcular as $idFreteRecalc) {
+                $this->recalcularRateioFreteParaVendas($idFreteRecalc);
+            }
+        });
+    }
+
+    private function aplicarFreteZeroVenda(Movimentacao $movimentacao): void
+    {
+        $this->assertVendaSaida($movimentacao);
+
+        $movimentacao->forceFill([
+            'id_frete' => null,
+            'valor_frete_kg' => '0.00',
+            'valor_frete_rateio' => '0.00',
+            'valor_frete_um' => '0.00',
+            'resultado_movimentacao' => number_format(round(
+                (float) $movimentacao->valor_nf_total
+                - (float) $movimentacao->valor_custo_saida
+                - round((float) $movimentacao->valor_custo_operacional * (float) $movimentacao->qtd_fruta_kg, 2),
+                2
+            ), 2, '.', ''),
+        ])->saveQuietly();
+    }
+
+    /**
      * @param  array<string, mixed>  $item
      */
     private function criarMovimentacaoVenda(

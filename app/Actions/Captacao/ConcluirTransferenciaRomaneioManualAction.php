@@ -20,7 +20,7 @@ final class ConcluirTransferenciaRomaneioManualAction
     {
         if ($lote->tipo !== CaptacaoLoteTipo::RomaneioManual) {
             throw ValidationException::withMessages([
-                'tipo' => 'Ação disponível apenas para romaneio manual.',
+                'tipo' => 'Ação disponível apenas para solicitação de transferência.',
             ]);
         }
 

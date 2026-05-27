@@ -35,7 +35,9 @@ class CaptacaoMatrizTest extends CaptacaoTestCase
         $this->actingAs($user)
             ->get(route('admin.captacao.matriz.index', ['lote' => $lote->id]))
             ->assertOk()
-            ->assertSee('Quantidade', false)
+            ->assertSee('Captação — '.$c['galpao']->nome, false)
+            ->assertDontSee('Matriz —', false)
+            ->assertSee('select-nova-loja', false)
             ->assertSee('Rotas', false)
             ->assertSee('Por rota', false)
             ->assertSee('matriz-tab-quantidade', false)
@@ -44,8 +46,10 @@ class CaptacaoMatrizTest extends CaptacaoTestCase
             ->assertSee('Total', false)
             ->assertDontSee('Linha do tempo do lote', false)
             ->assertSee('captacao-lote-timeline', false)
+            ->assertSee('Status atual:', false)
+            ->assertSee('Faturamento:', false)
             ->assertSee('matriz-sync-badge', false)
-            ->assertSee('Ver lote', false)
+            ->assertSee('Romaneio', false)
             ->assertSee('Finalizar captação (faturamento)', false)
             ->assertViewHas('totaisPorFruta', function (array $totais) use ($frutaId): bool {
                 return ($totais[$frutaId] ?? 0) === 12.0;
@@ -227,6 +231,40 @@ class CaptacaoMatrizTest extends CaptacaoTestCase
             ])
             ->assertOk()
             ->assertJsonPath('item.preco_venda', '11.5000');
+    }
+
+    public function test_matriz_permite_alterar_preco_apos_iniciar_transferencia_cigan(): void
+    {
+        $c = $this->cenarioCaptacaoBasico();
+        $lote = $this->criarLoteCaptacao($c);
+        $user = $this->captacaoManager();
+        $user->unidadesNegocio()->sync([$c['faturamento']->id, $c['galpao']->id]);
+
+        app(PedidoService::class)->adicionarLojaNaMatriz($lote, $c['cliente'], \App\Enums\PedidoOrigem::Web, $user);
+
+        $this->actingAs($user)->patchJson(route('admin.captacao.lotes.celula.update', $lote), [
+            'id_cliente' => $c['cliente']->id,
+            'id_fruta' => $c['fruta']->id,
+            'quantidade' => 5,
+            'preco_venda' => '10.00',
+        ])->assertOk();
+
+        $lote->update(['status' => CaptacaoLoteStatus::AguardandoVinculoFrete]);
+
+        $this->actingAs($user)
+            ->patchJson(route('admin.captacao.lotes.celula.update', $lote), [
+                'id_cliente' => $c['cliente']->id,
+                'id_fruta' => $c['fruta']->id,
+                'quantidade' => 5,
+                'preco_venda' => '13.25',
+            ])
+            ->assertOk()
+            ->assertJsonPath('item.preco_venda', '13.2500');
+
+        $this->assertDatabaseHas('pedido_itens', [
+            'id_fruta' => $c['fruta']->id,
+            'preco_venda' => '13.2500',
+        ]);
     }
 
     public function test_matriz_bloqueia_preco_quando_faturamento_cigan_iniciado(): void

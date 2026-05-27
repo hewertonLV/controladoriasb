@@ -65,6 +65,10 @@
     <div class="card mb-3">
         <div class="card-header pb-0"><strong>Abrir captação do dia</strong></div>
         <div class="card-body pt-2">
+            <p class="text-muted small mb-2">
+                Só não é possível abrir outra captação se já existir uma <strong>em andamento</strong> na mesma carteira e data.
+                Em qualquer outro status do lote anterior, você pode criar uma nova (complementar).
+            </p>
             <form method="post" action="{{ route('admin.captacao.lotes.store') }}" class="row g-2">
                 @csrf
                 <div class="col-md-2">
@@ -73,7 +77,11 @@
                 </div>
                 <div class="col-md-6">
                     <label class="form-label">Carteira</label>
-                    <select name="id_captacao_carteira" class="form-select" required>
+                    <select name="id_captacao_carteira"
+                            class="form-select"
+                            data-search-select
+                            data-placeholder="Selecione ou pesquise a carteira"
+                            required>
                         <option value="">Selecione a carteira…</option>
                         @foreach ($carteiras as $carteira)
                             <option value="{{ $carteira->id }}" @selected((int) old('id_captacao_carteira') === $carteira->id)>
@@ -127,6 +135,25 @@
                                         <i class="ri-pencil-line"></i> Matriz
                                     </a>
                                 @endcan
+                                @if ($lote->status === \App\Enums\CaptacaoLoteStatus::CaptacaoEmAndamento)
+                                    @can('captacao.lote.excluir')
+                                        <form method="post"
+                                              action="{{ route('admin.captacao.lotes.destroy', $lote) }}"
+                                              class="d-inline"
+                                              data-confirm="Excluir a captação de {{ $lote->data_referencia->format('d/m/Y') }} ({{ $lote->carteira?->nome ?? 'carteira' }})? Todos os pedidos e vínculos deste lote serão removidos. Esta ação não pode ser desfeita."
+                                              data-confirm-title="Excluir captação"
+                                              data-confirm-variant="danger"
+                                              data-confirm-btn="Excluir">
+                                            @csrf
+                                            @method('DELETE')
+                                            <button type="submit"
+                                                    class="btn btn-outline-danger btn-sm"
+                                                    title="Excluir captação em andamento">
+                                                <i class="ri-delete-bin-line"></i> Excluir
+                                            </button>
+                                        </form>
+                                    @endcan
+                                @endif
                             </div>
                         </td>
                     </tr>
@@ -139,3 +166,5 @@
         </div>
     </div>
 @endsection
+
+@include('admin.captacao._search-select-scripts')

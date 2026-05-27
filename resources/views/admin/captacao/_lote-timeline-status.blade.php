@@ -7,30 +7,19 @@
 @endphp
 
 <div class="card mb-3 captacao-lote-timeline">
-    <div class="card-header py-2 d-flex flex-wrap gap-2 align-items-center justify-content-between">
-        @if (($modoCabecalho ?? 'timeline') === 'matriz')
-            <div class="d-flex flex-wrap gap-3 align-items-center">
-                <p class="mb-0"><strong>Lote #{{ $lote->id }}</strong> — {{ $lote->data_referencia->format('d/m/Y') }} — {{ $lote->status->label() }}</p>
-                @if ($lote->status === \App\Enums\CaptacaoLoteStatus::CaptacaoEmAndamento)
-                    <span class="badge bg-secondary" id="matriz-sync-badge">sincronizado</span>
-                @endif
-                <a href="{{ route('admin.captacao.lotes.show', $lote) }}" class="btn btn-sm btn-light" title="Romaneios e detalhes do lote">
-                    <i class="ri-eye-line me-1"></i> Ver lote
-                </a>
-            </div>
-            <div class="d-flex flex-wrap gap-2 align-items-center">
-                @if ($lote->status === \App\Enums\CaptacaoLoteStatus::AguardandoVinculoFrete)
-                    @can('captacao.lote.frete.vincular')
-                        <a href="{{ route('admin.captacao.lotes.fretes.index', $lote) }}" class="btn btn-sm btn-soft-warning">Vincular frete (opcional)</a>
-                    @endcan
-                @endif
-                @include('admin.captacao._lote-pipeline-acoes', ['lote' => $lote])
-            </div>
-        @else
-            <strong>Linha do tempo do lote</strong>
-        @endif
-    </div>
+    @if (($modoCabecalho ?? 'timeline') === 'matriz')
+        <div class="card-header py-2">
+            <strong>Lote #{{ $lote->id }}</strong>
+        </div>
+    @endif
     <div class="card-body pb-2">
+        @include('admin.captacao._lote-info-acoes', [
+            'lote' => $lote,
+            'modoCabecalho' => $modoCabecalho ?? 'timeline',
+            'proximaAcao' => $proximaAcao ?? null,
+            'exibirLinkVerLote' => ($modoCabecalho ?? 'timeline') === 'matriz',
+            'exibirRomaneioSyncBadge' => $exibirRomaneioSyncBadge ?? false,
+        ])
         <div class="captacao-timeline-scroll">
             <ol class="captacao-timeline-steps list-unstyled mb-0">
                 @foreach ($passosTimeline as $passo)

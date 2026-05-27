@@ -1,41 +1,16 @@
 @extends('layouts.app')
 
-@section('title', 'Romaneio manual')
-@section('page-title', 'Romaneio manual #'.$lote->id)
+@section('title', 'Solicitar transferência')
+@section('page-title', 'Solicitar transferência #'.$lote->id)
 
 @section('content')
     <x-admin.flash-messages />
 
-    @include('admin.captacao._lote-timeline-status', ['lote' => $lote])
-
-    <div class="card mb-3">
-        <div class="card-body d-flex flex-wrap gap-3 align-items-center justify-content-between">
-            <div class="row g-2 flex-grow-1">
-                <div class="col-md-2">
-                    <span class="text-muted d-block small">Data</span>
-                    <strong>{{ $lote->data_referencia->format('d/m/Y') }}</strong>
-                </div>
-                <div class="col-md-4">
-                    <span class="text-muted d-block small">Faturamento (Cigan)</span>
-                    <strong>{{ $lote->unidadeFaturamento->nome }}</strong>
-                </div>
-                <div class="col-md-3">
-                    <span class="text-muted d-block small">Galpão destino</span>
-                    <strong>{{ $lote->unidadeGalpao->nome }}</strong>
-                </div>
-                <div class="col-md-3">
-                    <span class="text-muted d-block small">Status</span>
-                    <strong>{{ $lote->status->label() }}</strong>
-                </div>
-            </div>
-            @if ($editavel)
-                <span class="badge bg-success" id="romaneio-sync-badge">sincronizado</span>
-            @endif
-            <div class="d-flex flex-wrap gap-2 align-items-center">
-                @include('admin.captacao._lote-pipeline-acoes', ['lote' => $lote, 'proximaAcao' => $proximaAcao])
-            </div>
-        </div>
-    </div>
+    @include('admin.captacao._lote-timeline-status', [
+        'lote' => $lote,
+        'proximaAcao' => $proximaAcao,
+        'exibirRomaneioSyncBadge' => $editavel,
+    ])
 
     @if ($editavel)
         <div class="card mb-3">
@@ -43,7 +18,10 @@
             <div class="card-body row g-2 align-items-end">
                 <div class="col-md-5">
                     <label class="form-label" for="select-nova-fruta">Fruta</label>
-                    <select id="select-nova-fruta" class="form-select">
+                    <select id="select-nova-fruta"
+                            class="form-select"
+                            data-search-select
+                            data-placeholder="Selecione ou pesquise a fruta">
                         <option value="">Selecione a fruta…</option>
                         @foreach ($frutas as $fruta)
                             <option value="{{ $fruta->id }}">{{ $fruta->nome }}</option>
@@ -52,7 +30,10 @@
                 </div>
                 <div class="col-md-4">
                     <label class="form-label" for="select-origem-fruta">Origem física (HUB)</label>
-                    <select id="select-origem-fruta" class="form-select">
+                    <select id="select-origem-fruta"
+                            class="form-select"
+                            data-search-select
+                            data-placeholder="Selecione ou pesquise o HUB de origem">
                         <option value="">Selecione…</option>
                         @foreach ($hubs as $hub)
                             <option value="{{ $hub->id }}">{{ $hub->nome }}</option>
@@ -120,6 +101,8 @@
 @endsection
 
 @if ($editavel)
+@include('admin.captacao._search-select-scripts')
+
 @push('scripts')
 <script>
 (function () {
@@ -171,7 +154,7 @@
             });
             return;
         }
-        console.error('[Romaneio manual]', titulo, mensagem);
+        console.error('[Solicitar transferência]', titulo, mensagem);
     }
 
     function urlLinha(id) {

@@ -3,16 +3,24 @@
 namespace App\Http\Controllers\Admin\Captacao;
 
 use App\Actions\Captacao\ConcluirEtapaFreteLoteAction;
+use App\Actions\Captacao\ConcluirSaidaEstoqueFisicoLoteAction;
 use App\Actions\Captacao\DefinirHubOrigemCiganLoteAction;
+use App\Actions\Captacao\ConcluirVinculoRotasCaptacaoLoteAction;
 use App\Actions\Captacao\FinalizarVendasLoteAction;
+use App\Enums\CaptacaoLoteStatus;
 use App\Actions\Captacao\IniciarFaturamentoCiganAction;
 use App\Actions\Captacao\IniciarTransferenciaCiganAction;
+use App\Actions\Captacao\EnviarNfTransferenciaCiganLoteAction;
+use App\Actions\Captacao\EnviarNfVendaCiganLoteAction;
 use App\Actions\Captacao\ValidarTransferenciasGerenciaisLoteAction;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Admin\Captacao\DefinirHubOrigemCiganLoteRequest;
+use App\Http\Requests\Admin\Captacao\UploadNfTransferenciaCiganLoteRequest;
+use App\Http\Requests\Admin\Captacao\UploadNfVendaCiganLoteRequest;
 use App\Models\Captacao\CaptacaoLote;
 use App\Models\Captacao\CaptacaoLoteCiganExport;
 use App\Services\Captacao\GerarArquivoCiganService;
+use App\Services\Captacao\NfTransferenciaEstoqueHubInsuficienteException;
 use App\Services\Permissoes\UnidadeNegocioAccessService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -27,7 +35,7 @@ class CaptacaoLotePipelineController extends Controller
         $this->assertGalpao($request, $lote);
         app(IniciarTransferenciaCiganAction::class)->executar($lote, $request->user());
 
-        return back()->with('success', 'Transferência Cigan iniciada.');
+        return back()->with('success', 'Transferência Cigam iniciada.');
     }
 
     public function validarTransferencias(Request $request, CaptacaoLote $lote): RedirectResponse
@@ -36,6 +44,26 @@ class CaptacaoLotePipelineController extends Controller
         app(ValidarTransferenciasGerenciaisLoteAction::class)->executar($lote);
 
         return back()->with('success', 'Transferências gerenciais validadas.');
+    }
+
+    public function concluirSaidaEstoqueFisico(Request $request, CaptacaoLote $lote): RedirectResponse
+    {
+        $this->assertGalpao($request, $lote);
+
+        try {
+            app(ConcluirSaidaEstoqueFisicoLoteAction::class)->executar($lote);
+        } catch (NfTransferenciaEstoqueHubInsuficienteException $e) {
+            return redirect()
+                ->route('admin.captacao.matriz.index', ['lote' => $lote->id, 'aba' => 'saida-estoque-fisico'])
+                ->with('nf_transferencia_estoque_hub_insuficiente', [
+                    'hub_nome' => $e->hubNome,
+                    'frutas' => $e->frutas,
+                ]);
+        }
+
+        return redirect()
+            ->route('admin.captacao.matriz.index', ['lote' => $lote->id, 'aba' => 'frete-hub'])
+            ->with('success', 'Transferências gerenciais efetivadas. Vincule o frete se necessário.');
     }
 
     public function concluirFrete(Request $request, CaptacaoLote $lote): RedirectResponse
@@ -51,15 +79,22 @@ class CaptacaoLotePipelineController extends Controller
         $this->assertGalpao($request, $lote);
         app(IniciarFaturamentoCiganAction::class)->executar($lote, $request->user());
 
-        return back()->with('success', 'Faturamento Cigan iniciado.');
+        return back()->with('success', 'Faturamento Cigam iniciado.');
     }
 
     public function finalizarVendas(Request $request, CaptacaoLote $lote): RedirectResponse
     {
-        $this->assertGalpao($request, $lote);
-        app(FinalizarVendasLoteAction::class)->executar($lote, $request->user());
+        return $this->concluirVinculoRotas($request, $lote);
+    }
 
-        return back()->with('success', 'Vendas finalizadas no SB.');
+    public function concluirVinculoRotas(Request $request, CaptacaoLote $lote): RedirectResponse
+    {
+        $this->assertGalpao($request, $lote);
+        app(ConcluirVinculoRotasCaptacaoLoteAction::class)->executar($lote);
+
+        return redirect()
+            ->route('admin.captacao.matriz.index', ['lote' => $lote->id, 'aba' => 'frete-vendas'])
+            ->with('success', 'Vínculo de rotas concluído. Vendas finalizadas no SB.');
     }
 
     public function downloadCigan(CaptacaoLoteCiganExport $export): StreamedResponse
@@ -81,6 +116,115 @@ class CaptacaoLotePipelineController extends Controller
             ->with('success', 'HUB de origem definido. Você já pode baixar o arquivo TXT.');
     }
 
+    public function uploadNfTransferencia(UploadNfTransferenciaCiganLoteRequest $request, CaptacaoLote $lote): RedirectResponse
+    {
+        $this->assertGalpao($request, $lote);
+
+        try {
+            app(EnviarNfTransferenciaCiganLoteAction::class)->executar(
+                $lote,
+                $request->file('arquivo_nf_transferencia'),
+                $request->user(),
+            );
+        } catch (NfTransferenciaEstoqueHubInsuficienteException $e) {
+            return redirect()
+                ->route('admin.captacao.matriz.index', ['lote' => $lote->id, 'aba' => 'arquivo-cigan'])
+                ->with('nf_transferencia_estoque_hub_insuficiente', [
+                    'hub_nome' => $e->hubNome,
+                    'frutas' => $e->frutas,
+                ])
+                ->withInput();
+        }
+
+        return redirect()
+            ->route('admin.captacao.matriz.index', ['lote' => $lote->id, 'aba' => 'saida-estoque-fisico'])
+            ->with('success', 'NF de transferência enviada. Defina a saída física por loja e conclua a etapa.');
+    }
+
+    public function downloadNfTransferencia(Request $request, CaptacaoLote $lote): StreamedResponse
+    {
+        $this->assertGalpao($request, $lote);
+
+        if (! $lote->status->exibeAbaArquivoCiganTransferencia() || ! $lote->possuiNfTransferencia()) {
+            abort(404);
+        }
+
+        if (! Storage::disk('local')->exists($lote->arquivo_nf_transferencia_path)) {
+            abort(404);
+        }
+
+        return Storage::disk('local')->download(
+            $lote->arquivo_nf_transferencia_path,
+            $lote->arquivo_nf_transferencia_nome ?? basename($lote->arquivo_nf_transferencia_path),
+        );
+    }
+
+    public function uploadNfVenda(UploadNfVendaCiganLoteRequest $request, CaptacaoLote $lote): RedirectResponse
+    {
+        $this->assertGalpao($request, $lote);
+
+        $lote = app(EnviarNfVendaCiganLoteAction::class)->executar(
+            $lote,
+            $request->file('arquivo_nf_venda'),
+            $request->user(),
+        );
+
+        if ($lote->status === CaptacaoLoteStatus::VendasFinalizadas) {
+            return redirect()
+                ->route('admin.captacao.matriz.index', ['lote' => $lote->id, 'aba' => 'frete-vendas'])
+                ->with('success', 'NF de venda enviada. Vendas efetivadas no SB Controladoria.');
+        }
+
+        return redirect()
+            ->route('admin.captacao.matriz.index', ['lote' => $lote->id, 'aba' => 'rotas'])
+            ->with('success', 'NF de venda enviada e vendas movimentadas no SB. Vincule as rotas pendentes e clique em Concluído.');
+    }
+
+    public function downloadNfVenda(Request $request, CaptacaoLote $lote): StreamedResponse
+    {
+        $this->assertGalpao($request, $lote);
+
+        if (! $lote->status->exibeAbaArquivoCiganVendas() || ! $lote->possuiNfVenda()) {
+            abort(404);
+        }
+
+        if (! Storage::disk('local')->exists($lote->arquivo_nf_venda_path)) {
+            abort(404);
+        }
+
+        return Storage::disk('local')->download(
+            $lote->arquivo_nf_venda_path,
+            $lote->arquivo_nf_venda_nome ?? basename($lote->arquivo_nf_venda_path),
+        );
+    }
+
+    public function downloadArquivoCiganVendas(Request $request, CaptacaoLote $lote): StreamedResponse|RedirectResponse
+    {
+        $this->assertGalpao($request, $lote);
+
+        if (! $lote->status->exibeAbaArquivoCiganVendas()) {
+            abort(404);
+        }
+
+        try {
+            $conteudo = app(GerarArquivoCiganService::class)->conteudoTxtVendas($lote);
+        } catch (ValidationException $exception) {
+            return redirect()
+                ->route('admin.captacao.matriz.index', ['lote' => $lote->id, 'aba' => 'arquivo-cigan'])
+                ->withErrors($exception->errors());
+        }
+
+        $nomeArquivo = sprintf('cigan-vendas-lote-%d.txt', $lote->id);
+
+        return response()->streamDownload(
+            static function () use ($conteudo): void {
+                echo $conteudo;
+            },
+            $nomeArquivo,
+            ['Content-Type' => 'text/plain; charset=ISO-8859-1'],
+        );
+    }
+
     public function downloadArquivoCiganTransferencia(Request $request, CaptacaoLote $lote): StreamedResponse|RedirectResponse
     {
         $this->assertGalpao($request, $lote);
@@ -93,7 +237,7 @@ class CaptacaoLotePipelineController extends Controller
             return redirect()
                 ->route('admin.captacao.matriz.index', ['lote' => $lote->id, 'aba' => 'arquivo-cigan'])
                 ->withErrors([
-                    'id_unidade_negocio_hub_origem' => 'Informe a unidade HUB de origem antes de baixar o arquivo Cigan.',
+                    'id_unidade_negocio_hub_origem' => 'Informe a unidade HUB de origem antes de baixar o arquivo Cigam.',
                 ]);
         }
 

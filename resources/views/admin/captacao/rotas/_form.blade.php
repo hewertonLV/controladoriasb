@@ -9,6 +9,8 @@
         <select name="id_captacao_carteira"
                 id="id_captacao_carteira"
                 class="form-select @error('id_captacao_carteira') is-invalid @enderror"
+                data-search-select
+                data-placeholder="Selecione ou pesquise a carteira"
                 required>
             <option value="">Selecione…</option>
             @foreach ($carteiras as $carteira)
@@ -36,7 +38,11 @@
     </div>
     <div class="col-md-6">
         <label class="form-label" for="id_veiculo">Veículo (opcional)</label>
-        <select name="id_veiculo" id="id_veiculo" class="form-select @error('id_veiculo') is-invalid @enderror">
+        <select name="id_veiculo"
+                id="id_veiculo"
+                class="form-select @error('id_veiculo') is-invalid @enderror"
+                data-search-select
+                data-placeholder="Selecione ou pesquise o veículo">
             <option value="">Sem veículo vinculado</option>
             @foreach ($veiculos as $veiculo)
                 <option value="{{ $veiculo->id }}" @selected((int) old('id_veiculo', $rota->id_veiculo) === $veiculo->id)>

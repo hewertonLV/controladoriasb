@@ -3,6 +3,7 @@
 namespace App\Services\Captacao;
 
 use App\Models\Captacao\CaptacaoLote;
+use App\Models\Captacao\Pedido;
 use Illuminate\Support\Collection;
 
 final class RomaneioCarregamentoService
@@ -29,14 +30,39 @@ final class RomaneioCarregamentoService
      */
     public function preview(CaptacaoLote $lote): Collection
     {
+        $this->carregarPedidosRomaneio($lote);
+
+        return $this->previewFromPedidos($lote->pedidos);
+    }
+
+    public function previewParaUnidadeSaida(CaptacaoLote $lote, int $idUnidadeSaida): Collection
+    {
+        $this->carregarPedidosRomaneio($lote);
+
+        $pedidos = $lote->pedidos->filter(
+            fn (Pedido $pedido): bool => $this->pedidoSaidaNaUnidade($pedido, $lote, $idUnidadeSaida),
+        );
+
+        return $this->previewFromPedidos($pedidos);
+    }
+
+    private function carregarPedidosRomaneio(CaptacaoLote $lote): void
+    {
         $lote->load([
             'pedidos.cliente:id,razao_social,fantasia',
             'pedidos.rota:id,nome',
             'pedidos.itens.fruta:id,nome,unidade_medicao,kg_por_unidade_medicao',
         ]);
+    }
 
-        return $lote->pedidos
-            ->map(function ($pedido): ?array {
+    /**
+     * @param  \Illuminate\Support\Collection<int, Pedido>|\Illuminate\Database\Eloquent\Collection<int, Pedido>  $pedidos
+     * @return Collection<int, array<string, mixed>>
+     */
+    private function previewFromPedidos(Collection $pedidos): Collection
+    {
+        return $pedidos
+            ->map(function (Pedido $pedido): ?array {
                 $itens = $pedido->itens
                     ->map(fn ($item) => $this->mapItem($item))
                     ->filter()
@@ -58,6 +84,13 @@ final class RomaneioCarregamentoService
             })
             ->filter()
             ->values();
+    }
+
+    private function pedidoSaidaNaUnidade(Pedido $pedido, CaptacaoLote $lote, int $idUnidadeSaida): bool
+    {
+        $saida = (int) ($pedido->id_unidade_negocio_saida_venda ?? $lote->id_unidade_negocio_galpao);
+
+        return $saida === $idUnidadeSaida;
     }
 
     /**
@@ -96,6 +129,7 @@ final class RomaneioCarregamentoService
      *     quantidade_um_formatado: string,
      *     quantidade_kg: string,
      *     quantidade_kg_formatado: string,
+     *     preco_venda_formatado: string|null,
      * }|null
      */
     private function mapItem($item): ?array
@@ -109,6 +143,7 @@ final class RomaneioCarregamentoService
         $casasKg = $fruta->casasDecimaisKgPorUnidadeMedicao();
         $qtdKg = round($qtdUm * (float) $fruta->kg_por_unidade_medicao, $casasKg);
         $unidadeMedicao = mb_strtoupper(trim((string) $fruta->unidade_medicao), 'UTF-8');
+        $precoVenda = $item->preco_venda !== null ? (float) $item->preco_venda : null;
 
         return [
             'id_fruta' => $item->id_fruta,
@@ -118,6 +153,9 @@ final class RomaneioCarregamentoService
             'quantidade_um_formatado' => $this->formatarBr($qtdUm, 2),
             'quantidade_kg' => $this->formatarNumero($qtdKg, $casasKg),
             'quantidade_kg_formatado' => $this->formatarBr($qtdKg, $casasKg),
+            'preco_venda_formatado' => $precoVenda !== null && $precoVenda > 0
+                ? $this->formatarBr($precoVenda, 2)
+                : null,
         ];
     }
 

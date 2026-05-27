@@ -14,7 +14,11 @@
             <form method="get" action="{{ route('admin.captacao.frutas-por-loja.index') }}" class="row g-2 align-items-end">
                 <div class="col-md-6">
                     <label class="form-label">Unidade de faturamento</label>
-                    <select name="faturamento" class="form-select" onchange="this.form.submit()">
+                    <select name="faturamento"
+                            class="form-select"
+                            data-search-select
+                            data-placeholder="Selecione ou pesquise o faturamento"
+                            onchange="this.form.submit()">
                         @foreach ($faturamentos as $un)
                             <option value="{{ $un->id }}" @selected((int) $faturamentoId === $un->id)>{{ $un->nome }}</option>
                         @endforeach
@@ -96,3 +100,5 @@
         </div>
     @endif
 @endsection
+
+@include('admin.captacao._search-select-scripts')

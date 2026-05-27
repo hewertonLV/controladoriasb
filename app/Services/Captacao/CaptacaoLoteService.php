@@ -45,20 +45,56 @@ final class CaptacaoLoteService
 
         $idCaptacaoCarteira ??= $this->garantirCarteira($idUnidadeFaturamento, $idUnidadeGalpao)->id;
 
-        $this->garantirFaturamentoDiaAberto($dataReferencia, $idUnidadeFaturamento);
+        $this->resolverFaturamentoDia($dataReferencia, $idUnidadeFaturamento);
 
-        return CaptacaoLote::query()->firstOrCreate(
-            [
-                'data_referencia' => $dataReferencia,
-                'id_captacao_carteira' => $idCaptacaoCarteira,
-            ],
-            [
-                'id_unidade_negocio_faturamento' => $idUnidadeFaturamento,
-                'id_unidade_negocio_galpao' => $idUnidadeGalpao,
-                'tipo' => $tipo,
-                'status' => CaptacaoLoteStatus::CaptacaoEmAndamento,
-            ],
-        );
+        $loteEmAndamento = $this->loteCaptacaoEmAndamento($dataReferencia, $idCaptacaoCarteira, $tipo);
+
+        if ($loteEmAndamento !== null) {
+            return $loteEmAndamento;
+        }
+
+        return CaptacaoLote::query()->create([
+            'data_referencia' => $dataReferencia,
+            'id_captacao_carteira' => $idCaptacaoCarteira,
+            'id_unidade_negocio_faturamento' => $idUnidadeFaturamento,
+            'id_unidade_negocio_galpao' => $idUnidadeGalpao,
+            'tipo' => $tipo,
+            'status' => CaptacaoLoteStatus::CaptacaoEmAndamento,
+        ]);
+    }
+
+    public function possuiCaptacaoEmAndamento(
+        string $dataReferencia,
+        int $idCaptacaoCarteira,
+        CaptacaoLoteTipo $tipo = CaptacaoLoteTipo::CaptacaoPedidos,
+    ): bool {
+        return $this->loteCaptacaoEmAndamento($dataReferencia, $idCaptacaoCarteira, $tipo) !== null;
+    }
+
+    /** Já existe outro lote (qualquer status) no mesmo dia × carteira — útil para mensagem «complementar». */
+    public function possuiOutroLoteNaCarteiraData(
+        string $dataReferencia,
+        int $idCaptacaoCarteira,
+        CaptacaoLoteTipo $tipo = CaptacaoLoteTipo::CaptacaoPedidos,
+    ): bool {
+        return CaptacaoLote::query()
+            ->whereDate('data_referencia', $dataReferencia)
+            ->where('id_captacao_carteira', $idCaptacaoCarteira)
+            ->where('tipo', $tipo->value)
+            ->exists();
+    }
+
+    private function loteCaptacaoEmAndamento(
+        string $dataReferencia,
+        int $idCaptacaoCarteira,
+        CaptacaoLoteTipo $tipo,
+    ): ?CaptacaoLote {
+        return CaptacaoLote::query()
+            ->whereDate('data_referencia', $dataReferencia)
+            ->where('id_captacao_carteira', $idCaptacaoCarteira)
+            ->where('tipo', $tipo->value)
+            ->where('status', CaptacaoLoteStatus::CaptacaoEmAndamento->value)
+            ->first();
     }
 
     public function garantirCarteira(int $idUnidadeFaturamento, int $idUnidadeGalpao): CaptacaoCarteira
@@ -117,13 +153,15 @@ final class CaptacaoLoteService
     }
 
     /**
-     * Corrige lote de captação que ficou em andamento após o faturamento/dia já ter sido finalizado.
+     * Corrige lote travado em andamento após o dia de faturamento finalizado ([ADR-0102]).
+     * Não altera captação complementar nova ([ADR-0121]): outro lote da mesma carteira/data já saiu de «em andamento».
      */
     public function sincronizarStatusComFaturamentoFinalizado(CaptacaoLote $lote): CaptacaoLote
     {
         if ($lote->tipo !== CaptacaoLoteTipo::CaptacaoPedidos
             || $lote->status !== CaptacaoLoteStatus::CaptacaoEmAndamento
-            || ! $this->faturamentoDiaFinalizado($lote)) {
+            || ! $this->faturamentoDiaFinalizado($lote)
+            || $this->eCaptacaoComplementarIntencional($lote)) {
             return $lote;
         }
 
@@ -142,12 +180,42 @@ final class CaptacaoLoteService
             return 0;
         }
 
-        return CaptacaoLote::query()
+        $atualizados = 0;
+
+        CaptacaoLote::query()
             ->whereDate('data_referencia', $dataReferencia)
             ->where('id_unidade_negocio_faturamento', $idUnidadeFaturamento)
             ->where('tipo', CaptacaoLoteTipo::CaptacaoPedidos->value)
             ->where('status', CaptacaoLoteStatus::CaptacaoEmAndamento->value)
-            ->update(['status' => CaptacaoLoteStatus::AguardandoTransferenciaCigan->value]);
+            ->get()
+            ->each(function (CaptacaoLote $lote) use (&$atualizados): void {
+                if ($this->eCaptacaoComplementarIntencional($lote)) {
+                    return;
+                }
+
+                $lote->update(['status' => CaptacaoLoteStatus::AguardandoTransferenciaCigan->value]);
+                $atualizados++;
+            });
+
+        return $atualizados;
+    }
+
+    /**
+     * Novo lote em captação no mesmo dia × carteira enquanto outro lote já avançou no pipeline.
+     */
+    public function eCaptacaoComplementarIntencional(CaptacaoLote $lote): bool
+    {
+        if ($lote->id_captacao_carteira === null) {
+            return false;
+        }
+
+        return CaptacaoLote::query()
+            ->whereDate('data_referencia', $lote->data_referencia)
+            ->where('id_captacao_carteira', $lote->id_captacao_carteira)
+            ->where('tipo', CaptacaoLoteTipo::CaptacaoPedidos->value)
+            ->whereKeyNot($lote->id)
+            ->where('status', '!=', CaptacaoLoteStatus::CaptacaoEmAndamento->value)
+            ->exists();
     }
 
     public function resolverFaturamentoDia(string $dataReferencia, int $idUnidadeFaturamento): CaptacaoFaturamentoDia
@@ -166,19 +234,6 @@ final class CaptacaoLoteService
             'id_unidade_negocio_faturamento' => $idUnidadeFaturamento,
             'status' => CaptacaoFaturamentoDiaStatus::CaptacaoAberta,
         ]);
-    }
-
-    private function garantirFaturamentoDiaAberto(string $dataReferencia, int $idUnidadeFaturamento): CaptacaoFaturamentoDia
-    {
-        $dia = $this->resolverFaturamentoDia($dataReferencia, $idUnidadeFaturamento);
-
-        if ($dia->status === CaptacaoFaturamentoDiaStatus::CaptacaoFaturamentoFinalizada) {
-            throw ValidationException::withMessages([
-                'data_referencia' => 'A captação deste faturamento já foi finalizada para esta data.',
-            ]);
-        }
-
-        return $dia;
     }
 
     private function validarUnidades(int $idUnidadeFaturamento, int $idUnidadeGalpao): void

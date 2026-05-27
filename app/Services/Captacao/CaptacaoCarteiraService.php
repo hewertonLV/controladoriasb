@@ -5,6 +5,9 @@ namespace App\Services\Captacao;
 use App\Models\Captacao\CaptacaoCarteira;
 use App\Models\Cliente;
 use App\Models\UnidadeNegocio;
+use App\Models\User;
+use App\Services\Permissoes\UnidadeNegocioAccessService;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Validation\ValidationException;
 
 final class CaptacaoCarteiraService
@@ -32,6 +35,37 @@ final class CaptacaoCarteiraService
         return CaptacaoCarteira::query()
             ->where('ativo', true)
             ->findOrFail($idCarteira);
+    }
+
+    /**
+     * Carteiras ativas visíveis ao usuário (faturamento ou galpão vinculado).
+     *
+     * @return Collection<int, CaptacaoCarteira>
+     */
+    public function carteirasAcessiveisParaUsuario(?User $user, ?int $idCarteiraFiltro = null): Collection
+    {
+        $query = CaptacaoCarteira::query()
+            ->where('ativo', true)
+            ->orderBy('nome');
+
+        $unidadeIds = app(UnidadeNegocioAccessService::class)->unidadeIdsPermitidas($user);
+
+        if ($unidadeIds !== null) {
+            if ($unidadeIds === []) {
+                return new Collection;
+            }
+
+            $query->where(function ($builder) use ($unidadeIds): void {
+                $builder->whereIn('id_unidade_negocio_faturamento', $unidadeIds)
+                    ->orWhereIn('id_unidade_negocio_galpao', $unidadeIds);
+            });
+        }
+
+        if ($idCarteiraFiltro !== null && $idCarteiraFiltro > 0) {
+            $query->whereKey($idCarteiraFiltro);
+        }
+
+        return $query->get(['id', 'nome', 'id_unidade_negocio_faturamento', 'id_unidade_negocio_galpao']);
     }
 
     public function possuiClientesVinculados(CaptacaoCarteira $carteira): bool

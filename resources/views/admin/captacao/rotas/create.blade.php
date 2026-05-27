@@ -1,7 +1,7 @@
 @extends('layouts.app')
 
 @section('title', 'Nova rota')
-@section('page-title', 'Nova rota de captação')
+@section('page-title', 'Nova rota')
 
 @section('content')
     <x-admin.flash-messages />
@@ -19,3 +19,5 @@
         </div>
     </div>
 @endsection
+
+@include('admin.captacao._search-select-scripts')

@@ -18,3 +18,5 @@
         </div>
     </div>
 @endsection
+
+@include('admin.captacao._search-select-scripts')

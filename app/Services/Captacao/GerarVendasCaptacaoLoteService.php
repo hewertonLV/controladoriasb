@@ -27,7 +27,7 @@ final class GerarVendasCaptacaoLoteService
     {
         if ($lote->tipo === CaptacaoLoteTipo::RomaneioManual) {
             throw ValidationException::withMessages([
-                'tipo' => 'Romaneio manual não gera vendas.',
+                'tipo' => 'Solicitação de transferência não gera vendas.',
             ]);
         }
 
@@ -89,12 +89,14 @@ final class GerarVendasCaptacaoLoteService
                 $primeiraFruta = (int) $pedido->itens->first()->id_fruta;
                 $idFrete = $fretesPorFruta->get($primeiraFruta);
 
+                $unidadeSaida = (int) ($pedido->id_unidade_negocio_saida_venda ?? $galpao->id);
+
                 $resultado = $this->vendas->registrarVenda([
                     'numero_nf' => $this->numeroNfCaptacao($lote, $pedido->id_cliente),
                     'id_empresa_origem' => $empresaFaturamento->id,
                     'id_empresa_destino' => $empresaCliente->id,
                     'id_unidade_negocio_centro_resultado' => $galpao->id,
-                    'id_unidade_negocio_estoque' => $galpao->id,
+                    'id_unidade_negocio_estoque' => $unidadeSaida,
                     'data_emissao' => $dataEmissao->format('Y-m-d'),
                     'id_frete' => $idFrete,
                     'observacao' => "Captação lote #{$lote->id} pedido cliente #{$pedido->id_cliente}",

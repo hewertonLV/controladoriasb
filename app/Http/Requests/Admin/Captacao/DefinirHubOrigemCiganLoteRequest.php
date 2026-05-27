@@ -39,7 +39,7 @@ class DefinirHubOrigemCiganLoteRequest extends FormRequest
             }
 
             if (! $lote->status->exibeAbaArquivoCiganTransferencia()) {
-                $validator->errors()->add('status', 'O lote não está na fase de transferência Cigan iniciada.');
+                $validator->errors()->add('status', 'O lote não está na fase de transferência Cigam iniciada.');
             }
         });
     }

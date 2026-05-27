@@ -38,6 +38,10 @@ final class CiganEdiLinha
 
     private function escrever(int $inicio, int $tamanho, string $valor): self
     {
+        if (strlen($valor) > $tamanho) {
+            $valor = substr($valor, 0, $tamanho);
+        }
+
         $offset = $inicio - 1;
         $base = str_pad(substr($this->buffer, 0, $this->comprimento), $this->comprimento, ' ', STR_PAD_RIGHT);
         $cauda = substr($base, $offset + $tamanho);
@@ -61,10 +65,6 @@ final class CiganEdiLinha
             return str_pad(substr($digitos, -$tamanho), $tamanho, '0', STR_PAD_LEFT);
         }
 
-        if (mb_strlen($valor, 'UTF-8') > $tamanho) {
-            $valor = mb_substr($valor, 0, $tamanho, 'UTF-8');
-        }
-
-        return str_pad($valor, $tamanho, ' ', STR_PAD_RIGHT);
+        return CiganEdiEncoding::textoLatin1($valor, $tamanho);
     }
 }

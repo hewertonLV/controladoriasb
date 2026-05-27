@@ -19,7 +19,13 @@ final class CaptacaoMatrizEstadoService
      *     clientes: list<array{id: int, nome: string}>,
      *     frutas: list<array{id: int, nome: string}>,
      *     celulas: array<string, array{quantidade: string, preco_venda: string|null, version: int}>,
-     *     pedidos: array<string, array{captacao_concluida: bool, numero_pedido: string|null, id_captacao_rota: int|null, ordem_carregamento: int|null}>,
+     *     pedidos: array<string, array{
+     *         captacao_concluida: bool,
+     *         numero_pedido: string|null,
+     *         id_captacao_rota: int|null,
+     *         ordem_carregamento: int|null,
+     *         id_unidade_negocio_saida_venda: int|null,
+     *     }>,
      *     linhas_rotas: list<array<string, mixed>>,
      *     grupos_ordem_carregamento: list<array<string, mixed>>,
      *     rotas: list<array{id: int, nome: string, nome_motorista: string|null, id_veiculo: int|null}>,
@@ -51,12 +57,16 @@ final class CaptacaoMatrizEstadoService
                 'ordem_carregamento' => $pedido->ordem_carregamento !== null
                     ? (int) $pedido->ordem_carregamento
                     : null,
+                'id_unidade_negocio_saida_venda' => $pedido->id_unidade_negocio_saida_venda !== null
+                    ? (int) $pedido->id_unidade_negocio_saida_venda
+                    : null,
             ];
             $versionSum += (int) $pedido->updated_at?->timestamp;
             $versionSum += $pedido->captacao_concluida ? 1009 : 0;
             $versionSum += strlen($pedido->numero_pedido ?? '');
             $versionSum += (int) ($pedido->id_captacao_rota ?? 0);
             $versionSum += (int) ($pedido->ordem_carregamento ?? 0);
+            $versionSum += (int) ($pedido->id_unidade_negocio_saida_venda ?? 0);
 
             foreach ($pedido->itens as $item) {
                 $key = $pedido->id_cliente.'_'.$item->id_fruta;

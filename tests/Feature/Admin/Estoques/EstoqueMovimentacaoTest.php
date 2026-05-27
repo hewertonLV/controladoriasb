@@ -15,6 +15,21 @@ class EstoqueMovimentacaoTest extends TestCase
     use CreatesUsersWithRoles;
     use RefreshDatabase;
 
+    public function test_entrada_por_unidade_medicao_converte_para_kg(): void
+    {
+        $unidade = UnidadeNegocio::factory()->create(['possui_estoque' => true]);
+        $fruta = Fruta::factory()->create(['kg_por_unidade_medicao' => '20.00']);
+
+        $service = app(EstoqueMovimentacaoService::class);
+        $service->movimentarEntradaPorUnidadeMedicao($unidade, $fruta, '5', '10,00');
+
+        $estoque = $unidade->estoques()->where('id_fruta', $fruta->id)->firstOrFail();
+        $this->assertSame('100.00', (string) $estoque->qtd_fruta_kg);
+        $this->assertSame('5.00', (string) $estoque->qtd_fruta_um);
+        $this->assertSame('0.50', (string) $estoque->preco_medio_kg);
+        $this->assertSame('10.00', (string) $estoque->preco_medio_um);
+    }
+
     public function test_entrada_atualiza_estoque_e_cria_movimentacao(): void
     {
         $unidade = UnidadeNegocio::factory()->create(['possui_estoque' => true]);
@@ -64,21 +79,86 @@ class EstoqueMovimentacaoTest extends TestCase
     public function test_movimentar_requer_permissao(): void
     {
         $unidade = UnidadeNegocio::factory()->create(['possui_estoque' => true]);
-        $fruta = Fruta::factory()->create();
+        $fruta = Fruta::factory()->create(['kg_por_unidade_medicao' => '10.00']);
 
         $this->actingAs($this->userWithoutEmpresaPermissions())
-            ->get(route('admin.estoques.movimentar'))
+            ->get(route('admin.estoques.movimentar', ['id_unidade_negocio' => $unidade->id]))
             ->assertForbidden();
 
         $this->actingAs($this->userWithPermissions([Permissions::ESTOQUES_VISUALIZAR]))
             ->post(route('admin.estoques.movimentar.store'), [
                 'id_unidade_negocio' => $unidade->id,
-                'id_fruta' => $fruta->id,
-                'tipo' => 'entrada',
-                'quantidade_kg' => '10',
-                'preco_medio_kg' => '1',
+                'itens' => [
+                    [
+                        'id_fruta' => $fruta->id,
+                        'qtd_fruta_um' => '10',
+                        'preco_fruta_um' => '1',
+                    ],
+                ],
             ])
             ->assertForbidden();
+    }
+
+    public function test_adicionar_estoque_multiplas_frutas_redireciona_para_unidade(): void
+    {
+        $unidade = UnidadeNegocio::factory()->create(['possui_estoque' => true, 'nome' => 'HUB MV TESTE']);
+        $frutaA = Fruta::factory()->create(['nome' => 'FRUTA A ESTOQUE', 'kg_por_unidade_medicao' => '10.00']);
+        $frutaB = Fruta::factory()->create(['nome' => 'FRUTA B ESTOQUE', 'kg_por_unidade_medicao' => '5.00']);
+
+        $user = $this->userWithPermissions([
+            Permissions::ESTOQUES_VISUALIZAR,
+            Permissions::ESTOQUES_MOVIMENTAR,
+        ]);
+
+        $this->actingAs($user)
+            ->post(route('admin.estoques.movimentar.store'), [
+                'id_unidade_negocio' => $unidade->id,
+                'itens' => [
+                    [
+                        'id_fruta' => $frutaA->id,
+                        'qtd_fruta_um' => '10',
+                        'preco_fruta_um' => '2.50',
+                    ],
+                    [
+                        'id_fruta' => $frutaB->id,
+                        'qtd_fruta_um' => '10',
+                        'preco_fruta_um' => '3.00',
+                    ],
+                ],
+            ])
+            ->assertRedirect(route('admin.estoques.unidade', $unidade))
+            ->assertSessionHas('success');
+
+        $estoqueA = $unidade->estoques()->where('id_fruta', $frutaA->id)->firstOrFail();
+        $this->assertSame('100.00', (string) $estoqueA->qtd_fruta_kg);
+        $this->assertSame('10.00', (string) $estoqueA->qtd_fruta_um);
+        $this->assertSame('0.25', (string) $estoqueA->preco_medio_kg);
+        $this->assertSame('2.50', (string) $estoqueA->preco_medio_um);
+
+        $estoqueB = $unidade->estoques()->where('id_fruta', $frutaB->id)->firstOrFail();
+        $this->assertSame('50.00', (string) $estoqueB->qtd_fruta_kg);
+        $this->assertSame('10.00', (string) $estoqueB->qtd_fruta_um);
+        $this->assertSame('0.60', (string) $estoqueB->preco_medio_kg);
+        $this->assertSame('3.00', (string) $estoqueB->preco_medio_um);
+
+        $this->actingAs($user)
+            ->get(route('admin.estoques.movimentar', ['id_unidade_negocio' => $unidade->id]))
+            ->assertOk()
+            ->assertSee('Adicionar Estoque', false)
+            ->assertSee('HUB MV TESTE', false)
+            ->assertDontSee('Selecione ou pesquise a unidade', false);
+    }
+
+    public function test_movimentar_sem_unidade_retorna_404(): void
+    {
+        $user = $this->userWithPermissions([
+            Permissions::ESTOQUES_VISUALIZAR,
+            Permissions::ESTOQUES_MOVIMENTAR,
+        ]);
+
+        $this->actingAs($user)
+            ->get(route('admin.estoques.movimentar'))
+            ->assertNotFound();
     }
 
     public function test_index_exibe_tabela_de_unidades_e_lista_apenas_unidade_selecionada(): void

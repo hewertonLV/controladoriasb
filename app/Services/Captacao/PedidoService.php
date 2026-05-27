@@ -12,6 +12,8 @@ use App\Models\Captacao\PedidoItem;
 use App\Models\Cliente;
 use App\Models\Fruta;
 use App\Models\User;
+use Illuminate\Database\QueryException;
+use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
@@ -86,16 +88,65 @@ final class PedidoService
     ): Pedido {
         $this->assertLotePermiteCaptacao($lote);
 
-        $pedido = Pedido::query()->create([
-            'id_captacao_lote' => $lote->id,
-            'id_cliente' => $cliente->id,
-            'origem' => $origem,
-            'created_by_user_id' => $user?->id,
-        ]);
+        $pedido = DB::transaction(function () use ($lote, $cliente, $origem, $user): Pedido {
+            CaptacaoLote::query()->whereKey($lote->id)->lockForUpdate()->first();
+
+            $pedido = $this->buscarPedidoMatriz($lote->id, $cliente->id, lock: true);
+
+            if ($pedido !== null) {
+                return $this->reativarPedidoMatriz($pedido, $origem, (int) $lote->id_unidade_negocio_galpao);
+            }
+
+            try {
+                return Pedido::query()->create([
+                    'id_captacao_lote' => $lote->id,
+                    'id_cliente' => $cliente->id,
+                    'id_unidade_negocio_saida_venda' => $lote->id_unidade_negocio_galpao,
+                    'origem' => $origem,
+                    'created_by_user_id' => $user?->id,
+                ]);
+            } catch (UniqueConstraintViolationException|QueryException $e) {
+                if (! $this->isDuplicatePedidoLoteCliente($e)) {
+                    throw $e;
+                }
+
+                $pedido = $this->buscarPedidoMatriz($lote->id, $cliente->id, lock: true);
+
+                if ($pedido === null) {
+                    throw $e;
+                }
+
+                return $this->reativarPedidoMatriz($pedido, $origem, (int) $lote->id_unidade_negocio_galpao);
+            }
+        });
 
         $this->historico->registrarPedido($pedido, 'adicionar_matriz', $origem, $user);
 
         return $pedido;
+    }
+
+    public function removerLojaDaMatriz(
+        CaptacaoLote $lote,
+        int $idCliente,
+        PedidoOrigem $origem,
+        ?User $user,
+    ): void {
+        $this->assertLotePermiteCaptacao($lote);
+
+        $pedido = Pedido::query()
+            ->where('id_captacao_lote', $lote->id)
+            ->where('id_cliente', $idCliente)
+            ->first();
+
+        if ($pedido === null) {
+            throw ValidationException::withMessages([
+                'id_cliente' => 'Esta loja não está na matriz.',
+            ]);
+        }
+
+        $pedido->itens()->delete();
+        $this->historico->registrarPedido($pedido, 'remover_matriz', $origem, $user);
+        $pedido->delete();
     }
 
     public function upsertCelulaMatriz(
@@ -322,6 +373,10 @@ final class PedidoService
 
         $this->historico->registrarPedido($pedido, 'atualizar_rota', $origem, $user);
 
+        $loteAtualizado = $lote->fresh() ?? $lote;
+        app(AvancarEtapaVinculoRotasCaptacaoLoteService::class)
+            ->tentarAvancarAutomaticamente($loteAtualizado);
+
         return $pedido->refresh();
     }
 
@@ -434,6 +489,23 @@ final class PedidoService
         return false;
     }
 
+    public function lotePossuiPedidoComQuantidadeSemRota(CaptacaoLote $lote): bool
+    {
+        $lote->loadMissing(['pedidos.itens']);
+
+        foreach ($lote->pedidos as $pedido) {
+            if (! $this->pedidoTemQuantidadeCaptada($pedido)) {
+                continue;
+            }
+
+            if ($pedido->id_captacao_rota === null) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     /**
      * @throws ValidationException
      */
@@ -450,7 +522,7 @@ final class PedidoService
                 $nomeLoja = $pedido->cliente?->fantasia ?: $pedido->cliente?->razao_social ?: "#{$pedido->id_cliente}";
 
                 throw ValidationException::withMessages([
-                    'pedidos' => "A loja «{$nomeLoja}» (galpão {$lote->unidadeGalpao?->nome}) tem quantidade na matriz, mas está sem rota. Vincule a rota antes de finalizar as vendas.",
+                    'pedidos' => "A loja «{$nomeLoja}» (galpão {$lote->unidadeGalpao?->nome}) tem quantidade na matriz, mas está sem rota. Vincule a rota na aba Rotas e conclua a etapa.",
                 ]);
             }
         }
@@ -460,6 +532,135 @@ final class PedidoService
     {
         if ($lote->status !== CaptacaoLoteStatus::CaptacaoEmAndamento) {
             throw new CaptacaoEdicaoBloqueadaException('O lote não está em captação.');
+        }
+    }
+
+    private function buscarPedidoMatriz(int $idLote, int $idCliente, bool $lock = false): ?Pedido
+    {
+        $query = Pedido::query()
+            ->withTrashed()
+            ->where('id_captacao_lote', $idLote)
+            ->where('id_cliente', $idCliente);
+
+        if ($lock) {
+            $query->lockForUpdate();
+        }
+
+        return $query->first();
+    }
+
+    private function reativarPedidoMatriz(Pedido $pedido, PedidoOrigem $origem, int $idGalpaoPadrao): Pedido
+    {
+        if (! $pedido->trashed()) {
+            throw ValidationException::withMessages([
+                'id_cliente' => 'Esta loja já está na matriz.',
+            ]);
+        }
+
+        $pedido->restore();
+        $pedido->forceFill([
+            'origem' => $origem,
+            'captacao_concluida' => false,
+            'id_captacao_rota' => null,
+            'numero_pedido' => null,
+            'ordem_carregamento' => null,
+            'data_entrega' => null,
+            'id_unidade_negocio_saida_venda' => $pedido->id_unidade_negocio_saida_venda ?? $idGalpaoPadrao,
+        ])->save();
+
+        return $pedido->fresh() ?? $pedido;
+    }
+
+    private function isDuplicatePedidoLoteCliente(QueryException $e): bool
+    {
+        $message = $e->getMessage();
+
+        return str_contains($message, 'pedido_lote_cliente_uq')
+            || (str_contains($message, 'Duplicate entry') && str_contains($message, '`pedidos`'));
+    }
+
+    public function garantirSaidaFisicaVendaPadraoGalpao(CaptacaoLote $lote): void
+    {
+        Pedido::query()
+            ->where('id_captacao_lote', $lote->id)
+            ->whereNull('id_unidade_negocio_saida_venda')
+            ->update(['id_unidade_negocio_saida_venda' => $lote->id_unidade_negocio_galpao]);
+    }
+
+    public function atualizarSaidaFisicaVenda(
+        CaptacaoLote $lote,
+        int $idCliente,
+        int $idUnidadeSaida,
+        PedidoOrigem $origem,
+        ?User $user,
+    ): Pedido {
+        if ($lote->status !== CaptacaoLoteStatus::SaidaEstoqueFisico) {
+            throw ValidationException::withMessages([
+                'status' => 'A saída física só pode ser alterada na etapa correspondente.',
+            ]);
+        }
+
+        $pedido = Pedido::query()
+            ->where('id_captacao_lote', $lote->id)
+            ->where('id_cliente', $idCliente)
+            ->first();
+
+        if ($pedido === null) {
+            throw ValidationException::withMessages([
+                'id_cliente' => 'Loja não encontrada neste lote.',
+            ]);
+        }
+
+        $permitidas = [(int) $lote->id_unidade_negocio_galpao];
+        if ($lote->id_unidade_negocio_hub_origem !== null) {
+            $permitidas[] = (int) $lote->id_unidade_negocio_hub_origem;
+        }
+
+        if (! in_array($idUnidadeSaida, $permitidas, true)) {
+            throw ValidationException::withMessages([
+                'id_unidade_negocio_saida_venda' => 'A unidade de saída deve ser o galpão ou o HUB de origem do lote.',
+            ]);
+        }
+
+        $pedido->id_unidade_negocio_saida_venda = $idUnidadeSaida;
+        $pedido->save();
+
+        $this->historico->registrarPedido($pedido, 'atualizar_saida_fisica_venda', $origem, $user);
+
+        return $pedido->fresh(['cliente', 'unidadeSaidaVenda']);
+    }
+
+    public function assertSaidaFisicaVendaDefinidaParaLote(CaptacaoLote $lote): void
+    {
+        $lote->loadMissing(['pedidos.itens']);
+
+        foreach ($lote->pedidos as $pedido) {
+            if (! $this->pedidoTemQuantidadeCaptada($pedido)) {
+                continue;
+            }
+
+            if ($pedido->id_unidade_negocio_saida_venda === null) {
+                $nome = $pedido->cliente?->fantasia ?: $pedido->cliente?->razao_social ?: "#{$pedido->id_cliente}";
+
+                throw ValidationException::withMessages([
+                    'saida_fisica' => "Defina a saída física da loja «{$nome}» antes de concluir.",
+                ]);
+            }
+        }
+    }
+
+    public function sincronizarOrigemFisicaItensComSaidaVenda(CaptacaoLote $lote): void
+    {
+        $lote->loadMissing(['pedidos.itens']);
+
+        foreach ($lote->pedidos as $pedido) {
+            if ($pedido->id_unidade_negocio_saida_venda === null) {
+                continue;
+            }
+
+            $pedido->itens()->update([
+                'id_unidade_origem_fisica' => $pedido->id_unidade_negocio_saida_venda,
+            ]);
         }
     }
 

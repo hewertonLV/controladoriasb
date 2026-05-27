@@ -23,10 +23,12 @@ final class CaptacaoLotePipelineUi
         return match ($lote->status) {
             CaptacaoLoteStatus::CaptacaoEmAndamento => CaptacaoLoteAcaoPipeline::FinalizarCaptacaoFaturamento,
             CaptacaoLoteStatus::AguardandoTransferenciaCigan => CaptacaoLoteAcaoPipeline::IniciarTransferencia,
-            CaptacaoLoteStatus::TransferenciaCiganIniciada => CaptacaoLoteAcaoPipeline::ValidarTransferencias,
+            CaptacaoLoteStatus::TransferenciaCiganIniciada => null,
+            CaptacaoLoteStatus::SaidaEstoqueFisico => CaptacaoLoteAcaoPipeline::ConcluirSaidaEstoqueFisico,
             CaptacaoLoteStatus::AguardandoVinculoFrete => CaptacaoLoteAcaoPipeline::ConcluirFrete,
             CaptacaoLoteStatus::TransferenciaFinalizada => CaptacaoLoteAcaoPipeline::IniciarFaturamento,
-            CaptacaoLoteStatus::FaturamentoCiganIniciado => CaptacaoLoteAcaoPipeline::FinalizarVendas,
+            CaptacaoLoteStatus::FaturamentoCiganIniciado => null,
+            CaptacaoLoteStatus::VincularRotasNosPedidos => CaptacaoLoteAcaoPipeline::ConcluirVinculoRotas,
             default => null,
         };
     }

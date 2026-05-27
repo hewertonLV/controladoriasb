@@ -15,7 +15,11 @@
                 </div>
                 <div class="col-md-4">
                     <label class="form-label">Faturamento</label>
-                    <select name="id_unidade_negocio_faturamento" class="form-select" required>
+                    <select name="id_unidade_negocio_faturamento"
+                            class="form-select"
+                            data-search-select
+                            data-placeholder="Selecione ou pesquise o faturamento"
+                            required>
                         <option value="">—</option>
                         @foreach ($faturamentos as $un)
                             <option value="{{ $un->id }}" @selected($idFaturamento === $un->id)>{{ $un->nome }}</option>
@@ -24,7 +28,10 @@
                 </div>
                 <div class="col-md-4">
                     <label class="form-label">Galpão (opcional)</label>
-                    <select name="id_unidade_negocio_galpao" class="form-select">
+                    <select name="id_unidade_negocio_galpao"
+                            class="form-select"
+                            data-search-select
+                            data-placeholder="Selecione ou pesquise o galpão">
                         <option value="">Todos</option>
                         @foreach ($galpoes as $un)
                             <option value="{{ $un->id }}" @selected($idGalpao === $un->id)>{{ $un->nome }}</option>
@@ -74,3 +81,5 @@
         </div>
     </div>
 @endsection
+
+@include('admin.captacao._search-select-scripts')

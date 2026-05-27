@@ -207,7 +207,7 @@ class RomaneioManualTest extends CaptacaoTestCase
         $this->actingAs($user)
             ->get(route('admin.captacao.romaneio-manual.edit', $lote))
             ->assertOk()
-            ->assertSee('Fechar romaneio', false)
+            ->assertSee('Confirmar solicitação', false)
             ->assertDontSee('Iniciar transferência', false);
     }
 }

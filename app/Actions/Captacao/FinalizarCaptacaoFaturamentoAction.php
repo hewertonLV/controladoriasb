@@ -44,13 +44,17 @@ final class FinalizarCaptacaoFaturamentoAction
             $dia = $this->lotes->resolverFaturamentoDia($dataReferencia, $idUnidadeFaturamento);
 
             if ($dia->status === CaptacaoFaturamentoDiaStatus::CaptacaoFaturamentoFinalizada) {
+                foreach ($lotes as $lote) {
+                    $this->lotes->transicionarStatus($lote, CaptacaoLoteStatus::AguardandoTransferenciaCigan);
+                }
+
                 $this->lotes->sincronizarLotesEmAndamentoQuandoDiaFinalizado($dataReferencia, $idUnidadeFaturamento);
 
                 return $dia->refresh();
             }
 
             foreach ($lotes as $lote) {
-                $lote->update(['status' => CaptacaoLoteStatus::AguardandoTransferenciaCigan]);
+                $this->lotes->transicionarStatus($lote, CaptacaoLoteStatus::AguardandoTransferenciaCigan);
             }
 
             $dia->update([

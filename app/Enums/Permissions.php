@@ -264,6 +264,8 @@ final class Permissions
 
     public const CAPTACAO_LOTE_VISUALIZAR = 'captacao.lote.visualizar';
 
+    public const CAPTACAO_LOTE_EXCLUIR = 'captacao.lote.excluir';
+
     public const CAPTACAO_PEDIDO_EDITAR = 'captacao.pedido.editar';
 
     public const CAPTACAO_CLIENTE_FRUTA_VINCULAR = 'captacao.cliente_fruta.vincular';
@@ -510,6 +512,7 @@ final class Permissions
             ],
             'Captação' => [
                 self::CAPTACAO_LOTE_VISUALIZAR,
+                self::CAPTACAO_LOTE_EXCLUIR,
                 self::CAPTACAO_PEDIDO_EDITAR,
                 self::CAPTACAO_CLIENTE_FRUTA_VINCULAR,
                 self::CAPTACAO_ROTA_EDITAR,

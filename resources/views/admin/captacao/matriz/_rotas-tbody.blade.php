@@ -7,7 +7,7 @@
 @if ($gruposRotas === [])
     <tr>
         <td colspan="5" class="text-muted text-center py-4">
-            Nenhum item com quantidade informada. Use a aba <strong>Quantidade</strong> para captar pedidos.
+            Nenhum item com quantidade informada. Use a aba <strong>Captação</strong> para captar pedidos.
         </td>
     </tr>
 @else
@@ -42,6 +42,8 @@
                     <td rowspan="{{ count($grupo['itens']) }}" class="align-top">
                         @if ($lote->status->permiteEdicaoVinculoRota())
                             <select class="form-select form-select-sm matriz-rota-select"
+                                    data-search-select
+                                    data-placeholder="Selecione ou pesquise a rota"
                                     data-cliente="{{ $grupo['id_cliente'] }}"
                                     data-url="{{ route('admin.captacao.lotes.pedidos.rota', [$lote, $grupo['id_cliente']]) }}">
                                 @if ($rotas->isEmpty())

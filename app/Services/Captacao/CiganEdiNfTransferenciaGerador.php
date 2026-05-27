@@ -5,6 +5,7 @@ namespace App\Services\Captacao;
 use App\Models\Captacao\CaptacaoLote;
 use App\Models\Cliente;
 use App\Models\UnidadeNegocio;
+use App\Support\Captacao\Cigan\CiganEdiEncoding;
 use App\Support\Captacao\Cigan\CiganEdiLinha;
 use Illuminate\Support\Carbon;
 use Illuminate\Validation\ValidationException;
@@ -121,9 +122,7 @@ final class CiganEdiNfTransferenciaGerador
      */
     public function paraIso88591(string $conteudoUtf8): string
     {
-        $convertido = iconv('UTF-8', 'ISO-8859-1//TRANSLIT', $conteudoUtf8);
-
-        return $convertido !== false ? $convertido : mb_convert_encoding($conteudoUtf8, 'ISO-8859-1', 'UTF-8');
+        return CiganEdiEncoding::paraIso88591($conteudoUtf8);
     }
 
     private function montarRegistroNota(
@@ -468,6 +467,7 @@ final class CiganEdiNfTransferenciaGerador
     private function texto(string $valor, int $max): string
     {
         $valor = preg_replace('/\s+/', ' ', trim($valor)) ?? '';
+        $valor = str_replace(["\r", "\n", "\t"], ' ', $valor);
 
         return mb_substr($valor, 0, $max, 'UTF-8');
     }

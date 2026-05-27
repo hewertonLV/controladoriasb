@@ -8,7 +8,7 @@
 @if ($gruposOrdemCarregamento === [])
     <tr>
         <td colspan="5" class="text-muted text-center py-4">
-            Nenhuma loja com rota e quantidade informada. Use as abas <strong>Quantidade</strong> e <strong>Rotas</strong> primeiro.
+            Nenhuma loja com rota e quantidade informada. Use as abas <strong>Captação</strong> e <strong>Rotas</strong> primeiro.
         </td>
     </tr>
 @else
@@ -44,6 +44,8 @@
                                                data-url="{{ route('admin.captacao.lotes.rotas.motorista', [$lote, $grupoRota['id_captacao_rota']]) }}"
                                                value="{{ $grupoRota['motorista_nome'] ?? '' }}">
                                         <select class="form-select form-select-sm matriz-rota-veiculo"
+                                                data-search-select
+                                                data-placeholder="Selecione ou pesquise o veículo"
                                                 data-rota="{{ $grupoRota['id_captacao_rota'] }}"
                                                 data-url="{{ route('admin.captacao.lotes.rotas.veiculo', [$lote, $grupoRota['id_captacao_rota']]) }}">
                                             <option value="">Sem veículo vinculado</option>
@@ -74,6 +76,8 @@
                         <td rowspan="{{ $lojaRowspan }}" class="align-top">
                             @if ($lote->status->permiteEdicaoVinculoRota())
                                 <select class="form-select form-select-sm matriz-ordem-select"
+                                        data-search-select
+                                        data-placeholder="Ordem de carregamento"
                                         data-cliente="{{ $loja['id_cliente'] }}"
                                         data-rota="{{ $grupoRota['id_captacao_rota'] }}"
                                         data-total-lojas="{{ $totalLojas }}"

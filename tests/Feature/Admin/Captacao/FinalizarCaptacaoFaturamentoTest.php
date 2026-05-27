@@ -197,4 +197,58 @@ class FinalizarCaptacaoFaturamentoTest extends CaptacaoTestCase
             $lote->fresh()->status,
         );
     }
+
+    public function test_finalizar_complementar_com_dia_ja_finalizado_atualiza_status_do_lote(): void
+    {
+        $c = $this->cenarioCaptacaoBasico();
+        $user = $this->captacaoManager();
+        $user->unidadesNegocio()->sync([$c['faturamento']->id, $c['galpao']->id]);
+
+        $loteAnterior = $this->criarLoteCaptacao($c, '2026-05-27');
+        $loteAnterior->update(['status' => CaptacaoLoteStatus::AguardandoTransferenciaCigan]);
+
+        $loteComplementar = $this->criarLoteCaptacao($c, '2026-05-27');
+
+        $pedido = Pedido::query()->create([
+            'id_captacao_lote' => $loteComplementar->id,
+            'id_cliente' => $c['cliente']->id,
+            'captacao_concluida' => true,
+            'origem' => PedidoOrigem::Web,
+        ]);
+
+        PedidoItem::query()->create([
+            'id_pedido' => $pedido->id,
+            'id_fruta' => $c['fruta']->id,
+            'quantidade' => 3,
+            'version' => 1,
+        ]);
+
+        \App\Models\Captacao\CaptacaoFaturamentoDia::query()->create([
+            'data_referencia' => '2026-05-27',
+            'id_unidade_negocio_faturamento' => $c['faturamento']->id,
+            'status' => \App\Enums\CaptacaoFaturamentoDiaStatus::CaptacaoFaturamentoFinalizada,
+            'finalizado_em' => now(),
+            'finalizado_por_user_id' => $user->id,
+        ]);
+
+        $this->actingAs($user)
+            ->post(route('admin.captacao.faturamento.finalizar'), [
+                'data_referencia' => '2026-05-27',
+                'id_unidade_negocio_faturamento' => $c['faturamento']->id,
+                'id_captacao_lote' => $loteComplementar->id,
+            ])
+            ->assertRedirect(route('admin.captacao.lotes.show', $loteComplementar))
+            ->assertSessionHas('success')
+            ->assertSessionHasNoErrors();
+
+        $this->assertStringNotContainsString(
+            'Lucas',
+            session('success'),
+        );
+
+        $this->assertSame(
+            CaptacaoLoteStatus::AguardandoTransferenciaCigan,
+            $loteComplementar->fresh()->status,
+        );
+    }
 }

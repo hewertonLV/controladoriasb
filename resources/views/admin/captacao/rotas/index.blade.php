@@ -1,7 +1,7 @@
 @extends('layouts.app')
 
-@section('title', 'Rotas de captação')
-@section('page-title', 'Rotas de captação')
+@section('title', 'Rotas')
+@section('page-title', 'Rotas')
 
 @section('content')
     <x-admin.flash-messages />
@@ -14,7 +14,11 @@
             <form method="get" class="row g-2 align-items-end">
                 <div class="col-md-8">
                     <label class="form-label">Carteira</label>
-                    <select name="carteira" class="form-select" onchange="this.form.submit()">
+                    <select name="carteira"
+                            class="form-select"
+                            data-search-select
+                            data-placeholder="Selecione ou pesquise a carteira"
+                            onchange="this.form.submit()">
                         <option value="">Todas as carteiras</option>
                         @foreach ($carteiras as $carteira)
                             <option value="{{ $carteira->id }}" @selected((int) $carteiraId === $carteira->id)>
@@ -96,3 +100,5 @@
         </div>
     </div>
 @endsection
+
+@include('admin.captacao._search-select-scripts')

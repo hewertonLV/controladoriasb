@@ -38,7 +38,7 @@
             @endcan
             @can('estoques.movimentar')
                 <a href="{{ route('admin.estoques.movimentar', ['id_unidade_negocio' => $unidadeSelecionada->id]) }}" class="btn btn-primary">
-                    <i class="ri-exchange-line me-1"></i> Movimentar estoque
+                    <i class="ri-add-line me-1"></i> Adicionar Estoque
                 </a>
             @endcan
         </div>

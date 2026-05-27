@@ -25,6 +25,12 @@ final class EfetivarTransferenciasGerenciaisLoteService
      */
     public function executar(CaptacaoLote $lote): array
     {
+        if ($lote->tipo !== CaptacaoLoteTipo::RomaneioManual && $lote->id_unidade_negocio_hub_origem === null) {
+            throw ValidationException::withMessages([
+                'id_unidade_negocio_hub_origem' => 'Informe e salve o HUB de origem na aba Arquivo Cigan antes de enviar a NF.',
+            ]);
+        }
+
         if (CaptacaoLoteMovimentacao::query()
             ->where('id_captacao_lote', $lote->id)
             ->where('tipo', CaptacaoLoteMovimentacao::TIPO_TRANSFERENCIA)
@@ -98,6 +104,10 @@ final class EfetivarTransferenciasGerenciaisLoteService
 
     private function resolverUnidadeOrigem(CaptacaoLote $lote, int $idFruta): UnidadeNegocio
     {
+        if ($lote->tipo !== CaptacaoLoteTipo::RomaneioManual && $lote->id_unidade_negocio_hub_origem !== null) {
+            return UnidadeNegocio::query()->findOrFail($lote->id_unidade_negocio_hub_origem);
+        }
+
         $lote->loadMissing(['pedidos.itens']);
 
         $origens = collect();
