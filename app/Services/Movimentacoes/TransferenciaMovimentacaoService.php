@@ -20,6 +20,7 @@ use App\Models\UnidadeNegocio;
 use App\Services\Frutas\FrutaIcmsCalculoService;
 use App\Services\Permissoes\UnidadeNegocioAccessService;
 use App\Support\EmpresaEntidadeQuery;
+use App\Support\Movimentacoes\CustoOperacionalSnapshot;
 use App\Support\Movimentacoes\FrutasComEstoqueOrigem;
 use App\Support\TextoCadastro;
 use Illuminate\Database\QueryException;
@@ -375,7 +376,7 @@ final class TransferenciaMovimentacaoService
         $valorNfUm = $qtdUm > 0 ? round($valorEconomicoTotal / $qtdUm, 2) : 0.0;
         $valorNfKg = $qtdKg > 0 ? round($valorEconomicoTotal / $qtdKg, 2) : 0.0;
 
-        $coDestino = $this->obterCustoOperacionalDestino($unidadeDestino->id);
+        $coDestino = $this->obterCustoOperacionalDestino($unidadeDestino->id, $dataMovimentacao);
 
         $valorFreteKg = 0.0;
         $valorFreteRateio = 0.0;
@@ -399,7 +400,7 @@ final class TransferenciaMovimentacaoService
         $icmsKg = (float) app(FrutaIcmsCalculoService::class)
             ->calcularEntradaPorKg($fruta, $unidadeDestino, null, $unidadeOrigem, $dataMovimentacao);
         $icmsHistoricoEntrada = $this->camposIcmsHistorico($icmsKg, $qtdKg, $qtdUm);
-        $valorCoDest = (float) $coDestino->custo_operacional;
+        $valorCoDest = $coDestino['valor'];
         $precoEntradaKg = round($precoMedioOrigemKg + $valorFreteKg + $valorCoDest + $icmsKg, 2);
         $precoEntradaUm = round($precoEntradaKg * $kgPorUm, 2);
         $valorEntradaTotal = round($qtdKg * $precoEntradaKg, 2);
@@ -516,7 +517,7 @@ final class TransferenciaMovimentacaoService
             'valor_frete_rateio' => number_format($valorFreteRateio, 2, '.', ''),
             'valor_frete_um' => number_format($valorFreteUm, 2, '.', ''),
             'valor_frete_kg' => number_format($valorFreteKg, 2, '.', ''),
-            'id_custo_operacional' => $coDestino->id,
+            'id_custo_operacional' => $coDestino['id'],
             'valor_custo_operacional' => number_format($valorCoDest, 2, '.', ''),
             'saldo_estoque_fruta_kg' => number_format($saldoDestKg, 2, '.', ''),
             'saldo_estoque_fruta_um' => number_format($saldoDestUm, 2, '.', ''),
@@ -759,17 +760,20 @@ final class TransferenciaMovimentacaoService
         return $frete;
     }
 
-    private function obterCustoOperacionalDestino(int $idUnidadeNegocio): HistoricoCOUnNg
+    /**
+     * @return array{id: int, valor: float}
+     */
+    private function obterCustoOperacionalDestino(int $idUnidadeNegocio, Carbon $dataReferencia): array
     {
-        $co = HistoricoCOUnNg::query()
-            ->where('id_unidade_negocio', $idUnidadeNegocio)
-            ->where('status_position', true)
-            ->first();
-        if ($co === null) {
+        $snapshot = CustoOperacionalSnapshot::vigenteNaData($idUnidadeNegocio, $dataReferencia);
+        if ($snapshot['id'] === null) {
             throw new InvalidArgumentException('Não existe custo operacional vigente para a unidade de destino.');
         }
 
-        return $co;
+        return [
+            'id' => (int) $snapshot['id'],
+            'valor' => $snapshot['valor'],
+        ];
     }
 
     /**

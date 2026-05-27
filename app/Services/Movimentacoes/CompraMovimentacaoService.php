@@ -19,6 +19,7 @@ use App\Models\User;
 use App\Services\Frutas\FrutaIcmsCalculoService;
 use App\Services\Permissoes\UnidadeNegocioAccessService;
 use App\Support\EmpresaEntidadeQuery;
+use App\Support\Movimentacoes\CustoOperacionalSnapshot;
 use App\Support\TextoCadastro;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\QueryException;
@@ -149,14 +150,13 @@ final class CompraMovimentacaoService
                 $numeroNfOrigem = null;
             }
 
-            $co = HistoricoCOUnNg::query()
-                ->where('id_unidade_negocio', $unidade->id)
-                ->where('status_position', true)
-                ->first();
-            if ($co === null) {
+            $dataMovimentacao = now();
+
+            $coSnapshot = CustoOperacionalSnapshot::vigenteNaData((int) $unidade->id, $dataMovimentacao);
+            if ($coSnapshot['id'] === null) {
                 throw new InvalidArgumentException('Não existe custo operacional vigente (última posição) para a unidade de destino.');
             }
-            $valorCo = (float) $co->custo_operacional;
+            $valorCo = $coSnapshot['valor'];
 
             $estoque = $this->obterOuCriarEstoqueComLock($unidade->id, $fruta->id);
             $this->garantirPosicaoInicialSeNecessario($estoque, $unidade->id, $fruta->id);
@@ -188,7 +188,6 @@ final class CompraMovimentacaoService
             $valorFreteRateio = round($valorFreteKg * $qtdKg, 2);
             $valorFreteUm = round($valorFreteRateio / $qtdUm, 2);
 
-            $dataMovimentacao = now();
             $icmsKg = (float) app(FrutaIcmsCalculoService::class)
                 ->calcularEntradaPorKg($fruta, $unidade, $fornecedor, null, $dataMovimentacao);
             $icmsHistorico = $this->camposIcmsHistorico($icmsKg, $qtdKg, $qtdUm);
@@ -221,7 +220,7 @@ final class CompraMovimentacaoService
                 'valor_frete_rateio' => number_format($valorFreteRateio, 2, '.', ''),
                 'valor_frete_um' => number_format($valorFreteUm, 2, '.', ''),
                 'valor_frete_kg' => number_format($valorFreteKg, 2, '.', ''),
-                'id_custo_operacional' => $co->id,
+                'id_custo_operacional' => $coSnapshot['id'],
                 'valor_custo_operacional' => number_format($valorCo, 2, '.', ''),
                 'saldo_estoque_fruta_kg' => number_format($saldoKgNovo, 2, '.', ''),
                 'saldo_estoque_fruta_um' => number_format($saldoUmNovo, 2, '.', ''),

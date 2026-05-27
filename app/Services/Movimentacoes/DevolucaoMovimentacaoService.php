@@ -9,13 +9,13 @@ use App\Enums\TipoDevolucao;
 use App\Models\Empresa;
 use App\Models\Estoque;
 use App\Models\Fruta;
-use App\Models\HistoricoCOUnNg;
 use App\Models\Movimentacao;
 use App\Models\MovimentacaoEstoque;
 use App\Models\StatusMovimentacao;
 use App\Models\UnidadeNegocio;
 use App\Models\User;
 use App\Services\Permissoes\UnidadeNegocioAccessService;
+use App\Support\Movimentacoes\CustoOperacionalSnapshot;
 use App\Support\Movimentacoes\VendaCustoOperacionalHub;
 use App\Support\TextoCadastro;
 use Illuminate\Database\Eloquent\Collection;
@@ -345,12 +345,7 @@ final class DevolucaoMovimentacaoService
             return ['id' => null, 'valor' => 0.0];
         }
 
-        $co = HistoricoCOUnNg::query()
-            ->where('id_unidade_negocio', $unidadeDestino->id)
-            ->where('status_position', true)
-            ->first();
-
-        return ['id' => $co?->id, 'valor' => (float) ($co?->custo_operacional ?? $unidadeDestino->custo_operacional ?? 0)];
+        return CustoOperacionalSnapshot::daMovimentacao($venda);
     }
 
     private function resolverVendaOrigem(int $id): Movimentacao

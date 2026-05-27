@@ -243,6 +243,31 @@ class DevolucaoMovimentacaoTest extends TestCase
         $this->assertEstoque($hub['unidade_faturamento'], $hub['fruta'], '90.00', '9.00', '7.00', '70.00', '630.00');
     }
 
+    public function test_devolucao_hub_usa_co_da_venda_origem_mesmo_apos_alterar_cadastro(): void
+    {
+        $this->seedBase();
+        $hub = $this->cenarioBase(origemHub: true, custoFaturamento: 2.0);
+        $this->registrarCompra($hub, '10', '500,00');
+        $this->registrarTransferenciaHubParaLoja($hub, '10');
+        $vendaHub = $this->registrarVenda($hub, '2', '400,00');
+
+        $this->assertSame('2.00', (string) $vendaHub->valor_custo_operacional);
+
+        HistoricoCOUnNg::query()
+            ->where('id_unidade_negocio', $hub['unidade_faturamento']->id)
+            ->update(['status_position' => false]);
+        HistoricoCOUnNg::factory()->create([
+            'id_unidade_negocio' => $hub['unidade_faturamento']->id,
+            'custo_operacional' => 99,
+            'status_position' => true,
+        ]);
+
+        $devHub = $this->registrarDevolucao($vendaHub, TipoDevolucao::COM_RETORNO_ESTOQUE, '1', $hub['unidade_faturamento']);
+
+        $this->assertSame('2.00', (string) $devHub->valor_custo_operacional);
+        $this->assertSame('70.00', (string) $devHub->valor_custo_devolucao);
+    }
+
     public function test_devolucao_com_retorno_usa_unidade_fisica_informada_e_hub_nao_hub_define_custo_operacional(): void
     {
         $this->seedBase();

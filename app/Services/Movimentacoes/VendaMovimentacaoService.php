@@ -12,7 +12,6 @@ use App\Models\Empresa;
 use App\Models\Estoque;
 use App\Models\Frete;
 use App\Models\Fruta;
-use App\Models\HistoricoCOUnNg;
 use App\Models\Movimentacao;
 use App\Models\MovimentacaoEstoque;
 use App\Models\StatusMovimentacao;
@@ -22,6 +21,7 @@ use App\Models\VendaNota;
 use App\Services\Frutas\FrutaIcmsCalculoService;
 use App\Services\Permissoes\UnidadeNegocioAccessService;
 use App\Support\Movimentacoes\FrutasComEstoqueOrigem;
+use App\Support\Movimentacoes\CustoOperacionalSnapshot;
 use App\Support\Movimentacoes\VendaCustoOperacionalHub;
 use App\Support\TextoCadastro;
 use Illuminate\Database\Eloquent\Collection;
@@ -200,6 +200,7 @@ final class VendaMovimentacaoService
                 $precoMedioKg,
                 $qtdKg,
                 $input,
+                $dataEmissao,
             );
             $valorCustoSaida = $custos['valor_custo_saida'];
             $freteRateioAtual = (float) $ativa->valor_frete_rateio;
@@ -407,6 +408,7 @@ final class VendaMovimentacaoService
             $precoMedioKg,
             $qtdKg,
             $input,
+            $dataMovimentacao,
         );
         $valorCustoSaida = $custos['valor_custo_saida'];
 
@@ -631,13 +633,14 @@ final class VendaMovimentacaoService
         UnidadeNegocio $unidadeCentroResultado,
         UnidadeNegocio $unidadePmDebito,
         array $input,
+        ?Carbon $dataReferencia = null,
     ): array {
         if ($unidadeCentroResultado->is_galpao_operacional) {
-            return $this->snapshotCoVigenteUnidade($unidadeCentroResultado);
+            return $this->snapshotCoVigenteUnidade($unidadeCentroResultado, $dataReferencia);
         }
 
         if ($unidadeFaturamento->is_unidade_producao && ! $unidadePmDebito->is_hub) {
-            return $this->resolverCustoOperacionalProducao($input);
+            return $this->resolverCustoOperacionalProducao($input, $dataReferencia);
         }
 
         return $this->coMargemZerado();
@@ -647,7 +650,7 @@ final class VendaMovimentacaoService
      * @param  array<string, mixed>  $input
      * @return array{id_custo_operacional: int|null, valor_custo_operacional: string}
      */
-    private function resolverCustoOperacionalProducao(array $input): array
+    private function resolverCustoOperacionalProducao(array $input, ?Carbon $dataReferencia = null): array
     {
         $aplicar = filter_var($input['aplicar_custo_operacional_hub'] ?? true, FILTER_VALIDATE_BOOLEAN);
         if (! $aplicar) {
@@ -664,38 +667,31 @@ final class VendaMovimentacaoService
             throw new InvalidArgumentException('A unidade selecionada para custo operacional deve ser HUB.');
         }
 
-        $co = HistoricoCOUnNg::query()
-            ->where('id_unidade_negocio', $hub->id)
-            ->where('status_position', true)
-            ->first();
-
-        if ($co === null) {
+        $co = CustoOperacionalSnapshot::paraNovaMovimentacao($hub, $dataReferencia);
+        if ($co['id'] === null) {
             throw new InvalidArgumentException('Não existe custo operacional vigente para o HUB selecionado.');
         }
 
         return [
-            'id_custo_operacional' => (int) $co->id,
-            'valor_custo_operacional' => number_format((float) $co->custo_operacional, 2, '.', ''),
+            'id_custo_operacional' => (int) $co['id'],
+            'valor_custo_operacional' => $co['valor_formatado'],
         ];
     }
 
     /**
      * @return array{id_custo_operacional: int|null, valor_custo_operacional: string}
      */
-    private function snapshotCoVigenteUnidade(UnidadeNegocio $unidade): array
+    private function snapshotCoVigenteUnidade(UnidadeNegocio $unidade, ?Carbon $dataReferencia = null): array
     {
-        $co = HistoricoCOUnNg::query()
-            ->where('id_unidade_negocio', $unidade->id)
-            ->where('status_position', true)
-            ->first();
+        $co = CustoOperacionalSnapshot::paraNovaMovimentacao($unidade, $dataReferencia);
 
-        if ($co === null) {
+        if ($co['id'] === null && $co['valor'] <= 0) {
             return $this->coMargemZerado();
         }
 
         return [
-            'id_custo_operacional' => (int) $co->id,
-            'valor_custo_operacional' => number_format((float) $co->custo_operacional, 2, '.', ''),
+            'id_custo_operacional' => $co['id'],
+            'valor_custo_operacional' => $co['valor_formatado'],
         ];
     }
 
@@ -742,11 +738,12 @@ final class VendaMovimentacaoService
         float $precoMedioKg,
         float $qtdKg,
         array $input,
+        ?Carbon $dataReferencia = null,
     ): array {
         $valorCustoBase = round($precoMedioKg * $qtdKg, 2);
 
         if (VendaCustoOperacionalHub::saidaFisicaEhHubUnidade($unidadePmDebito)) {
-            $custoMargem = $this->snapshotCoVigenteUnidade($unidadeFaturamento);
+            $custoMargem = $this->snapshotCoVigenteUnidade($unidadeFaturamento, $dataReferencia);
             $valorCoKg = (float) $custoMargem['valor_custo_operacional'];
             $valorCoTotal = round($valorCoKg * $qtdKg, 2);
 
@@ -768,6 +765,7 @@ final class VendaMovimentacaoService
             $unidadeCentroResultado,
             $unidadePmDebito,
             $input,
+            $dataReferencia,
         );
 
         return [
@@ -994,13 +992,35 @@ final class VendaMovimentacaoService
         $unidadePmDebito = $venda->unidadeEstoque
             ?? UnidadeNegocio::query()->findOrFail((int) $venda->id_unidade_negocio_estoque);
 
+        $precoMedioKg = (float) $venda->preco_medio_fruta_kg;
+        $qtdKg = (float) $venda->qtd_fruta_kg;
+
+        if ($this->devePreservarCoGravadoNaVenda($venda, $unidadeFaturamento)) {
+            $co = CustoOperacionalSnapshot::daMovimentacao($venda);
+            $valorCoKg = $co['valor'];
+            $valorCoTotal = round($valorCoKg * $qtdKg, 2);
+
+            return [
+                'valor_custo_saida' => round($precoMedioKg * $qtdKg + $valorCoTotal, 2),
+                'id_custo_operacional' => $co['id'],
+                'valor_custo_operacional' => number_format($valorCoKg, 2, '.', ''),
+                'co_embutido_custo_saida' => true,
+                'observacao' => VendaCustoOperacionalHub::observacaoCustoEmbutidoHub(
+                    $unidadeFaturamento,
+                    $valorCoKg,
+                    $qtdKg,
+                ),
+            ];
+        }
+
         return $this->resolverCustosItemVenda(
             $unidadeFaturamento,
             $unidadeFaturamento,
             $unidadePmDebito,
-            (float) $venda->preco_medio_fruta_kg,
-            (float) $venda->qtd_fruta_kg,
+            $precoMedioKg,
+            $qtdKg,
             [],
+            Carbon::parse((string) $venda->data_movimentacao),
         );
     }
 
@@ -1031,5 +1051,23 @@ final class VendaMovimentacaoService
         ])->saveQuietly();
 
         return true;
+    }
+
+    private function devePreservarCoGravadoNaVenda(Movimentacao $venda, UnidadeNegocio $unidadeFaturamento): bool
+    {
+        if (! CustoOperacionalSnapshot::movimentacaoPossuiSnapshot($venda)) {
+            return false;
+        }
+
+        if (trim((string) ($venda->observacao ?? '')) !== '') {
+            return true;
+        }
+
+        $coNaData = CustoOperacionalSnapshot::vigenteNaData(
+            (int) $unidadeFaturamento->id,
+            Carbon::parse((string) $venda->data_movimentacao),
+        );
+
+        return (int) ($venda->id_custo_operacional ?? 0) === (int) ($coNaData['id'] ?? 0);
     }
 }
