@@ -16,6 +16,7 @@ use App\Models\StatusMovimentacao;
 use App\Models\UnidadeNegocio;
 use App\Models\User;
 use App\Services\Permissoes\UnidadeNegocioAccessService;
+use App\Support\Movimentacoes\VendaCustoOperacionalHub;
 use App\Support\TextoCadastro;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\DB;
@@ -254,7 +255,9 @@ final class DevolucaoMovimentacaoService
         );
         $co = $this->custoOperacionalRetorno($venda, $tipo, $unidadeDestino);
         $valorCoTotal = round($co['valor'] * $qtdKg, 2);
-        $custoDevolucao = round($custoBase + $valorCoTotal, 2);
+        $custoDevolucao = VendaCustoOperacionalHub::coEmbutidoNoCustoSaida($venda)
+            ? $custoBase
+            : round($custoBase + $valorCoTotal, 2);
         $resultado = $tipo === TipoDevolucao::SEM_RETORNO_ESTOQUE
             ? round(-((float) $venda->resultado_movimentacao * $proporcao), 2)
             : round($valorDevolucao - $custoDevolucao, 2);

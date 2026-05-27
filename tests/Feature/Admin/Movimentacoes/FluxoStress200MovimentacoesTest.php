@@ -24,6 +24,7 @@ use App\Models\MovimentacaoEstoque;
 use App\Models\MovimentacaoHistorico;
 use App\Models\StatusMovimentacao;
 use App\Models\UnidadeNegocio;
+use App\Support\Movimentacoes\VendaCustoOperacionalHub;
 use App\Services\Frutas\FrutaIcmsSyncService;
 use App\Support\Frutas\FrutaIcmsLinhaFormulario;
 use App\Services\UnidadesNegocio\HistoricoCustoOperacionalUnidadeNegocioService;
@@ -802,7 +803,7 @@ class FluxoStress200MovimentacoesTest extends TestCase
         $vendas = Movimentacao::query()->where('categoria_movimentacao_id', CategoriaMovimentacaoTipo::Venda->value)->get();
         foreach ($vendas as $venda) {
             $this->assertGreaterThanOrEqual(0, (float) $venda->valor_custo_saida);
-            $custoOperacionalTotal = round((float) $venda->valor_custo_operacional * (float) $venda->qtd_fruta_kg, 2);
+            $custoOperacionalTotal = VendaCustoOperacionalHub::valorCoTotalDescontadoNaMargem($venda);
             $this->assertSame(
                 number_format(round((float) $venda->valor_nf_total - (float) $venda->valor_custo_saida - $custoOperacionalTotal - (float) $venda->valor_frete_rateio, 2), 2, '.', ''),
                 (string) $venda->resultado_movimentacao,
