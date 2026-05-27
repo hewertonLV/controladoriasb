@@ -16,7 +16,6 @@ final class EfetivarVendasCaptacaoLoteService
         private readonly GerarVendasCaptacaoLoteService $gerarVendas,
         private readonly PedidoService $pedidos,
         private readonly ArmazenarNfVendaCiganLoteService $armazenarNf,
-        private readonly AvancarEtapaVinculoRotasCaptacaoLoteService $avancarVinculoRotas,
     ) {}
 
     public function executar(CaptacaoLote $lote, UploadedFile $arquivoNf, User $user): CaptacaoLote
@@ -33,12 +32,10 @@ final class EfetivarVendasCaptacaoLoteService
             $this->gerarVendas->executar($lote, $user);
             $this->armazenarNf->executar($lote, $arquivoNf, $user);
 
-            $lote = $this->lotes->transicionarStatus(
+            return $this->lotes->transicionarStatus(
                 $lote->fresh(),
                 CaptacaoLoteStatus::VincularRotasNosPedidos,
             );
-
-            return $this->avancarVinculoRotas->tentarAvancarAutomaticamente($lote);
         });
     }
 }

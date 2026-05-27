@@ -6,75 +6,42 @@
 @section('content')
     <x-admin.flash-messages />
 
-    <div class="card">
-        <div class="card-header d-flex align-items-center flex-wrap gap-2">
-            <div>
-                <h4 class="header-title mb-0">Compras</h4>
-                <p class="text-muted mb-0 small">Movimentações da categoria compra (versão ativa).</p>
-            </div>
+    <x-admin.datatable
+        title="Compras"
+        subtitle="Movimentações da categoria compra (versão ativa)."
+        table-id="compras-movimentacao-datatable"
+        root-id="compras-movimentacao-table-root"
+        print-title="Movimentação — Compras"
+        entity-label="movimentações"
+        entity-label-singular="movimentação"
+        :order="[2, 'desc']"
+        :sort-column-map="[
+            0 => 'numero_compra',
+            1 => 'numero_nf',
+            2 => 'data_movimentacao',
+            3 => 'fornecedor',
+            4 => 'unidade',
+            5 => 'fruta',
+            6 => 'qtd_fruta_um',
+            7 => 'qtd_fruta_kg',
+            8 => 'valor_nf_total',
+            9 => 'frete',
+        ]"
+        :column-defs="[
+            ['targets' => -1, 'orderable' => false, 'searchable' => false],
+            ['targets' => [6, 7, 8], 'className' => 'text-end'],
+        ]"
+    >
+        <x-slot:actions>
             @can('movimentacoes.compras.criar')
-                <a href="{{ route('admin.movimentacoes.compras.create') }}" class="btn btn-primary btn-sm ms-auto">
+                <a href="{{ route('admin.movimentacoes.compras.create') }}" class="btn btn-primary btn-sm">
                     <i class="ri-add-line me-1"></i> Nova compra
                 </a>
             @endcan
-        </div>
-        <div class="card-body p-0">
-            <div class="table-responsive">
-                <table class="table table-hover table-striped mb-0 align-middle">
-                    <thead class="table-light">
-                        <tr>
-                            <th>Compra</th>
-                            <th>NF</th>
-                            <th>Data</th>
-                            <th>Forn.</th>
-                            <th>Unidade</th>
-                            <th>Fruta</th>
-                            <th class="text-end">UM</th>
-                            <th class="text-end">Kg</th>
-                            <th class="text-end">NF</th>
-                            <th>Frete</th>
-                            <th class="text-end">Ações</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        @forelse ($movimentacoes as $m)
-                            <tr>
-                                <td class="fw-semibold">Compra #{{ $m->numero_compra ?? $m->id }}</td>
-                                <td>{{ $m->numero_nf_origem ?? '—' }}</td>
-                                <td>{{ $m->data_movimentacao?->format('d/m/Y H:i') }}</td>
-                                <td>{{ $m->empresaOrigem?->nomeExibicao() ?? '—' }}</td>
-                                <td>{{ $m->empresaDestino?->nomeExibicao() ?? '—' }}</td>
-                                <td>{{ $m->fruta?->nome ?? '—' }}</td>
-                                <td class="text-end">{{ number_format((float) $m->qtd_fruta_um, 2, ',', '.') }}</td>
-                                <td class="text-end">{{ number_format((float) $m->qtd_fruta_kg, 2, ',', '.') }}</td>
-                                <td class="text-end">R$ {{ number_format((float) $m->valor_nf_total, 2, ',', '.') }}</td>
-                                <td>{{ $m->frete?->nome ?? '—' }}</td>
-                                <td class="text-end">
-                                    @can('movimentacoes.compras.visualizar')
-                                        <a href="{{ route('admin.movimentacoes.compras.show', $m) }}" class="btn btn-light btn-sm" title="Ver">
-                                            <i class="ri-eye-line"></i> Ver
-                                        </a>
-                                    @endcan
-                                    @can('movimentacoes.compras.editar')
-                                        <a href="{{ route('admin.movimentacoes.compras.edit', $m) }}" class="btn btn-light btn-sm" title="Editar">
-                                            <i class="ri-pencil-line"></i> Editar
-                                        </a>
-                                    @endcan
-                                </td>
-                            </tr>
-                        @empty
-                            <tr>
-                                <td colspan="11" class="text-center text-muted py-4">Nenhuma compra registrada.</td>
-                            </tr>
-                        @endforelse
-                    </tbody>
-                </table>
-            </div>
-        </div>
-        @if ($movimentacoes->hasPages())
-            <div class="card-footer">
-                {{ $movimentacoes->links() }}
-            </div>
-        @endif
-    </div>
+        </x-slot:actions>
+
+        @include('admin.movimentacoes.compras._table', [
+            'movimentacoes' => $movimentacoes,
+        ])
+    </x-admin.datatable>
 @endsection

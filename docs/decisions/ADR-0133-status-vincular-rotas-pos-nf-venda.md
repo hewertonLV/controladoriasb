@@ -12,10 +12,10 @@ A validação de rota obrigatória para lojas com quantidade na matriz bloqueava
 
 - Inserir status `VINCULAR_ROTAS_NOS_PEDIDOS` («Vincular rotas nos pedidos») **depois** do upload da NF de venda.
 - No upload: manter `GerarVendasCaptacaoLoteService` (movimentações) e **não** exigir rota; avançar para `VINCULAR_ROTAS_NOS_PEDIDOS`.
-- Se, ao entrar nesse status, todas as lojas com quantidade já tiverem rota, avançar **automaticamente** para `VENDAS_FINALIZADAS`.
-- Se houver pendência: operador vincula rotas na matriz e clica **Concluído** (pipeline) para validar rotas e ir a `VENDAS_FINALIZADAS`.
-- Ao vincular rota na matriz, reavaliar auto-avanço quando o lote estiver em `VINCULAR_ROTAS_NOS_PEDIDOS`.
-- A validação `assertPedidosComQuantidadeTemRota` deixa de rodar no upload e passa a valer só na conclusão da etapa de rotas.
+- O avanço para `VENDAS_FINALIZADAS` **não é automático**; o operador clica **Concluir rotas e carregamento** no pipeline.
+- Na conclusão, validar rota (`assertPedidosComQuantidadeTemRota`) e ordem de carregamento (`assertPedidosComQuantidadeTemOrdemCarregamento`) para cada loja com quantidade.
+- Rotas na aba **Rotas** (salvamento automático ao selecionar); ordem na aba **Por rota**.
+- Sem rota ou sem ordem: o botão de conclusão retorna erro e o status não muda.
 
 ## Alternativas consideradas
 

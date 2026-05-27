@@ -56,6 +56,7 @@ final class CaptacaoLoteTimelineUi
             CaptacaoLoteStatus::TransferenciaFinalizada,
             CaptacaoLoteStatus::FaturamentoCiganIniciado,
             CaptacaoLoteStatus::VincularRotasNosPedidos,
+            CaptacaoLoteStatus::VincularFreteVenda,
             CaptacaoLoteStatus::VendasFinalizadas,
         ];
     }
@@ -120,8 +121,9 @@ final class CaptacaoLoteTimelineUi
             CaptacaoLoteStatus::AguardandoVinculoFrete => 'Transferências gerenciais efetivadas no SB. Vincule fretes na aba Frete HUB x CD (opcional) e conclua a etapa de frete.',
             CaptacaoLoteStatus::TransferenciaFinalizada => 'Transferência encerrada. Romaneio principal imutável. Ajuste preços na matriz até iniciar o faturamento no Cigam.',
             CaptacaoLoteStatus::FaturamentoCiganIniciado => 'Baixe o TXT de vendas na aba Arquivo Cigam Venda, importe no Cigam e envie a NF no SB para efetivar as movimentações de venda. Preços travados na matriz.',
-            CaptacaoLoteStatus::VincularRotasNosPedidos => 'NF recebida e vendas movimentadas no SB. Vincule a rota de cada loja com quantidade na aba Rotas. Se todas já estiverem vinculadas, o lote avança automaticamente; caso contrário, clique em Concluído.',
-            CaptacaoLoteStatus::VendasFinalizadas => 'Vendas efetivadas no SB. Ciclo do lote concluído.',
+            CaptacaoLoteStatus::VincularRotasNosPedidos => 'NF recebida e vendas movimentadas no SB. Vincule a rota de cada loja (aba Rotas) e a ordem de carregamento (aba Por rota). Quando tudo estiver preenchido, clique em Concluir rotas e carregamento.',
+            CaptacaoLoteStatus::VincularFreteVenda => 'Rotas concluídas. Na aba Frete Vendas, vincule frete por loja se necessário (opcional) e clique em Concluir frete venda.',
+            CaptacaoLoteStatus::VendasFinalizadas => 'Vendas e fretes concluídos no SB. Ciclo do lote encerrado.',
             default => $status->label(),
         };
     }

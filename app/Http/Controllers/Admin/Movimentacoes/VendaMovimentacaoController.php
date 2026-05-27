@@ -36,8 +36,7 @@ class VendaMovimentacaoController extends Controller
         $movimentacoes = $query
             ->orderByDesc('data_movimentacao')
             ->orderByDesc('id')
-            ->paginate(15)
-            ->withQueryString();
+            ->get();
 
         return view('admin.movimentacoes.vendas.index', ['movimentacoes' => $movimentacoes]);
     }
@@ -65,7 +64,7 @@ class VendaMovimentacaoController extends Controller
 
     public function show(Movimentacao $movimentacaoVenda): View
     {
-        $movimentacaoVenda->load(['vendaNota', 'empresaOrigem', 'empresaDestino', 'unidadeFaturamento', 'fruta', 'canceladaPor']);
+        $movimentacaoVenda->load(['vendaNota', 'empresaOrigem', 'empresaDestino', 'unidadeFaturamento', 'unidadeEstoque', 'fruta', 'canceladaPor']);
         $itens = $this->itensDaMesmaVenda($movimentacaoVenda);
 
         return view('admin.movimentacoes.vendas.show', [
@@ -111,7 +110,7 @@ class VendaMovimentacaoController extends Controller
             : $movimentacao->status_registro;
 
         $query = Movimentacao::query()
-            ->with(['vendaNota', 'empresaOrigem', 'empresaDestino', 'unidadeFaturamento', 'fruta', 'canceladaPor'])
+            ->with(['vendaNota', 'empresaOrigem', 'empresaDestino', 'unidadeFaturamento', 'unidadeEstoque', 'fruta', 'canceladaPor'])
             ->where('categoria_movimentacao_id', CategoriaMovimentacaoTipo::Venda->value)
             ->where('status_movimentacao_id', StatusMovimentacao::ID_SAIDA)
             ->whereIn('status_registro', [

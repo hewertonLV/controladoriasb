@@ -12,7 +12,7 @@
             <strong>Lote #{{ $lote->id }}</strong>
         </div>
     @endif
-    <div class="card-body pb-2">
+    <div class="card-body py-2 px-3">
         @include('admin.captacao._lote-info-acoes', [
             'lote' => $lote,
             'modoCabecalho' => $modoCabecalho ?? 'timeline',
@@ -29,23 +29,23 @@
                         'captacao-timeline-step--atual' => $passo['estado'] === 'atual',
                         'captacao-timeline-step--pendente' => $passo['estado'] === 'pendente',
                     ])>
-                        <span class="captacao-timeline-marker" aria-hidden="true">
-                            @if ($passo['estado'] === 'concluido')
-                                <i class="ri-check-line"></i>
-                            @elseif ($passo['estado'] === 'atual')
-                                <i class="ri-focus-3-line"></i>
-                            @else
-                                <i class="ri-circle-line"></i>
-                            @endif
-                        </span>
+                        @if ($passo['estado'] !== 'concluido')
+                            <span class="captacao-timeline-marker" aria-hidden="true">
+                                @if ($passo['estado'] === 'atual')
+                                    <i class="ri-focus-3-line"></i>
+                                @else
+                                    <i class="ri-circle-line"></i>
+                                @endif
+                            </span>
+                        @endif
                         <div class="captacao-timeline-content">
                             <span class="captacao-timeline-label">{{ $passo['label'] }}</span>
                             @if ($passo['estado'] === 'atual')
-                                <span class="badge bg-primary-subtle text-primary">Agora</span>
+                                <span class="badge bg-primary-subtle text-primary captacao-timeline-badge">Agora</span>
                             @elseif ($passo['estado'] === 'concluido')
-                                <span class="badge bg-success-subtle text-success">Concluído</span>
+                                <span class="badge bg-success-subtle text-success captacao-timeline-badge">Concluído</span>
                             @else
-                                <span class="badge bg-secondary-subtle text-secondary">Próximo</span>
+                                <span class="badge bg-secondary-subtle text-secondary captacao-timeline-badge">Próximo</span>
                             @endif
                         </div>
                     </li>
@@ -53,7 +53,7 @@
             </ol>
         </div>
 
-        <div class="captacao-timeline-descricao mt-2 mb-0 py-2 px-3 small">
+        <div class="captacao-timeline-descricao mt-1 mb-0 py-1 px-2 small">
             <i class="ri-information-line me-1"></i>
             <strong>Neste momento:</strong> {{ $descricaoAtual }}
         </div>
@@ -68,17 +68,21 @@
 @once
     @push('head')
         <style>
+            .captacao-lote-timeline .card-header {
+                padding: 0.35rem 0.75rem;
+            }
+
             .captacao-timeline-scroll {
                 overflow-x: auto;
                 overflow-y: hidden;
                 -webkit-overflow-scrolling: touch;
-                padding-bottom: 0.25rem;
+                padding-bottom: 0.1rem;
             }
 
             .captacao-timeline-steps {
                 display: flex;
                 flex-wrap: nowrap;
-                gap: 0.5rem;
+                gap: 0.3rem;
                 padding: 0;
                 min-width: min-content;
             }
@@ -86,12 +90,12 @@
             .captacao-timeline-step {
                 display: flex;
                 align-items: flex-start;
-                gap: 0.4rem;
+                gap: 0.25rem;
                 flex: 0 0 auto;
-                min-width: 9.5rem;
-                max-width: 11rem;
-                padding: 0.4rem 0.55rem;
-                border-radius: 0.375rem;
+                min-width: 6.75rem;
+                max-width: 8.5rem;
+                padding: 0.2rem 0.35rem;
+                border-radius: 0.25rem;
                 --captacao-timeline-step-bg: transparent;
                 --captacao-timeline-step-border: var(--bs-border-color);
                 background-color: var(--captacao-timeline-step-bg);
@@ -129,14 +133,12 @@
                 display: inline-flex;
                 align-items: center;
                 justify-content: center;
-                width: 1.35rem;
-                height: 1.35rem;
+                width: 1rem;
+                height: 1rem;
                 flex-shrink: 0;
-                font-size: 0.95rem;
-            }
-
-            .captacao-timeline-step--concluido .captacao-timeline-marker {
-                color: var(--bs-success);
+                font-size: 0.85rem;
+                line-height: 1;
+                margin-top: 0.05rem;
             }
 
             .captacao-timeline-step--atual .captacao-timeline-marker {
@@ -149,19 +151,24 @@
 
             .captacao-timeline-content {
                 min-width: 0;
+                display: flex;
+                flex-direction: column;
+                gap: 0.1rem;
             }
 
             .captacao-timeline-label {
                 display: block;
-                font-size: 0.75rem;
+                font-size: 0.68rem;
                 font-weight: 600;
-                line-height: 1.2;
+                line-height: 1.15;
                 color: var(--bs-body-color);
             }
 
-            .captacao-timeline-step .badge {
-                font-size: 0.65rem;
-                margin-top: 0.15rem;
+            .captacao-timeline-badge {
+                align-self: flex-start;
+                font-size: 0.6rem;
+                font-weight: 500;
+                padding: 0.1em 0.4em;
             }
 
             .captacao-timeline-descricao {

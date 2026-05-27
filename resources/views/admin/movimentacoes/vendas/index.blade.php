@@ -6,76 +6,45 @@
 @section('content')
     <x-admin.flash-messages />
 
-    <div class="card">
-        <div class="card-header d-flex align-items-center flex-wrap gap-2">
-            <div>
-                <h4 class="header-title mb-0">Vendas</h4>
-                <p class="text-muted mb-0 small">Saídas comerciais/fiscais por item de fruta (versão ativa).</p>
-            </div>
-            <div class="ms-auto d-flex flex-wrap gap-2">
-                @can('movimentacoes.vendas.importar')
-                    <a href="{{ route('admin.movimentacoes.vendas.importar') }}" class="btn btn-soft-primary btn-sm">
-                        <i class="ri-file-excel-2-line me-1"></i> Importar NF de vendas
-                    </a>
-                @endcan
-                @can('movimentacoes.vendas.criar')
-                    <a href="{{ route('admin.movimentacoes.vendas.create') }}" class="btn btn-primary btn-sm">
-                        <i class="ri-add-line me-1"></i> Nova venda
-                    </a>
-                @endcan
-            </div>
-        </div>
-        <div class="card-body p-0">
-            <div class="table-responsive">
-                <table class="table table-hover table-striped mb-0 align-middle">
-                    <thead class="table-light">
-                        <tr>
-                            <th>Data</th>
-                            <th>NF</th>
-                            <th>Origem</th>
-                            <th>Cliente</th>
-                            <th>Fruta</th>
-                            <th class="text-end">Kg</th>
-                            <th class="text-end">Venda</th>
-                            <th class="text-end">Res.</th>
-                            <th class="text-end">Ações</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        @forelse ($movimentacoes as $m)
-                            <tr>
-                                <td>{{ $m->data_movimentacao?->format('d/m/Y H:i') }}</td>
-                                <td>{{ $m->vendaNota?->numero_nf ?? '—' }}</td>
-                                <td>{{ $m->empresaOrigem?->nomeExibicao() ?? '—' }}</td>
-                                <td>{{ $m->empresaDestino?->nomeExibicao() ?? '—' }}</td>
-                                <td>{{ $m->fruta?->nome ?? '—' }}</td>
-                                <td class="text-end">{{ number_format((float) $m->qtd_fruta_kg, 2, ',', '.') }}</td>
-                                <td class="text-end">R$ {{ number_format((float) $m->valor_nf_total, 2, ',', '.') }}</td>
-                                <td class="text-end">R$ {{ number_format((float) $m->resultado_movimentacao, 2, ',', '.') }}</td>
-                                <td class="text-end">
-                                    @can('movimentacoes.vendas.visualizar')
-                                        <a href="{{ route('admin.movimentacoes.vendas.show', $m) }}" class="btn btn-light btn-sm" title="Ver">
-                                            <i class="ri-eye-line"></i> Ver
-                                        </a>
-                                    @endcan
-                                    @can('movimentacoes.vendas.editar')
-                                        <a href="{{ route('admin.movimentacoes.vendas.edit', $m) }}" class="btn btn-light btn-sm" title="Editar">
-                                            <i class="ri-pencil-line"></i> Editar
-                                        </a>
-                                    @endcan
-                                </td>
-                            </tr>
-                        @empty
-                            <tr>
-                                <td colspan="9" class="text-center text-muted py-4">Nenhuma venda registrada.</td>
-                            </tr>
-                        @endforelse
-                    </tbody>
-                </table>
-            </div>
-        </div>
-        @if ($movimentacoes->hasPages())
-            <div class="card-footer">{{ $movimentacoes->links() }}</div>
-        @endif
-    </div>
+    <x-admin.datatable
+        title="Vendas"
+        subtitle="Saídas comerciais/fiscais por item de fruta (versão ativa)."
+        table-id="vendas-movimentacao-datatable"
+        root-id="vendas-movimentacao-table-root"
+        print-title="Movimentação — Vendas"
+        entity-label="movimentações"
+        entity-label-singular="movimentação"
+        :order="[0, 'desc']"
+        :sort-column-map="[
+            0 => 'data_movimentacao',
+            1 => 'numero_nf',
+            2 => 'origem',
+            3 => 'cliente',
+            4 => 'fruta',
+            5 => 'qtd_fruta_kg',
+            6 => 'valor_nf_total',
+            7 => 'resultado_movimentacao',
+        ]"
+        :column-defs="[
+            ['targets' => -1, 'orderable' => false, 'searchable' => false],
+            ['targets' => [5, 6, 7], 'className' => 'text-end'],
+        ]"
+    >
+        <x-slot:actions>
+            @can('movimentacoes.vendas.importar')
+                <a href="{{ route('admin.movimentacoes.vendas.importar') }}" class="btn btn-soft-primary btn-sm">
+                    <i class="ri-file-excel-2-line me-1"></i> Importar NF de vendas
+                </a>
+            @endcan
+            @can('movimentacoes.vendas.criar')
+                <a href="{{ route('admin.movimentacoes.vendas.create') }}" class="btn btn-primary btn-sm">
+                    <i class="ri-add-line me-1"></i> Nova venda
+                </a>
+            @endcan
+        </x-slot:actions>
+
+        @include('admin.movimentacoes.vendas._table', [
+            'movimentacoes' => $movimentacoes,
+        ])
+    </x-admin.datatable>
 @endsection

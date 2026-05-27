@@ -13,6 +13,7 @@ use App\Models\Movimentacao;
 use App\Models\MovimentacaoEstoque;
 use App\Models\StatusMovimentacao;
 use App\Models\UnidadeNegocio;
+use App\Support\Movimentacoes\VendaCustoOperacionalHub;
 use Illuminate\Support\Collection;
 use InvalidArgumentException;
 
@@ -23,8 +24,7 @@ class ReplayLinhaTempoEstoqueService
 {
     public function reprocessarUnidadeFruta(int $idUnidadeNegocio, int $idFruta): void
     {
-        $empresaId = $this->empresaIdDaUnidade($idUnidadeNegocio);
-        $eventos = $this->eventos($empresaId, $idFruta);
+        $eventos = $this->eventos($idUnidadeNegocio, $idFruta);
         $primeiroEvento = $eventos->first();
         $baselineId = $primeiroEvento !== null
             ? (int) ($primeiroEvento['movimentacao']->id_movimentacao_estoque_old ?? 0)
@@ -39,8 +39,7 @@ class ReplayLinhaTempoEstoqueService
      */
     public function reprocessarUnidadeFrutaAposCancelamentoSaida(int $idUnidadeNegocio, int $idFruta, Movimentacao $saidaCancelada): void
     {
-        $empresaId = $this->empresaIdDaUnidade($idUnidadeNegocio);
-        $todosEventos = $this->eventos($empresaId, $idFruta);
+        $todosEventos = $this->eventos($idUnidadeNegocio, $idFruta);
         $chaveCancelada = $this->chaveOrdenacao($saidaCancelada);
 
         $eventosPosteriores = $todosEventos
@@ -185,9 +184,8 @@ class ReplayLinhaTempoEstoqueService
 
         MovimentacaoEstoque::query()->whereKey($ultimaMeId)->update(['status_ultima_posicao' => true]);
 
-        $ultimaPosicao = MovimentacaoEstoque::query()->find($ultimaMeId);
-        $precoMedioKg = $ultimaPosicao !== null ? (float) $ultimaPosicao->preco_medio_kg : ($runKg > 0 ? round($valorAcumulado / $runKg, 2) : 0.0);
-        $precoMedioUm = $ultimaPosicao !== null ? (float) $ultimaPosicao->preco_medio_um : round($precoMedioKg * $kgPorUm, 2);
+        $precoMedioKg = $runKg > 0 ? round($valorAcumulado / $runKg, 2) : 0.0;
+        $precoMedioUm = $runKg > 0 ? round($precoMedioKg * $kgPorUm, 2) : 0.0;
 
         $estoque->forceFill([
             'qtd_fruta_kg' => number_format($runKg, 2, '.', ''),
@@ -214,8 +212,10 @@ class ReplayLinhaTempoEstoqueService
     /**
      * @return Collection<int, array{tipo: 'entrada'|'saida', movimentacao: Movimentacao}>
      */
-    private function eventos(int $empresaId, int $idFruta): Collection
+    private function eventos(int $idUnidadeNegocio, int $idFruta): Collection
     {
+        $empresaId = $this->empresaIdDaUnidade($idUnidadeNegocio);
+
         $entradasCompra = Movimentacao::query()
             ->vigentesParaCalculo()
             ->where('categoria_movimentacao_id', CategoriaMovimentacaoTipo::Compra->value)
@@ -288,6 +288,20 @@ class ReplayLinhaTempoEstoqueService
             ->where('id_fruta', $idFruta)
             ->get()
             ->map(static fn (Movimentacao $m): array => ['tipo' => 'saida', 'movimentacao' => $m]);
+
+        $saidasVendaEstoqueFisico = Movimentacao::query()
+            ->vigentesParaCalculo()
+            ->where('categoria_movimentacao_id', CategoriaMovimentacaoTipo::Venda->value)
+            ->where('status_movimentacao_id', StatusMovimentacao::ID_SAIDA)
+            ->where('id_unidade_negocio_estoque', $idUnidadeNegocio)
+            ->where('id_fruta', $idFruta)
+            ->get()
+            ->map(static fn (Movimentacao $m): array => ['tipo' => 'saida', 'movimentacao' => $m]);
+
+        $saidasVenda = $saidasVenda
+            ->concat($saidasVendaEstoqueFisico)
+            ->unique(static fn (array $evento): int => (int) $evento['movimentacao']->id)
+            ->values();
 
         $saidasTransferencia = Movimentacao::query()
             ->vigentesParaCalculo()
@@ -405,13 +419,17 @@ class ReplayLinhaTempoEstoqueService
         $qKg = (float) $m->qtd_fruta_kg;
 
         $isVenda = (int) $m->categoria_movimentacao_id === CategoriaMovimentacaoTipo::Venda->value;
-        $precoMedioKg = $runKg > 0 ? round($valorAcumulado / $runKg, 2) : 0.0;
-        $precoMedioUm = round($precoMedioKg * $kgPorUm, 2);
-        $valorMovimentacao = round($precoMedioKg * $qKg, 2);
+        $precoMedioKgAntes = $runKg > 0 ? round($valorAcumulado / $runKg, 2) : 0.0;
+        $valorMovimentacao = round($precoMedioKgAntes * $qKg, 2);
+        if ($isVenda && VendaCustoOperacionalHub::coEmbutidoNoCustoSaida($m)) {
+            $valorMovimentacao = round($valorMovimentacao + (float) $m->valor_custo_operacional * $qKg, 2);
+        }
 
         $runUm = round($runUm - $qUm, 2);
         $runKg = round($runKg - $qKg, 2);
         $valorAcumulado = round($valorAcumulado - $valorMovimentacao, 2);
+        $precoMedioKg = $runKg > 0 ? round($valorAcumulado / $runKg, 2) : 0.0;
+        $precoMedioUm = round($precoMedioKg * $kgPorUm, 2);
 
         $me = $this->salvarMovimentacaoEstoque(
             $m,
@@ -450,7 +468,13 @@ class ReplayLinhaTempoEstoqueService
             $attrs['valor_custo_saida'] = number_format($valorMovimentacao, 2, '.', '');
             $attrs['valor_total_movimentacao'] = number_format($valorMovimentacao, 2, '.', '');
             $attrs['resultado_movimentacao'] = number_format(
-                round((float) $m->valor_nf_total - $valorMovimentacao - (float) $m->valor_frete_rateio, 2),
+                round(
+                    (float) $m->valor_nf_total
+                    - $valorMovimentacao
+                    - VendaCustoOperacionalHub::valorCoTotalDescontadoNaMargem($m)
+                    - (float) $m->valor_frete_rateio,
+                    2,
+                ),
                 2,
                 '.',
                 '',

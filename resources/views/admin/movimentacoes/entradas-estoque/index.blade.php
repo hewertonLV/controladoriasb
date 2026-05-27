@@ -6,60 +6,38 @@
 @section('content')
     <x-admin.flash-messages />
 
-    <div class="card">
-        <div class="card-header d-flex align-items-center flex-wrap gap-2">
-            <div>
-                <h4 class="header-title mb-0">Entradas de estoque</h4>
-                <p class="text-muted mb-0 small">Produção interna — aumenta saldo e recalcula preço médio.</p>
-            </div>
+    <x-admin.datatable
+        title="Entradas de estoque"
+        subtitle="Produção interna — aumenta saldo e recalcula preço médio."
+        table-id="entradas-estoque-movimentacao-datatable"
+        root-id="entradas-estoque-movimentacao-table-root"
+        print-title="Movimentação — Entradas de estoque"
+        entity-label="movimentações"
+        entity-label-singular="movimentação"
+        :order="[0, 'desc']"
+        :sort-column-map="[
+            0 => 'data_movimentacao',
+            1 => 'unidade',
+            2 => 'fruta',
+            3 => 'qtd_fruta_um',
+            4 => 'valor_nf_um',
+            5 => 'valor_nf_total',
+        ]"
+        :column-defs="[
+            ['targets' => -1, 'orderable' => false, 'searchable' => false],
+            ['targets' => [3, 4, 5], 'className' => 'text-end'],
+        ]"
+    >
+        <x-slot:actions>
             @can('movimentacoes.entradas-estoque.criar')
-                <a href="{{ route('admin.movimentacoes.entradas-estoque.create') }}" class="btn btn-primary btn-sm ms-auto">
+                <a href="{{ route('admin.movimentacoes.entradas-estoque.create') }}" class="btn btn-primary btn-sm">
                     <i class="ri-add-line me-1"></i> Nova entrada
                 </a>
             @endcan
-        </div>
-        <div class="card-body p-0">
-            <div class="table-responsive">
-                <table class="table table-hover table-striped mb-0 align-middle">
-                    <thead class="table-light">
-                        <tr>
-                            <th>Data</th>
-                            <th>Unidade</th>
-                            <th>Fruta</th>
-                            <th class="text-end">Qtd UM</th>
-                            <th class="text-end">Preço / UM</th>
-                            <th class="text-end">Valor total</th>
-                            <th class="text-end">Ações</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        @forelse ($movimentacoes as $m)
-                            <tr>
-                                <td>{{ $m->data_movimentacao?->format('d/m/Y H:i') }}</td>
-                                <td>{{ $m->empresaOrigem?->nomeExibicao() ?? '—' }}</td>
-                                <td>{{ $m->fruta?->nome ?? '—' }}</td>
-                                <td class="text-end">{{ number_format((float) $m->qtd_fruta_um, 2, ',', '.') }}</td>
-                                <td class="text-end">R$ {{ number_format((float) $m->valor_nf_um, 2, ',', '.') }}</td>
-                                <td class="text-end">R$ {{ number_format((float) $m->valor_nf_total, 2, ',', '.') }}</td>
-                                <td class="text-end">
-                                    @can('movimentacoes.entradas-estoque.visualizar')
-                                        <a href="{{ route('admin.movimentacoes.entradas-estoque.show', $m) }}" class="btn btn-light btn-sm">
-                                            <i class="ri-eye-line"></i> Ver
-                                        </a>
-                                    @endcan
-                                </td>
-                            </tr>
-                        @empty
-                            <tr>
-                                <td colspan="7" class="text-center text-muted py-4">Nenhuma entrada de estoque registrada.</td>
-                            </tr>
-                        @endforelse
-                    </tbody>
-                </table>
-            </div>
-        </div>
-        @if ($movimentacoes->hasPages())
-            <div class="card-footer">{{ $movimentacoes->links() }}</div>
-        @endif
-    </div>
+        </x-slot:actions>
+
+        @include('admin.movimentacoes.entradas-estoque._table', [
+            'movimentacoes' => $movimentacoes,
+        ])
+    </x-admin.datatable>
 @endsection

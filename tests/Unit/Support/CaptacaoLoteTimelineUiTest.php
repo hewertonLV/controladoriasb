@@ -19,7 +19,7 @@ class CaptacaoLoteTimelineUiTest extends TestCase
 
         $passos = CaptacaoLoteTimelineUi::passos($lote);
 
-        $this->assertCount(9, $passos);
+        $this->assertCount(10, $passos);
         $this->assertSame('concluido', $passos[0]['estado']);
         $this->assertSame('concluido', $passos[1]['estado']);
         $this->assertSame('atual', $passos[2]['estado']);

@@ -1326,6 +1326,10 @@ Route::middleware(['auth', 'verified', 'user.active', 'password.changed'])->grou
                 ->middleware('permission:captacao.lote.venda.finalizar')
                 ->name('lotes.nf-venda-cigan.download');
 
+            Route::post('/lotes/{lote}/pipeline/sincronizar-vendas-pendentes', [CaptacaoLotePipelineController::class, 'sincronizarVendasPendentes'])
+                ->middleware('permission:captacao.lote.venda.finalizar')
+                ->name('lotes.pipeline.sincronizar-vendas-pendentes');
+
             Route::post('/lotes/{lote}/nf-transferencia-cigan', [CaptacaoLotePipelineController::class, 'uploadNfTransferencia'])
                 ->middleware('permission:captacao.lote.transferencia.validar')
                 ->name('lotes.nf-transferencia-cigan.upload');
@@ -1357,6 +1361,10 @@ Route::middleware(['auth', 'verified', 'user.active', 'password.changed'])->grou
             Route::post('/lotes/{lote}/pipeline/concluir-vinculo-rotas', [CaptacaoLotePipelineController::class, 'concluirVinculoRotas'])
                 ->middleware('permission:captacao.lote.venda.finalizar')
                 ->name('lotes.pipeline.concluir-vinculo-rotas');
+
+            Route::post('/lotes/{lote}/pipeline/concluir-frete-venda', [CaptacaoLotePipelineController::class, 'concluirFreteVenda'])
+                ->middleware('permission:captacao.lote.venda.finalizar')
+                ->name('lotes.pipeline.concluir-frete-venda');
 
             Route::get('/alertas', [AlertasComerciaisController::class, 'index'])
                 ->middleware('permission:captacao.alertas.visualizar')

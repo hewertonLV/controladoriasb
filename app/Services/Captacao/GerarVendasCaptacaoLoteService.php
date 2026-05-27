@@ -3,10 +3,13 @@
 namespace App\Services\Captacao;
 
 use App\Enums\CaptacaoLoteTipo;
+use App\Enums\MovimentacaoStatusRegistro;
 use App\Models\Captacao\CaptacaoLote;
 use App\Models\Captacao\CaptacaoLoteFreteLinha;
 use App\Models\Captacao\CaptacaoLoteMovimentacao;
+use App\Models\Captacao\Pedido;
 use App\Models\Cliente;
+use App\Models\Movimentacao;
 use App\Models\UnidadeNegocio;
 use App\Models\User;
 use App\Models\VendaNota;
@@ -31,19 +34,6 @@ final class GerarVendasCaptacaoLoteService
             ]);
         }
 
-        if (CaptacaoLoteMovimentacao::query()
-            ->where('id_captacao_lote', $lote->id)
-            ->where('tipo', CaptacaoLoteMovimentacao::TIPO_VENDA_NOTA)
-            ->exists()) {
-            return CaptacaoLoteMovimentacao::query()
-                ->where('id_captacao_lote', $lote->id)
-                ->where('tipo', CaptacaoLoteMovimentacao::TIPO_VENDA_NOTA)
-                ->pluck('venda_nota_id')
-                ->filter()
-                ->map(fn ($id) => (int) $id)
-                ->all();
-        }
-
         $lote->load(['pedidos.itens.fruta', 'pedidos.cliente']);
 
         $faturamento = UnidadeNegocio::query()->findOrFail($lote->id_unidade_negocio_faturamento);
@@ -58,6 +48,23 @@ final class GerarVendasCaptacaoLoteService
 
         DB::transaction(function () use ($lote, $user, $faturamento, $galpao, $empresaFaturamento, $fretesPorFruta, &$notaIds): void {
             foreach ($lote->pedidos as $pedido) {
+                if ($this->pedidoVendaJaSincronizada($lote, $pedido)) {
+                    $notaExistente = $this->vendaNotaDoPedido($lote, $pedido);
+                    if ($notaExistente !== null) {
+                        $notaIds[] = $notaExistente->id;
+                    }
+
+                    continue;
+                }
+
+                $notaExistente = $this->vendaNotaDoPedido($lote, $pedido);
+                if ($notaExistente !== null) {
+                    $this->garantirVinculoVendaNota($lote, $notaExistente);
+                    $notaIds[] = $notaExistente->id;
+
+                    continue;
+                }
+
                 if ($pedido->itens->isEmpty()) {
                     continue;
                 }
@@ -115,13 +122,127 @@ final class GerarVendasCaptacaoLoteService
             }
         });
 
-        if ($notaIds === [] && $lote->pedidos->isNotEmpty()) {
+        $notaIds = array_values(array_unique($notaIds));
+
+        if ($notaIds === [] && $this->pedidosComQuantidade($lote)->isNotEmpty()) {
             throw ValidationException::withMessages([
                 'vendas' => 'Nenhuma venda foi gerada. Verifique itens com quantidade e preço.',
             ]);
         }
 
         return $notaIds;
+    }
+
+    /**
+     * Resumo por loja: itens captados vs movimentações de venda geradas no SB.
+     *
+     * @return list<array{
+     *     id_cliente: int,
+     *     loja_nome: string,
+     *     itens_captados: int,
+     *     movimentacoes: int,
+     *     numero_nf: string|null,
+     *     completo: bool,
+     * }>
+     */
+    public function resumoVendasLote(CaptacaoLote $lote): array
+    {
+        $lote->loadMissing(['pedidos.itens', 'pedidos.cliente']);
+
+        $resumo = [];
+
+        foreach ($lote->pedidos as $pedido) {
+            $itensCaptados = $pedido->itens->filter(static fn ($item) => (float) $item->quantidade > 0)->count();
+            if ($itensCaptados === 0) {
+                continue;
+            }
+
+            $nota = $this->vendaNotaDoPedido($lote, $pedido);
+            $movimentacoes = $nota === null
+                ? 0
+                : Movimentacao::query()
+                    ->where('venda_nota_id', $nota->id)
+                    ->where('status_registro', MovimentacaoStatusRegistro::ATIVO->value)
+                    ->count();
+
+            $resumo[] = [
+                'id_cliente' => $pedido->id_cliente,
+                'loja_nome' => $pedido->cliente?->fantasia ?: $pedido->cliente?->razao_social ?: "Cliente #{$pedido->id_cliente}",
+                'itens_captados' => $itensCaptados,
+                'movimentacoes' => $movimentacoes,
+                'numero_nf' => $nota?->numero_nf,
+                'completo' => $nota !== null && $movimentacoes === $itensCaptados,
+            ];
+        }
+
+        return $resumo;
+    }
+
+    public function possuiVendasPendentes(CaptacaoLote $lote): bool
+    {
+        foreach ($this->resumoVendasLote($lote) as $linha) {
+            if (! $linha['completo']) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private function pedidoVendaJaSincronizada(CaptacaoLote $lote, Pedido $pedido): bool
+    {
+        $itensCaptados = $pedido->itens->filter(static fn ($item) => (float) $item->quantidade > 0)->count();
+        if ($itensCaptados === 0) {
+            return true;
+        }
+
+        $nota = $this->vendaNotaDoPedido($lote, $pedido);
+        if ($nota === null) {
+            return false;
+        }
+
+        $vinculo = CaptacaoLoteMovimentacao::query()
+            ->where('id_captacao_lote', $lote->id)
+            ->where('tipo', CaptacaoLoteMovimentacao::TIPO_VENDA_NOTA)
+            ->where('venda_nota_id', $nota->id)
+            ->exists();
+
+        if (! $vinculo) {
+            return false;
+        }
+
+        $movimentacoes = Movimentacao::query()
+            ->where('venda_nota_id', $nota->id)
+            ->where('status_registro', MovimentacaoStatusRegistro::ATIVO->value)
+            ->count();
+
+        return $movimentacoes === $itensCaptados;
+    }
+
+    private function vendaNotaDoPedido(CaptacaoLote $lote, Pedido $pedido): ?VendaNota
+    {
+        return VendaNota::query()
+            ->where('numero_nf', $this->numeroNfCaptacao($lote, $pedido->id_cliente))
+            ->first();
+    }
+
+    /**
+     * @return \Illuminate\Support\Collection<int, Pedido>
+     */
+    private function pedidosComQuantidade(CaptacaoLote $lote)
+    {
+        return $lote->pedidos->filter(function (Pedido $pedido): bool {
+            return $pedido->itens->contains(static fn ($item) => (float) $item->quantidade > 0);
+        });
+    }
+
+    private function garantirVinculoVendaNota(CaptacaoLote $lote, VendaNota $nota): void
+    {
+        CaptacaoLoteMovimentacao::query()->firstOrCreate([
+            'id_captacao_lote' => $lote->id,
+            'tipo' => CaptacaoLoteMovimentacao::TIPO_VENDA_NOTA,
+            'venda_nota_id' => $nota->id,
+        ]);
     }
 
     private function numeroNfCaptacao(CaptacaoLote $lote, int $idCliente): string

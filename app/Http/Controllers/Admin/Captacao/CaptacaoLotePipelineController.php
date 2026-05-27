@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Admin\Captacao;
 use App\Actions\Captacao\ConcluirEtapaFreteLoteAction;
 use App\Actions\Captacao\ConcluirSaidaEstoqueFisicoLoteAction;
 use App\Actions\Captacao\DefinirHubOrigemCiganLoteAction;
+use App\Actions\Captacao\ConcluirFreteVendaCaptacaoLoteAction;
 use App\Actions\Captacao\ConcluirVinculoRotasCaptacaoLoteAction;
 use App\Actions\Captacao\FinalizarVendasLoteAction;
 use App\Enums\CaptacaoLoteStatus;
@@ -20,6 +21,7 @@ use App\Http\Requests\Admin\Captacao\UploadNfVendaCiganLoteRequest;
 use App\Models\Captacao\CaptacaoLote;
 use App\Models\Captacao\CaptacaoLoteCiganExport;
 use App\Services\Captacao\GerarArquivoCiganService;
+use App\Services\Captacao\GerarVendasCaptacaoLoteService;
 use App\Services\Captacao\NfTransferenciaEstoqueHubInsuficienteException;
 use App\Services\Permissoes\UnidadeNegocioAccessService;
 use Illuminate\Http\RedirectResponse;
@@ -94,7 +96,17 @@ class CaptacaoLotePipelineController extends Controller
 
         return redirect()
             ->route('admin.captacao.matriz.index', ['lote' => $lote->id, 'aba' => 'frete-vendas'])
-            ->with('success', 'Vínculo de rotas concluído. Vendas finalizadas no SB.');
+            ->with('success', 'Rotas e ordem de carregamento concluídos. Vincule o frete das vendas se necessário.');
+    }
+
+    public function concluirFreteVenda(Request $request, CaptacaoLote $lote): RedirectResponse
+    {
+        $this->assertGalpao($request, $lote);
+        app(ConcluirFreteVendaCaptacaoLoteAction::class)->executar($lote);
+
+        return redirect()
+            ->route('admin.captacao.matriz.index', ['lote' => $lote->id, 'aba' => 'quantidade'])
+            ->with('success', 'Frete de vendas concluído. Lote em vendas finalizadas.');
     }
 
     public function downloadCigan(CaptacaoLoteCiganExport $export): StreamedResponse
@@ -178,6 +190,31 @@ class CaptacaoLotePipelineController extends Controller
         return redirect()
             ->route('admin.captacao.matriz.index', ['lote' => $lote->id, 'aba' => 'rotas'])
             ->with('success', 'NF de venda enviada e vendas movimentadas no SB. Vincule as rotas pendentes e clique em Concluído.');
+    }
+
+    public function sincronizarVendasPendentes(Request $request, CaptacaoLote $lote): RedirectResponse
+    {
+        $this->assertGalpao($request, $lote);
+
+        if (! $lote->possuiNfVenda()) {
+            return back()->withErrors([
+                'vendas' => 'Envie a NF de venda antes de sincronizar as movimentações.',
+            ]);
+        }
+
+        $gerador = app(GerarVendasCaptacaoLoteService::class);
+
+        if (! $gerador->possuiVendasPendentes($lote)) {
+            return redirect()
+                ->route('admin.captacao.matriz.index', ['lote' => $lote->id, 'aba' => 'arquivo-cigan'])
+                ->with('success', 'Todas as lojas com quantidade já possuem movimentação de venda no SB.');
+        }
+
+        $gerador->executar($lote, $request->user());
+
+        return redirect()
+            ->route('admin.captacao.matriz.index', ['lote' => $lote->id, 'aba' => 'arquivo-cigan'])
+            ->with('success', 'Vendas pendentes do lote foram geradas no SB.');
     }
 
     public function downloadNfVenda(Request $request, CaptacaoLote $lote): StreamedResponse

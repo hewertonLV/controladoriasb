@@ -20,6 +20,7 @@ final class CancelarVendaMovimentacaoAdminService
         private readonly VendaMovimentacaoService $vendaMovimentacao,
         private readonly ReprocessaSaidasVendaOrigem $reprocessaSaidasVendaOrigem,
         private readonly MovimentacaoAuditoriaService $auditoria,
+        private readonly RealocacaoEstoqueHubVendaService $realocacaoEstoqueHub,
     ) {}
 
     public function executar(Movimentacao $movimentacao, User $user, string $motivo): void
@@ -97,11 +98,26 @@ final class CancelarVendaMovimentacaoAdminService
                     'motivo_cancelamento' => $motivo,
                 ])->saveQuietly();
 
+                if ($unidadeEstoque->is_hub && (int) ($mov->id_unidade_negocio_faturamento ?? 0) !== (int) $unidadeEstoque->id) {
+                    $this->realocacaoEstoqueHub->reverterRealocacaoAposCancelamentoVenda($mov);
+                }
+
                 $reprocessos[$unidadeEstoque->id.':'.$mov->id_fruta] = [
                     'id_unidade_negocio' => (int) $unidadeEstoque->id,
                     'id_fruta' => (int) $mov->id_fruta,
                     'movimentacao_id' => (int) $mov->id,
                 ];
+
+                $idFaturamento = (int) ($mov->id_unidade_negocio_faturamento ?? 0);
+                if ($idFaturamento > 0
+                    && $idFaturamento !== (int) $unidadeEstoque->id
+                    && $unidadeEstoque->is_hub) {
+                    $reprocessos[$idFaturamento.':'.$mov->id_fruta] = [
+                        'id_unidade_negocio' => $idFaturamento,
+                        'id_fruta' => (int) $mov->id_fruta,
+                        'movimentacao_id' => (int) $mov->id,
+                    ];
+                }
             }
 
             if ($ancora->venda_nota_id !== null) {

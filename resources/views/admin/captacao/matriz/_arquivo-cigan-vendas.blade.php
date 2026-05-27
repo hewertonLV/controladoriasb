@@ -1,5 +1,8 @@
 @php
     /** @var \App\Models\Captacao\CaptacaoLote $lote */
+    /** @var list<array{id_cliente: int, loja_nome: string, itens_captados: int, movimentacoes: int, numero_nf: string|null, completo: bool}> $resumoVendasLote */
+    $resumoVendasLote = $resumoVendasLote ?? [];
+    $vendasLotePendentes = collect($resumoVendasLote)->contains(fn (array $linha) => ! $linha['completo']);
     $lote->loadMissing([
         'unidadeFaturamento',
         'unidadeGalpao',
@@ -31,8 +34,9 @@
         <h6 class="mb-2">NF de venda</h6>
         <p class="text-muted small mb-3">
             Após importar o TXT no Cigam, envie aqui a NF gerada (XML, PDF ou TXT). O sistema
-            <strong>efetiva as movimentações de venda</strong> no SB. Em seguida, vincule as rotas na aba
-            <strong>Rotas</strong> (etapa automática se todas já estiverem vinculadas).
+            <strong>efetiva as movimentações de venda</strong> no SB. Em seguida, vincule as rotas (aba
+            <strong>Rotas</strong>) e a ordem de carregamento (aba <strong>Por rota</strong>) e clique em
+            <strong>Concluir rotas e carregamento</strong>.
         </p>
         @if ($lote->possuiNfVenda())
             <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
@@ -92,15 +96,85 @@
             @endcan
         @elseif ($lote->status === \App\Enums\CaptacaoLoteStatus::VincularRotasNosPedidos)
             <p class="small text-warning mb-0">
-                NF enviada e vendas movimentadas no SB. Vincule as rotas na aba <strong>Rotas</strong> e use o botão
-                <strong>Concluído</strong> no topo do lote para finalizar a etapa.
+                NF enviada e vendas movimentadas no SB. Vincule rotas (aba <strong>Rotas</strong>) e ordem de carregamento
+                (aba <strong>Por rota</strong>). Depois clique em <strong>Concluir rotas e carregamento</strong> no topo do lote.
+            </p>
+        @elseif ($lote->status === \App\Enums\CaptacaoLoteStatus::VincularFreteVenda)
+            <p class="small text-warning mb-0">
+                Rotas concluídas. Vincule frete por loja na aba <strong>Frete Vendas</strong> (opcional) e clique em
+                <strong>Concluir frete venda</strong> no topo do lote.
             </p>
         @elseif ($lote->status === \App\Enums\CaptacaoLoteStatus::VendasFinalizadas)
             <p class="small text-success mb-0">
-                Vendas efetivadas. Use o botão acima para baixar a NF ou vincule frete na aba <strong>Frete Vendas</strong>.
+                Ciclo do lote concluído. Use o botão acima para baixar a NF; frete de vendas pode ser consultado na aba <strong>Frete Vendas</strong>.
             </p>
         @endif
     </div>
+
+    @if ($lote->possuiNfVenda() && $resumoVendasLote !== [])
+        <div class="border rounded p-3 mt-3 {{ $vendasLotePendentes ? 'border-warning' : 'border-success' }}">
+            <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
+                <h6 class="mb-0">Movimentação de venda no SB</h6>
+                @if ($vendasLotePendentes)
+                    <span class="badge bg-warning-subtle text-warning">Pendências</span>
+                @else
+                    <span class="badge bg-success-subtle text-success">Completo</span>
+                @endif
+                @if ($vendasLotePendentes)
+                    @can(\App\Enums\Permissions::CAPTACAO_LOTE_VENDA_FINALIZAR)
+                        <form method="post"
+                              action="{{ route('admin.captacao.lotes.pipeline.sincronizar-vendas-pendentes', $lote) }}"
+                              class="ms-auto">
+                            @csrf
+                            <button type="submit" class="btn btn-warning btn-sm">
+                                <i class="ri-refresh-line me-1"></i> Gerar vendas pendentes
+                            </button>
+                        </form>
+                    @endcan
+                @endif
+            </div>
+            <p class="text-muted small mb-2">
+                Uma NF de venda por loja com quantidade captada. Compare itens da captação com movimentações em
+                <strong>Movimentação → Vendas</strong> (busque por <code>CAP-{{ $lote->data_referencia->format('Ymd') }}-{{ $lote->id }}-</code>…).
+            </p>
+            <div class="table-responsive">
+                <table class="table table-sm mb-0">
+                    <thead>
+                    <tr>
+                        <th>Loja</th>
+                        <th>NF SB</th>
+                        <th class="text-end">Itens captados</th>
+                        <th class="text-end">Movimentações</th>
+                        <th>Status</th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    @foreach ($resumoVendasLote as $linha)
+                        <tr @class(['table-warning' => ! $linha['completo']])>
+                            <td>{{ $linha['loja_nome'] }}</td>
+                            <td>
+                                @if ($linha['numero_nf'])
+                                    <code class="small">{{ $linha['numero_nf'] }}</code>
+                                @else
+                                    <span class="text-muted">—</span>
+                                @endif
+                            </td>
+                            <td class="text-end">{{ $linha['itens_captados'] }}</td>
+                            <td class="text-end">{{ $linha['movimentacoes'] }}</td>
+                            <td>
+                                @if ($linha['completo'])
+                                    <span class="text-success small">OK</span>
+                                @else
+                                    <span class="text-warning small">Pendente</span>
+                                @endif
+                            </td>
+                        </tr>
+                    @endforeach
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    @endif
 
     @if ($lote->pedidos->isNotEmpty())
         <div class="table-responsive mt-3">

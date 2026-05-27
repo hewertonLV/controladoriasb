@@ -85,6 +85,7 @@ class CaptacaoLoteFreteController extends Controller
             $lote,
             (int) $dados['id_cliente'],
             isset($dados['id_frete']) ? (int) $dados['id_frete'] : null,
+            $request->user(),
         );
 
         return $this->respostaVinculoFrete($request, $lote, 'frete-vendas', $dados['id_frete'] ?? null, 'Frete da venda atualizado.');

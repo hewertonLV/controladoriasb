@@ -12,9 +12,39 @@
                 return idFrete ? 'text-success' : 'text-muted';
             }
 
-            function atualizarRotulo(wrap, idFrete, estado) {
-                const el = wrap.closest('tr')?.querySelector('.captacao-frete-status')
-                    ?? wrap.closest('.d-flex')?.querySelector('.captacao-frete-status');
+            function encontrarRotuloStatus(wrap) {
+                const naLinha = wrap.closest('tr')?.querySelector('.captacao-frete-status');
+                if (naLinha) {
+                    return naLinha;
+                }
+
+                const irmaoNoMesmoBloco = wrap.parentElement?.querySelector('.captacao-frete-status');
+                if (irmaoNoMesmoBloco) {
+                    return irmaoNoMesmoBloco;
+                }
+
+                return wrap.closest('.captacao-frete-venda-card__frete, .card, .border')
+                    ?.querySelector('.captacao-frete-status')
+                    ?? null;
+            }
+
+            function aplicarClassesRotulo(el, idFrete, estado) {
+                const base = 'captacao-frete-status fw-semibold text-nowrap';
+                if (estado === 'salvando') {
+                    el.className = base + ' small text-warning';
+
+                    return;
+                }
+                if (estado === 'erro') {
+                    el.className = base + ' small text-danger';
+
+                    return;
+                }
+                el.className = base + ' small ' + classeStatus(idFrete);
+            }
+
+            function atualizarRotulo(wrap, idFrete, estado, textoCustomizado) {
+                const el = encontrarRotuloStatus(wrap);
 
                 if (!el) {
                     return;
@@ -22,20 +52,20 @@
 
                 if (estado === 'salvando') {
                     el.textContent = 'Salvando…';
-                    el.className = 'captacao-frete-status small text-warning';
+                    aplicarClassesRotulo(el, idFrete, 'salvando');
 
                     return;
                 }
 
                 if (estado === 'erro') {
                     el.textContent = 'Erro ao salvar';
-                    el.className = 'captacao-frete-status small text-danger';
+                    aplicarClassesRotulo(el, idFrete, 'erro');
 
                     return;
                 }
 
-                el.textContent = rotuloStatus(idFrete);
-                el.className = 'captacao-frete-status small fw-semibold ' + classeStatus(idFrete);
+                el.textContent = textoCustomizado ?? rotuloStatus(idFrete);
+                aplicarClassesRotulo(el, idFrete, 'ok');
             }
 
             function atualizarBotaoRemover(wrap, idFrete) {
@@ -134,7 +164,7 @@
                     const data = await res.json();
                     const idFrete = data.id_frete ?? null;
                     wrap.dataset.freteValorSalvo = idFrete ? String(idFrete) : '';
-                    atualizarRotulo(wrap, idFrete, 'ok');
+                    atualizarRotulo(wrap, idFrete, 'ok', data.status_label ?? null);
                     atualizarBotaoRemover(wrap, idFrete);
                 } catch (e) {
                     select.value = wrap.dataset.freteValorSalvo ?? '';

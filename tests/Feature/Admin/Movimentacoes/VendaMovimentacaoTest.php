@@ -443,7 +443,7 @@ class VendaMovimentacaoTest extends TestCase
         );
     }
 
-    public function test_venda_comercial_com_saida_fisica_hub_aplica_co_faturamento_na_margem(): void
+    public function test_venda_comercial_com_saida_fisica_hub_embuti_co_faturamento_no_custo_saida(): void
     {
         $this->seedBase();
         $c = $this->cenarioLojaComHub();
@@ -475,10 +475,58 @@ class VendaMovimentacaoTest extends TestCase
         $this->assertSame($c['hub']->id, (int) $venda->id_unidade_negocio_estoque);
         $this->assertSame('1.00', (string) $venda->valor_custo_operacional);
         $this->assertSame((int) $coLoja->id, (int) $venda->id_custo_operacional);
-        $this->assertSame('100.00', (string) $venda->valor_custo_saida);
+        $this->assertSame('120.00', (string) $venda->valor_custo_saida);
         $this->assertSame('180.00', (string) $venda->resultado_movimentacao);
-        $this->assertEstoque($c['hub'], $c['fruta'], '0.00', '0.00', '5.00', '50.00', '0.00');
+        $this->assertStringContainsString('Saída física em unidade HUB', (string) $venda->observacao);
+        $this->assertStringContainsString($c['loja']->nome, (string) $venda->observacao);
+        $this->assertEstoque($c['hub'], $c['fruta'], '0.00', '0.00', '5.00', '50.00', '-20.00');
         $this->assertEstoque($c['loja'], $c['fruta'], '80.00', '8.00', '6.00', '60.00', '480.00');
+    }
+
+    public function test_cancelamento_venda_hub_restitui_estoque_com_co_embutido(): void
+    {
+        $this->seedBase();
+        $c = $this->cenarioLojaComHub();
+        $this->registrarCompra($c, '10', '500,00');
+        $saida = $this->registrarTransferenciaHubParaLoja($c, '10');
+        $this->confirmarTransferenciaConforme((int) $saida->transferencia_origem_id, '10');
+
+        $hubAntes = $this->snapshotEstoque($c['hub'], $c['fruta']);
+        $lojaAntes = $this->snapshotEstoque($c['loja'], $c['fruta']);
+
+        $this->actingAs($this->movimentacoesVendasUsuario())->postJson(route('admin.movimentacoes.vendas.store'), [
+            'numero_nf' => 'NF-HUB-CANCEL',
+            'id_empresa_origem' => $c['empresa_loja']->id,
+            'id_unidade_negocio_estoque' => $c['hub']->id,
+            'id_empresa_destino' => $c['empresa_cliente']->id,
+            'itens' => [
+                ['id_fruta' => $c['fruta']->id, 'qtd_fruta_um' => '2', 'valor_nf_total' => '300,00'],
+            ],
+        ])->assertCreated();
+
+        $venda = Movimentacao::query()
+            ->where('categoria_movimentacao_id', CategoriaMovimentacaoTipo::Venda->value)
+            ->whereHas('vendaNota', fn ($q) => $q->where('numero_nf', 'NF-HUB-CANCEL'))
+            ->firstOrFail();
+
+        $coTotal = round((float) $venda->valor_custo_operacional * (float) $venda->qtd_fruta_kg, 2);
+        $custoPm = round((float) $venda->preco_medio_fruta_kg * (float) $venda->qtd_fruta_kg, 2);
+
+        $this->assertSame($c['hub']->id, (int) $venda->id_unidade_negocio_estoque);
+        $this->assertSame('120.00', (string) $venda->valor_custo_saida);
+        $this->assertSame(round($custoPm + $coTotal, 2), (float) $venda->valor_custo_saida);
+        $this->assertGreaterThan(0, $coTotal);
+        $this->assertStringContainsString('Saída física em unidade HUB', (string) $venda->observacao);
+
+        $this->assertEstoque($c['hub'], $c['fruta'], '0.00', '0.00', '5.00', '50.00', '-20.00');
+        $this->assertEstoque($c['loja'], $c['fruta'], '80.00', '8.00', '6.00', '60.00', '480.00');
+
+        $this->cancelarVendaAdmin($venda);
+
+        $venda->refresh();
+        $this->assertSame(MovimentacaoStatusRegistro::CANCELADO->value, $venda->status_registro);
+        $this->assertSame($hubAntes, $this->snapshotEstoque($c['hub'], $c['fruta']));
+        $this->assertSame($lojaAntes, $this->snapshotEstoque($c['loja'], $c['fruta']));
     }
 
     public function test_realocacao_automatica_ao_vender_do_hub_com_saldo_na_loja(): void
@@ -503,7 +551,7 @@ class VendaMovimentacaoTest extends TestCase
             ],
         ])->assertCreated();
 
-        $this->assertEstoque($c['hub'], $c['fruta'], '0.00', '0.00', '5.00', '50.00', '0.00');
+        $this->assertEstoque($c['hub'], $c['fruta'], '0.00', '0.00', '5.00', '50.00', '-30.00');
         $this->assertSame('70.00', (string) Estoque::query()->where('id_unidade_negocio', $c['loja']->id)->where('id_fruta', $c['fruta']->id)->value('qtd_fruta_kg'));
 
         $entradaTransfer = Movimentacao::query()
@@ -1040,6 +1088,53 @@ class VendaMovimentacaoTest extends TestCase
             ->firstOrFail();
     }
 
+    public function test_corrige_venda_hub_legada_sem_co_embutido_no_custo_saida(): void
+    {
+        $this->seedBase();
+        $c = $this->cenarioLojaComHub();
+        $this->registrarCompra($c, '10', '500,00');
+        $saida = $this->registrarTransferenciaHubParaLoja($c, '10');
+        $this->confirmarTransferenciaConforme((int) $saida->transferencia_origem_id, '10');
+
+        $this->actingAs($this->movimentacoesVendasUsuario())->postJson(route('admin.movimentacoes.vendas.store'), [
+            'numero_nf' => 'NF-HUB-LEGADO',
+            'id_empresa_origem' => $c['empresa_loja']->id,
+            'id_unidade_negocio_estoque' => $c['hub']->id,
+            'id_empresa_destino' => $c['empresa_cliente']->id,
+            'itens' => [
+                ['id_fruta' => $c['fruta']->id, 'qtd_fruta_um' => '2', 'valor_nf_total' => '300,00'],
+            ],
+        ])->assertCreated();
+
+        $venda = Movimentacao::query()
+            ->where('categoria_movimentacao_id', CategoriaMovimentacaoTipo::Venda->value)
+            ->whereHas('vendaNota', fn ($q) => $q->where('numero_nf', 'NF-HUB-LEGADO'))
+            ->firstOrFail();
+
+        $coErrado = HistoricoCOUnNg::query()
+            ->where('id_unidade_negocio', $c['hub']->id)
+            ->where('status_position', true)
+            ->firstOrFail();
+
+        $venda->forceFill([
+            'valor_custo_saida' => '100.00',
+            'valor_total_movimentacao' => '100.00',
+            'observacao' => null,
+            'id_custo_operacional' => $coErrado->id,
+            'valor_custo_operacional' => '2.00',
+            'resultado_movimentacao' => '200.00',
+        ])->saveQuietly();
+
+        $corrigidas = app(\App\Services\Movimentacoes\CorrigirCustosVendaSaidaHubService::class)
+            ->corrigirNota('NF-HUB-LEGADO');
+
+        $this->assertSame(1, $corrigidas);
+        $venda->refresh();
+        $this->assertSame('120.00', (string) $venda->valor_custo_saida);
+        $this->assertStringContainsString('Saída física em unidade HUB', (string) $venda->observacao);
+        $this->assertSame('180.00', (string) $venda->resultado_movimentacao);
+    }
+
     private function cancelarVendaAdmin(Movimentacao $venda): void
     {
         $this->actingAs($this->userWithPermissions([Permissions::MOVIMENTACOES_VENDAS_CANCELAR_ADMIN]))
@@ -1056,5 +1151,30 @@ class VendaMovimentacaoTest extends TestCase
         $this->assertSame($precoKg, (string) $estoque->preco_medio_kg);
         $this->assertSame($precoUm, (string) $estoque->preco_medio_um);
         $this->assertSame($valor, (string) $estoque->valor_total_acumulado);
+    }
+
+    /**
+     * @return array{
+     *     qtd_fruta_kg: string,
+     *     qtd_fruta_um: string,
+     *     preco_medio_kg: string,
+     *     preco_medio_um: string,
+     *     valor_total_acumulado: string,
+     * }
+     */
+    private function snapshotEstoque(UnidadeNegocio $unidade, Fruta $fruta): array
+    {
+        $estoque = Estoque::query()
+            ->where('id_unidade_negocio', $unidade->id)
+            ->where('id_fruta', $fruta->id)
+            ->firstOrFail();
+
+        return [
+            'qtd_fruta_kg' => (string) $estoque->qtd_fruta_kg,
+            'qtd_fruta_um' => (string) $estoque->qtd_fruta_um,
+            'preco_medio_kg' => (string) $estoque->preco_medio_kg,
+            'preco_medio_um' => (string) $estoque->preco_medio_um,
+            'valor_total_acumulado' => (string) $estoque->valor_total_acumulado,
+        ];
     }
 }

@@ -15,6 +15,7 @@ enum CaptacaoLoteAcaoPipeline: string
     case IniciarFaturamento = 'iniciar_faturamento';
     case FinalizarVendas = 'finalizar_vendas';
     case ConcluirVinculoRotas = 'concluir_vinculo_rotas';
+    case ConcluirFreteVenda = 'concluir_frete_venda';
 
     public function label(): string
     {
@@ -29,7 +30,8 @@ enum CaptacaoLoteAcaoPipeline: string
             self::ConcluirTransferenciaManual => 'Concluir transferência',
             self::IniciarFaturamento => 'Iniciar faturamento Cigam',
             self::FinalizarVendas => 'Finalizar vendas SB',
-            self::ConcluirVinculoRotas => 'Concluído',
+            self::ConcluirVinculoRotas => 'Concluir rotas e carregamento',
+            self::ConcluirFreteVenda => 'Concluir frete venda',
         };
     }
 
@@ -46,7 +48,8 @@ enum CaptacaoLoteAcaoPipeline: string
             self::ConcluirTransferenciaManual => Permissions::CAPTACAO_LOTE_TRANSFERENCIA_VALIDAR,
             self::IniciarFaturamento => Permissions::CAPTACAO_LOTE_FATURAMENTO_INICIAR,
             self::FinalizarVendas,
-            self::ConcluirVinculoRotas => Permissions::CAPTACAO_LOTE_VENDA_FINALIZAR,
+            self::ConcluirVinculoRotas,
+            self::ConcluirFreteVenda => Permissions::CAPTACAO_LOTE_VENDA_FINALIZAR,
         };
     }
 
@@ -59,7 +62,8 @@ enum CaptacaoLoteAcaoPipeline: string
             self::ConcluirFrete => 'secondary',
             self::IniciarFaturamento => 'soft-success',
             self::FinalizarVendas,
-            self::ConcluirVinculoRotas => 'success',
+            self::ConcluirVinculoRotas,
+            self::ConcluirFreteVenda => 'success',
         };
     }
 }

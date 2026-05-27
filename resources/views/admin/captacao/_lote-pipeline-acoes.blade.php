@@ -84,6 +84,13 @@
                     {{ $proximaAcao->label() }}
                 </button>
             </form>
+        @elseif ($proximaAcao === \App\Enums\CaptacaoLoteAcaoPipeline::ConcluirFreteVenda)
+            <form method="post" action="{{ route('admin.captacao.lotes.pipeline.concluir-frete-venda', $lote) }}" class="d-inline">
+                @csrf
+                <button type="submit" class="btn btn-{{ $proximaAcao->variant() }} btn-sm">
+                    {{ $proximaAcao->label() }}
+                </button>
+            </form>
         @endif
     @endcan
 @endif

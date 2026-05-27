@@ -20,6 +20,7 @@ use App\Models\Cliente;
 use App\Models\UnidadeNegocio;
 use App\Services\Captacao\CaptacaoLoteFreteService;
 use App\Services\Captacao\CaptacaoLoteService;
+use App\Services\Captacao\GerarVendasCaptacaoLoteService;
 use App\Services\Captacao\CaptacaoMatrizRotasService;
 use App\Services\Captacao\CaptacaoMatrizEstadoService;
 use App\Services\Captacao\ClienteFrutaVinculoService;
@@ -118,6 +119,12 @@ class CaptacaoMatrizController extends Controller
         $dadosFreteVendas = $lote->status->exibeAbaFreteVendas()
             ? $this->freteLote->dadosFreteVendas($lote)
             : null;
+        $freteVendaEditavel = $lote->status->exibeAbaFreteVendas()
+            && $this->freteLote->podeAlterarFreteVenda($lote, $request->user());
+
+        $resumoVendasLote = $lote->status->exibeAbaArquivoCiganVendas()
+            ? app(GerarVendasCaptacaoLoteService::class)->resumoVendasLote($lote)
+            : [];
 
         $romaneioCarregamento = collect();
         $romaneioCarregamentoTotaisGerais = null;
@@ -145,6 +152,8 @@ class CaptacaoMatrizController extends Controller
             'aba' => $aba,
             'dadosFreteHub' => $dadosFreteHub,
             'dadosFreteVendas' => $dadosFreteVendas,
+            'freteVendaEditavel' => $freteVendaEditavel,
+            'resumoVendasLote' => $resumoVendasLote,
             'romaneioCarregamento' => $romaneioCarregamento,
             'romaneioCarregamentoTotaisGerais' => $romaneioCarregamentoTotaisGerais,
             'urlRotasCadastro' => $lote->id_captacao_carteira
@@ -260,7 +269,7 @@ class CaptacaoMatrizController extends Controller
         }
 
         $nome = $request->validated('nome_motorista');
-        $rota = $this->matrizRotas->atualizarNomeMotorista(
+        $config = $this->matrizRotas->atualizarNomeMotorista(
             $lote,
             $rota,
             is_string($nome) ? $nome : null,
@@ -268,8 +277,8 @@ class CaptacaoMatrizController extends Controller
 
         return response()->json([
             'ok' => true,
-            'id_captacao_rota' => $rota->id,
-            'nome_motorista' => $rota->nome_motorista,
+            'id_captacao_rota' => $config->id_captacao_rota,
+            'nome_motorista' => $config->nome_motorista,
         ]);
     }
 
@@ -283,18 +292,18 @@ class CaptacaoMatrizController extends Controller
         }
 
         $veiculoId = $request->validated('id_veiculo');
-        $rota = $this->matrizRotas->atualizarVeiculoRota(
+        $config = $this->matrizRotas->atualizarVeiculoRota(
             $lote,
             $rota,
             $veiculoId !== null ? (int) $veiculoId : null,
         );
 
-        $veiculo = $rota->veiculo;
+        $veiculo = $config->veiculo;
 
         return response()->json([
             'ok' => true,
-            'id_captacao_rota' => $rota->id,
-            'id_veiculo' => $rota->id_veiculo,
+            'id_captacao_rota' => $config->id_captacao_rota,
+            'id_veiculo' => $config->id_veiculo,
             'veiculo_rotulo' => $veiculo !== null
                 ? "{$veiculo->nome} (SBS {$veiculo->id_sbs})"
                 : null,

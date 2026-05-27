@@ -8,6 +8,7 @@ use App\Enums\StatusTransferenciaOperacional;
 use App\Models\Empresa;
 use App\Models\Frete;
 use App\Models\Fruta;
+use App\Support\Movimentacoes\VendaCustoOperacionalHub;
 use App\Models\Movimentacao;
 use App\Models\StatusMovimentacao;
 use App\Models\UnidadeNegocio;
@@ -280,7 +281,7 @@ final class FreteRateioMovimentacaoService
             'resultado_movimentacao' => number_format(round(
                 (float) $movimentacao->valor_nf_total
                 - (float) $movimentacao->valor_custo_saida
-                - round((float) $movimentacao->valor_custo_operacional * (float) $movimentacao->qtd_fruta_kg, 2)
+                - VendaCustoOperacionalHub::valorCoTotalDescontadoNaMargem($movimentacao)
                 - $rateio,
                 2
             ), 2, '.', ''),

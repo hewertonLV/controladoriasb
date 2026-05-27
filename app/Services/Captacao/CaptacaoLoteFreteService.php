@@ -2,11 +2,15 @@
 
 namespace App\Services\Captacao;
 
+use App\Enums\CaptacaoLoteStatus;
 use App\Enums\FreteStatusSituacao;
 use App\Enums\MovimentacaoStatusRegistro;
+use App\Enums\Roles;
+use App\Models\User;
 use App\Models\Captacao\CaptacaoLote;
 use App\Models\Captacao\CaptacaoLoteMovimentacao;
 use App\Models\Frete;
+use App\Models\UnidadeNegocio;
 use App\Models\Movimentacao;
 use App\Models\StatusMovimentacao;
 use App\Models\VendaNota;
@@ -20,6 +24,30 @@ final class CaptacaoLoteFreteService
     public function __construct(
         private readonly VendaMovimentacaoService $vendas,
     ) {}
+
+    public function podeAlterarFreteVenda(CaptacaoLote $lote, ?User $user): bool
+    {
+        if ($lote->status->permiteEdicaoFreteVenda()) {
+            return true;
+        }
+
+        if ($lote->status === CaptacaoLoteStatus::VendasFinalizadas) {
+            return $user !== null && $user->hasRole(Roles::ADMINISTRADOR->value);
+        }
+
+        return false;
+    }
+
+    public function assertPodeAlterarFreteVenda(CaptacaoLote $lote, ?User $user): void
+    {
+        if ($this->podeAlterarFreteVenda($lote, $user)) {
+            return;
+        }
+
+        throw ValidationException::withMessages([
+            'status' => 'O frete de vendas não pode ser alterado após concluir a etapa. Somente administrador pode corrigir.',
+        ]);
+    }
 
     /**
      * @return array{
@@ -63,6 +91,9 @@ final class CaptacaoLoteFreteService
      *         loja_nome: string,
      *         numero_nf: string,
      *         id_frete_atual: int|null,
+     *         is_saida_hub: bool,
+     *         saida_fisica_nome: string,
+     *         saida_fisica_tipo: 'hub'|'galpao',
      *         itens: list<array{fruta_nome: string, quantidade: string, unidade_medicao: string|null, preco_venda: string|null}>,
      *     }>,
      *     fretesAbertos: Collection<int, Frete>,
@@ -70,7 +101,19 @@ final class CaptacaoLoteFreteService
      */
     public function dadosFreteVendas(CaptacaoLote $lote): array
     {
-        $lote->loadMissing(['pedidos.cliente', 'pedidos.itens.fruta']);
+        $lote->loadMissing(['pedidos.cliente', 'pedidos.itens.fruta', 'unidadeGalpao']);
+
+        $galpao = $lote->unidadeGalpao;
+        $idsSaida = $lote->pedidos
+            ->pluck('id_unidade_negocio_saida_venda')
+            ->filter()
+            ->map(static fn ($id): int => (int) $id)
+            ->unique()
+            ->values();
+        $unidadesSaida = UnidadeNegocio::query()
+            ->whereIn('id', $idsSaida)
+            ->get()
+            ->keyBy('id');
 
         $lojas = collect();
         foreach ($lote->pedidos as $pedido) {
@@ -97,11 +140,21 @@ final class CaptacaoLoteFreteService
             $cliente = $pedido->cliente;
             $lojaNome = $cliente?->fantasia ?: $cliente?->razao_social ?: "Cliente #{$pedido->id_cliente}";
 
+            $saidaFisica = $this->resolverSaidaFisicaVendaPedido($pedido, $galpao, $unidadesSaida);
+
+            $freteAtual = $idFreteAtual !== null
+                ? Frete::query()->find((int) $idFreteAtual)
+                : null;
+
             $lojas->push([
                 'id_cliente' => (int) $pedido->id_cliente,
                 'loja_nome' => $lojaNome,
                 'numero_nf' => $numeroNf,
                 'id_frete_atual' => $idFreteAtual !== null ? (int) $idFreteAtual : null,
+                'frete_nome' => $freteAtual?->nome,
+                'is_saida_hub' => $saidaFisica['is_hub'],
+                'saida_fisica_nome' => $saidaFisica['nome'],
+                'saida_fisica_tipo' => $saidaFisica['tipo'],
                 'itens' => $itensVendidos->map(static fn ($item) => [
                     'fruta_nome' => $item->fruta?->nome ?? '—',
                     'quantidade' => number_format((float) $item->quantidade, 2, '.', ''),
@@ -114,13 +167,56 @@ final class CaptacaoLoteFreteService
         }
 
         return [
-            'lojas' => $lojas->sortBy('loja_nome')->values(),
+            'lojas' => $lojas
+                ->sortBy([
+                    fn (array $loja): int => $loja['is_saida_hub'] ? 0 : 1,
+                    fn (array $loja): string => mb_strtolower($loja['loja_nome']),
+                ])
+                ->values(),
             'fretesAbertos' => $this->fretesAbertos(),
         ];
     }
 
-    public function vincularFreteVendaLoja(CaptacaoLote $lote, int $idCliente, ?int $idFrete): void
+    /**
+     * @param  \Illuminate\Support\Collection<int, UnidadeNegocio>  $unidadesSaida
+     * @return array{is_hub: bool, nome: string, tipo: 'hub'|'galpao'}
+     */
+    private function resolverSaidaFisicaVendaPedido(
+        \App\Models\Captacao\Pedido $pedido,
+        ?UnidadeNegocio $galpao,
+        Collection $unidadesSaida,
+    ): array {
+        $idSaida = $pedido->id_unidade_negocio_saida_venda ?? $galpao?->id;
+        if ($idSaida === null) {
+            return [
+                'is_hub' => false,
+                'nome' => 'Galpão',
+                'tipo' => 'galpao',
+            ];
+        }
+
+        $unidade = $unidadesSaida->get((int) $idSaida)
+            ?? ($galpao !== null && (int) $galpao->id === (int) $idSaida ? $galpao : UnidadeNegocio::query()->find($idSaida));
+
+        if ($unidade === null) {
+            return [
+                'is_hub' => false,
+                'nome' => 'Galpão',
+                'tipo' => 'galpao',
+            ];
+        }
+
+        return [
+            'is_hub' => $unidade->is_hub,
+            'nome' => $unidade->nome,
+            'tipo' => $unidade->is_hub ? 'hub' : 'galpao',
+        ];
+    }
+
+    public function vincularFreteVendaLoja(CaptacaoLote $lote, int $idCliente, ?int $idFrete, ?User $user = null): void
     {
+        $this->assertPodeAlterarFreteVenda($lote, $user);
+
         $pedido = $lote->pedidos()->where('id_cliente', $idCliente)->first();
         if ($pedido === null) {
             throw ValidationException::withMessages([

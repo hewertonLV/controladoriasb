@@ -47,9 +47,9 @@
         @endcan
     @endif
 
-    @if ($lote->status === \App\Enums\CaptacaoLoteStatus::VendasFinalizadas)
+    @if ($lote->status->exibeAbaFreteVendas())
         @can('captacao.lote.frete.vincular')
-            <a href="{{ route('admin.captacao.matriz.index', ['lote' => $lote->id, 'aba' => 'frete-vendas']) }}" class="btn btn-sm btn-soft-warning">Frete Vendas (opcional)</a>
+            <a href="{{ route('admin.captacao.matriz.index', ['lote' => $lote->id, 'aba' => 'frete-vendas']) }}" class="btn btn-sm btn-soft-warning">Frete Vendas</a>
         @endcan
     @endif
 

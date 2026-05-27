@@ -373,10 +373,6 @@ final class PedidoService
 
         $this->historico->registrarPedido($pedido, 'atualizar_rota', $origem, $user);
 
-        $loteAtualizado = $lote->fresh() ?? $lote;
-        app(AvancarEtapaVinculoRotasCaptacaoLoteService::class)
-            ->tentarAvancarAutomaticamente($loteAtualizado);
-
         return $pedido->refresh();
     }
 
@@ -522,7 +518,54 @@ final class PedidoService
                 $nomeLoja = $pedido->cliente?->fantasia ?: $pedido->cliente?->razao_social ?: "#{$pedido->id_cliente}";
 
                 throw ValidationException::withMessages([
-                    'pedidos' => "A loja «{$nomeLoja}» (galpão {$lote->unidadeGalpao?->nome}) tem quantidade na matriz, mas está sem rota. Vincule a rota na aba Rotas e conclua a etapa.",
+                    'pedidos' => "A loja «{$nomeLoja}» (galpão {$lote->unidadeGalpao?->nome}) tem quantidade na matriz, mas está sem rota. Vincule a rota na aba Rotas.",
+                ]);
+            }
+        }
+    }
+
+    public function lotePossuiPedidoComQuantidadeSemOrdemCarregamento(CaptacaoLote $lote): bool
+    {
+        $lote->loadMissing(['pedidos.itens']);
+
+        foreach ($lote->pedidos as $pedido) {
+            if (! $this->pedidoTemQuantidadeCaptada($pedido)) {
+                continue;
+            }
+
+            if ($pedido->id_captacao_rota === null) {
+                continue;
+            }
+
+            if ($pedido->ordem_carregamento === null) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * @throws ValidationException
+     */
+    public function assertPedidosComQuantidadeTemOrdemCarregamento(CaptacaoLote $lote): void
+    {
+        $lote->loadMissing(['pedidos.cliente', 'pedidos.itens', 'unidadeGalpao']);
+
+        foreach ($lote->pedidos as $pedido) {
+            if (! $this->pedidoTemQuantidadeCaptada($pedido)) {
+                continue;
+            }
+
+            if ($pedido->id_captacao_rota === null) {
+                continue;
+            }
+
+            if ($pedido->ordem_carregamento === null) {
+                $nomeLoja = $pedido->cliente?->fantasia ?: $pedido->cliente?->razao_social ?: "#{$pedido->id_cliente}";
+
+                throw ValidationException::withMessages([
+                    'pedidos' => "A loja «{$nomeLoja}» (galpão {$lote->unidadeGalpao?->nome}) está sem ordem de carregamento. Defina na aba Por rota.",
                 ]);
             }
         }

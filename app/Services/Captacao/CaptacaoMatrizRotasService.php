@@ -3,6 +3,7 @@
 namespace App\Services\Captacao;
 
 use App\Models\Captacao\CaptacaoLote;
+use App\Models\Captacao\CaptacaoLoteRota;
 use App\Models\Captacao\CaptacaoRota;
 use App\Models\Veiculo;
 use App\Models\Cliente;
@@ -84,6 +85,8 @@ final class CaptacaoMatrizRotasService
     }
 
     /**
+     * Rotas da carteira com motorista/veículo do lote (ADR-0134).
+     *
      * @return Collection<int, CaptacaoRota>
      */
     public function rotasDaCarteira(CaptacaoLote $lote): Collection
@@ -92,17 +95,37 @@ final class CaptacaoMatrizRotasService
             return collect();
         }
 
+        $configs = $this->configPorRotaNoLote($lote);
+
         return CaptacaoRota::query()
             ->where('id_captacao_carteira', $lote->id_captacao_carteira)
             ->where('ativo', true)
-            ->with('veiculo:id,nome,id_sbs')
             ->orderBy('nome')
-            ->get(['id', 'nome', 'nome_motorista', 'id_veiculo']);
+            ->get(['id', 'nome'])
+            ->map(function (CaptacaoRota $rota) use ($configs): CaptacaoRota {
+                $cfg = $configs->get($rota->id);
+
+                $rota->nome_motorista = $cfg?->nome_motorista;
+                $rota->id_veiculo = $cfg?->id_veiculo;
+                $rota->setRelation('veiculo', $cfg?->veiculo);
+
+                return $rota;
+            });
     }
 
     /**
-     * Catálogo de veículos ativos (selects filtram por rota no cliente/servidor).
-     *
+     * @return Collection<int, CaptacaoLoteRota>
+     */
+    public function configPorRotaNoLote(CaptacaoLote $lote): Collection
+    {
+        return CaptacaoLoteRota::query()
+            ->where('id_captacao_lote', $lote->id)
+            ->with('veiculo:id,nome,id_sbs')
+            ->get()
+            ->keyBy('id_captacao_rota');
+    }
+
+    /**
      * @return Collection<int, Veiculo>
      */
     public function veiculosDisponiveis(): Collection
@@ -114,21 +137,16 @@ final class CaptacaoMatrizRotasService
     }
 
     /**
-     * Veículos já vinculados a outras rotas da mesma carteira.
+     * Veículos já vinculados a outras rotas do mesmo lote.
      *
      * @return list<int>
      */
-    public function idsVeiculosOcupadosNaCarteira(CaptacaoLote $lote, ?int $excetoRotaId = null): array
+    public function idsVeiculosOcupadosNoLote(CaptacaoLote $lote, ?int $excetoRotaId = null): array
     {
-        if ($lote->id_captacao_carteira === null) {
-            return [];
-        }
-
-        return CaptacaoRota::query()
-            ->where('id_captacao_carteira', $lote->id_captacao_carteira)
-            ->where('ativo', true)
+        return CaptacaoLoteRota::query()
+            ->where('id_captacao_lote', $lote->id)
             ->whereNotNull('id_veiculo')
-            ->when($excetoRotaId !== null, fn ($q) => $q->whereKeyNot($excetoRotaId))
+            ->when($excetoRotaId !== null, fn ($q) => $q->where('id_captacao_rota', '!=', $excetoRotaId))
             ->pluck('id_veiculo')
             ->map(fn ($id) => (int) $id)
             ->values()
@@ -140,14 +158,14 @@ final class CaptacaoMatrizRotasService
      */
     public function veiculosDisponiveisParaRota(CaptacaoLote $lote, int $rotaId): Collection
     {
-        $ocupados = $this->idsVeiculosOcupadosNaCarteira($lote, $rotaId);
+        $ocupados = $this->idsVeiculosOcupadosNoLote($lote, $rotaId);
 
         return $this->veiculosDisponiveis()->filter(
             fn (Veiculo $veiculo): bool => ! in_array($veiculo->id, $ocupados, true),
         )->values();
     }
 
-    public function atualizarVeiculoRota(CaptacaoLote $lote, CaptacaoRota $rota, ?int $veiculoId): CaptacaoRota
+    public function atualizarVeiculoRota(CaptacaoLote $lote, CaptacaoRota $rota, ?int $veiculoId): CaptacaoLoteRota
     {
         if (! $lote->status->permiteEdicaoVinculoRota()) {
             throw \Illuminate\Validation\ValidationException::withMessages([
@@ -173,22 +191,29 @@ final class CaptacaoMatrizRotasService
                 ]);
             }
 
-            $jaVinculado = in_array($veiculoId, $this->idsVeiculosOcupadosNaCarteira($lote, $rota->id), true);
+            $jaVinculado = in_array($veiculoId, $this->idsVeiculosOcupadosNoLote($lote, $rota->id), true);
 
             if ($jaVinculado) {
                 throw \Illuminate\Validation\ValidationException::withMessages([
-                    'id_veiculo' => 'Este veículo já está vinculado a outra rota desta carteira.',
+                    'id_veiculo' => 'Este veículo já está vinculado a outra rota deste lote.',
                 ]);
             }
         }
 
-        $rota->id_veiculo = $veiculoId;
-        $rota->save();
+        $config = CaptacaoLoteRota::query()->updateOrCreate(
+            [
+                'id_captacao_lote' => $lote->id,
+                'id_captacao_rota' => $rota->id,
+            ],
+            [
+                'id_veiculo' => $veiculoId,
+            ],
+        );
 
-        return $rota->refresh()->load('veiculo:id,nome,id_sbs');
+        return $config->refresh()->load('veiculo:id,nome,id_sbs');
     }
 
-    public function atualizarNomeMotorista(CaptacaoLote $lote, CaptacaoRota $rota, ?string $nomeMotorista): CaptacaoRota
+    public function atualizarNomeMotorista(CaptacaoLote $lote, CaptacaoRota $rota, ?string $nomeMotorista): CaptacaoLoteRota
     {
         if (! $lote->status->permiteEdicaoVinculoRota()) {
             throw \Illuminate\Validation\ValidationException::withMessages([
@@ -203,15 +228,21 @@ final class CaptacaoMatrizRotasService
         }
 
         $nome = $nomeMotorista !== null ? trim($nomeMotorista) : null;
-        $rota->nome_motorista = $nome !== '' ? $nome : null;
-        $rota->save();
 
-        return $rota->refresh();
+        $config = CaptacaoLoteRota::query()->updateOrCreate(
+            [
+                'id_captacao_lote' => $lote->id,
+                'id_captacao_rota' => $rota->id,
+            ],
+            [
+                'nome_motorista' => $nome !== '' ? $nome : null,
+            ],
+        );
+
+        return $config->refresh();
     }
 
     /**
-     * Lojas com rota e quantidade, agrupadas por rota e ordenadas por ordem de carregamento.
-     *
      * @param  list<array<string, mixed>>  $gruposLoja
      * @return list<array{
      *     id_captacao_rota: int,
@@ -220,13 +251,7 @@ final class CaptacaoMatrizRotasService
      *     id_veiculo: int|null,
      *     veiculo_rotulo: string|null,
      *     total_lojas: int,
-     *     lojas: list<array{
-     *         id_cliente: int,
-     *         loja_nome: string,
-     *         ordem_carregamento: int|null,
-     *         captacao_concluida: bool,
-     *         itens: list<array<string, mixed>>,
-     *     }>,
+     *     lojas: list<array<string, mixed>>,
      * }>
      */
     public function gruposOrdemCarregamento(array $gruposLoja, Collection $rotas): array

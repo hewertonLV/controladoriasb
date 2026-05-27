@@ -90,10 +90,11 @@ final class CaptacaoMatrizEstadoService
         $gruposOrdemCarregamento = $this->matrizRotas->gruposOrdemCarregamento($linhasRotas, $rotas);
         $veiculos = $this->matrizRotas->veiculosDisponiveis();
 
-        foreach ($rotas as $rota) {
-            $versionSum += strlen($rota->nome_motorista ?? '');
-            $versionSum += (int) ($rota->id_veiculo ?? 0);
-            $versionSum += (int) $rota->updated_at?->timestamp;
+        $configsLoteRota = $this->matrizRotas->configPorRotaNoLote($lote);
+        foreach ($configsLoteRota as $config) {
+            $versionSum += strlen($config->nome_motorista ?? '');
+            $versionSum += (int) ($config->id_veiculo ?? 0);
+            $versionSum += (int) $config->updated_at?->timestamp;
         }
 
         return [

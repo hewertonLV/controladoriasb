@@ -13,19 +13,6 @@ final class AvancarEtapaVinculoRotasCaptacaoLoteService
         private readonly PedidoService $pedidos,
     ) {}
 
-    public function tentarAvancarAutomaticamente(CaptacaoLote $lote): CaptacaoLote
-    {
-        if ($lote->status !== CaptacaoLoteStatus::VincularRotasNosPedidos) {
-            return $lote;
-        }
-
-        if ($this->pedidos->lotePossuiPedidoComQuantidadeSemRota($lote)) {
-            return $lote->fresh();
-        }
-
-        return $this->lotes->transicionarStatus($lote, CaptacaoLoteStatus::VendasFinalizadas);
-    }
-
     /**
      * @throws ValidationException
      */
@@ -33,12 +20,13 @@ final class AvancarEtapaVinculoRotasCaptacaoLoteService
     {
         if ($lote->status !== CaptacaoLoteStatus::VincularRotasNosPedidos) {
             throw ValidationException::withMessages([
-                'status' => 'A conclusão do vínculo de rotas só é permitida nesta etapa do lote.',
+                'status' => 'A conclusão de rotas e carregamento só é permitida nesta etapa do lote.',
             ]);
         }
 
         $this->pedidos->assertPedidosComQuantidadeTemRota($lote);
+        $this->pedidos->assertPedidosComQuantidadeTemOrdemCarregamento($lote);
 
-        return $this->lotes->transicionarStatus($lote, CaptacaoLoteStatus::VendasFinalizadas);
+        return $this->lotes->transicionarStatus($lote, CaptacaoLoteStatus::VincularFreteVenda);
     }
 }

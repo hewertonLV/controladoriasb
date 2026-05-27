@@ -29,7 +29,7 @@ class ConversaoEmbalagemMovimentacaoController extends Controller
 
         $movimentacoes = $query
             ->latest()
-            ->paginate(15);
+            ->get();
 
         return view('admin.movimentacoes.conversoes-embalagem.index', compact('movimentacoes'));
     }

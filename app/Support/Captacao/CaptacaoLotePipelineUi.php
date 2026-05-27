@@ -29,6 +29,7 @@ final class CaptacaoLotePipelineUi
             CaptacaoLoteStatus::TransferenciaFinalizada => CaptacaoLoteAcaoPipeline::IniciarFaturamento,
             CaptacaoLoteStatus::FaturamentoCiganIniciado => null,
             CaptacaoLoteStatus::VincularRotasNosPedidos => CaptacaoLoteAcaoPipeline::ConcluirVinculoRotas,
+            CaptacaoLoteStatus::VincularFreteVenda => CaptacaoLoteAcaoPipeline::ConcluirFreteVenda,
             default => null,
         };
     }

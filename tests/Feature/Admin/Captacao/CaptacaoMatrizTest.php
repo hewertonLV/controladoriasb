@@ -466,8 +466,9 @@ class CaptacaoMatrizTest extends CaptacaoTestCase
             ->assertOk()
             ->assertJsonPath('nome_motorista', 'João Motorista');
 
-        $this->assertDatabaseHas('captacao_rotas', [
-            'id' => $c['rota']->id,
+        $this->assertDatabaseHas('captacao_lote_rotas', [
+            'id_captacao_lote' => $lote->id,
+            'id_captacao_rota' => $c['rota']->id,
             'nome_motorista' => 'João Motorista',
         ]);
 
@@ -512,8 +513,9 @@ class CaptacaoMatrizTest extends CaptacaoTestCase
             ->assertJsonPath('id_veiculo', $veiculo->id)
             ->assertJsonPath('veiculo_rotulo', 'CAMINHAO TESTE (SBS '.$veiculo->id_sbs.')');
 
-        $this->assertDatabaseHas('captacao_rotas', [
-            'id' => $c['rota']->id,
+        $this->assertDatabaseHas('captacao_lote_rotas', [
+            'id_captacao_lote' => $lote->id,
+            'id_captacao_rota' => $c['rota']->id,
             'id_veiculo' => $veiculo->id,
         ]);
 
@@ -607,6 +609,92 @@ class CaptacaoMatrizTest extends CaptacaoTestCase
             ])
             ->assertUnprocessable()
             ->assertJsonValidationErrors(['id_veiculo']);
+    }
+
+    public function test_motorista_e_veiculo_sao_independentes_entre_lotes(): void
+    {
+        $c = $this->cenarioCaptacaoBasico();
+        $user = $this->captacaoManager();
+        $user->unidadesNegocio()->sync([$c['faturamento']->id, $c['galpao']->id]);
+
+        $lote1 = $this->criarLoteCaptacao($c);
+        $lote2 = $this->criarLoteCaptacao($c);
+
+        $veiculo1 = \App\Models\Veiculo::factory()->create([
+            'id_unidade_negocio' => $c['faturamento']->id,
+            'nome' => 'CAMINHAO LOTE 1',
+            'status' => 'ATIVO',
+        ]);
+        $veiculo2 = \App\Models\Veiculo::factory()->create([
+            'id_unidade_negocio' => $c['faturamento']->id,
+            'nome' => 'CAMINHAO LOTE 2',
+            'status' => 'ATIVO',
+        ]);
+
+        foreach ([$lote1, $lote2] as $lote) {
+            app(PedidoService::class)->adicionarLojaNaMatriz($lote, $c['cliente'], \App\Enums\PedidoOrigem::Web, $user);
+            $this->actingAs($user)->patchJson(route('admin.captacao.lotes.celula.update', $lote), [
+                'id_cliente' => $c['cliente']->id,
+                'id_fruta' => $c['fruta']->id,
+                'quantidade' => 2,
+            ])->assertOk();
+            $this->actingAs($user)->patchJson(route('admin.captacao.lotes.pedidos.rota', [$lote, $c['cliente']]), [
+                'id_captacao_rota' => $c['rota']->id,
+            ])->assertOk();
+        }
+
+        $this->actingAs($user)
+            ->patchJson(route('admin.captacao.lotes.rotas.motorista', [$lote1, $c['rota']]), [
+                'nome_motorista' => 'Motorista Lote 1',
+            ])
+            ->assertOk();
+
+        $this->actingAs($user)
+            ->patchJson(route('admin.captacao.lotes.rotas.veiculo', [$lote1, $c['rota']]), [
+                'id_veiculo' => $veiculo1->id,
+            ])
+            ->assertOk();
+
+        $this->actingAs($user)
+            ->patchJson(route('admin.captacao.lotes.rotas.motorista', [$lote2, $c['rota']]), [
+                'nome_motorista' => 'Motorista Lote 2',
+            ])
+            ->assertOk();
+
+        $this->actingAs($user)
+            ->patchJson(route('admin.captacao.lotes.rotas.veiculo', [$lote2, $c['rota']]), [
+                'id_veiculo' => $veiculo2->id,
+            ])
+            ->assertOk();
+
+        $this->assertDatabaseHas('captacao_lote_rotas', [
+            'id_captacao_lote' => $lote1->id,
+            'id_captacao_rota' => $c['rota']->id,
+            'nome_motorista' => 'Motorista Lote 1',
+            'id_veiculo' => $veiculo1->id,
+        ]);
+
+        $this->assertDatabaseHas('captacao_lote_rotas', [
+            'id_captacao_lote' => $lote2->id,
+            'id_captacao_rota' => $c['rota']->id,
+            'nome_motorista' => 'Motorista Lote 2',
+            'id_veiculo' => $veiculo2->id,
+        ]);
+
+        $estado1 = $this->actingAs($user)
+            ->getJson(route('admin.captacao.lotes.matriz.estado', $lote1))
+            ->assertOk()
+            ->json();
+
+        $estado2 = $this->actingAs($user)
+            ->getJson(route('admin.captacao.lotes.matriz.estado', $lote2))
+            ->assertOk()
+            ->json();
+
+        $this->assertSame('Motorista Lote 1', $estado1['grupos_ordem_carregamento'][0]['motorista_nome']);
+        $this->assertSame($veiculo1->id, $estado1['grupos_ordem_carregamento'][0]['id_veiculo']);
+        $this->assertSame('Motorista Lote 2', $estado2['grupos_ordem_carregamento'][0]['motorista_nome']);
+        $this->assertSame($veiculo2->id, $estado2['grupos_ordem_carregamento'][0]['id_veiculo']);
     }
 
     public function test_matriz_atualiza_ordem_carregamento_e_reordena_lojas_da_rota(): void

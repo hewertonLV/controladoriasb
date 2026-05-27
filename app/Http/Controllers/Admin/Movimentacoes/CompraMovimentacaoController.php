@@ -33,8 +33,7 @@ class CompraMovimentacaoController extends Controller
         $movimentacoes = $query
             ->orderByDesc('data_movimentacao')
             ->orderByDesc('id')
-            ->paginate(15)
-            ->withQueryString();
+            ->get();
 
         return view('admin.movimentacoes.compras.index', [
             'movimentacoes' => $movimentacoes,

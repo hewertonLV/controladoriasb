@@ -12,6 +12,7 @@ enum CaptacaoLoteStatus: string
     case TransferenciaFinalizada = 'TRANSFERENCIA_FINALIZADA';
     case FaturamentoCiganIniciado = 'FATURAMENTO_CIGAN_INICIADO';
     case VincularRotasNosPedidos = 'VINCULAR_ROTAS_NOS_PEDIDOS';
+    case VincularFreteVenda = 'VINCULAR_FRETE_VENDA';
     case VendasFinalizadas = 'VENDAS_FINALIZADAS';
 
     public function label(): string
@@ -24,7 +25,8 @@ enum CaptacaoLoteStatus: string
             self::AguardandoVinculoFrete => 'Aguardando vínculo de frete',
             self::TransferenciaFinalizada => 'Transferência finalizada',
             self::FaturamentoCiganIniciado => 'Faturamento Cigam iniciado',
-            self::VincularRotasNosPedidos => 'Vincular rotas nos pedidos',
+            self::VincularRotasNosPedidos => 'Vincular rotas e carregamento',
+            self::VincularFreteVenda => 'Vincular frete venda',
             self::VendasFinalizadas => 'Vendas finalizadas',
         };
     }
@@ -50,6 +52,7 @@ enum CaptacaoLoteStatus: string
         return in_array($this, [
             self::FaturamentoCiganIniciado,
             self::VincularRotasNosPedidos,
+            self::VincularFreteVenda,
             self::VendasFinalizadas,
         ], true);
     }
@@ -76,7 +79,16 @@ enum CaptacaoLoteStatus: string
     /** Aba na matriz: vínculo opcional de frete nas vendas por loja. */
     public function exibeAbaFreteVendas(): bool
     {
-        return $this === self::VendasFinalizadas;
+        return in_array($this, [
+            self::VincularFreteVenda,
+            self::VendasFinalizadas,
+        ], true);
+    }
+
+    /** Vínculo/alteração de frete de vendas na matriz (após concluir etapa, só administrador). */
+    public function permiteEdicaoFreteVenda(): bool
+    {
+        return $this === self::VincularFreteVenda;
     }
 
     public function permiteUploadNfTransferenciaCigan(): bool
@@ -94,10 +106,13 @@ enum CaptacaoLoteStatus: string
         return $this === self::CaptacaoEmAndamento;
     }
 
-    /** Vínculo de rota, ordem de carregamento e motorista (abertura até vendas finalizadas). */
+    /** Vínculo de rota, ordem de carregamento e motorista (até concluir rotas). */
     public function permiteEdicaoVinculoRota(): bool
     {
-        return $this !== self::VendasFinalizadas;
+        return ! in_array($this, [
+            self::VincularFreteVenda,
+            self::VendasFinalizadas,
+        ], true);
     }
 
     public function permiteEdicaoQuantidadeAposFinalizarFaturamento(): bool
@@ -112,6 +127,7 @@ enum CaptacaoLoteStatus: string
         return ! in_array($this, [
             self::FaturamentoCiganIniciado,
             self::VincularRotasNosPedidos,
+            self::VincularFreteVenda,
             self::VendasFinalizadas,
         ], true);
     }
@@ -131,7 +147,8 @@ enum CaptacaoLoteStatus: string
             self::TransferenciaCiganIniciada,
             self::SaidaEstoqueFisico,
             self::FaturamentoCiganIniciado => 'bg-info-subtle text-info',
-            self::VincularRotasNosPedidos => 'bg-warning-subtle text-warning',
+            self::VincularRotasNosPedidos,
+            self::VincularFreteVenda => 'bg-warning-subtle text-warning',
             self::TransferenciaFinalizada => 'bg-secondary-subtle text-secondary',
             self::VendasFinalizadas => 'bg-success-subtle text-success',
         };
@@ -146,7 +163,8 @@ enum CaptacaoLoteStatus: string
             self::TransferenciaCiganIniciada,
             self::SaidaEstoqueFisico,
             self::FaturamentoCiganIniciado => 'andamento',
-            self::VincularRotasNosPedidos => 'aguardando',
+            self::VincularRotasNosPedidos,
+            self::VincularFreteVenda => 'aguardando',
             self::TransferenciaFinalizada => 'transferencia',
             self::VendasFinalizadas => 'finalizado',
         };

@@ -175,6 +175,18 @@
             min-width: 10rem;
         }
 
+        #captacao-matriz-rotas .select2-container.matriz-rota-select2--salvo .select2-selection {
+            border-color: var(--bs-success, #198754) !important;
+            border-width: 2px !important;
+            box-shadow: 0 0 0 0.15rem rgba(25, 135, 84, 0.28);
+        }
+
+        #captacao-matriz-rotas .select2-container.matriz-rota-select2--erro .select2-selection {
+            border-color: var(--bs-danger, #dc3545) !important;
+            border-width: 2px !important;
+            box-shadow: 0 0 0 0.15rem rgba(220, 53, 69, 0.28);
+        }
+
         #captacao-matriz-ordem {
             font-size: 0.85rem;
         }
@@ -466,7 +478,9 @@
                 <div class="card-body table-responsive border-top-0 pt-3">
                     <p class="text-muted small mb-2">
                         Itens com quantidade captada na aba Captação. A rota é vinculada por loja (mesma rota para todos os itens da loja).
-                        Pode ser preenchida a qualquer momento até as vendas serem finalizadas.
+                        A rota é salva automaticamente ao selecionar. A ordem de carregamento é definida na aba
+                        <strong>Por rota</strong>. O lote só avança após clicar em
+                        <strong>Concluir rotas e carregamento</strong> (com tudo preenchido).
                         @if ($lote->carteira)
                             <span class="d-block mt-1">Carteira do lote: <strong>{{ $lote->carteira->nome }}</strong> — só aparecem rotas cadastradas nesta carteira.</span>
                         @endif
@@ -531,7 +545,10 @@
                 <div class="tab-pane fade {{ $aba === 'arquivo-cigan' ? 'show active' : '' }}" id="matriz-tab-arquivo-cigan" role="tabpanel">
                     <div class="card-body border-top-0 pt-4 pb-4">
                         @if ($lote->status->exibeAbaArquivoCiganVendas())
-                            @include('admin.captacao.matriz._arquivo-cigan-vendas', ['lote' => $lote])
+                            @include('admin.captacao.matriz._arquivo-cigan-vendas', [
+                                'lote' => $lote,
+                                'resumoVendasLote' => $resumoVendasLote ?? [],
+                            ])
                         @endif
 
                         @if ($lote->status->exibeAbaArquivoCiganTransferencia())
@@ -737,6 +754,7 @@
                             'lote' => $lote,
                             'lojas' => $dadosFreteVendas['lojas'],
                             'fretesAbertos' => $dadosFreteVendas['fretesAbertos'],
+                            'freteVendaEditavel' => $freteVendaEditavel ?? false,
                         ])
                     </div>
                 @endcan
@@ -1613,7 +1631,69 @@ document.addEventListener('DOMContentLoaded', function () {
 
         tbody.innerHTML = html;
         initCaptacaoSearchSelects(tbody);
+        bindRotasHandlers();
         atualizarAlertaRotasVazias();
+    }
+
+    function containerSelect2Rota(select) {
+        const proximo = select?.nextElementSibling;
+
+        return proximo?.classList.contains('select2-container') ? proximo : null;
+    }
+
+    /** @param {'valid'|'invalid'|null} estado */
+    function aplicarFeedbackRotaSelect(select, estado) {
+        if (!select) {
+            return;
+        }
+
+        select.classList.remove('is-valid', 'is-invalid');
+        const container = containerSelect2Rota(select);
+        container?.classList.remove('matriz-rota-select2--salvo', 'matriz-rota-select2--erro');
+
+        if (estado === 'valid') {
+            select.classList.add('is-valid');
+            container?.classList.add('matriz-rota-select2--salvo');
+        } else if (estado === 'invalid') {
+            select.classList.add('is-invalid');
+            container?.classList.add('matriz-rota-select2--erro');
+        }
+    }
+
+    function matrizRotaSelectEmEdicao(clienteId) {
+        return Array.from(document.querySelectorAll(`.matriz-rota-select[data-cliente="${clienteId}"]`))
+            .some((select) => {
+                if (document.activeElement === select) {
+                    return true;
+                }
+
+                const instancia = window.jQuery?.(select)?.data('select2');
+
+                return Boolean(instancia?.isOpen?.());
+            });
+    }
+
+    function bindRotasHandlers() {
+        const tbody = document.getElementById('matriz-rotas-body');
+        if (!tbody || !window.jQuery) {
+            return;
+        }
+
+        const $tbody = window.jQuery(tbody);
+        $tbody.off(
+            'change.matrizRota select2:select.matrizRota select2:clear.matrizRota',
+            '.matriz-rota-select',
+        );
+        $tbody.on('select2:opening.matrizRota', '.matriz-rota-select', function () {
+            aplicarFeedbackRotaSelect(this, null);
+        });
+        $tbody.on(
+            'change.matrizRota select2:select.matrizRota select2:clear.matrizRota',
+            '.matriz-rota-select',
+            function () {
+                salvarRota(this);
+            },
+        );
     }
 
     function idsVeiculosOcupadosOutrasRotas(rotaId) {
@@ -1644,10 +1724,41 @@ document.addEventListener('DOMContentLoaded', function () {
         return html;
     }
 
+    function matrizVeiculoSelectEmEdicao(rotaId) {
+        return Array.from(document.querySelectorAll(`.matriz-rota-veiculo[data-rota="${rotaId}"]`))
+            .some((select) => {
+                if (document.activeElement === select) {
+                    return true;
+                }
+
+                return Boolean(window.jQuery?.(select)?.data('select2')?.isOpen?.());
+            });
+    }
+
+    function bindVeiculoRotaHandlers() {
+        const tbody = document.getElementById('matriz-ordem-body');
+        if (!tbody || !window.jQuery) {
+            return;
+        }
+
+        const $tbody = window.jQuery(tbody);
+        $tbody.off(
+            'change.matrizVeiculo select2:select.matrizVeiculo select2:clear.matrizVeiculo',
+            '.matriz-rota-veiculo',
+        );
+        $tbody.on(
+            'change.matrizVeiculo select2:select.matrizVeiculo select2:clear.matrizVeiculo',
+            '.matriz-rota-veiculo',
+            function () {
+                salvarVeiculoRota(this);
+            },
+        );
+    }
+
     function atualizarSelectsVeiculoRotas(rotaEmEdicao = null) {
         document.querySelectorAll('.matriz-rota-veiculo').forEach((select) => {
             const rotaId = Number(select.dataset.rota);
-            if (rotaEmEdicao !== null && rotaId === Number(rotaEmEdicao) && document.activeElement === select) {
+            if (rotaEmEdicao !== null && rotaId === Number(rotaEmEdicao) && matrizVeiculoSelectEmEdicao(rotaId)) {
                 return;
             }
 
@@ -1773,6 +1884,7 @@ document.addEventListener('DOMContentLoaded', function () {
         tbody.innerHTML = html;
         initCaptacaoSearchSelects(tbody);
         bindOrdemCarregamentoHandlers();
+        bindVeiculoRotaHandlers();
         ignorarOrdemChange = false;
 
         if (rotaMotoristaEmEdicao) {
@@ -1793,10 +1905,11 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     async function salvarVeiculoRota(select) {
-        if (select.disabled) {
+        if (select.disabled || select.dataset.salvandoVeiculo === '1') {
             return;
         }
 
+        select.dataset.salvandoVeiculo = '1';
         setBadge('sincronizando');
 
         try {
@@ -1827,6 +1940,8 @@ document.addEventListener('DOMContentLoaded', function () {
         } catch (e) {
             select.classList.add('is-invalid');
             setBadge('erro');
+        } finally {
+            delete select.dataset.salvandoVeiculo;
         }
     }
 
@@ -1859,14 +1974,6 @@ document.addEventListener('DOMContentLoaded', function () {
             setBadge('erro');
         }
     }
-
-    document.getElementById('matriz-ordem-body')?.addEventListener('change', (event) => {
-        const select = event.target.closest('.matriz-rota-veiculo');
-        if (!select) {
-            return;
-        }
-        salvarVeiculoRota(select);
-    });
 
     document.getElementById('matriz-ordem-body')?.addEventListener('blur', (event) => {
         const input = event.target.closest('.matriz-rota-motorista');
@@ -1948,9 +2055,11 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     async function salvarRota(select) {
-        if (select.disabled) {
+        if (select.disabled || select.dataset.salvandoRota === '1') {
             return;
         }
+
+        select.dataset.salvandoRota = '1';
 
         const clienteId = select.dataset.cliente;
         const rotaId = select.value === '' ? null : Number(select.value);
@@ -1964,37 +2073,31 @@ document.addEventListener('DOMContentLoaded', function () {
             });
 
             if (!res.ok) {
-                select.classList.add('is-invalid');
+                aplicarFeedbackRotaSelect(select, 'invalid');
                 setBadge('erro');
                 mostrarErro(await mensagemErroResposta(res));
                 return;
             }
 
-            select.classList.remove('is-invalid');
-            select.classList.add('is-valid');
+            aplicarFeedbackRotaSelect(select, 'valid');
             document.querySelectorAll(`.matriz-rota-select[data-cliente="${clienteId}"]`).forEach((outro) => {
                 if (outro !== select) {
                     outro.value = select.value;
                 }
-                outro.classList.remove('is-invalid');
-                outro.classList.add('is-valid');
+                window.AdminSearchSelect?.refresh(outro);
+                aplicarFeedbackRotaSelect(outro, 'valid');
             });
-            select.classList.add('is-valid');
+            window.AdminSearchSelect?.refresh(select);
+            aplicarFeedbackRotaSelect(select, 'valid');
             setBadge('sincronizado');
             pollEstado();
         } catch (e) {
-            select.classList.add('is-invalid');
+            aplicarFeedbackRotaSelect(select, 'invalid');
             setBadge('erro');
+        } finally {
+            delete select.dataset.salvandoRota;
         }
     }
-
-    document.getElementById('matriz-rotas-body')?.addEventListener('change', (event) => {
-        const select = event.target.closest('.matriz-rota-select');
-        if (!select) {
-            return;
-        }
-        salvarRota(select);
-    });
 
     async function salvarNumeroPedido(input) {
         if (input.disabled) return;
@@ -2119,9 +2222,14 @@ document.addEventListener('DOMContentLoaded', function () {
                 numeroInput.value = pedido.numero_pedido ?? '';
             }
 
-            if (!document.querySelector(`.matriz-rota-select[data-cliente="${clienteId}"]:focus`)) {
+            if (!matrizRotaSelectEmEdicao(clienteId)) {
+                const rotaValor = pedido.id_captacao_rota ? String(pedido.id_captacao_rota) : '';
                 document.querySelectorAll(`.matriz-rota-select[data-cliente="${clienteId}"]`).forEach((select) => {
-                    select.value = pedido.id_captacao_rota ? String(pedido.id_captacao_rota) : '';
+                    if (select.value === rotaValor) {
+                        return;
+                    }
+                    select.value = rotaValor;
+                    window.AdminSearchSelect?.refresh(select);
                 });
             }
 
@@ -2141,12 +2249,17 @@ document.addEventListener('DOMContentLoaded', function () {
         }
 
         (data.rotas || []).forEach((rota) => {
-            if (document.querySelector(`.matriz-rota-veiculo[data-rota="${rota.id}"]:focus`)) {
+            if (matrizVeiculoSelectEmEdicao(rota.id)) {
                 return;
             }
 
             document.querySelectorAll(`.matriz-rota-veiculo[data-rota="${rota.id}"]`).forEach((select) => {
-                select.value = rota.id_veiculo ? String(rota.id_veiculo) : '';
+                const valor = rota.id_veiculo ? String(rota.id_veiculo) : '';
+                if (select.value === valor) {
+                    return;
+                }
+                select.value = valor;
+                window.AdminSearchSelect?.refresh(select);
             });
         });
 
@@ -2230,6 +2343,8 @@ document.addEventListener('DOMContentLoaded', function () {
     bindCelulas();
 
     initCaptacaoSearchSelects();
+    bindRotasHandlers();
+    bindVeiculoRotaHandlers();
     bindSelectNovaLoja();
     bindSelectRemoverLoja();
     bindOrdemCarregamentoHandlers();

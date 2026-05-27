@@ -74,6 +74,20 @@ class CaptacaoPipelineTest extends CaptacaoTestCase
         $this->enviarNfVendaPipeline($user, $lote);
 
         $lote->refresh();
+        $this->assertSame(CaptacaoLoteStatus::VincularRotasNosPedidos, $lote->status);
+
+        $this->actingAs($user)
+            ->post(route('admin.captacao.lotes.pipeline.concluir-vinculo-rotas', $lote))
+            ->assertRedirect();
+
+        $lote->refresh();
+        $this->assertSame(CaptacaoLoteStatus::VincularFreteVenda, $lote->status);
+
+        $this->actingAs($user)
+            ->post(route('admin.captacao.lotes.pipeline.concluir-frete-venda', $lote))
+            ->assertRedirect();
+
+        $lote->refresh();
         $this->assertSame(CaptacaoLoteStatus::VendasFinalizadas, $lote->status);
         $this->assertTrue($lote->possuiNfVenda());
     }
@@ -98,6 +112,51 @@ class CaptacaoPipelineTest extends CaptacaoTestCase
             'id_captacao_lote' => $lote->id,
             'id_cliente' => $c['cliente']->id,
             'id_captacao_rota' => null,
+            'captacao_concluida' => true,
+            'origem' => \App\Enums\PedidoOrigem::Web,
+        ]);
+
+        \App\Models\Captacao\PedidoItem::query()->create([
+            'id_pedido' => $pedido->id,
+            'id_fruta' => $c['fruta']->id,
+            'quantidade' => 5,
+            'preco_venda' => '12.50',
+            'version' => 1,
+        ]);
+
+        $user = $this->captacaoManager();
+        $user->unidadesNegocio()->sync([$c['faturamento']->id, $c['galpao']->id, $hub->id]);
+
+        $this->actingAs($user)
+            ->from(route('admin.captacao.matriz.index', ['lote' => $lote->id]))
+            ->post(route('admin.captacao.lotes.pipeline.concluir-vinculo-rotas', $lote))
+            ->assertRedirect(route('admin.captacao.matriz.index', ['lote' => $lote->id]))
+            ->assertSessionHasErrors('pedidos');
+
+        $this->assertSame(CaptacaoLoteStatus::VincularRotasNosPedidos, $lote->fresh()->status);
+    }
+
+    public function test_concluir_vinculo_rotas_bloqueia_sem_ordem_carregamento(): void
+    {
+        $this->seedCaptacaoMovimentacao();
+
+        $c = $this->cenarioCaptacaoBasico();
+        $hub = $this->criarHubComEstoque($c['fruta'], '200.00', '20.00');
+        $this->criarCoGalpao($c['galpao']);
+
+        $lote = CaptacaoLote::query()->create([
+            'data_referencia' => '2026-05-29',
+            'id_unidade_negocio_faturamento' => $c['faturamento']->id,
+            'id_unidade_negocio_galpao' => $c['galpao']->id,
+            'tipo' => 'CAPTACAO_PEDIDOS',
+            'status' => CaptacaoLoteStatus::VincularRotasNosPedidos,
+        ]);
+
+        $pedido = \App\Models\Captacao\Pedido::query()->create([
+            'id_captacao_lote' => $lote->id,
+            'id_cliente' => $c['cliente']->id,
+            'id_captacao_rota' => $c['rota']->id,
+            'ordem_carregamento' => null,
             'captacao_concluida' => true,
             'origem' => \App\Enums\PedidoOrigem::Web,
         ]);
@@ -507,8 +566,13 @@ class CaptacaoPipelineTest extends CaptacaoTestCase
         $this->enviarNfVendaPipeline($user, $lote->fresh());
 
         $lote->refresh();
-        $this->assertSame(CaptacaoLoteStatus::VendasFinalizadas, $lote->status);
+        $this->assertSame(CaptacaoLoteStatus::VincularRotasNosPedidos, $lote->status);
         $this->assertTrue($lote->possuiNfVenda());
+
+        $this->concluirPipelineAteVendasFinalizadas($user, $lote, $c);
+
+        $lote->refresh();
+        $this->assertSame(CaptacaoLoteStatus::VendasFinalizadas, $lote->status);
 
         $this->assertDatabaseHas('captacao_lote_movimentacoes', [
             'id_captacao_lote' => $lote->id,

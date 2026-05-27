@@ -173,4 +173,53 @@ abstract class CaptacaoTestCase extends TestCase
             ])
             ->assertRedirect();
     }
+
+    protected function concluirRotasECarregamentoPipeline(
+        \App\Models\User $user,
+        \App\Models\Captacao\CaptacaoLote $lote,
+        array $c,
+        int $ordemCarregamento = 1,
+    ): void {
+        $pedido = \App\Models\Captacao\Pedido::query()
+            ->where('id_captacao_lote', $lote->id)
+            ->where('id_cliente', $c['cliente']->id)
+            ->first();
+
+        if ($pedido !== null && $pedido->id_captacao_rota === null) {
+            $this->actingAs($user)
+                ->patchJson(route('admin.captacao.lotes.pedidos.rota', [$lote, $c['cliente']]), [
+                    'id_captacao_rota' => $c['rota']->id,
+                ])
+                ->assertOk();
+        }
+
+        if ($pedido !== null) {
+            $this->actingAs($user)
+                ->patchJson(route('admin.captacao.lotes.pedidos.ordem-carregamento', [$lote, $c['cliente']]), [
+                    'ordem_carregamento' => $ordemCarregamento,
+                ])
+                ->assertOk();
+        }
+
+        $this->actingAs($user)
+            ->post(route('admin.captacao.lotes.pipeline.concluir-vinculo-rotas', $lote))
+            ->assertRedirect();
+    }
+
+    protected function concluirFreteVendaPipeline(\App\Models\User $user, \App\Models\Captacao\CaptacaoLote $lote): void
+    {
+        $this->actingAs($user)
+            ->post(route('admin.captacao.lotes.pipeline.concluir-frete-venda', $lote))
+            ->assertRedirect();
+    }
+
+    protected function concluirPipelineAteVendasFinalizadas(
+        \App\Models\User $user,
+        \App\Models\Captacao\CaptacaoLote $lote,
+        array $c,
+        int $ordemCarregamento = 1,
+    ): void {
+        $this->concluirRotasECarregamentoPipeline($user, $lote, $c, $ordemCarregamento);
+        $this->concluirFreteVendaPipeline($user, $lote->fresh());
+    }
 }
