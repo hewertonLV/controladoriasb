@@ -424,7 +424,16 @@ class EstoqueImportacaoProcessor
             $umNovo = $dadosEnriquecidos['qtd_fruta_um'];
             $valorNovo = $dadosEnriquecidos['valor_total'];
 
-            if ($umAtual === $umNovo && $valorAtual === $valorNovo) {
+            $posicaoQuantidadeValorIgual = $umAtual === $umNovo && $valorAtual === $valorNovo;
+            $precosDevemSerZerados = EstoqueImportacaoCustoOperacional::quantidadeEstoqueZerada(
+                (string) $dadosEnriquecidos['qtd_fruta_kg'],
+                (string) $dadosEnriquecidos['qtd_fruta_um'],
+            ) && (
+                abs((float) $existente->preco_medio_kg) >= 0.005
+                || abs((float) $existente->preco_medio_um) >= 0.005
+            );
+
+            if ($posicaoQuantidadeValorIgual && ! $precosDevemSerZerados) {
                 $semAlteracoes[] = [
                     'row_id' => $rowId,
                     'linha' => $linha,
@@ -442,6 +451,14 @@ class EstoqueImportacaoProcessor
             }
             if ($valorAtual !== $valorNovo) {
                 $camposAlterados[] = ['campo' => 'valor_total', 'atual' => $valorAtual, 'novo' => $valorNovo];
+            }
+            if ($precosDevemSerZerados) {
+                $camposAlterados[] = [
+                    'campo' => 'preco_medio',
+                    'atual' => number_format((float) $existente->preco_medio_kg, 2, '.', '').'/kg · '
+                        .number_format((float) $existente->preco_medio_um, 2, '.', '').'/UM',
+                    'novo' => '0.00/kg · 0.00/UM',
+                ];
             }
 
             $atualizacoes[] = [

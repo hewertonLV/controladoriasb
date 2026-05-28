@@ -17,6 +17,55 @@
             min-height: 1.45rem;
         }
         .captacao-pedido-loja-compact .rent-seta { font-size: 0.95rem; line-height: 1; vertical-align: -1px; }
+        .captacao-pedido-loja-compact .captacao-pedido-loja-input.is-valid {
+            border-color: var(--bs-success, #198754);
+            box-shadow: 0 0 0 0.15rem rgba(25, 135, 84, 0.2);
+        }
+        .captacao-pedido-loja-compact .captacao-pedido-loja-input.is-invalid {
+            border-color: var(--bs-danger, #dc3545);
+        }
+        #pedido-loja-sync-badge.sincronizando { background-color: var(--bs-info); }
+        #pedido-loja-sync-badge.sincronizado { background-color: var(--bs-success); }
+        #pedido-loja-sync-badge.erro { background-color: var(--bs-danger); }
+        #pedido-loja-sync-badge.pendente { background-color: var(--bs-warning); color: #212529; }
+        .captacao-saida-fisica-inline {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 0.1rem 0.25rem;
+            font-size: 0.8rem;
+            line-height: 1.3;
+            margin-bottom: 0.35rem;
+        }
+        .captacao-saida-fisica-inline.salvando { opacity: 0.85; }
+        .captacao-saida-fisica-inline .captacao-saida-sep {
+            color: var(--bs-secondary-color, #6c757d);
+            padding: 0 0.15rem;
+            user-select: none;
+        }
+        .captacao-saida-fisica-inline .form-check {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.2rem;
+            margin: 0;
+            padding: 0;
+            min-height: 0;
+        }
+        .captacao-saida-fisica-inline .form-check-input {
+            width: 0.85rem;
+            height: 0.85rem;
+            margin: 0;
+            flex-shrink: 0;
+        }
+        .captacao-saida-fisica-inline .form-check-label {
+            white-space: nowrap;
+            font-size: inherit;
+            cursor: pointer;
+        }
+        .captacao-pedido-loja-saida-check:checked { accent-color: var(--bs-primary); }
+        .captacao-pedido-loja-compact .captacao-custo-num { font-variant-numeric: tabular-nums; }
+        .captacao-pedido-loja-compact th.captacao-custo-sub,
+        .captacao-pedido-loja-compact td.captacao-custo-sub { font-size: 0.72rem; max-width: 4.25rem; }
     </style>
 @endpush
 
@@ -114,6 +163,35 @@
             @csrf
             @method('PUT')
         </form>
+
+        @php
+            $titleSaidaFisica = $saidaPadraoCadastroLabel
+                ? 'Padrão cadastro: '.$saidaPadraoCadastroLabel.($pedidoSaidaOverride ? ' · alterado neste lote' : '')
+                : null;
+        @endphp
+        <div class="captacao-saida-fisica-inline"
+             id="card-saida-fisica-loja"
+             data-saida-fisica-loja-opcoes
+             @if ($titleSaidaFisica) title="{{ $titleSaidaFisica }}" @endif>
+            <span class="text-nowrap fw-semibold me-1">Saída do estoque físico:</span>
+            @foreach ($opcoesSaidaFisica as $i => $opcao)
+                @if ($i > 0)<span class="captacao-saida-sep" aria-hidden="true">|</span>@endif
+                <div class="form-check">
+                    <input type="checkbox"
+                           class="form-check-input captacao-pedido-loja-saida-check"
+                           id="saida-fisica-{{ $opcao['id'] }}"
+                           value="{{ $opcao['id'] }}"
+                           title="{{ $opcao['label'] }}"
+                           data-url="{{ route('admin.captacao.pedidos-por-loja.saida-fisica-venda', [$lote, $cliente]) }}"
+                           @checked((int) $idSaidaSelecionada === (int) $opcao['id'])
+                           @disabled(! $podeEditar)>
+                    <label class="form-check-label" for="saida-fisica-{{ $opcao['id'] }}" title="{{ $opcao['label'] }}">
+                        {{ $opcao['label_curto'] }}
+                    </label>
+                </div>
+            @endforeach
+            <span class="captacao-pedido-loja-saida-status text-muted" aria-live="polite"></span>
+        </div>
         @endif
 
         <div class="mb-2 d-flex flex-wrap gap-2 align-items-center">
@@ -121,9 +199,7 @@
                 <i class="ri-arrow-left-line"></i> Lojas
             </a>
             @if ($possuiFrutas && $podeEditar)
-                <button type="submit" form="form-pedido-loja" class="btn btn-sm btn-primary py-0">
-                    Sincronizar
-                </button>
+                <span id="pedido-loja-sync-badge" class="badge bg-secondary d-none">Aguardando</span>
                 <form method="post"
                       action="{{ route('admin.captacao.pedidos-por-loja.captacao-concluida', [$lote, $cliente]) }}"
                       class="d-inline">
@@ -165,13 +241,18 @@
                         <tr>
                             <th>Fruta</th>
                             <th class="text-end" style="width:4.5rem">Qtd</th>
+                            <th class="text-end captacao-custo-sub" title="Preço médio no estoque da unidade de saída">PM saída</th>
+                            <th class="text-end captacao-custo-sub" title="Custo operacional da unidade de faturamento (na UM da fruta)">CO fatur.</th>
                             <th class="text-end">Custo</th>
                             <th class="text-end" style="width:5rem">Venda</th>
                         </tr>
                         </thead>
                         <tbody>
                         @foreach ($linhas as $i => $linha)
-                            <tr>
+                            @php
+                                $custoDet = $linha['custo_detalhe'];
+                            @endphp
+                            <tr class="captacao-pedido-loja-linha" data-fruta-id="{{ $linha['fruta']->id }}">
                                 <td class="text-truncate" style="max-width:12rem" title="{{ $linha['fruta']->nome }}">
                                     {{ $linha['fruta']->nome }}
                                     <span class="text-muted">({{ $linha['fruta']->unidade_medicao }})</span>
@@ -179,22 +260,39 @@
                                 <td class="text-end">
                                     <input type="number" step="0.001" min="0" name="itens[{{ $i }}][quantidade]"
                                            form="form-pedido-loja"
-                                           class="form-control form-control-sm text-end"
+                                           class="form-control form-control-sm text-end captacao-pedido-loja-input captacao-pedido-loja-qty"
                                            value="{{ $linha['item_atual'] ? rtrim(rtrim($linha['item_atual']->quantidade, '0'), '.') : '' }}"
                                            @disabled(! $podeEditar)>
                                     <input type="hidden" name="itens[{{ $i }}][id_fruta]" form="form-pedido-loja" value="{{ $linha['fruta']->id }}">
                                 </td>
-                                <td class="text-end text-muted text-nowrap">
-                                    @if ($linha['custo'] !== null)
-                                        {{ number_format((float) $linha['custo'], 2, ',', '.') }}
+                                <td class="text-end text-muted text-nowrap captacao-custo-sub captacao-pedido-loja-pm">
+                                    @if ($custoDet['pm_um'] !== null)
+                                        <span class="captacao-custo-num">{{ number_format((float) $custoDet['pm_um'], 2, ',', '.') }}</span>
                                     @else
-                                        <span class="text-warning" title="Sem estoque no galpão">s/ est.</span>
+                                        <span class="text-warning" title="Sem estoque na unidade de saída">s/ est.</span>
+                                    @endif
+                                </td>
+                                <td class="text-end text-muted text-nowrap captacao-custo-sub captacao-pedido-loja-co">
+                                    @if ($custoDet['eh_saida_hub'] && $custoDet['pm_um'] !== null)
+                                        <span class="captacao-custo-num">{{ number_format((float) ($custoDet['co_um'] ?? 0), 2, ',', '.') }}</span>
+                                        @if ($custoDet['co_kg'] !== null && (float) $custoDet['co_kg'] > 0)
+                                            <span class="d-none d-md-inline text-muted" title="CO por kg">· {{ number_format((float) $custoDet['co_kg'], 2, ',', '.') }}/kg</span>
+                                        @endif
+                                    @else
+                                        <span class="text-muted">—</span>
+                                    @endif
+                                </td>
+                                <td class="text-end text-nowrap captacao-pedido-loja-custo">
+                                    @if ($custoDet['custo_final'] !== null)
+                                        <strong class="captacao-custo-num">{{ number_format((float) $custoDet['custo_final'], 2, ',', '.') }}</strong>
+                                    @else
+                                        <span class="text-warning" title="Sem estoque na unidade de saída">s/ est.</span>
                                     @endif
                                 </td>
                                 <td class="text-end">
                                     <input type="number" step="0.01" min="0" name="itens[{{ $i }}][preco_venda]"
                                            form="form-pedido-loja"
-                                           class="form-control form-control-sm text-end"
+                                           class="form-control form-control-sm text-end captacao-pedido-loja-input captacao-pedido-loja-preco"
                                            value="{{ $linha['item_atual']?->preco_venda !== null ? rtrim(rtrim($linha['item_atual']->preco_venda, '0'), '.') : '' }}"
                                            @disabled(! $podeEditar)>
                                 </td>
@@ -207,3 +305,228 @@
         @endif
     </div>
 @endsection
+
+@if ($possuiFrutas && $podeEditar)
+@push('scripts')
+<script>
+(function () {
+    const form = document.getElementById('form-pedido-loja');
+    const badge = document.getElementById('pedido-loja-sync-badge');
+    const token = document.querySelector('meta[name="csrf-token"]')?.content;
+    if (!form) return;
+
+    let debounceTimer = null;
+    let salvando = false;
+    let salvarNovamente = false;
+    let linhaPendente = null;
+
+    function setBadge(estado, texto) {
+        if (!badge) return;
+        badge.classList.remove('d-none', 'sincronizando', 'sincronizado', 'erro', 'pendente', 'bg-secondary');
+        badge.classList.add(estado);
+        badge.textContent = texto;
+    }
+
+    function linhaDoInput(input) {
+        return input?.closest('tr.captacao-pedido-loja-linha');
+    }
+
+    function marcarLinha(linha, ok) {
+        if (!linha) return;
+        linha.querySelectorAll('.captacao-pedido-loja-input').forEach((inp) => {
+            inp.classList.remove('is-valid', 'is-invalid');
+            inp.classList.add(ok ? 'is-valid' : 'is-invalid');
+        });
+    }
+
+    async function mensagemErro(res) {
+        const data = await res.json().catch(() => ({}));
+        if (data.message) return data.message;
+        if (data.errors) return Object.values(data.errors).flat().join(' ');
+        return 'Não foi possível salvar o pedido.';
+    }
+
+    async function salvarPedido() {
+        if (salvando) {
+            salvarNovamente = true;
+            return;
+        }
+
+        salvando = true;
+
+        do {
+            salvarNovamente = false;
+            setBadge('sincronizando', 'Salvando…');
+
+            const linha = linhaPendente;
+            const data = new FormData(form);
+
+            try {
+                const res = await fetch(form.action, {
+                    method: 'POST',
+                    headers: {
+                        'Accept': 'application/json',
+                        'X-Requested-With': 'XMLHttpRequest',
+                        'X-CSRF-TOKEN': token,
+                    },
+                    body: data,
+                });
+
+                if (!res.ok) {
+                    marcarLinha(linha, false);
+                    setBadge('erro', 'Erro ao salvar');
+                    if (typeof window.AdminConfirm?.alert === 'function') {
+                        window.AdminConfirm.alert({
+                            title: 'Captação',
+                            message: await mensagemErro(res),
+                            variant: 'warning',
+                            confirmLabel: 'Entendi',
+                        });
+                    }
+                    break;
+                }
+
+                marcarLinha(linha, true);
+                setBadge('sincronizado', 'Salvo');
+            } catch (e) {
+                marcarLinha(linha, false);
+                setBadge('erro', 'Erro ao salvar');
+                break;
+            }
+        } while (salvarNovamente);
+
+        salvando = false;
+        linhaPendente = null;
+    }
+
+    function agendarSalvo(input) {
+        linhaPendente = linhaDoInput(input);
+        setBadge('pendente', 'Alterado');
+        clearTimeout(debounceTimer);
+        debounceTimer = setTimeout(salvarPedido, 450);
+    }
+
+    document.querySelectorAll('.captacao-pedido-loja-input:not(:disabled)').forEach((input) => {
+        input.addEventListener('input', () => agendarSalvo(input));
+        input.addEventListener('change', () => agendarSalvo(input));
+        input.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                clearTimeout(debounceTimer);
+                agendarSalvo(input);
+                salvarPedido();
+            }
+        });
+    });
+
+    const cardSaida = document.getElementById('card-saida-fisica-loja');
+    const statusSaida = document.querySelector('.captacao-pedido-loja-saida-status');
+    const checksSaida = document.querySelectorAll('.captacao-pedido-loja-saida-check:not(:disabled)');
+
+    function formatarMoedaBr(valor) {
+        if (valor === null || valor === undefined || valor === '') {
+            return null;
+        }
+        const n = Number(valor);
+        if (Number.isNaN(n)) {
+            return null;
+        }
+        return n.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    }
+
+    function htmlSemEstoque() {
+        return '<span class="text-warning" title="Sem estoque na unidade de saída">s/ est.</span>';
+    }
+
+    function atualizarCustosNaTabela(custos) {
+        if (!custos || typeof custos !== 'object') return;
+        Object.entries(custos).forEach(([idFruta, detalhe]) => {
+            const linha = document.querySelector(`tr.captacao-pedido-loja-linha[data-fruta-id="${idFruta}"]`);
+            if (!linha) return;
+
+            const celPm = linha.querySelector('.captacao-pedido-loja-pm');
+            const celCo = linha.querySelector('.captacao-pedido-loja-co');
+            const celFinal = linha.querySelector('.captacao-pedido-loja-custo');
+
+            const pm = formatarMoedaBr(detalhe?.pm);
+            const co = formatarMoedaBr(detalhe?.co);
+            const final = formatarMoedaBr(detalhe?.final);
+
+            if (celPm) {
+                celPm.innerHTML = pm !== null
+                    ? `<span class="captacao-custo-num">${pm}</span>`
+                    : htmlSemEstoque();
+            }
+            if (celCo) {
+                celCo.innerHTML = co !== null
+                    ? `<span class="captacao-custo-num">${co}</span>`
+                    : '<span class="text-muted">—</span>';
+            }
+            if (celFinal) {
+                celFinal.innerHTML = final !== null
+                    ? `<strong class="captacao-custo-num">${final}</strong>`
+                    : htmlSemEstoque();
+            }
+        });
+    }
+
+    async function salvarSaidaFisica(check) {
+        const url = check.dataset.url;
+        if (!url) return;
+
+        cardSaida?.classList.add('salvando');
+        if (statusSaida) statusSaida.textContent = '…';
+
+        try {
+            const res = await fetch(url, {
+                method: 'PATCH',
+                headers: {
+                    'Accept': 'application/json',
+                    'Content-Type': 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'X-CSRF-TOKEN': token,
+                },
+                body: JSON.stringify({
+                    id_unidade_negocio_saida_venda: parseInt(check.value, 10),
+                }),
+            });
+
+            if (!res.ok) {
+                if (statusSaida) statusSaida.textContent = 'Erro ao salvar saída.';
+                if (typeof window.AdminConfirm?.alert === 'function') {
+                    window.AdminConfirm.alert({
+                        title: 'Saída estoque físico',
+                        message: await mensagemErro(res),
+                        variant: 'warning',
+                        confirmLabel: 'Entendi',
+                    });
+                }
+                return;
+            }
+
+            const data = await res.json().catch(() => ({}));
+            atualizarCustosNaTabela(data.custos);
+            if (statusSaida) statusSaida.textContent = '';
+        } catch (e) {
+            if (statusSaida) statusSaida.textContent = 'Erro ao salvar saída.';
+        } finally {
+            cardSaida?.classList.remove('salvando');
+        }
+    }
+
+    checksSaida.forEach((check) => {
+        check.addEventListener('change', async () => {
+            if (!check.checked) {
+                check.checked = true;
+                return;
+            }
+            checksSaida.forEach((outro) => {
+                if (outro !== check) outro.checked = false;
+            });
+            await salvarSaidaFisica(check);
+        });
+    });
+})();
+</script>
+@endpush
+@endif

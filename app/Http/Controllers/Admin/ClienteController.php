@@ -15,6 +15,7 @@ use App\Models\Captacao\CaptacaoCarteira;
 use App\Services\Captacao\ClienteCaptacaoAgendaService;
 use App\Services\Clientes\ClienteAuditoriaService;
 use App\Support\Captacao\DiasSemanaCaptacao;
+use App\Support\Clientes\ClienteSaidaFisicoPadraoOpcoesService;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -55,6 +56,7 @@ class ClienteController extends Controller
             'diasSemanaCaptacao' => DiasSemanaCaptacao::labels(),
             'diasCriacaoPedido' => [],
             'diasEnvioPedido' => [],
+            'saidaFisicoOpcoesMap' => app(ClienteSaidaFisicoPadraoOpcoesService::class)->mapaJsonParaFormulario(),
         ]);
     }
 
@@ -99,6 +101,7 @@ class ClienteController extends Controller
             'diasSemanaCaptacao' => DiasSemanaCaptacao::labels(),
             'diasCriacaoPedido' => $agenda['criacao'],
             'diasEnvioPedido' => $agenda['envio'],
+            'saidaFisicoOpcoesMap' => app(ClienteSaidaFisicoPadraoOpcoesService::class)->mapaJsonParaFormulario(),
         ]);
     }
 

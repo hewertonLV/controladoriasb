@@ -1,10 +1,14 @@
 @php
+    use App\Support\Captacao\SaidaEstoqueFisicoCaptacaoService;
+
     /** @var \App\Models\Captacao\CaptacaoLote $lote */
     /** @var \Illuminate\Support\Collection<int, array<string, mixed>> $romaneioCarregamento */
     /** @var \Illuminate\Support\Collection<int, \App\Models\Captacao\Pedido>|\Illuminate\Database\Eloquent\Collection $pedidosPorCliente */
-    $idGalpao = (int) $lote->id_unidade_negocio_galpao;
-    $idHub = $lote->id_unidade_negocio_hub_origem !== null ? (int) $lote->id_unidade_negocio_hub_origem : null;
+    $saidaFisicaResolver = app(SaidaEstoqueFisicoCaptacaoService::class);
+    $idGalpao = $saidaFisicaResolver->idGalpaoLote($lote);
+    $idHub = $saidaFisicaResolver->idHubLote($lote);
     $nomeGalpao = $lote->unidadeGalpao?->nome ?? 'Galpão';
+    $nomeFaturamento = $lote->unidadeFaturamento?->nome;
     $nomeHub = $lote->unidadeHubOrigem?->nome ?? 'HUB';
 @endphp
 
@@ -24,7 +28,9 @@
     @forelse ($romaneioCarregamento as $loja)
         @php
             $pedido = $pedidosPorCliente->get($loja['id_cliente']);
-            $saidaAtual = (int) ($pedido?->id_unidade_negocio_saida_venda ?? $idGalpao);
+            $saidaAtual = $pedido !== null
+                ? $saidaFisicaResolver->idSaidaEfetiva($pedido, $lote)
+                : $idGalpao;
             $qtdLinhas = count($loja['itens']);
             $rowspan = $qtdLinhas + 1;
         @endphp
@@ -42,7 +48,12 @@
                                        data-cliente="{{ $loja['id_cliente'] }}"
                                        data-url="{{ route('admin.captacao.lotes.pedidos.saida-fisica-venda', [$lote, $loja['id_cliente']]) }}"
                                        @checked($saidaAtual === $idGalpao)>
-                                <span class="form-check-label">{{ $nomeGalpao }}</span>
+                                <span class="form-check-label">
+                                    Galpão — {{ $nomeGalpao }}
+                                    @if ($nomeFaturamento)
+                                        <span class="text-muted">(fatur. {{ $nomeFaturamento }})</span>
+                                    @endif
+                                </span>
                             </label>
                             @if ($idHub !== null)
                                 <label class="form-check mb-0">
@@ -53,10 +64,10 @@
                                            data-cliente="{{ $loja['id_cliente'] }}"
                                            data-url="{{ route('admin.captacao.lotes.pedidos.saida-fisica-venda', [$lote, $loja['id_cliente']]) }}"
                                            @checked($saidaAtual === $idHub)>
-                                    <span class="form-check-label">{{ $nomeHub }}</span>
+                                    <span class="form-check-label">HUB — {{ $nomeHub }}</span>
                                 </label>
                             @else
-                                <span class="text-muted">HUB não definido na aba Arquivo Cigam.</span>
+                                <span class="text-muted">HUB não definido na transferência Cigam iniciada.</span>
                             @endif
                             <span class="captacao-saida-fisica-status text-muted" aria-live="polite"></span>
                         </div>

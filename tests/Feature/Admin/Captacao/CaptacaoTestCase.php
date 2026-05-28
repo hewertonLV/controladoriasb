@@ -58,6 +58,8 @@ abstract class CaptacaoTestCase extends TestCase
 
         app(ClienteFrutaVinculoService::class)->sincronizarFrutas($cliente, [$fruta->id]);
 
+        $cliente->update(['id_unidade_negocio_saida_fisico_padrao' => $galpao->id]);
+
         return compact('faturamento', 'galpao', 'carteira', 'cliente', 'fruta', 'rota');
     }
 

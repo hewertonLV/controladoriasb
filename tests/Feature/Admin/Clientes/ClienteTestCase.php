@@ -2,9 +2,11 @@
 
 namespace Tests\Feature\Admin\Clientes;
 
+use App\Models\Captacao\CaptacaoCarteira;
 use App\Models\Grupo;
 use App\Models\Praca;
 use App\Models\UnidadeNegocio;
+use App\Services\Captacao\CaptacaoLoteService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\Support\CreatesUsersWithRoles;
 use Tests\TestCase;
@@ -32,7 +34,7 @@ abstract class ClienteTestCase extends TestCase
             $pracaId = $praca->id;
         }
 
-        return array_replace([
+        $payload = array_replace([
             'id_cigam' => '1',
             'numero_divisao' => '10',
             'razao_social' => 'Cliente Teste LTDA',
@@ -42,7 +44,19 @@ abstract class ClienteTestCase extends TestCase
             'id_praca' => $pracaId,
             'grupo_id' => null,
             'desconto_nf' => '10.00',
+            'id_unidade_negocio_saida_fisico_padrao' => null,
         ], $overrides);
+
+        if (
+            ! array_key_exists('id_unidade_negocio_saida_fisico_padrao', $overrides)
+            || $overrides['id_unidade_negocio_saida_fisico_padrao'] === null
+        ) {
+            $galpao = UnidadeNegocio::factory()->galpaoOperacional()->create();
+            app(CaptacaoLoteService::class)->garantirCarteira((int) $unit, $galpao->id);
+            $payload['id_unidade_negocio_saida_fisico_padrao'] ??= $galpao->id;
+        }
+
+        return $payload;
     }
 
     protected function criarGrupo(string $nome = 'GRUPO TESTE'): Grupo

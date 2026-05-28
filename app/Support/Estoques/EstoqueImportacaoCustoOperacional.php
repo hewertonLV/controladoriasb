@@ -34,7 +34,13 @@ final class EstoqueImportacaoCustoOperacional
         string $precoMedioKgBase,
         UnidadeNegocio $unidade,
         bool $aplicarCo,
+        ?string $qtdFrutaKg = null,
+        ?string $qtdFrutaUm = null,
     ): string {
+        if ($qtdFrutaKg !== null && $qtdFrutaUm !== null && self::quantidadeEstoqueZerada($qtdFrutaKg, $qtdFrutaUm)) {
+            return '0.00';
+        }
+
         $precoBase = round((float) $precoMedioKgBase, 2);
 
         if (! $aplicarCo) {
@@ -44,6 +50,12 @@ final class EstoqueImportacaoCustoOperacional
         $custoKg = self::resolverCustoOperacionalKg($unidade);
 
         return number_format(round($precoBase + $custoKg, 2), 2, '.', '');
+    }
+
+    public static function quantidadeEstoqueZerada(string $qtdFrutaKg, string $qtdFrutaUm): bool
+    {
+        return abs(round((float) str_replace(',', '.', $qtdFrutaKg), 2)) < 0.005
+            || abs(round((float) str_replace(',', '.', $qtdFrutaUm), 2)) < 0.005;
     }
 
     public static function precoMedioKgAplicandoCoPorId(

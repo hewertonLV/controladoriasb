@@ -22,10 +22,12 @@ Layout fixo da planilha (linha 1 = cabeçalho):
 O sistema deriva antes de gravar:
 
 - `qtd_fruta_kg` = `qtd_fruta_um` × `kg_por_unidade_medicao` da fruta
-- `preco_medio_kg` = `valor_total` ÷ `qtd_fruta_kg` (0 se kg = 0)
-- `preco_medio_um` e `valor_total_acumulado` via `EstoqueMovimentacaoService::definirPosicaoAbsoluta`
+- `preco_medio_kg` = `valor_total` ÷ `qtd_fruta_kg` (0 se `qtd_fruta_kg` ou `qtd_fruta_um` = 0)
+- `preco_medio_um` = 0 nas mesmas condições de quantidade zerada
+- Na confirmação, custo operacional **não** incrementa preço médio quando a quantidade importada (kg ou UM) é zero
+- `valor_total_acumulado` via `EstoqueMovimentacaoService::definirPosicaoAbsoluta`
 
-Preview compara posição existente por UM e valor total acumulado.
+Preview compara posição existente por UM e valor total acumulado. Se a planilha traz quantidade zero e o estoque ainda tem preço médio residual, a linha entra em **atualizações** (não em «sem alterações») para permitir zerar PM na confirmação.
 
 Quantidade na UM pode ser **negativa, zero ou positiva** na importação; ver ADR-0045.
 

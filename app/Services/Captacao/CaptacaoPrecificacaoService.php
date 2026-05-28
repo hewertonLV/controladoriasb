@@ -5,11 +5,116 @@ namespace App\Services\Captacao;
 use App\Models\Captacao\PedidoItem;
 use App\Models\Estoque;
 use App\Models\Fruta;
+use App\Models\UnidadeNegocio;
+use App\Support\Movimentacoes\CustoOperacionalSnapshot;
+use App\Support\Movimentacoes\VendaCustoOperacionalHub;
+use Illuminate\Support\Carbon;
 
 final class CaptacaoPrecificacaoService
 {
     /**
-     * Custo de referência na UM da fruta (ADR-0073): PM por unidade de medição do estoque do galpão.
+     * Custo de referência na UM da fruta (ADR-0073): PM do estoque na unidade de saída física.
+     * Se a saída for HUB, soma o CO (R$/kg) da unidade de faturamento convertido para a UM (ADR-0077 / venda HUB).
+     */
+    /**
+     * @return array{
+     *     pm_um: string|null,
+     *     co_um: string|null,
+     *     co_kg: string|null,
+     *     custo_final: string|null,
+     *     eh_saida_hub: bool,
+     * }
+     */
+    public function detalheCustoSaidaFisica(
+        int $idUnidadeEstoqueSaida,
+        int $idUnidadeFaturamento,
+        Fruta $fruta,
+        ?Carbon $dataReferencia = null,
+    ): array {
+        $pmUm = $this->custoReferenciaPorUm($idUnidadeEstoqueSaida, $fruta);
+        $unidadeSaida = UnidadeNegocio::query()->find($idUnidadeEstoqueSaida);
+        $ehHub = $unidadeSaida !== null && VendaCustoOperacionalHub::saidaFisicaEhHubUnidade($unidadeSaida);
+
+        if ($pmUm === null) {
+            return [
+                'pm_um' => null,
+                'co_um' => null,
+                'co_kg' => null,
+                'custo_final' => null,
+                'eh_saida_hub' => $ehHub,
+            ];
+        }
+
+        $coKg = null;
+        $coUm = null;
+
+        if ($ehHub) {
+            $co = CustoOperacionalSnapshot::vigenteNaData(
+                $idUnidadeFaturamento,
+                $dataReferencia ?? now(),
+            );
+            $coKg = number_format($co['valor'], 4, '.', '');
+            $kgPorUm = $this->kgPorUnidadeMedicao($fruta);
+            if ($kgPorUm > 0) {
+                $coUm = number_format($co['valor'] * $kgPorUm, 4, '.', '');
+            }
+        }
+
+        $custoFinal = $pmUm;
+        if ($coUm !== null && (float) $coUm > 0) {
+            $custoFinal = number_format((float) $pmUm + (float) $coUm, 4, '.', '');
+        }
+
+        return [
+            'pm_um' => $pmUm,
+            'co_um' => $coUm,
+            'co_kg' => $coKg,
+            'custo_final' => $custoFinal,
+            'eh_saida_hub' => $ehHub,
+        ];
+    }
+
+    /**
+     * @param  array{
+     *     pm_um: string|null,
+     *     co_um: string|null,
+     *     co_kg: string|null,
+     *     custo_final: string|null,
+     *     eh_saida_hub: bool,
+     * }  $detalhe
+     * @return array{pm: string|null, co: string|null, final: string|null}
+     */
+    public function detalheCustoSaidaFisicaParaApi(array $detalhe): array
+    {
+        return [
+            'pm' => $detalhe['pm_um'] !== null
+                ? number_format((float) $detalhe['pm_um'], 2, '.', '')
+                : null,
+            'co' => $detalhe['eh_saida_hub'] && $detalhe['co_um'] !== null
+                ? number_format((float) $detalhe['co_um'], 2, '.', '')
+                : null,
+            'final' => $detalhe['custo_final'] !== null
+                ? number_format((float) $detalhe['custo_final'], 2, '.', '')
+                : null,
+        ];
+    }
+
+    public function custoReferenciaPorUmNaSaidaFisica(
+        int $idUnidadeEstoqueSaida,
+        int $idUnidadeFaturamento,
+        Fruta $fruta,
+        ?Carbon $dataReferencia = null,
+    ): ?string {
+        return $this->detalheCustoSaidaFisica(
+            $idUnidadeEstoqueSaida,
+            $idUnidadeFaturamento,
+            $fruta,
+            $dataReferencia,
+        )['custo_final'];
+    }
+
+    /**
+     * Custo de referência na UM da fruta (ADR-0073): PM por unidade de medição do estoque da unidade informada.
      */
     public function custoReferenciaPorUm(int $idUnidadeGalpao, Fruta $fruta): ?string
     {

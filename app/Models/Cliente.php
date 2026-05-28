@@ -59,6 +59,7 @@ class Cliente extends Model
         'id_captacao_carteira',
         'desconto_nf',
         'percentual_margem_alvo',
+        'id_unidade_negocio_saida_fisico_padrao',
     ];
 
     /**
@@ -74,7 +75,16 @@ class Cliente extends Model
             'fantasia' => 'string',
             'desconto_nf' => 'decimal:2',
             'percentual_margem_alvo' => 'decimal:2',
+            'id_unidade_negocio_saida_fisico_padrao' => 'integer',
         ];
+    }
+
+    /**
+     * @return BelongsTo<UnidadeNegocio, $this>
+     */
+    public function unidadeSaidaFisicoPadrao(): BelongsTo
+    {
+        return $this->belongsTo(UnidadeNegocio::class, 'id_unidade_negocio_saida_fisico_padrao');
     }
 
     protected function setIdCigamAttribute(mixed $value): void

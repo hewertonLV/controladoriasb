@@ -5,6 +5,7 @@ namespace Tests\Unit\Captacao;
 use App\Models\Captacao\PedidoItem;
 use App\Models\Estoque;
 use App\Models\Fruta;
+use App\Models\HistoricoCOUnNg;
 use App\Models\UnidadeNegocio;
 use App\Services\Captacao\CaptacaoPrecificacaoService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -74,6 +75,115 @@ class CaptacaoPrecificacaoServiceTest extends TestCase
         $this->assertSame('15.0000', $detalhe['margem_por_um']);
         $this->assertSame('30.00', $detalhe['margem_percentual']);
         $this->assertSame('150.00', $detalhe['margem_total_linha']);
+    }
+
+    public function test_detalhe_custo_saida_fisica_separa_pm_co_e_final(): void
+    {
+        $faturamento = UnidadeNegocio::factory()->create(['emite_nota_fiscal' => true]);
+        $hub = UnidadeNegocio::factory()->create([
+            'is_hub' => true,
+            'possui_estoque' => true,
+            'emite_nota_fiscal' => false,
+        ]);
+        HistoricoCOUnNg::factory()->create([
+            'id_unidade_negocio' => $faturamento->id,
+            'custo_operacional' => '2.00',
+            'status_position' => true,
+        ]);
+
+        $fruta = Fruta::factory()->create(['kg_por_unidade_medicao' => '10.00']);
+
+        Estoque::factory()->create([
+            'id_unidade_negocio' => $hub->id,
+            'id_fruta' => $fruta->id,
+            'preco_medio_um' => '50.0000',
+            'qtd_fruta_um' => '1',
+            'qtd_fruta_kg' => '10',
+            'ativo_unico' => 1,
+        ]);
+
+        $detalhe = app(CaptacaoPrecificacaoService::class)->detalheCustoSaidaFisica(
+            $hub->id,
+            $faturamento->id,
+            $fruta,
+        );
+
+        $this->assertTrue($detalhe['eh_saida_hub']);
+        $this->assertSame('50.0000', $detalhe['pm_um']);
+        $this->assertSame('20.0000', $detalhe['co_um']);
+        $this->assertSame('2.0000', $detalhe['co_kg']);
+        $this->assertSame('70.0000', $detalhe['custo_final']);
+    }
+
+    public function test_custo_referencia_hub_soma_co_da_unidade_faturamento_na_um(): void
+    {
+        $faturamento = UnidadeNegocio::factory()->create([
+            'emite_nota_fiscal' => true,
+            'is_hub' => false,
+        ]);
+        $hub = UnidadeNegocio::factory()->create([
+            'is_hub' => true,
+            'possui_estoque' => true,
+            'emite_nota_fiscal' => false,
+        ]);
+        HistoricoCOUnNg::factory()->create([
+            'id_unidade_negocio' => $faturamento->id,
+            'custo_operacional' => '2.00',
+            'status_position' => true,
+        ]);
+
+        $fruta = Fruta::factory()->create([
+            'unidade_medicao' => 'CX',
+            'kg_por_unidade_medicao' => '10.00',
+        ]);
+
+        Estoque::factory()->create([
+            'id_unidade_negocio' => $hub->id,
+            'id_fruta' => $fruta->id,
+            'preco_medio_kg' => '5.0000',
+            'preco_medio_um' => '50.0000',
+            'qtd_fruta_kg' => '100',
+            'qtd_fruta_um' => '10',
+            'ativo_unico' => 1,
+        ]);
+
+        $custo = app(CaptacaoPrecificacaoService::class)->custoReferenciaPorUmNaSaidaFisica(
+            $hub->id,
+            $faturamento->id,
+            $fruta,
+        );
+
+        $this->assertSame('70.0000', $custo);
+    }
+
+    public function test_custo_referencia_galpao_nao_soma_co(): void
+    {
+        $faturamento = UnidadeNegocio::factory()->create(['emite_nota_fiscal' => true]);
+        $galpao = UnidadeNegocio::factory()->galpaoOperacional()->create();
+        HistoricoCOUnNg::factory()->create([
+            'id_unidade_negocio' => $faturamento->id,
+            'custo_operacional' => '5.00',
+            'status_position' => true,
+        ]);
+
+        $fruta = Fruta::factory()->create(['kg_por_unidade_medicao' => '10.00']);
+
+        Estoque::factory()->create([
+            'id_unidade_negocio' => $galpao->id,
+            'id_fruta' => $fruta->id,
+            'preco_medio_um' => '40.0000',
+            'qtd_fruta_um' => '5',
+            'qtd_fruta_kg' => '50',
+            'ativo_unico' => 1,
+        ]);
+
+        $custo = app(CaptacaoPrecificacaoService::class)->custoReferenciaPorUmNaSaidaFisica(
+            $galpao->id,
+            $faturamento->id,
+            $fruta,
+        );
+
+        $this->assertSame('40.0000', $custo);
     }
 
     public function test_custo_referencia_null_sem_saldo(): void

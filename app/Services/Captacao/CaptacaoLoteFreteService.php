@@ -8,6 +8,7 @@ use App\Enums\MovimentacaoStatusRegistro;
 use App\Enums\Roles;
 use App\Models\User;
 use App\Models\Captacao\CaptacaoLote;
+use App\Support\Captacao\SaidaEstoqueFisicoCaptacaoService;
 use App\Models\Captacao\CaptacaoLoteMovimentacao;
 use App\Models\Frete;
 use App\Models\UnidadeNegocio;
@@ -140,7 +141,7 @@ final class CaptacaoLoteFreteService
             $cliente = $pedido->cliente;
             $lojaNome = $cliente?->fantasia ?: $cliente?->razao_social ?: "Cliente #{$pedido->id_cliente}";
 
-            $saidaFisica = $this->resolverSaidaFisicaVendaPedido($pedido, $galpao, $unidadesSaida);
+            $saidaFisica = $this->resolverSaidaFisicaVendaPedido($pedido, $lote, $galpao, $unidadesSaida);
 
             $freteAtual = $idFreteAtual !== null
                 ? Frete::query()->find((int) $idFreteAtual)
@@ -183,10 +184,11 @@ final class CaptacaoLoteFreteService
      */
     private function resolverSaidaFisicaVendaPedido(
         \App\Models\Captacao\Pedido $pedido,
+        CaptacaoLote $lote,
         ?UnidadeNegocio $galpao,
         Collection $unidadesSaida,
     ): array {
-        $idSaida = $pedido->id_unidade_negocio_saida_venda ?? $galpao?->id;
+        $idSaida = app(SaidaEstoqueFisicoCaptacaoService::class)->idSaidaEfetiva($pedido, $lote);
         if ($idSaida === null) {
             return [
                 'is_hub' => false,

@@ -4,6 +4,7 @@ namespace App\Services\Captacao;
 
 use App\Models\Captacao\CaptacaoLote;
 use App\Models\Captacao\Pedido;
+use App\Support\Captacao\SaidaEstoqueFisicoCaptacaoService;
 use Illuminate\Support\Collection;
 
 final class RomaneioCarregamentoService
@@ -49,7 +50,7 @@ final class RomaneioCarregamentoService
     private function carregarPedidosRomaneio(CaptacaoLote $lote): void
     {
         $lote->load([
-            'pedidos.cliente:id,razao_social,fantasia',
+            'pedidos.cliente:id,razao_social,fantasia,id_unidade_negocio_saida_fisico_padrao',
             'pedidos.rota:id,nome',
             'pedidos.itens.fruta:id,nome,unidade_medicao,kg_por_unidade_medicao',
         ]);
@@ -88,7 +89,7 @@ final class RomaneioCarregamentoService
 
     private function pedidoSaidaNaUnidade(Pedido $pedido, CaptacaoLote $lote, int $idUnidadeSaida): bool
     {
-        $saida = (int) ($pedido->id_unidade_negocio_saida_venda ?? $lote->id_unidade_negocio_galpao);
+        $saida = app(SaidaEstoqueFisicoCaptacaoService::class)->idSaidaEfetiva($pedido, $lote);
 
         return $saida === $idUnidadeSaida;
     }

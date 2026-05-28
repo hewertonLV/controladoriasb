@@ -59,7 +59,22 @@ class EstoqueMovimentacaoTest extends TestCase
         $estoque = $unidade->estoques()->where('id_fruta', $fruta->id)->firstOrFail();
         $this->assertSame('0.00', (string) $estoque->qtd_fruta_kg);
         $this->assertSame('0.00', (string) $estoque->qtd_fruta_um);
+        $this->assertSame('0.00', (string) $estoque->preco_medio_kg);
+        $this->assertSame('0.00', (string) $estoque->preco_medio_um);
         $this->assertSame('0.00', (string) $estoque->valor_total_acumulado);
+    }
+
+    public function test_definir_posicao_absoluta_com_quantidade_zero_ignora_preco_medio_informado(): void
+    {
+        $unidade = UnidadeNegocio::factory()->create(['possui_estoque' => true]);
+        $fruta = Fruta::factory()->create(['kg_por_unidade_medicao' => '9.00']);
+
+        $service = app(EstoqueMovimentacaoService::class);
+        $service->definirPosicaoAbsoluta($unidade, $fruta, '0', '0.87');
+
+        $estoque = $unidade->estoques()->where('id_fruta', $fruta->id)->firstOrFail();
+        $this->assertSame('0.00', (string) $estoque->preco_medio_kg);
+        $this->assertSame('0.00', (string) $estoque->preco_medio_um);
     }
 
     public function test_definir_posicao_absoluta_negativa(): void

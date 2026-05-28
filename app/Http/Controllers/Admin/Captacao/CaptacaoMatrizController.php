@@ -59,7 +59,7 @@ class CaptacaoMatrizController extends Controller
 
         $lote = $this->lotes->sincronizarStatusComFaturamentoFinalizado($lote);
 
-        $lote->load(['pedidos.itens']);
+        $lote->load(['pedidos.itens', 'pedidos.cliente:id,id_unidade_negocio_saida_fisico_padrao']);
         $matriz = $this->vinculos->dadosMatriz($lote);
 
         $pedidosPorCliente = $lote->pedidos->keyBy('id_cliente');

@@ -388,10 +388,12 @@
 
         function resumoPosicao(d, aplicarCo) {
             const um = escapeHtml(d.qtd_fruta_um);
-            let precoKg = parseFloat(d.preco_medio_kg || 0);
-            const co = parseFloat(d.custo_operacional_kg || 0);
+            const qtdUm = parseFloat(d.qtd_fruta_um || 0);
             const kg = parseFloat(d.qtd_fruta_kg || 0);
-            if (aplicarCo && co > 0) {
+            const semQuantidade = Math.abs(qtdUm) < 0.005 || Math.abs(kg) < 0.005;
+            let precoKg = semQuantidade ? 0 : parseFloat(d.preco_medio_kg || 0);
+            const co = parseFloat(d.custo_operacional_kg || 0);
+            if (!semQuantidade && aplicarCo && co > 0) {
                 precoKg = Math.round((precoKg + co) * 100) / 100;
             }
             const total = Math.round(kg * precoKg * 100) / 100;

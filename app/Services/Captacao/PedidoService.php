@@ -12,8 +12,11 @@ use App\Models\Captacao\PedidoItem;
 use App\Models\Cliente;
 use App\Models\Fruta;
 use App\Models\User;
+use App\Support\Captacao\CaptacaoPedidoPorLojaSaidaFisicaService;
+use App\Support\Captacao\SaidaEstoqueFisicoCaptacaoService;
 use Illuminate\Database\QueryException;
 use Illuminate\Database\UniqueConstraintViolationException;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
@@ -48,18 +51,18 @@ final class PedidoService
         $this->assertRotaPertenceCarteiraDoLote($dados['id_captacao_rota'] ?? null, $lote);
 
         return DB::transaction(function () use ($lote, $dados, $origem, $user): Pedido {
-            $pedido = Pedido::query()->updateOrCreate(
-                [
-                    'id_captacao_lote' => $lote->id,
-                    'id_cliente' => $dados['id_cliente'],
-                ],
-                [
-                    'id_captacao_rota' => $dados['id_captacao_rota'] ?? null,
-                    'data_entrega' => $dados['data_entrega'] ?? null,
-                    'origem' => $origem,
-                    'created_by_user_id' => $user?->id,
-                ],
+            $pedido = $this->resolverPedidoLoteCliente(
+                $lote,
+                (int) $dados['id_cliente'],
+                $origem,
+                $user,
             );
+
+            $pedido->forceFill([
+                'id_captacao_rota' => $dados['id_captacao_rota'] ?? null,
+                'data_entrega' => $dados['data_entrega'] ?? null,
+                'origem' => $origem,
+            ])->save();
 
             $this->historico->registrarPedido($pedido, 'salvar', $origem, $user);
 
@@ -101,7 +104,7 @@ final class PedidoService
                 return Pedido::query()->create([
                     'id_captacao_lote' => $lote->id,
                     'id_cliente' => $cliente->id,
-                    'id_unidade_negocio_saida_venda' => $lote->id_unidade_negocio_galpao,
+                    'id_unidade_negocio_saida_venda' => null,
                     'origem' => $origem,
                     'created_by_user_id' => $user?->id,
                 ]);
@@ -222,10 +225,7 @@ final class PedidoService
         $this->frutaVinculos->assertFrutaVinculadaAoCliente($pedido->id_cliente, (int) $dados['id_fruta']);
 
         $fruta = Fruta::query()->findOrFail((int) $dados['id_fruta']);
-        $custo = $this->precificacao->custoReferenciaPorUm(
-            (int) $lote->id_unidade_negocio_galpao,
-            $fruta,
-        );
+        $custo = $this->resolverCustoReferenciaItemPedido($lote, $pedido, $fruta);
 
         $quantidade = $this->resolverQuantidade($existente, $dados);
 
@@ -578,6 +578,53 @@ final class PedidoService
         }
     }
 
+    /**
+     * Obtém ou cria o pedido do par lote×cliente com lock e retry em violação de unique (autosave concorrente).
+     */
+    private function resolverPedidoLoteCliente(
+        CaptacaoLote $lote,
+        int $idCliente,
+        PedidoOrigem $origem,
+        ?User $user,
+    ): Pedido {
+        CaptacaoLote::query()->whereKey($lote->id)->lockForUpdate()->first();
+
+        $pedido = $this->buscarPedidoMatriz($lote->id, $idCliente, lock: true);
+
+        if ($pedido !== null) {
+            if ($pedido->trashed()) {
+                return $this->reativarPedidoMatriz($pedido, $origem, (int) $lote->id_unidade_negocio_galpao);
+            }
+
+            return $pedido;
+        }
+
+        try {
+            return Pedido::query()->create([
+                'id_captacao_lote' => $lote->id,
+                'id_cliente' => $idCliente,
+                'origem' => $origem,
+                'created_by_user_id' => $user?->id,
+            ]);
+        } catch (UniqueConstraintViolationException|QueryException $e) {
+            if (! $this->isDuplicatePedidoLoteCliente($e)) {
+                throw $e;
+            }
+
+            $pedido = $this->buscarPedidoMatriz($lote->id, $idCliente, lock: true);
+
+            if ($pedido === null) {
+                throw $e;
+            }
+
+            if ($pedido->trashed()) {
+                return $this->reativarPedidoMatriz($pedido, $origem, (int) $lote->id_unidade_negocio_galpao);
+            }
+
+            return $pedido;
+        }
+    }
+
     private function buscarPedidoMatriz(int $idLote, int $idCliente, bool $lock = false): ?Pedido
     {
         $query = Pedido::query()
@@ -608,7 +655,7 @@ final class PedidoService
             'numero_pedido' => null,
             'ordem_carregamento' => null,
             'data_entrega' => null,
-            'id_unidade_negocio_saida_venda' => $pedido->id_unidade_negocio_saida_venda ?? $idGalpaoPadrao,
+            'id_unidade_negocio_saida_venda' => null,
         ])->save();
 
         return $pedido->fresh() ?? $pedido;
@@ -624,10 +671,99 @@ final class PedidoService
 
     public function garantirSaidaFisicaVendaPadraoGalpao(CaptacaoLote $lote): void
     {
-        Pedido::query()
-            ->where('id_captacao_lote', $lote->id)
-            ->whereNull('id_unidade_negocio_saida_venda')
-            ->update(['id_unidade_negocio_saida_venda' => $lote->id_unidade_negocio_galpao]);
+        $resolver = app(SaidaEstoqueFisicoCaptacaoService::class);
+        $lote->loadMissing(['pedidos.cliente', 'pedidos.itens']);
+
+        foreach ($lote->pedidos as $pedido) {
+            if (! $this->pedidoTemQuantidadeCaptada($pedido)) {
+                continue;
+            }
+
+            if ($pedido->id_unidade_negocio_saida_venda !== null) {
+                continue;
+            }
+
+            $cliente = $pedido->cliente;
+            if ($cliente === null) {
+                $pedido->id_unidade_negocio_saida_venda = $resolver->idGalpaoLote($lote);
+            } else {
+                $pedido->id_unidade_negocio_saida_venda = $resolver->idSaidaPadraoParaCliente($cliente, $lote);
+            }
+
+            $pedido->save();
+        }
+    }
+
+    public function atualizarSaidaFisicaVendaPedidoPorLoja(
+        CaptacaoLote $lote,
+        int $idCliente,
+        int $idUnidadeSaida,
+        PedidoOrigem $origem,
+        ?User $user,
+    ): Pedido {
+        if ($lote->status !== CaptacaoLoteStatus::CaptacaoEmAndamento) {
+            throw ValidationException::withMessages([
+                'status' => 'A saída física da loja só pode ser alterada com a captação em andamento.',
+            ]);
+        }
+
+        $resolver = app(\App\Support\Captacao\CaptacaoPedidoPorLojaSaidaFisicaService::class);
+
+        if (! $resolver->unidadePermitida($lote, $idUnidadeSaida)) {
+            throw ValidationException::withMessages([
+                'id_unidade_negocio_saida_venda' => 'A unidade de saída não é permitida para este lote.',
+            ]);
+        }
+
+        return DB::transaction(function () use ($lote, $idCliente, $idUnidadeSaida, $origem, $user): Pedido {
+            $pedido = $this->resolverPedidoLoteCliente($lote, $idCliente, $origem, $user);
+            $pedido->id_unidade_negocio_saida_venda = $idUnidadeSaida;
+            $pedido->save();
+
+            $this->historico->registrarPedido($pedido, 'atualizar_saida_loja', $origem, $user);
+            $this->recalcularCustosReferenciaPorSaidaFisica($lote, $pedido);
+
+            return $pedido->fresh(['cliente', 'unidadeSaidaVenda', 'itens.fruta']);
+        });
+    }
+
+    /**
+     * @return array<int, string|null> id_fruta => custo_referencia
+     */
+    public function recalcularCustosReferenciaPorSaidaFisica(CaptacaoLote $lote, Pedido $pedido): array
+    {
+        $pedido->loadMissing(['itens.fruta', 'cliente']);
+        $cliente = $pedido->cliente ?? Cliente::query()->findOrFail($pedido->id_cliente);
+        $idSaida = app(CaptacaoPedidoPorLojaSaidaFisicaService::class)->idSaidaEfetivaParaExibicao(
+            $pedido,
+            $lote,
+            $cliente,
+        );
+        $dataReferencia = $lote->data_referencia !== null
+            ? Carbon::parse($lote->data_referencia)->startOfDay()
+            : null;
+
+        $custos = [];
+
+        foreach ($pedido->itens as $item) {
+            $fruta = $item->fruta;
+            if ($fruta === null) {
+                continue;
+            }
+
+            $custo = $this->precificacao->custoReferenciaPorUmNaSaidaFisica(
+                $idSaida,
+                (int) $lote->id_unidade_negocio_faturamento,
+                $fruta,
+                $dataReferencia,
+            );
+
+            $item->custo_referencia = $custo;
+            $item->save();
+            $custos[(int) $item->id_fruta] = $custo;
+        }
+
+        return $custos;
     }
 
     public function atualizarSaidaFisicaVenda(
@@ -654,12 +790,9 @@ final class PedidoService
             ]);
         }
 
-        $permitidas = [(int) $lote->id_unidade_negocio_galpao];
-        if ($lote->id_unidade_negocio_hub_origem !== null) {
-            $permitidas[] = (int) $lote->id_unidade_negocio_hub_origem;
-        }
+        $resolver = app(SaidaEstoqueFisicoCaptacaoService::class);
 
-        if (! in_array($idUnidadeSaida, $permitidas, true)) {
+        if (! $resolver->unidadePermitida($lote, $idUnidadeSaida)) {
             throw ValidationException::withMessages([
                 'id_unidade_negocio_saida_venda' => 'A unidade de saída deve ser o galpão ou o HUB de origem do lote.',
             ]);
@@ -705,6 +838,27 @@ final class PedidoService
                 'id_unidade_origem_fisica' => $pedido->id_unidade_negocio_saida_venda,
             ]);
         }
+    }
+
+    private function resolverCustoReferenciaItemPedido(CaptacaoLote $lote, Pedido $pedido, Fruta $fruta): ?string
+    {
+        $pedido->loadMissing('cliente');
+        $cliente = $pedido->cliente ?? Cliente::query()->findOrFail($pedido->id_cliente);
+        $idSaida = app(CaptacaoPedidoPorLojaSaidaFisicaService::class)->idSaidaEfetivaParaExibicao(
+            $pedido,
+            $lote,
+            $cliente,
+        );
+        $dataReferencia = $lote->data_referencia !== null
+            ? Carbon::parse($lote->data_referencia)->startOfDay()
+            : null;
+
+        return $this->precificacao->custoReferenciaPorUmNaSaidaFisica(
+            $idSaida,
+            (int) $lote->id_unidade_negocio_faturamento,
+            $fruta,
+            $dataReferencia,
+        );
     }
 
     private function assertLotePermiteEdicaoPreco(CaptacaoLote $lote): void

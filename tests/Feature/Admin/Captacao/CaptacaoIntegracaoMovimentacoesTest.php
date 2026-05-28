@@ -155,6 +155,58 @@ class CaptacaoIntegracaoMovimentacoesTest extends CaptacaoTestCase
         $this->assertSame($hub->id, $estado['pedidos'][$clienteId]['id_unidade_negocio_saida_venda']);
     }
 
+    public function test_upload_nf_preenche_saida_hub_quando_cliente_padrao_hub(): void
+    {
+        $c = $this->cenarioCaptacaoBasico();
+        $hub = $this->criarHubComEstoque($c['fruta']);
+        $c['cliente']->update(['id_unidade_negocio_saida_fisico_padrao' => $hub->id]);
+        $this->criarCoGalpao($c['galpao']);
+
+        $lote = $this->criarLoteComPedido($c, 10);
+        $user = $this->captacaoManager();
+        $user->unidadesNegocio()->sync([$c['faturamento']->id, $c['galpao']->id, $hub->id]);
+
+        $this->actingAs($user)->post(route('admin.captacao.lotes.pipeline.iniciar-transferencia', $lote));
+        $lote->update(['id_unidade_negocio_hub_origem' => $hub->id]);
+
+        $pedido = $lote->fresh()->pedidos()->firstOrFail();
+        $this->assertNull($pedido->id_unidade_negocio_saida_venda);
+
+        Storage::fake('local');
+        $this->actingAs($user)->post(route('admin.captacao.lotes.nf-transferencia-cigan.upload', $lote), [
+            'arquivo_nf_transferencia' => UploadedFile::fake()->create('nf.xml', 50, 'application/xml'),
+        ])->assertRedirect();
+
+        $pedido->refresh();
+        $this->assertSame($hub->id, $pedido->id_unidade_negocio_saida_venda);
+    }
+
+    public function test_matriz_estado_usa_padrao_cliente_quando_saida_venda_null(): void
+    {
+        $c = $this->cenarioCaptacaoBasico();
+        $hub = $this->criarHubComEstoque($c['fruta']);
+        $c['cliente']->update(['id_unidade_negocio_saida_fisico_padrao' => $hub->id]);
+        $lote = $this->criarLoteComPedido($c, 3);
+        $lote->update([
+            'status' => CaptacaoLoteStatus::SaidaEstoqueFisico,
+            'id_unidade_negocio_hub_origem' => $hub->id,
+        ]);
+
+        $user = $this->captacaoManager();
+        $user->unidadesNegocio()->sync([$c['faturamento']->id, $c['galpao']->id, $hub->id]);
+
+        $pedido = $lote->fresh()->pedidos()->firstOrFail();
+        $pedido->update(['id_unidade_negocio_saida_venda' => null]);
+
+        $clienteId = (string) $c['cliente']->id;
+        $estado = $this->actingAs($user)
+            ->getJson(route('admin.captacao.lotes.matriz.estado', $lote))
+            ->assertOk()
+            ->json();
+
+        $this->assertSame($hub->id, $estado['pedidos'][$clienteId]['id_unidade_negocio_saida_venda']);
+    }
+
     public function test_concluir_saida_fisico_nao_transfere_quando_loja_vende_direto_do_hub(): void
     {
         $c = $this->cenarioCaptacaoBasico();

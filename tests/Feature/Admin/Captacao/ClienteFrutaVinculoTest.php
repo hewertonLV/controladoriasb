@@ -66,6 +66,34 @@ class ClienteFrutaVinculoTest extends CaptacaoTestCase
             ->assertForbidden();
     }
 
+    public function test_tela_frutas_por_loja_exibe_vinculadas_antes_de_disponiveis(): void
+    {
+        $c = $this->cenarioCaptacaoBasico();
+        $frutaVinculada = $c['fruta'];
+        $frutaDisponivel = \App\Models\Fruta::factory()->create(['nome' => 'UVA DISPONIVEL TESTE']);
+
+        app(ClienteFrutaVinculoService::class)->sincronizarFrutas($c['cliente'], [$frutaVinculada->id]);
+
+        $html = $this->actingAs($this->captacaoManager())
+            ->get(route('admin.captacao.frutas-por-loja.show', $c['cliente']))
+            ->assertOk()
+            ->assertSee('Vinculadas a esta loja', false)
+            ->assertSee('Disponíveis para vincular', false)
+            ->getContent();
+
+        $posVinculada = mb_strpos($html, $frutaVinculada->nome);
+        $posDisponivel = mb_strpos($html, $frutaDisponivel->nome);
+        $posSecaoVinculadas = mb_strpos($html, 'Vinculadas a esta loja');
+        $posSecaoDisponiveis = mb_strpos($html, 'Disponíveis para vincular');
+
+        $this->assertNotFalse($posVinculada);
+        $this->assertNotFalse($posDisponivel);
+        $this->assertNotFalse($posSecaoVinculadas);
+        $this->assertNotFalse($posSecaoDisponiveis);
+        $this->assertLessThan($posSecaoDisponiveis, $posSecaoVinculadas);
+        $this->assertLessThan($posDisponivel, $posVinculada);
+    }
+
     public function test_tela_frutas_por_loja_e_salvamento_em_lote(): void
     {
         $c = $this->cenarioCaptacaoBasico();
@@ -80,7 +108,9 @@ class ClienteFrutaVinculoTest extends CaptacaoTestCase
         $this->actingAs($user)
             ->get(route('admin.captacao.frutas-por-loja.show', $c['cliente']))
             ->assertOk()
-            ->assertSee('Salvar vínculos', false);
+            ->assertSee('Salvar vínculos', false)
+            ->assertSee('Desmarcar todas', false)
+            ->assertSee('id="btn-desmarcar-todas"', false);
 
         $this->actingAs($user)
             ->put(route('admin.captacao.clientes.frutas.sync', $c['cliente']), [

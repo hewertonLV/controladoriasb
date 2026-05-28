@@ -108,6 +108,127 @@ class EstoqueImportacaoTest extends TestCase
         $this->assertSame('0.00', $dados['valor_total']);
         $this->assertSame('0.00', $dados['qtd_fruta_kg']);
         $this->assertSame('0.00', $dados['preco_medio_kg']);
+        $this->assertSame('0.00', $dados['preco_medio_um']);
+    }
+
+    public function test_processor_detecta_atualizacao_quando_quantidade_zero_mas_preco_medio_antigo_persiste(): void
+    {
+        $this->seed(EstadoSeeder::class);
+
+        $unidade = UnidadeNegocio::factory()->create([
+            'id_cigam' => '100014',
+            'possui_estoque' => true,
+        ]);
+        $fruta = Fruta::factory()->create([
+            'id_cigam' => '021105',
+            'kg_por_unidade_medicao' => 9,
+        ]);
+
+        Estoque::query()->create([
+            'id_unidade_negocio' => $unidade->id,
+            'id_fruta' => $fruta->id,
+            'qtd_fruta_kg' => '0.00',
+            'qtd_fruta_um' => '0.00',
+            'preco_medio_kg' => '0.87',
+            'preco_medio_um' => '7.83',
+            'valor_total_acumulado' => '0.00',
+        ]);
+
+        $path = 'estoques/importacoes/teste-zero-preco-residual.xlsx';
+        Storage::disk('local')->makeDirectory('estoques/importacoes');
+        $this->criarPlanilha(Storage::disk('local')->path($path), [
+            ['ID CIGAM Unidade', 'ID CIGAM Fruta', 'Qtd UM', 'Preço total'],
+            [$unidade->id_cigam, $fruta->id_cigam, '0', '0'],
+        ]);
+
+        $importacao = \App\Models\EstoqueImportacao::create([
+            'uuid' => (string) \Illuminate\Support\Str::uuid(),
+            'user_id' => null,
+            'arquivo_original' => 'teste-zero-preco.xlsx',
+            'arquivo_path' => $path,
+            'status' => \App\Models\EstoqueImportacao::STATUS_AGUARDANDO,
+        ]);
+
+        app(EstoqueImportacaoProcessor::class)->processar($importacao->fresh());
+
+        $importacao->refresh();
+        $this->assertCount(1, $importacao->resultado['atualizacoes'] ?? []);
+        $this->assertSame('0.00', $importacao->resultado['atualizacoes'][0]['dados_novos']['preco_medio_kg']);
+        $this->assertSame('0.00', $importacao->resultado['atualizacoes'][0]['dados_novos']['preco_medio_um']);
+    }
+
+    public function test_confirmar_com_quantidade_zero_nao_aplica_custo_operacional_no_preco_medio(): void
+    {
+        $this->seed(EstadoSeeder::class);
+
+        $unidade = UnidadeNegocio::factory()->create([
+            'id_cigam' => '100013',
+            'possui_estoque' => true,
+        ]);
+        HistoricoCOUnNg::query()->where('id_unidade_negocio', $unidade->id)->update(['status_position' => false]);
+        HistoricoCOUnNg::factory()->create([
+            'id_unidade_negocio' => $unidade->id,
+            'custo_operacional' => '2.00',
+            'status_position' => true,
+        ]);
+        $fruta = Fruta::factory()->create([
+            'id_cigam' => '200013',
+            'kg_por_unidade_medicao' => 10,
+        ]);
+
+        $user = $this->userWithPermissions([
+            Permissions::ESTOQUES_IMPORTAR,
+            Permissions::ESTOQUES_IMPORTAR_CONFIRMAR,
+        ]);
+
+        $importacao = \App\Models\EstoqueImportacao::create([
+            'uuid' => (string) \Illuminate\Support\Str::uuid(),
+            'user_id' => $user->id,
+            'arquivo_original' => 'confirmar-zero-co.xlsx',
+            'arquivo_path' => 'estoques/importacoes/confirmar-zero-co.xlsx',
+            'status' => \App\Models\EstoqueImportacao::STATUS_CONCLUIDO,
+            'resultado' => [
+                'novas' => [[
+                    'row_id' => 1,
+                    'linha' => 2,
+                    'id_unidade_negocio' => $unidade->id,
+                    'id_fruta' => $fruta->id,
+                    'chave' => '100013|200013',
+                    'dados' => [
+                        'qtd_fruta_um' => '0.00',
+                        'valor_total' => '0.00',
+                        'qtd_fruta_kg' => '0.00',
+                        'preco_medio_kg' => '0.00',
+                        'preco_medio_um' => '0.00',
+                        'custo_operacional_kg' => '2.00',
+                    ],
+                ]],
+                'atualizacoes' => [],
+                'sem_alteracoes' => [],
+                'erros' => [],
+            ],
+        ]);
+
+        $response = $this->actingAs($user)->postJson(
+            route('admin.estoques.importar.confirmar', $importacao),
+            [
+                'row_ids_novas' => [1],
+                'aplicar_custo_operacional_por_row' => ['1' => true],
+            ],
+        );
+
+        $response->assertOk();
+
+        $estoque = Estoque::query()
+            ->where('id_unidade_negocio', $unidade->id)
+            ->where('id_fruta', $fruta->id)
+            ->firstOrFail();
+
+        $this->assertSame('0.00', $estoque->qtd_fruta_um);
+        $this->assertSame('0.00', $estoque->qtd_fruta_kg);
+        $this->assertSame('0.00', $estoque->preco_medio_kg);
+        $this->assertSame('0.00', $estoque->preco_medio_um);
+        $this->assertSame('0.00', $estoque->valor_total_acumulado);
     }
 
     public function test_processor_aceita_quantidade_negativa(): void

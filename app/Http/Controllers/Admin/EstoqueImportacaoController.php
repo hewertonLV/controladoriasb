@@ -189,6 +189,8 @@ class EstoqueImportacaoController extends Controller
                             (string) ($dados['preco_medio_kg'] ?? '0'),
                             $unidade,
                             $aplicarCo,
+                            (string) ($dados['qtd_fruta_kg'] ?? '0'),
+                            (string) ($dados['qtd_fruta_um'] ?? '0'),
                         );
 
                         $this->movimentacaoService->definirPosicaoAbsoluta(
@@ -233,6 +235,8 @@ class EstoqueImportacaoController extends Controller
                             (string) ($dados['preco_medio_kg'] ?? '0'),
                             $unidade,
                             $aplicarCo,
+                            (string) ($dados['qtd_fruta_kg'] ?? '0'),
+                            (string) ($dados['qtd_fruta_um'] ?? '0'),
                         );
 
                         $this->movimentacaoService->definirPosicaoAbsoluta(

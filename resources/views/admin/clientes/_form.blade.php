@@ -181,6 +181,21 @@
                 @enderror
             </div>
             <div class="col-md-4">
+                <label for="id_unidade_negocio_saida_fisico_padrao" class="form-label">Saída estoque físico padrão <span class="text-danger">*</span></label>
+                <select id="id_unidade_negocio_saida_fisico_padrao"
+                        name="id_unidade_negocio_saida_fisico_padrao"
+                        class="form-select @error('id_unidade_negocio_saida_fisico_padrao') is-invalid @enderror"
+                        data-saida-padrao-selecionada="{{ old('id_unidade_negocio_saida_fisico_padrao', $cliente->id_unidade_negocio_saida_fisico_padrao ?? '') }}"
+                        required
+                        disabled>
+                    <option value="">Selecione a unidade de negócio (faturamento)</option>
+                </select>
+                <div class="form-text">Galpão do faturamento, galpões da rede (HUB → galpão) e HUBs ativos. Usado na etapa «Saída estoque físico» da captação.</div>
+                @error('id_unidade_negocio_saida_fisico_padrao')
+                    <div class="invalid-feedback">{{ $message }}</div>
+                @enderror
+            </div>
+            <div class="col-md-4">
                 <label for="percentual_margem_alvo" class="form-label">Margem alvo captação (%)</label>
                 <input type="number"
                        id="percentual_margem_alvo"
@@ -349,6 +364,77 @@
             });
 
             atualizarPracas(false);
+        })();
+
+        (function () {
+            const unidadeSelect = document.getElementById('id_unidade_negocio');
+            const saidaSelect = document.getElementById('id_unidade_negocio_saida_fisico_padrao');
+            const mapa = @json($saidaFisicoOpcoesMap ?? []);
+
+            if (!unidadeSelect || !saidaSelect) {
+                return;
+            }
+
+            function atualizarSaidaFisicoPadrao(resetSelecao) {
+                const unidadeId = unidadeSelect.value;
+                const selecionado = resetSelecao
+                    ? ''
+                    : (saidaSelect.dataset.saidaPadraoSelecionada || saidaSelect.value || '');
+
+                saidaSelect.innerHTML = '';
+                const placeholder = document.createElement('option');
+                placeholder.value = '';
+                placeholder.textContent = unidadeId
+                    ? 'Selecione...'
+                    : 'Selecione a unidade de negócio (faturamento)';
+                saidaSelect.appendChild(placeholder);
+
+                if (!unidadeId || !mapa[unidadeId]) {
+                    saidaSelect.value = '';
+                    saidaSelect.disabled = true;
+                    return;
+                }
+
+                saidaSelect.disabled = false;
+                let selecionou = false;
+                const porGrupo = {};
+
+                mapa[unidadeId].forEach(function (opcao) {
+                    if (!porGrupo[opcao.grupo]) {
+                        porGrupo[opcao.grupo] = [];
+                    }
+                    porGrupo[opcao.grupo].push(opcao);
+                });
+
+                Object.keys(porGrupo).forEach(function (grupo) {
+                    const optgroup = document.createElement('optgroup');
+                    optgroup.label = grupo;
+                    porGrupo[grupo].forEach(function (opcao) {
+                        const option = document.createElement('option');
+                        option.value = String(opcao.id);
+                        option.textContent = opcao.label;
+                        if (selecionado !== '' && option.value === String(selecionado)) {
+                            option.selected = true;
+                            selecionou = true;
+                        }
+                        optgroup.appendChild(option);
+                    });
+                    saidaSelect.appendChild(optgroup);
+                });
+
+                if (!selecionou && mapa[unidadeId].length === 1) {
+                    saidaSelect.value = String(mapa[unidadeId][0].id);
+                } else if (!selecionou) {
+                    saidaSelect.value = '';
+                }
+            }
+
+            unidadeSelect.addEventListener('change', function () {
+                saidaSelect.dataset.saidaPadraoSelecionada = '';
+                atualizarSaidaFisicoPadrao(true);
+            });
+
+            atualizarSaidaFisicoPadrao(false);
         })();
     </script>
 @endpush

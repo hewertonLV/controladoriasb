@@ -3,6 +3,7 @@
 namespace App\Services\Captacao;
 
 use App\Models\Captacao\CaptacaoLote;
+use App\Support\Captacao\SaidaEstoqueFisicoCaptacaoService;
 
 final class CaptacaoMatrizEstadoService
 {
@@ -37,9 +38,12 @@ final class CaptacaoMatrizEstadoService
      */
     public function snapshot(CaptacaoLote $lote): array
     {
-        $lote->load(['pedidos.itens', 'pedidos.cliente:id,razao_social,fantasia', 'carteira:id,nome']);
-
         $matriz = $this->vinculos->dadosMatriz($lote);
+
+        $lote->load([
+            'pedidos.cliente:id,razao_social,fantasia,id_unidade_negocio_saida_fisico_padrao',
+            'carteira:id,nome',
+        ]);
         $clientes = $matriz['clientes'];
         $frutas = $matriz['frutas'];
 
@@ -48,8 +52,11 @@ final class CaptacaoMatrizEstadoService
         $versionSum = 0;
 
         $pedidosPorCliente = $lote->pedidos->keyBy('id_cliente');
+        $saidaFisicaResolver = app(SaidaEstoqueFisicoCaptacaoService::class);
 
         foreach ($lote->pedidos as $pedido) {
+            $idSaidaExibicao = $saidaFisicaResolver->idSaidaEfetiva($pedido, $lote);
+
             $pedidos[(string) $pedido->id_cliente] = [
                 'captacao_concluida' => (bool) $pedido->captacao_concluida,
                 'numero_pedido' => $pedido->numero_pedido,
@@ -57,16 +64,14 @@ final class CaptacaoMatrizEstadoService
                 'ordem_carregamento' => $pedido->ordem_carregamento !== null
                     ? (int) $pedido->ordem_carregamento
                     : null,
-                'id_unidade_negocio_saida_venda' => $pedido->id_unidade_negocio_saida_venda !== null
-                    ? (int) $pedido->id_unidade_negocio_saida_venda
-                    : null,
+                'id_unidade_negocio_saida_venda' => $idSaidaExibicao,
             ];
             $versionSum += (int) $pedido->updated_at?->timestamp;
             $versionSum += $pedido->captacao_concluida ? 1009 : 0;
             $versionSum += strlen($pedido->numero_pedido ?? '');
             $versionSum += (int) ($pedido->id_captacao_rota ?? 0);
             $versionSum += (int) ($pedido->ordem_carregamento ?? 0);
-            $versionSum += (int) ($pedido->id_unidade_negocio_saida_venda ?? 0);
+            $versionSum += $idSaidaExibicao;
 
             foreach ($pedido->itens as $item) {
                 $key = $pedido->id_cliente.'_'.$item->id_fruta;

@@ -1242,6 +1242,10 @@ Route::middleware(['auth', 'verified', 'user.active', 'password.changed'])->grou
                 ->middleware('permission:captacao.pedido.editar')
                 ->name('pedidos-por-loja.salvar');
 
+            Route::patch('/lotes/{lote}/pedidos-por-loja/{cliente}/saida-fisica-venda', [CaptacaoPedidoPorLojaController::class, 'updateSaidaFisicaVenda'])
+                ->middleware('permission:captacao.pedido.editar')
+                ->name('pedidos-por-loja.saida-fisica-venda');
+
             Route::post('/lotes/{lote}/pedidos-por-loja/{cliente}/captacao-concluida', [CaptacaoPedidoPorLojaController::class, 'toggleConclusao'])
                 ->middleware('permission:captacao.pedido.editar')
                 ->name('pedidos-por-loja.captacao-concluida');

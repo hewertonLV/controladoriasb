@@ -23,7 +23,19 @@ class EstoqueImportacaoPosicaoDerivadorTest extends TestCase
         $posicao = EstoqueImportacaoPosicaoDerivador::derivar(10.0, 0.0, 0.0);
 
         $this->assertSame('0.00', $posicao['qtd_fruta_kg']);
+        $this->assertSame('0.00', $posicao['qtd_fruta_um']);
         $this->assertSame('0.00', $posicao['preco_medio_kg']);
+        $this->assertSame('0.00', $posicao['preco_medio_um']);
+    }
+
+    public function test_preco_medio_zerado_quando_kg_deriva_zero_mesmo_com_um_positiva(): void
+    {
+        $posicao = EstoqueImportacaoPosicaoDerivador::derivar(0.0, 5.0, 100.0);
+
+        $this->assertSame('5.00', $posicao['qtd_fruta_um']);
+        $this->assertSame('0.00', $posicao['qtd_fruta_kg']);
+        $this->assertSame('0.00', $posicao['preco_medio_kg']);
+        $this->assertSame('0.00', $posicao['preco_medio_um']);
     }
 
     public function test_quantidade_negativa_deriva_kg_e_preco_negativos(): void

@@ -79,11 +79,17 @@ class ClienteFrutaVinculoController extends Controller
             ->map(fn ($id) => (int) $id)
             ->all();
 
+        $idsVinculadas = collect($vinculadas);
+        $todasFrutas = Fruta::query()->orderBy('nome')->get(['id', 'id_cigam', 'nome']);
+        $frutasVinculadas = $todasFrutas->whereIn('id', $idsVinculadas)->values();
+        $frutasDisponiveis = $todasFrutas->whereNotIn('id', $idsVinculadas)->values();
+
         $user = request()->user();
 
         return view('admin.captacao.cliente-frutas.show', [
             'cliente' => $cliente,
-            'frutas' => Fruta::query()->orderBy('nome')->get(['id', 'nome']),
+            'frutasVinculadas' => $frutasVinculadas,
+            'frutasDisponiveis' => $frutasDisponiveis,
             'vinculadas' => $vinculadas,
             'podeSalvarVinculos' => $user?->canAny([
                 'captacao.cliente_fruta.vincular',

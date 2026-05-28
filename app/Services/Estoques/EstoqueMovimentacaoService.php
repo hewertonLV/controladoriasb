@@ -200,8 +200,15 @@ class EstoqueMovimentacaoService
         float $novaPKg,
     ): MovimentacaoEstoque {
         $novaQUm = round($novaQKg / $kgPorUm, 2);
-        $novaPUm = round($novaPKg * $kgPorUm, 2);
-        $valorTotal = round($novaQKg * $novaPKg, 2);
+
+        if (abs($novaQKg) < 0.005 || abs($novaQUm) < 0.005) {
+            $novaPKg = 0.0;
+            $novaPUm = 0.0;
+            $valorTotal = 0.0;
+        } else {
+            $novaPUm = round($novaPKg * $kgPorUm, 2);
+            $valorTotal = round($novaQKg * $novaPKg, 2);
+        }
 
         MovimentacaoEstoque::query()
             ->where('id_estoque', $estoque->id)

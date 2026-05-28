@@ -12,7 +12,7 @@ Após o HUB efetuar a transferência no Cigam e o operador enviar a NF no SB, er
 
 - Novo status `SAIDA_ESTOQUE_FISICO` (**Saída estoque físico (SB Controladoria)**) entre `TRANSFERENCIA_CIGAN_INICIADA` e `AGUARDANDO_VINCULO_FRETE`.
 - **Upload da NF de transferência:** apenas armazena o arquivo e avança para `SAIDA_ESTOQUE_FISICO` — **sem** movimentações de transferência.
-- **Aba «Saída estoque físico»:** tabela no formato do Romaneio 1 (carregamento) com coluna por loja: origem da saída na venda = **galpão** ou **HUB** (`id_unidade_negocio_hub_origem` do lote). Padrão: galpão. Gravação em tempo real (AJAX) em `pedidos.id_unidade_negocio_saida_venda`.
+- **Aba «Saída estoque físico»:** tabela no formato do Romaneio 1 (carregamento) com coluna por loja: origem da saída na venda = **galpão** ou **HUB** (`id_unidade_negocio_hub_origem` do lote). Padrão por loja: cadastro do cliente ([ADR-0142](ADR-0142-saida-estoque-fisico-padrao-cliente.md)). Gravação em tempo real (AJAX) em `pedidos.id_unidade_negocio_saida_venda`.
 - **Sincronização entre usuários:** o endpoint `matriz.estado` (poll da matriz) inclui `id_unidade_negocio_saida_venda` por loja; a aba atualiza os rádios sem recarregar a página, sem alterar o campo em foco nem durante salvamento local.
 - **Concluir saída estoque físico:** valida estoque no HUB, executa `EfetivarTransferenciasGerenciaisLoteService` (somente demanda de lojas com saída no galpão — [ADR-0131](ADR-0131-abastecimento-exclui-venda-direta-hub.md)) e vai para `AGUARDANDO_VINCULO_FRETE`.
 - **Finalizar vendas:** `id_unidade_negocio_estoque` da movimentação = valor salvo por loja; `id_empresa_origem` / faturamento permanecem na unidade de faturamento do lote.

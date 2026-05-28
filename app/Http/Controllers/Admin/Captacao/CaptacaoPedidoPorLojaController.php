@@ -8,13 +8,16 @@ use App\Enums\PedidoOrigem;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Admin\Captacao\SalvarPedidoPorLojaRequest;
 use App\Http\Requests\Admin\Captacao\ToggleCaptacaoConcluidaRequest;
+use App\Http\Requests\Admin\Captacao\UpdateCaptacaoPedidoPorLojaSaidaFisicaVendaRequest;
 use App\Models\Captacao\CaptacaoLote;
+use App\Models\Captacao\Pedido;
 use App\Models\Cliente;
 use App\Services\Captacao\CaptacaoPrecificacaoService;
 use App\Services\Captacao\ClienteFrutaVinculoService;
 use App\Services\Captacao\PedidoCaptacaoEstadoService;
 use App\Services\Captacao\PedidoService;
 use App\Services\Permissoes\UnidadeNegocioAccessService;
+use App\Support\Captacao\CaptacaoPedidoPorLojaSaidaFisicaService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -27,6 +30,7 @@ class CaptacaoPedidoPorLojaController extends Controller
         private readonly PedidoCaptacaoEstadoService $estado,
         private readonly ClienteFrutaVinculoService $vinculos,
         private readonly CaptacaoPrecificacaoService $precificacao,
+        private readonly CaptacaoPedidoPorLojaSaidaFisicaService $saidaFisicaLoja,
     ) {}
 
     public function carteiras(Request $request): View
@@ -92,26 +96,44 @@ class CaptacaoPedidoPorLojaController extends Controller
         $this->assertAcessoLote($request, $lote);
         $this->assertClienteDaCarteira($lote, $cliente);
 
-        $lote->load(['pedidos.itens.fruta', 'unidadeGalpao']);
+        $cliente->load(['unidadeSaidaFisicoPadrao:id,nome,id_cigam']);
+
+        $lote->load(['pedidos.itens.fruta', 'unidadeGalpao', 'unidadeFaturamento']);
         $pedidoAtual = $lote->pedidos->firstWhere('id_cliente', $cliente->id);
         $pedidoAnterior = $this->estado->pedidoAnteriorCaptacao($cliente->id, $lote);
 
         $frutas = app(ClienteFrutaVinculoService::class)->frutasVinculadasDoCliente($cliente->id);
         $possuiFrutas = $frutas->isNotEmpty();
 
-        $linhas = $frutas->map(function ($fruta) use ($lote, $cliente, $pedidoAtual, $pedidoAnterior): array {
+        $idSaidaSelecionada = $this->saidaFisicaLoja->idSaidaEfetivaParaExibicao(
+            $pedidoAtual ?? new Pedido(['id_unidade_negocio_saida_venda' => null]),
+            $lote,
+            $cliente,
+        );
+        $dataReferenciaCusto = $lote->data_referencia?->copy()->startOfDay();
+
+        $linhas = $frutas->map(function ($fruta) use (
+            $lote,
+            $pedidoAtual,
+            $pedidoAnterior,
+            $idSaidaSelecionada,
+            $dataReferenciaCusto,
+        ): array {
             $itemAtual = $pedidoAtual?->itens->firstWhere('id_fruta', $fruta->id);
             $itemAnterior = $pedidoAnterior?->itens->firstWhere('id_fruta', $fruta->id);
-            $custo = $this->precificacao->custoReferenciaPorUm(
-                (int) $lote->id_unidade_negocio_galpao,
+            $custoDetalhe = $this->precificacao->detalheCustoSaidaFisica(
+                $idSaidaSelecionada,
+                (int) $lote->id_unidade_negocio_faturamento,
                 $fruta,
+                $dataReferenciaCusto,
             );
 
             return [
                 'fruta' => $fruta,
                 'item_atual' => $itemAtual,
                 'item_anterior' => $itemAnterior,
-                'custo' => $custo,
+                'custo' => $custoDetalhe['custo_final'],
+                'custo_detalhe' => $custoDetalhe,
             ];
         });
 
@@ -133,6 +155,13 @@ class CaptacaoPedidoPorLojaController extends Controller
             ? null
             : $this->precificacao->rentabilidadePedido($itensUltimoPedido, (float) $cliente->desconto_nf);
 
+        $opcoesSaidaFisica = $this->saidaFisicaLoja->opcoesParaLote($lote);
+        $saidaPadraoCadastroId = $cliente->id_unidade_negocio_saida_fisico_padrao;
+        $saidaPadraoCadastroLabel = $saidaPadraoCadastroId !== null
+            ? $this->saidaFisicaLoja->labelUnidadePorId($lote, (int) $saidaPadraoCadastroId)
+                ?? $cliente->unidadeSaidaFisicoPadrao?->nome
+            : null;
+
         return view('admin.captacao.pedidos-por-loja.show', [
             'lote' => $lote,
             'cliente' => $cliente,
@@ -145,20 +174,73 @@ class CaptacaoPedidoPorLojaController extends Controller
             'estadoLoja' => $estadoLoja,
             'podeEditar' => $lote->status === CaptacaoLoteStatus::CaptacaoEmAndamento,
             'possuiFrutas' => $possuiFrutas,
+            'opcoesSaidaFisica' => $opcoesSaidaFisica,
+            'idSaidaSelecionada' => $idSaidaSelecionada,
+            'saidaPadraoCadastroId' => $saidaPadraoCadastroId,
+            'saidaPadraoCadastroLabel' => $saidaPadraoCadastroLabel,
+            'pedidoSaidaOverride' => $pedidoAtual?->id_unidade_negocio_saida_venda !== null,
         ]);
     }
 
-    public function salvar(SalvarPedidoPorLojaRequest $request, CaptacaoLote $lote, Cliente $cliente): RedirectResponse
+    public function updateSaidaFisicaVenda(
+        UpdateCaptacaoPedidoPorLojaSaidaFisicaVendaRequest $request,
+        CaptacaoLote $lote,
+        Cliente $cliente,
+    ): JsonResponse {
+        $this->assertAcessoLote($request, $lote);
+        $this->assertClienteDaCarteira($lote, $cliente);
+
+        if ($lote->status !== CaptacaoLoteStatus::CaptacaoEmAndamento) {
+            abort(422, 'A captação deste lote não está em andamento.');
+        }
+
+        $pedido = $this->pedidos->atualizarSaidaFisicaVendaPedidoPorLoja(
+            $lote,
+            $cliente->id,
+            (int) $request->validated('id_unidade_negocio_saida_venda'),
+            PedidoOrigem::Web,
+            $request->user(),
+        );
+
+        $idSaida = (int) $pedido->id_unidade_negocio_saida_venda;
+        $dataReferencia = $lote->data_referencia?->copy()->startOfDay();
+        $custos = [];
+
+        foreach ($this->vinculos->frutasVinculadasDoCliente($cliente->id) as $fruta) {
+            $detalhe = $this->precificacao->detalheCustoSaidaFisica(
+                $idSaida,
+                (int) $lote->id_unidade_negocio_faturamento,
+                $fruta,
+                $dataReferencia,
+            );
+            $custos[(int) $fruta->id] = $this->precificacao->detalheCustoSaidaFisicaParaApi($detalhe);
+        }
+
+        return response()->json([
+            'ok' => true,
+            'id_unidade_negocio_saida_venda' => $pedido->id_unidade_negocio_saida_venda,
+            'custos' => $custos,
+        ]);
+    }
+
+    public function salvar(SalvarPedidoPorLojaRequest $request, CaptacaoLote $lote, Cliente $cliente): JsonResponse|RedirectResponse
     {
         $this->assertAcessoLote($request, $lote);
         $this->assertClienteDaCarteira($lote, $cliente);
 
         $dados = $request->pedidoPayload($cliente->id);
-        $this->pedidos->salvarPedidoComItens($lote, $dados, PedidoOrigem::Web, $request->user());
+        $pedido = $this->pedidos->salvarPedidoComItens($lote, $dados, PedidoOrigem::Web, $request->user());
+
+        if ($request->expectsJson()) {
+            return response()->json([
+                'ok' => true,
+                'pedido_id' => $pedido->id,
+            ]);
+        }
 
         return redirect()
             ->route('admin.captacao.pedidos-por-loja.show', [$lote, $cliente])
-            ->with('success', 'Pedido sincronizado.');
+            ->with('success', 'Pedido salvo.');
     }
 
     public function toggleConclusao(ToggleCaptacaoConcluidaRequest $request, CaptacaoLote $lote, Cliente $cliente): JsonResponse|RedirectResponse

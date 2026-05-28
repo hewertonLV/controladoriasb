@@ -3,6 +3,7 @@
 namespace App\Http\Requests\Admin\Concerns;
 
 use App\Models\Praca;
+use App\Support\Clientes\ClienteSaidaFisicoPadraoOpcoesService;
 use App\Support\TextoCadastro;
 use Closure;
 use Illuminate\Validation\Rule;
@@ -62,6 +63,13 @@ trait ValidatesClienteAttributes
                 'regex:/^\\d+(\\.\\d{1,2})?$/',
             ],
             'percentual_margem_alvo' => ['nullable', 'numeric', 'min:0', 'max:99.99'],
+            'id_unidade_negocio_saida_fisico_padrao' => [
+                'required',
+                'integer',
+                'min:1',
+                Rule::exists('unidades_negocio', 'id'),
+                $this->saidaFisicoPadraoPermitidaRule(),
+            ],
             'id_captacao_carteira' => [
                 'nullable',
                 'integer',
@@ -93,6 +101,7 @@ trait ValidatesClienteAttributes
             'grupo_id' => 'grupo',
             'desconto_nf' => 'desconto NF',
             'percentual_margem_alvo' => 'margem alvo captação',
+            'id_unidade_negocio_saida_fisico_padrao' => 'saída de estoque físico padrão',
             'id_captacao_carteira' => 'carteira de captação',
             'dias_criacao_pedido' => 'dias de criação do pedido',
             'dias_envio_pedido' => 'dias de envio do pedido',
@@ -140,6 +149,7 @@ trait ValidatesClienteAttributes
             'id_captacao_carteira' => $this->filled('id_captacao_carteira')
                 ? (int) $this->input('id_captacao_carteira')
                 : null,
+            'id_unidade_negocio_saida_fisico_padrao' => (int) $this->input('id_unidade_negocio_saida_fisico_padrao'),
             'dias_criacao_pedido' => array_values(array_map('intval', (array) $this->input('dias_criacao_pedido', []))),
             'dias_envio_pedido' => array_values(array_map('intval', (array) $this->input('dias_envio_pedido', []))),
         ]);
@@ -185,6 +195,22 @@ trait ValidatesClienteAttributes
 
             if (! in_array($len, [11, 14], true)) {
                 $fail('O CPF/CNPJ deve ter 11 dígitos (CPF) ou 14 dígitos (CNPJ).');
+            }
+        };
+    }
+
+    protected function saidaFisicoPadraoPermitidaRule(): Closure
+    {
+        return function (string $attribute, mixed $value, Closure $fail): void {
+            $idFaturamento = (int) $this->input('id_unidade_negocio');
+            $idSaida = (int) $value;
+
+            if ($idFaturamento < 1 || $idSaida < 1) {
+                return;
+            }
+
+            if (! app(ClienteSaidaFisicoPadraoOpcoesService::class)->opcaoPermitida($idFaturamento, $idSaida)) {
+                $fail('A unidade de saída física padrão não é válida para o faturamento selecionado.');
             }
         };
     }

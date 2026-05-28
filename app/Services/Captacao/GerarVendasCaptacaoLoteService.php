@@ -5,6 +5,7 @@ namespace App\Services\Captacao;
 use App\Enums\CaptacaoLoteTipo;
 use App\Enums\MovimentacaoStatusRegistro;
 use App\Models\Captacao\CaptacaoLote;
+use App\Support\Captacao\SaidaEstoqueFisicoCaptacaoService;
 use App\Models\Captacao\CaptacaoLoteFreteLinha;
 use App\Models\Captacao\CaptacaoLoteMovimentacao;
 use App\Models\Captacao\Pedido;
@@ -96,7 +97,7 @@ final class GerarVendasCaptacaoLoteService
                 $primeiraFruta = (int) $pedido->itens->first()->id_fruta;
                 $idFrete = $fretesPorFruta->get($primeiraFruta);
 
-                $unidadeSaida = (int) ($pedido->id_unidade_negocio_saida_venda ?? $galpao->id);
+                $unidadeSaida = app(SaidaEstoqueFisicoCaptacaoService::class)->idSaidaEfetiva($pedido, $lote);
 
                 $resultado = $this->vendas->registrarVenda([
                     'numero_nf' => $this->numeroNfCaptacao($lote, $pedido->id_cliente),

@@ -31,6 +31,30 @@ class EstoqueImportacaoCustoOperacionalTest extends TestCase
         $this->assertSame('6.50', $preco);
     }
 
+    public function test_nao_soma_custo_operacional_quando_quantidade_importada_e_zero(): void
+    {
+        $this->seed(EstadoSeeder::class);
+
+        $unidade = UnidadeNegocio::factory()->create(['possui_estoque' => true]);
+        HistoricoCOUnNg::query()->where('id_unidade_negocio', $unidade->id)->update(['status_position' => false]);
+        HistoricoCOUnNg::factory()->create([
+            'id_unidade_negocio' => $unidade->id,
+            'custo_operacional' => '1.50',
+            'status_position' => true,
+        ]);
+
+        $unidade->load('historicoCustoOperacionalAtual');
+        $preco = EstoqueImportacaoCustoOperacional::precoMedioKgAplicandoCo(
+            '0.00',
+            $unidade,
+            true,
+            '0.00',
+            '0.00',
+        );
+
+        $this->assertSame('0.00', $preco);
+    }
+
     public function test_nao_soma_quando_switch_desligado(): void
     {
         $this->seed(EstadoSeeder::class);

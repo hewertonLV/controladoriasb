@@ -35,11 +35,15 @@
                             <div class="fw-semibold text-truncate" title="{{ $cliente->fantasia ?: $cliente->razao_social }}">
                                 {{ $cliente->fantasia ?: $cliente->razao_social }}
                             </div>
-                            @if ($estado['estado'] === 'concluido' && $estado['rentabilidade']['margem_percentual'] !== null)
-                                <div class="small text-success mt-2">
-                                    Rent. {{ $estado['rentabilidade']['margem_percentual'] }}%
-                                    · R$ {{ number_format((float) $estado['rentabilidade']['margem_total'], 2, ',', '.') }}
-                                </div>
+                            @if ($estado['estado'] === 'concluido')
+                                @if ($estado['rentabilidade']['margem_percentual'] !== null)
+                                    <div class="small text-success mt-2">
+                                        Rent. {{ $estado['rentabilidade']['margem_percentual'] }}%
+                                        · R$ {{ number_format((float) $estado['rentabilidade']['margem_total'], 2, ',', '.') }}
+                                    </div>
+                                @else
+                                    <div class="small text-success mt-2">Concluído</div>
+                                @endif
                             @elseif ($estado['estado'] === 'em_andamento')
                                 <div class="small text-warning mt-2">Em andamento</div>
                             @else

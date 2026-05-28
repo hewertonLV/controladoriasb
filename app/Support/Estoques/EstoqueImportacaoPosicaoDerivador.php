@@ -24,10 +24,15 @@ final class EstoqueImportacaoPosicaoDerivador
         $valorTotal = round($valorTotal, 2);
 
         $qtdKg = round($qtdUm * $kgPorUm, 2);
-        $precoKg = abs($qtdKg) >= 0.005
-            ? round($valorTotal / $qtdKg, 2)
-            : 0.0;
-        $precoUm = round($precoKg * $kgPorUm, 2);
+        $semQuantidade = abs($qtdUm) < 0.005 || abs($qtdKg) < 0.005;
+
+        if ($semQuantidade) {
+            $precoKg = 0.0;
+            $precoUm = 0.0;
+        } else {
+            $precoKg = round($valorTotal / $qtdKg, 2);
+            $precoUm = round($precoKg * $kgPorUm, 2);
+        }
 
         return [
             'qtd_fruta_um' => self::formatar($qtdUm),

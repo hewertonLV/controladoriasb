@@ -44,6 +44,36 @@ class ClienteTest extends ClienteTestCase
             ->assertSee('data-admin-datatable', false);
     }
 
+    public function test_cadastro_persiste_saida_estoque_fisico_padrao_unidade(): void
+    {
+        $unit = UnidadeNegocio::factory()->create(['emite_nota_fiscal' => true, 'is_hub' => false]);
+        $hub = UnidadeNegocio::factory()->create(['is_hub' => true, 'status' => true]);
+        $galpao = UnidadeNegocio::factory()->galpaoOperacional()->create();
+        \App\Models\Captacao\CaptacaoCarteira::query()->create([
+            'nome' => 'Carteira teste saída',
+            'id_unidade_negocio_faturamento' => $unit->id,
+            'id_unidade_negocio_galpao' => $galpao->id,
+            'ativo' => true,
+        ]);
+
+        $praca = Praca::factory()->create(['id_unidade_negocio' => $unit->id]);
+
+        $this->actingAs($this->userWithPermissions([Permissions::CLIENTES_CRIAR]))
+            ->post(route('admin.clientes.store'), $this->clientePayload([
+                'id_cigam' => '000901',
+                'id_unidade_negocio' => $unit->id,
+                'id_praca' => $praca->id,
+                'id_unidade_negocio_saida_fisico_padrao' => $hub->id,
+            ]))
+            ->assertStatus(302)
+            ->assertSessionHasNoErrors();
+
+        $this->assertDatabaseHas('clientes', [
+            'id_cigam' => '000901',
+            'id_unidade_negocio_saida_fisico_padrao' => $hub->id,
+        ]);
+    }
+
     public function test_cadastro_com_sucesso_normaliza_campos(): void
     {
         $payload = $this->clientePayload([
@@ -176,7 +206,7 @@ class ClienteTest extends ClienteTestCase
         ]);
 
         $this->actingAs($this->userWithPermissions([Permissions::CLIENTES_EDITAR]))
-            ->put(route('admin.clientes.update', $cliente), [
+            ->put(route('admin.clientes.update', $cliente), $this->clientePayload([
                 'id_cigam' => '50',
                 'razao_social' => 'DEPOIS',
                 'fantasia' => 'Fantasia Depois',
@@ -185,7 +215,7 @@ class ClienteTest extends ClienteTestCase
                 'id_praca' => $cliente->id_praca,
                 'grupo_id' => $cliente->grupo_id,
                 'desconto_nf' => '1.25',
-            ])
+            ]))
             ->assertStatus(302)
             ->assertSessionHas('success');
 
@@ -221,9 +251,9 @@ class ClienteTest extends ClienteTestCase
             ->get(route('admin.clientes.create'))
             ->assertOk()
             ->assertSee('LOJA COMUM TESTE', false)
-            ->assertDontSee('HUB TESTE', false)
             ->assertSee('name="id_unidade_negocio"', false)
-            ->assertSee('value="'.$unidadeComum->id.'"', false);
+            ->assertSee('value="'.$unidadeComum->id.'"', false)
+            ->assertSee('id="id_unidade_negocio_saida_fisico_padrao"', false);
     }
 
     public function test_formulario_criacao_praca_inicia_vazia_ate_selecionar_unidade(): void
