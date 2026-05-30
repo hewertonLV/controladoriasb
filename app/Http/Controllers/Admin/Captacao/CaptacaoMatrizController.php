@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Admin\Captacao;
 
+use App\Enums\CaptacaoLoteStatus;
 use App\Enums\PedidoOrigem;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Admin\Captacao\AdicionarLojaMatrizRequest;
@@ -18,8 +19,10 @@ use App\Models\Captacao\CaptacaoLote;
 use App\Models\Captacao\CaptacaoRota;
 use App\Models\Cliente;
 use App\Models\UnidadeNegocio;
+use App\Actions\Captacao\ConcluirCaptacaoLoteAction;
 use App\Services\Captacao\CaptacaoLoteFreteService;
 use App\Services\Captacao\CaptacaoLoteService;
+use App\Services\Captacao\ConcluirCaptacaoLoteService;
 use App\Services\Captacao\GerarVendasCaptacaoLoteService;
 use App\Services\Captacao\CaptacaoMatrizRotasService;
 use App\Services\Captacao\CaptacaoMatrizEstadoService;
@@ -27,9 +30,13 @@ use App\Services\Captacao\ClienteFrutaVinculoService;
 use App\Services\Captacao\PedidoService;
 use App\Services\Captacao\RomaneioAbastecimentoService;
 use App\Services\Captacao\RomaneioCarregamentoService;
+use App\Services\Captacao\RomaneioRotaPdfService;
 use App\Services\Permissoes\UnidadeNegocioAccessService;
+use App\Support\Captacao\CaptacaoPedidoPorLojaSaidaFisicaService;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\Response;
 use Illuminate\View\View;
 
 class CaptacaoMatrizController extends Controller
@@ -41,6 +48,7 @@ class CaptacaoMatrizController extends Controller
         private readonly ClienteFrutaVinculoService $vinculos,
         private readonly CaptacaoLoteService $lotes,
         private readonly CaptacaoLoteFreteService $freteLote,
+        private readonly ConcluirCaptacaoLoteService $concluirCaptacaoLote,
     ) {}
 
     public function index(Request $request): View
@@ -66,15 +74,21 @@ class CaptacaoMatrizController extends Controller
         $totaisPorFruta = $this->matrizEstado->totaisPorFruta($lote, $matriz['frutas'], $matriz['clientes']);
         $rotas = $this->matrizRotas->rotasDaCarteira($lote);
         $gruposRotas = $this->matrizRotas->gruposPorLoja(
+            $lote,
             $matriz['clientes'],
             $matriz['frutasPorCliente'],
             $pedidosPorCliente,
             $matriz['frutas'],
         );
-        $gruposOrdemCarregamento = $this->matrizRotas->gruposOrdemCarregamento($gruposRotas, $rotas);
+        $gruposOrdemCarregamento = $this->matrizRotas->gruposOrdemCarregamento($gruposRotas, $rotas, $lote);
         $veiculos = $this->matrizRotas->veiculosDisponiveis();
 
-        $abasPermitidas = ['quantidade', 'rotas', 'por-rota'];
+        $abasRotasVinculadas = array_map(
+            static fn (array $grupo): string => 'rota-'.$grupo['id_captacao_rota'],
+            $gruposOrdemCarregamento,
+        );
+
+        $abasPermitidas = array_merge(['quantidade', 'rotas'], $abasRotasVinculadas);
         if ($lote->status->exibeAbaArquivoCigan()) {
             $abasPermitidas[] = 'arquivo-cigan';
         }
@@ -91,6 +105,9 @@ class CaptacaoMatrizController extends Controller
         $aba = $request->string('aba', 'quantidade')->toString();
         if ($aba === 'frete') {
             $aba = 'frete-hub';
+        }
+        if ($aba === 'por-rota') {
+            $aba = $abasRotasVinculadas[0] ?? 'quantidade';
         }
         if (! in_array($aba, $abasPermitidas, true)) {
             $aba = match (true) {
@@ -128,14 +145,25 @@ class CaptacaoMatrizController extends Controller
 
         $romaneioCarregamento = collect();
         $romaneioCarregamentoTotaisGerais = null;
+        $romaneiosCarregamentoPorRota = collect();
         if ($lote->status->exibeAbaSaidaEstoqueFisico()) {
-            $romaneioCarregamento = app(RomaneioCarregamentoService::class)->preview($lote);
+            $romaneiosCarregamentoPorRota = app(RomaneioCarregamentoService::class)->previewPorRotas($lote);
+            $romaneioCarregamento = $romaneiosCarregamentoPorRota
+                ->flatMap(fn (array $grupo) => $grupo['lojas'])
+                ->values();
             $romaneioCarregamentoTotaisGerais = app(RomaneioCarregamentoService::class)
                 ->totaisGerais($romaneioCarregamento);
         }
 
+        $saidaFisicaLoja = app(CaptacaoPedidoPorLojaSaidaFisicaService::class);
+        $opcoesSaidaFisicaMatriz = $lote->status === CaptacaoLoteStatus::CaptacaoEmAndamento
+            ? $saidaFisicaLoja->opcoesParaLote($lote)
+            : [];
+
         return view('admin.captacao.matriz.index', [
             'lote' => $lote,
+            'opcoesSaidaFisicaMatriz' => $opcoesSaidaFisicaMatriz,
+            'saidaFisicaLoja' => $saidaFisicaLoja,
             'hubsDisponiveis' => $hubsDisponiveis,
             'romaneioAbastecimento' => $romaneioAbastecimento,
             'clientes' => $matriz['clientes'],
@@ -156,10 +184,27 @@ class CaptacaoMatrizController extends Controller
             'resumoVendasLote' => $resumoVendasLote,
             'romaneioCarregamento' => $romaneioCarregamento,
             'romaneioCarregamentoTotaisGerais' => $romaneioCarregamentoTotaisGerais,
+            'romaneiosCarregamentoPorRota' => $romaneiosCarregamentoPorRota,
             'urlRotasCadastro' => $lote->id_captacao_carteira
                 ? route('admin.captacao.rotas.create', ['carteira' => $lote->id_captacao_carteira])
                 : route('admin.captacao.rotas.create'),
+            'todasRotasDoLoteConcluidas' => $this->matrizRotas->todasRotasComPedidoEstaoConcluidasNoLote($lote),
+            'rotasPendentesConclusaoCaptacao' => $this->matrizRotas->nomesRotasComPedidoNaoConcluidasNoLote($lote),
+            ...$this->dadosConclusaoCaptacaoLote($lote),
         ]);
+    }
+
+    public function concluirCaptacao(Request $request, CaptacaoLote $lote): RedirectResponse
+    {
+        if (! app(UnidadeNegocioAccessService::class)->canAccess($request->user(), $lote->id_unidade_negocio_galpao)) {
+            abort(403);
+        }
+
+        app(ConcluirCaptacaoLoteAction::class)->executar($lote);
+
+        return redirect()
+            ->route('admin.captacao.matriz.index', ['lote' => $lote->id, 'aba' => 'quantidade'])
+            ->with('success', 'Captação do lote concluída.');
     }
 
     public function toggleConclusao(ToggleCaptacaoConcluidaRequest $request, CaptacaoLote $lote, Cliente $cliente): JsonResponse
@@ -310,6 +355,41 @@ class CaptacaoMatrizController extends Controller
         ]);
     }
 
+    public function concluirRota(Request $request, CaptacaoLote $lote, CaptacaoRota $rota): JsonResponse
+    {
+        if (! app(UnidadeNegocioAccessService::class)->canAccess($request->user(), $lote->id_unidade_negocio_galpao)) {
+            abort(403);
+        }
+
+        $this->matrizRotas->concluirRota($lote, $rota);
+
+        return $this->respostaMatrizRotas($lote);
+    }
+
+    public function reabrirRota(Request $request, CaptacaoLote $lote, CaptacaoRota $rota): JsonResponse
+    {
+        if (! app(UnidadeNegocioAccessService::class)->canAccess($request->user(), $lote->id_unidade_negocio_galpao)) {
+            abort(403);
+        }
+
+        $this->matrizRotas->reabrirRota($lote, $rota);
+
+        return $this->respostaMatrizRotas($lote);
+    }
+
+    public function downloadRomaneioRota(Request $request, CaptacaoLote $lote, CaptacaoRota $rota): Response
+    {
+        if (! app(UnidadeNegocioAccessService::class)->canAccess($request->user(), $lote->id_unidade_negocio_galpao)) {
+            abort(403);
+        }
+
+        $pdfService = app(RomaneioRotaPdfService::class);
+        $dados = $pdfService->dadosParaPdf($lote, $rota);
+        $pdf = $pdfService->gerarPdf($lote, $rota);
+
+        return $pdf->download($dados['nome_arquivo']);
+    }
+
     public function adicionarLoja(AdicionarLojaMatrizRequest $request, CaptacaoLote $lote): JsonResponse
     {
         if (! app(UnidadeNegocioAccessService::class)->canAccess($request->user(), $lote->id_unidade_negocio_galpao)) {
@@ -335,13 +415,23 @@ class CaptacaoMatrizController extends Controller
             abort(403);
         }
 
-        $pedido = $this->pedidos->atualizarSaidaFisicaVenda(
-            $lote,
-            $cliente->id,
-            (int) $request->validated('id_unidade_negocio_saida_venda'),
-            PedidoOrigem::Web,
-            $request->user(),
-        );
+        $idUnidade = (int) $request->validated('id_unidade_negocio_saida_venda');
+
+        $pedido = $lote->status === CaptacaoLoteStatus::CaptacaoEmAndamento
+            ? $this->pedidos->atualizarSaidaFisicaVendaPedidoPorLoja(
+                $lote,
+                $cliente->id,
+                $idUnidade,
+                PedidoOrigem::Web,
+                $request->user(),
+            )
+            : $this->pedidos->atualizarSaidaFisicaVenda(
+                $lote,
+                $cliente->id,
+                $idUnidade,
+                PedidoOrigem::Web,
+                $request->user(),
+            );
 
         return response()->json([
             'ok' => true,
@@ -391,7 +481,8 @@ class CaptacaoMatrizController extends Controller
 
         return response()->json([
             'ok' => true,
-            'item' => [
+            'removido' => $item === null,
+            'item' => $item === null ? null : [
                 'id' => $item->id,
                 'version' => $item->version,
                 'quantidade' => $item->quantidade,
@@ -416,6 +507,14 @@ class CaptacaoMatrizController extends Controller
         ));
     }
 
+    private function respostaMatrizRotas(CaptacaoLote $lote): JsonResponse
+    {
+        return response()->json(array_merge(
+            $this->matrizEstado->snapshot($lote->refresh()),
+            ['ok' => true],
+        ));
+    }
+
     /**
      * @param  \Illuminate\Support\Collection<int, Cliente>  $clientes
      * @return list<array{id: int, nome: string}>
@@ -429,5 +528,18 @@ class CaptacaoMatrizController extends Controller
             ])
             ->values()
             ->all();
+    }
+
+    /**
+     * @return array{podeConcluirCaptacaoLote: bool, pendenciasConclusaoCaptacaoLote: list<string>}
+     */
+    private function dadosConclusaoCaptacaoLote(CaptacaoLote $lote): array
+    {
+        $validacao = $this->concluirCaptacaoLote->pendenciasParaConcluir($lote);
+
+        return [
+            'podeConcluirCaptacaoLote' => $validacao['pode'],
+            'pendenciasConclusaoCaptacaoLote' => $validacao['pendencias'],
+        ];
     }
 }

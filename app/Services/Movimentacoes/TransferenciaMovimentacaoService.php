@@ -60,7 +60,51 @@ final class TransferenciaMovimentacaoService
             now(),
             null,
             null,
+            true,
         ));
+    }
+
+    /**
+     * Transferência com saída na origem e entrada pendente no destino (captação por rota).
+     *
+     * @param  array<string, mixed>  $input
+     * @return array{saida: Movimentacao, entrada: Movimentacao}
+     */
+    public function criarTransferenciaAguardandoRecebimento(array $input, ?int $transferenciaOrigemId = null): array
+    {
+        return DB::transaction(fn (): array => $this->criarTransferenciaInterno(
+            $input,
+            $transferenciaOrigemId,
+            1,
+            now(),
+            null,
+            null,
+            false,
+        ));
+    }
+
+    /**
+     * @return array{saida: Movimentacao, entrada: Movimentacao}
+     */
+    public function confirmarRecebimentoConforme(int $transferenciaOrigemId): array
+    {
+        return DB::transaction(function () use ($transferenciaOrigemId): array {
+            ['saida' => $saida, 'entrada' => $entrada] = $this->obterParAtivoPorTransferenciaOrigemId($transferenciaOrigemId);
+
+            if ($entrada->status_transferencia !== StatusTransferenciaOperacional::PENDENTE_RECEBIMENTO->value) {
+                throw new InvalidArgumentException('Esta transferência não está aguardando recebimento.');
+            }
+
+            $empresaDestino = Empresa::query()->with('entidade')->findOrFail((int) $entrada->id_empresa_destino);
+            $unidadeDestino = $this->unidadeDaEmpresa($empresaDestino);
+            $fruta = Fruta::query()->findOrFail((int) $entrada->id_fruta);
+            $qtdUm = (float) $entrada->qtd_fruta_um;
+            $qtdKg = (float) $entrada->qtd_fruta_kg;
+
+            $this->efetivarEntradaConforme($saida, $entrada, $unidadeDestino, $fruta, $qtdUm, $qtdKg);
+
+            return ['saida' => $saida->fresh(), 'entrada' => $entrada->fresh()];
+        });
     }
 
     /**
@@ -208,6 +252,41 @@ final class TransferenciaMovimentacaoService
         });
     }
 
+    public function cancelarTransferenciaPendenteRecebimento(int $transferenciaOrigemId, ?string $motivo = null): void
+    {
+        DB::transaction(function () use ($transferenciaOrigemId, $motivo): void {
+            ['saida' => $saida, 'entrada' => $entrada] = $this->obterParAtivoPorTransferenciaOrigemId($transferenciaOrigemId);
+
+            if ($entrada->status_transferencia !== StatusTransferenciaOperacional::PENDENTE_RECEBIMENTO->value) {
+                throw new InvalidArgumentException(
+                    'Cancelamento de demanda só é permitido para transferência aguardando recebimento.',
+                );
+            }
+
+            $this->estornarSaidaNoEstoqueOrigem($saida);
+
+            $mot = $motivo !== null && trim($motivo) !== '' ? trim($motivo) : null;
+
+            $saida->forceFill([
+                'status_registro' => MovimentacaoStatusRegistro::CANCELADO->value,
+                'status_transferencia' => StatusTransferenciaOperacional::CANCELADA->value,
+                'motivo_substituicao' => $mot,
+                'substituida_em' => now(),
+            ])->saveQuietly();
+
+            $entrada->forceFill([
+                'status_registro' => MovimentacaoStatusRegistro::CANCELADO->value,
+                'status_transferencia' => StatusTransferenciaOperacional::CANCELADA->value,
+                'motivo_substituicao' => $mot,
+                'substituida_em' => now(),
+            ])->saveQuietly();
+
+            if ($saida->id_frete !== null) {
+                $this->reconciliacao->recalcularRateioFreteParaTransferencias((int) $saida->id_frete);
+            }
+        });
+    }
+
     public function reverterEntradaNoEstoqueDestino(Movimentacao $entrada): void
     {
         if ((int) $entrada->categoria_movimentacao_id !== CategoriaMovimentacaoTipo::Transferencia->value) {
@@ -309,6 +388,7 @@ final class TransferenciaMovimentacaoService
         Carbon $dataMovimentacao,
         ?int $substituiSaidaId = null,
         ?int $substituiEntradaId = null,
+        bool $autoEfetivarEntrada = true,
     ): array {
         $categoriaId = CategoriaMovimentacaoTipo::Transferencia->value;
 
@@ -553,7 +633,9 @@ final class TransferenciaMovimentacaoService
             $entrada->refresh();
         }
 
-        $this->efetivarEntradaConforme($saida, $entrada, $unidadeDestino, $fruta, $qtdUm, $qtdKg);
+        if ($autoEfetivarEntrada) {
+            $this->efetivarEntradaConforme($saida, $entrada, $unidadeDestino, $fruta, $qtdUm, $qtdKg);
+        }
 
         return ['saida' => $saida->fresh(), 'entrada' => $entrada->fresh()];
     }

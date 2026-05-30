@@ -536,6 +536,29 @@ final class Permissions
     }
 
     /**
+     * Permissões padrão do grupo Vendedor (Captação, Transferência e Venda).
+     *
+     * @return list<string>
+     */
+    public static function permissoesGrupoVendedor(): array
+    {
+        return array_values(array_unique(array_merge(
+            self::groups()['Captação'],
+            [
+                self::MOVIMENTACOES_TRANSFERENCIAS_VISUALIZAR,
+                self::MOVIMENTACOES_TRANSFERENCIAS_CRIAR,
+                self::MOVIMENTACOES_TRANSFERENCIAS_EDITAR,
+                self::MOVIMENTACOES_TRANSFERENCIAS_RECEBER,
+                self::MOVIMENTACOES_TRANSFERENCIAS_REENVIAR,
+                self::MOVIMENTACOES_TRANSFERENCIAS_CANCELAR,
+                self::MOVIMENTACOES_VENDAS_VISUALIZAR,
+                self::MOVIMENTACOES_VENDAS_CRIAR,
+                self::MOVIMENTACOES_VENDAS_EDITAR,
+            ],
+        )));
+    }
+
+    /**
      * Lista plana de todas as permissões do sistema.
      *
      * @return list<string>

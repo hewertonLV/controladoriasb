@@ -9,13 +9,26 @@ use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
+    private function colunaAncoraClientes(): string
+    {
+        if (Schema::hasColumn('clientes', 'saida_estoque_fisico_padrao')) {
+            return 'saida_estoque_fisico_padrao';
+        }
+
+        if (Schema::hasColumn('clientes', 'percentual_margem_alvo')) {
+            return 'percentual_margem_alvo';
+        }
+
+        return 'desconto_nf';
+    }
+
     public function up(): void
     {
         Schema::table('clientes', function (Blueprint $table): void {
             if (! Schema::hasColumn('clientes', 'id_unidade_negocio_saida_fisico_padrao')) {
                 $table->foreignId('id_unidade_negocio_saida_fisico_padrao')
                     ->nullable()
-                    ->after('percentual_margem_alvo')
+                    ->after($this->colunaAncoraClientes())
                     ->constrained('unidades_negocio', indexName: 'clientes_saida_fis_pad_un_fk')
                     ->cascadeOnUpdate()
                     ->restrictOnDelete();
@@ -54,7 +67,7 @@ return new class extends Migration
             if (! Schema::hasColumn('clientes', 'saida_estoque_fisico_padrao')) {
                 $table->string('saida_estoque_fisico_padrao', 10)
                     ->default('galpao')
-                    ->after('percentual_margem_alvo');
+                    ->after($this->colunaAncoraClientes());
             }
         });
 

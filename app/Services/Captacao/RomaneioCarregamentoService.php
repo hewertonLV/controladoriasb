@@ -3,6 +3,7 @@
 namespace App\Services\Captacao;
 
 use App\Models\Captacao\CaptacaoLote;
+use App\Models\Captacao\CaptacaoLoteRota;
 use App\Models\Captacao\Pedido;
 use App\Support\Captacao\SaidaEstoqueFisicoCaptacaoService;
 use Illuminate\Support\Collection;
@@ -15,6 +16,7 @@ final class RomaneioCarregamentoService
      *     cliente_nome: string,
      *     id_captacao_rota: int|null,
      *     rota_nome: string|null,
+     *     ordem_carregamento: int|null,
      *     itens: list<array{
      *         id_fruta: int,
      *         fruta_nome: string,
@@ -34,6 +36,73 @@ final class RomaneioCarregamentoService
         $this->carregarPedidosRomaneio($lote);
 
         return $this->previewFromPedidos($lote->pedidos);
+    }
+
+    /**
+     * Um romaneio de carregamento por rota vinculada (ADR-0153).
+     *
+     * @return Collection<int, array{
+     *     id_captacao_rota: int,
+     *     rota_nome: string,
+     *     carteira_nome: string,
+     *     titulo_aba: string,
+     *     motorista_nome: string|null,
+     *     veiculo_rotulo: string|null,
+     *     lojas: Collection<int, array<string, mixed>>,
+     *     totais_gerais: array{
+     *         total_kg: string,
+     *         total_kg_formatado: string,
+     *         totais_por_um: list<array{unidade_medicao: string, quantidade: string, quantidade_formatado: string}>,
+     *     },
+     * }>
+     */
+    public function previewPorRotas(CaptacaoLote $lote): Collection
+    {
+        $lote->loadMissing(['carteira:id,nome']);
+
+        $carteiraNome = trim((string) ($lote->carteira?->nome ?? ''));
+        if ($carteiraNome === '') {
+            $carteiraNome = 'Carteira';
+        }
+
+        $configs = CaptacaoLoteRota::query()
+            ->where('id_captacao_lote', $lote->id)
+            ->with('veiculo:id,nome,id_sbs')
+            ->get()
+            ->keyBy('id_captacao_rota');
+
+        $lojas = $this->preview($lote);
+
+        return $lojas
+            ->filter(fn (array $loja): bool => $loja['id_captacao_rota'] !== null)
+            ->groupBy('id_captacao_rota')
+            ->map(function (Collection $groupLojas, int|string $rotaId) use ($carteiraNome, $configs): array {
+                $rotaId = (int) $rotaId;
+                $primeiraLoja = $groupLojas->first();
+                $rotaNome = trim((string) ($primeiraLoja['rota_nome'] ?? ''));
+                if ($rotaNome === '') {
+                    $rotaNome = 'Rota';
+                }
+
+                $config = $configs->get($rotaId);
+                $veiculo = $config?->veiculo;
+                $lojasOrdenadas = $this->ordenarLojas($groupLojas);
+
+                return [
+                    'id_captacao_rota' => $rotaId,
+                    'rota_nome' => $rotaNome,
+                    'carteira_nome' => $carteiraNome,
+                    'titulo_aba' => "{$carteiraNome} — {$rotaNome}",
+                    'motorista_nome' => $config?->nome_motorista,
+                    'veiculo_rotulo' => $veiculo !== null
+                        ? "{$veiculo->nome} (SBS {$veiculo->id_sbs})"
+                        : null,
+                    'lojas' => $lojasOrdenadas,
+                    'totais_gerais' => $this->totaisGerais($lojasOrdenadas),
+                ];
+            })
+            ->sortBy('titulo_aba', SORT_NATURAL | SORT_FLAG_CASE)
+            ->values();
     }
 
     public function previewParaUnidadeSaida(CaptacaoLote $lote, int $idUnidadeSaida): Collection
@@ -79,11 +148,33 @@ final class RomaneioCarregamentoService
                     'cliente_nome' => $pedido->cliente->fantasia ?: $pedido->cliente->razao_social,
                     'id_captacao_rota' => $pedido->id_captacao_rota,
                     'rota_nome' => $pedido->rota?->nome,
+                    'ordem_carregamento' => $pedido->ordem_carregamento !== null
+                        ? (int) $pedido->ordem_carregamento
+                        : null,
                     'itens' => $itens,
                     ...$this->calcularTotaisLoja($itens),
                 ];
             })
             ->filter()
+            ->pipe(fn (Collection $lojas) => $this->ordenarLojas($lojas));
+    }
+
+    /**
+     * @param  Collection<int, array<string, mixed>>  $lojas
+     * @return Collection<int, array<string, mixed>>
+     */
+    private function ordenarLojas(Collection $lojas): Collection
+    {
+        return $lojas
+            ->sort(function (array $a, array $b): int {
+                $ordemA = $a['ordem_carregamento'] ?? 9999;
+                $ordemB = $b['ordem_carregamento'] ?? 9999;
+                if ($ordemA !== $ordemB) {
+                    return $ordemA <=> $ordemB;
+                }
+
+                return strcasecmp($a['cliente_nome'], $b['cliente_nome']);
+            })
             ->values();
     }
 

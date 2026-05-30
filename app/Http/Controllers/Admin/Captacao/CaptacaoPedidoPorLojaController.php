@@ -5,10 +5,13 @@ namespace App\Http\Controllers\Admin\Captacao;
 use App\Enums\CaptacaoLoteStatus;
 use App\Enums\CaptacaoLoteTipo;
 use App\Enums\PedidoOrigem;
+use App\Actions\Captacao\ConcluirCaptacaoLoteAction;
 use App\Http\Controllers\Controller;
+use App\Services\Captacao\ConcluirCaptacaoLoteService;
 use App\Http\Requests\Admin\Captacao\SalvarPedidoPorLojaRequest;
 use App\Http\Requests\Admin\Captacao\ToggleCaptacaoConcluidaRequest;
 use App\Http\Requests\Admin\Captacao\UpdateCaptacaoPedidoPorLojaSaidaFisicaVendaRequest;
+use App\Models\Captacao\CaptacaoCarteira;
 use App\Models\Captacao\CaptacaoLote;
 use App\Models\Captacao\Pedido;
 use App\Models\Cliente;
@@ -31,23 +34,27 @@ class CaptacaoPedidoPorLojaController extends Controller
         private readonly ClienteFrutaVinculoService $vinculos,
         private readonly CaptacaoPrecificacaoService $precificacao,
         private readonly CaptacaoPedidoPorLojaSaidaFisicaService $saidaFisicaLoja,
+        private readonly ConcluirCaptacaoLoteService $concluirCaptacaoLote,
     ) {}
 
     public function carteiras(Request $request): View
     {
         $dataReferencia = $request->string('data_referencia', now()->toDateString())->toString();
 
-        $lotes = CaptacaoLote::query()
+        $lotesQuery = CaptacaoLote::query()
             ->with(['carteira:id,nome', 'unidadeGalpao:id,nome', 'unidadeFaturamento:id,nome', 'pedidos'])
             ->where('tipo', CaptacaoLoteTipo::CaptacaoPedidos)
-            ->where('status', CaptacaoLoteStatus::CaptacaoEmAndamento)
+            ->whereIn('status', [
+                CaptacaoLoteStatus::CaptacaoEmAndamento,
+                CaptacaoLoteStatus::CaptacaoConcluida,
+            ])
             ->whereDate('data_referencia', $dataReferencia)
             ->orderBy('id_captacao_carteira')
             ->get()
             ->filter(fn (CaptacaoLote $lote) => app(UnidadeNegocioAccessService::class)
                 ->canAccess($request->user(), (int) $lote->id_unidade_negocio_galpao));
 
-        $resumos = $lotes->map(function (CaptacaoLote $lote): array {
+        $mapearResumo = function (CaptacaoLote $lote): array {
             $lote->loadMissing(['pedidos.itens']);
             $elegiveis = $this->estado->lojasDaCarteira($lote);
             $concluidas = $elegiveis->filter(function ($cliente) use ($lote): bool {
@@ -60,12 +67,28 @@ class CaptacaoPedidoPorLojaController extends Controller
                 'lote' => $lote,
                 'total_lojas' => $elegiveis->count(),
                 'concluidas' => $concluidas,
+                'captacao_concluida' => $lote->status === CaptacaoLoteStatus::CaptacaoConcluida,
             ];
-        });
+        };
+
+        $resumos = $lotesQuery
+            ->filter(fn (CaptacaoLote $l) => $l->status === CaptacaoLoteStatus::CaptacaoEmAndamento)
+            ->map($mapearResumo)
+            ->values();
+
+        $resumosConcluidos = $lotesQuery
+            ->filter(fn (CaptacaoLote $l) => $l->status === CaptacaoLoteStatus::CaptacaoConcluida)
+            ->map($mapearResumo)
+            ->values();
 
         return view('admin.captacao.pedidos-por-loja.carteiras', [
             'dataReferencia' => $dataReferencia,
             'resumos' => $resumos,
+            'resumosConcluidos' => $resumosConcluidos,
+            'carteiras' => CaptacaoCarteira::query()
+                ->where('ativo', true)
+                ->orderBy('nome')
+                ->get(['id', 'nome', 'id_unidade_negocio_faturamento', 'id_unidade_negocio_galpao']),
         ]);
     }
 
@@ -85,10 +108,26 @@ class CaptacaoPedidoPorLojaController extends Controller
             ];
         });
 
+        $validacaoConclusaoLote = $this->concluirCaptacaoLote->pendenciasParaConcluir($lote);
+
         return view('admin.captacao.pedidos-por-loja.lojas', [
             'lote' => $lote,
             'lojas' => $lojas,
+            'captacaoLoteConcluida' => $lote->status === CaptacaoLoteStatus::CaptacaoConcluida,
+            'podeConcluirCaptacaoLote' => $validacaoConclusaoLote['pode'],
+            'pendenciasConclusaoCaptacaoLote' => $validacaoConclusaoLote['pendencias'],
         ]);
+    }
+
+    public function concluirCaptacao(Request $request, CaptacaoLote $lote): RedirectResponse
+    {
+        $this->assertAcessoLote($request, $lote);
+
+        app(ConcluirCaptacaoLoteAction::class)->executar($lote);
+
+        return redirect()
+            ->route('admin.captacao.pedidos-por-loja.lojas', $lote)
+            ->with('success', 'Captação do lote concluída.');
     }
 
     public function show(Request $request, CaptacaoLote $lote, Cliente $cliente): View
@@ -139,6 +178,9 @@ class CaptacaoPedidoPorLojaController extends Controller
 
         $estadoLoja = $this->estado->estadoLoja($lote, $cliente, $pedidoAtual);
 
+        $captacaoLoteAberta = $lote->status === CaptacaoLoteStatus::CaptacaoEmAndamento;
+        $pedidoConcluido = (bool) ($pedidoAtual?->captacao_concluida ?? false);
+
         $itensUltimoPedido = $pedidoAnterior === null
             ? collect()
             : $pedidoAnterior->itens
@@ -172,7 +214,9 @@ class CaptacaoPedidoPorLojaController extends Controller
             'pedidoAtual' => $pedidoAtual,
             'linhas' => $linhas,
             'estadoLoja' => $estadoLoja,
-            'podeEditar' => $lote->status === CaptacaoLoteStatus::CaptacaoEmAndamento,
+            'captacaoLoteAberta' => $captacaoLoteAberta,
+            'pedidoConcluido' => $pedidoConcluido,
+            'podeEditar' => $captacaoLoteAberta && ! $pedidoConcluido,
             'possuiFrutas' => $possuiFrutas,
             'opcoesSaidaFisica' => $opcoesSaidaFisica,
             'idSaidaSelecionada' => $idSaidaSelecionada,
@@ -188,6 +232,7 @@ class CaptacaoPedidoPorLojaController extends Controller
         Cliente $cliente,
     ): JsonResponse {
         $this->assertAcessoLote($request, $lote);
+        $this->assertLoteEditavel($lote);
         $this->assertClienteDaCarteira($lote, $cliente);
 
         if ($lote->status !== CaptacaoLoteStatus::CaptacaoEmAndamento) {
@@ -226,6 +271,7 @@ class CaptacaoPedidoPorLojaController extends Controller
     public function salvar(SalvarPedidoPorLojaRequest $request, CaptacaoLote $lote, Cliente $cliente): JsonResponse|RedirectResponse
     {
         $this->assertAcessoLote($request, $lote);
+        $this->assertLoteEditavel($lote);
         $this->assertClienteDaCarteira($lote, $cliente);
 
         $dados = $request->pedidoPayload($cliente->id);
@@ -246,6 +292,7 @@ class CaptacaoPedidoPorLojaController extends Controller
     public function toggleConclusao(ToggleCaptacaoConcluidaRequest $request, CaptacaoLote $lote, Cliente $cliente): JsonResponse|RedirectResponse
     {
         $this->assertAcessoLote($request, $lote);
+        $this->assertLoteEditavel($lote);
         $this->assertClienteDaCarteira($lote, $cliente);
 
         $pedido = $this->pedidos->definirCaptacaoConcluida(
@@ -276,6 +323,13 @@ class CaptacaoPedidoPorLojaController extends Controller
     {
         if (! app(UnidadeNegocioAccessService::class)->canAccess($request->user(), (int) $lote->id_unidade_negocio_galpao)) {
             abort(403, UnidadeNegocioAccessService::MENSAGEM_SEM_ACESSO);
+        }
+    }
+
+    private function assertLoteEditavel(CaptacaoLote $lote): void
+    {
+        if ($lote->status !== CaptacaoLoteStatus::CaptacaoEmAndamento) {
+            abort(403, 'Captação concluída. Não é possível alterar ou reabrir.');
         }
     }
 

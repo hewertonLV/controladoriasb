@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests\Admin;
 
+use App\Enums\AppModulo;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 use Spatie\Permission\Models\Role;
@@ -35,6 +36,8 @@ class UpdateGrupoPermissaoRequest extends FormRequest
                 'integer',
                 Rule::exists('permissions', 'id')->where('guard_name', 'web'),
             ],
+            'modulos' => ['nullable', 'array'],
+            'modulos.*' => ['string', Rule::in(AppModulo::values())],
         ];
     }
 
@@ -47,6 +50,8 @@ class UpdateGrupoPermissaoRequest extends FormRequest
             'name' => 'nome',
             'permissions' => 'permissões',
             'permissions.*' => 'permissão',
+            'modulos' => 'módulos do hub',
+            'modulos.*' => 'módulo',
         ];
     }
 

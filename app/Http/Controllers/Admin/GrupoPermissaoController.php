@@ -3,9 +3,11 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Enums\Roles;
+use App\Enums\AppModulo;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Admin\StoreGrupoPermissaoRequest;
 use App\Http\Requests\Admin\UpdateGrupoPermissaoRequest;
+use App\Services\Modulos\RoleModuloService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Collection;
 use Illuminate\View\View;
@@ -18,6 +20,10 @@ class GrupoPermissaoController extends Controller
      * Guard padrão do sistema.
      */
     private const GUARD = 'web';
+
+    public function __construct(
+        private readonly RoleModuloService $roleModulos,
+    ) {}
 
     public function index(): View
     {
@@ -40,6 +46,8 @@ class GrupoPermissaoController extends Controller
             'role' => new Role(['guard_name' => self::GUARD]),
             'permissionGroups' => $this->groupPermissions($this->permissions()),
             'selectedPermissionIds' => collect(),
+            'selectedModulos' => collect(),
+            'modulosDisponiveis' => AppModulo::cases(),
             'isProgramador' => false,
         ]);
     }
@@ -55,6 +63,7 @@ class GrupoPermissaoController extends Controller
 
         $permissions = $this->resolvePermissions($data['permissions'] ?? []);
         $role->syncPermissions($permissions);
+        $this->roleModulos->sincronizarModulos($role, $data['modulos'] ?? []);
 
         return redirect()
             ->route('admin.grupos-permissoes.index')
@@ -69,6 +78,8 @@ class GrupoPermissaoController extends Controller
             'role' => $role,
             'permissionGroups' => $this->groupPermissions($this->permissions()),
             'selectedPermissionIds' => $role->permissions->pluck('id'),
+            'selectedModulos' => $this->roleModulos->modulosDoRole($role)->map->value,
+            'modulosDisponiveis' => AppModulo::cases(),
             'isProgramador' => $isProgramador,
         ]);
     }
@@ -87,6 +98,7 @@ class GrupoPermissaoController extends Controller
 
         $permissions = $this->resolvePermissions($data['permissions'] ?? []);
         $role->syncPermissions($permissions);
+        $this->roleModulos->sincronizarModulos($role, $data['modulos'] ?? []);
 
         return redirect()
             ->route('admin.grupos-permissoes.index')

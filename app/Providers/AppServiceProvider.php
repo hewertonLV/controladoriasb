@@ -8,9 +8,11 @@ use App\Contracts\Movimentacoes\ReprocessaSaidasDescarteOrigem;
 use App\Contracts\Movimentacoes\ReprocessaSaidasDoacaoOrigem;
 use App\Contracts\Movimentacoes\ReprocessaSaidasTransferenciaOrigem;
 use App\Contracts\Movimentacoes\ReprocessaSaidasVendaOrigem;
+use App\Enums\AppModulo;
 use App\Enums\CategoriaMovimentacaoTipo;
 use App\Enums\MovimentacaoStatusRegistro;
 use App\Enums\Roles;
+use App\Models\Captacao\CaptacaoCarteira;
 use App\Models\Cliente;
 use App\Models\Estado;
 use App\Models\Fornecedor;
@@ -28,6 +30,7 @@ use App\Services\Movimentacoes\ReplayEstoqueDevolucaoService;
 use App\Services\Movimentacoes\ReplayEstoqueDoacaoService;
 use App\Services\Movimentacoes\ReplayEstoqueTransferenciaService;
 use App\Services\Dashboard\DashboardStatsService;
+use App\Services\Modulos\ModuloHubService;
 use App\Services\Movimentacoes\ReplayEstoqueVendaService;
 use App\Support\DynamicAppUrl;
 use Illuminate\Pagination\Paginator;
@@ -64,6 +67,32 @@ class AppServiceProvider extends ServiceProvider
             if (! array_key_exists('dashboard', $view->getData())) {
                 $view->with('dashboard', app(DashboardStatsService::class)->vazio());
             }
+        });
+
+        View::composer(['layouts.app', 'layouts.partials.topbar', 'layouts.partials.topbar-captacao', 'layouts.partials.sidebar'], function ($view): void {
+            $user = auth()->user();
+
+            if ($user === null) {
+                return;
+            }
+
+            $hub = app(ModuloHubService::class);
+            $moduloAtivo = AppModulo::tryFromSession();
+
+            $dados = [
+                'moduloAtivo' => $moduloAtivo,
+                'exibirSidebarAdministrativa' => $hub->deveExibirSidebarAdministrativa($moduloAtivo, $user),
+            ];
+
+            if ($moduloAtivo?->usaTopbarModuloCaptacao()) {
+                $dados['carteirasAbrirCaptacao'] = CaptacaoCarteira::query()
+                    ->where('ativo', true)
+                    ->orderBy('nome')
+                    ->get(['id', 'nome', 'id_unidade_negocio_faturamento', 'id_unidade_negocio_galpao']);
+                $dados['dataReferenciaAbrirCaptacao'] = request()->string('data_referencia', now()->toDateString())->toString();
+            }
+
+            $view->with($dados);
         });
 
         Route::bind('estado', function (string $value): Estado {

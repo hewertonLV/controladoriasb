@@ -19,8 +19,8 @@ class UpdateCaptacaoCelulaRequest extends FormRequest
         return [
             'id_cliente' => ['required', 'integer', 'exists:clientes,id'],
             'id_fruta' => ['required', 'integer', 'exists:frutas,id'],
-            'quantidade' => ['required_without:incremento', 'nullable', 'numeric', 'min:0'],
-            'incremento' => ['required_without:quantidade', 'nullable', 'numeric'],
+            'quantidade' => ['nullable', 'numeric', 'min:0'],
+            'incremento' => ['nullable', 'numeric'],
             'preco_venda' => ['nullable', 'numeric', 'min:0'],
             'version' => ['nullable', 'integer', 'min:1'],
         ];

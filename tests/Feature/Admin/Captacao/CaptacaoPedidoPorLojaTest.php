@@ -4,6 +4,7 @@ namespace Tests\Feature\Admin\Captacao;
 
 use App\Enums\CaptacaoLoteStatus;
 use App\Enums\PedidoOrigem;
+use App\Models\Captacao\CaptacaoLote;
 use App\Models\Captacao\Pedido;
 use App\Models\Captacao\PedidoItem;
 use App\Models\Estoque;
@@ -27,7 +28,42 @@ class CaptacaoPedidoPorLojaTest extends CaptacaoTestCase
                 'data_referencia' => $lote->data_referencia->format('Y-m-d'),
             ]))
             ->assertOk()
-            ->assertSee($c['carteira']->nome, false);
+            ->assertSee($c['carteira']->nome, false)
+            ->assertSee('Abrir captação do dia', false)
+            ->assertSee('Criar captação', false);
+    }
+
+    public function test_modulo_captacao_exibe_topbar_criar_captacao_em_lojas(): void
+    {
+        $c = $this->cenarioCaptacaoBasico();
+        $user = $this->captacaoManager();
+        $user->unidadesNegocio()->sync([$c['galpao']->id]);
+        $lote = $this->criarLoteCaptacao($c);
+
+        $this->actingAs($user)
+            ->withSession(['app_modulo' => 'captacao'])
+            ->get(route('admin.captacao.pedidos-por-loja.lojas', $lote))
+            ->assertOk()
+            ->assertSee('Criar Captação', false)
+            ->assertSee('Módulos', false)
+            ->assertSee('modal-criar-captacao', false)
+            ->assertSee('Buscar loja', false)
+            ->assertSee('filtro-lojas-captacao', false);
+    }
+
+    public function test_abrir_captacao_no_modulo_redireciona_para_lojas(): void
+    {
+        $c = $this->cenarioCaptacaoBasico();
+        $user = $this->captacaoManager();
+        $user->unidadesNegocio()->sync([$c['galpao']->id]);
+
+        $this->actingAs($user)
+            ->withSession(['app_modulo' => 'captacao'])
+            ->post(route('admin.captacao.lotes.store'), [
+                'data_referencia' => now()->toDateString(),
+                'id_captacao_carteira' => $c['carteira']->id,
+            ])
+            ->assertRedirect(route('admin.captacao.pedidos-por-loja.lojas', CaptacaoLote::query()->latest('id')->first()));
     }
 
     public function test_lista_todas_lojas_da_carteira_mesmo_sem_frutas_vinculadas(): void
@@ -335,6 +371,195 @@ class CaptacaoPedidoPorLojaTest extends CaptacaoTestCase
         $this->assertSame(PedidoCaptacaoEstadoService::ESTADO_CONCLUIDO, $estado['estado']);
     }
 
+    public function test_reabrir_editar_e_finalizar_persiste_quantidade_e_preco(): void
+    {
+        $c = $this->cenarioCaptacaoBasico();
+        $user = $this->captacaoManager();
+        $user->unidadesNegocio()->sync([$c['galpao']->id]);
+        $lote = $this->criarLoteCaptacao($c);
+
+        Estoque::factory()->create([
+            'id_unidade_negocio' => $c['galpao']->id,
+            'id_fruta' => $c['fruta']->id,
+            'preco_medio_kg' => '5.0000',
+            'qtd_fruta_kg' => '100',
+            'ativo_unico' => 1,
+        ]);
+
+        $this->actingAs($user)
+            ->putJson(route('admin.captacao.pedidos-por-loja.salvar', [$lote, $c['cliente']]), [
+                'itens' => [
+                    [
+                        'id_fruta' => $c['fruta']->id,
+                        'quantidade' => '10',
+                        'preco_venda' => '8.50',
+                    ],
+                ],
+            ])
+            ->assertOk();
+
+        $this->actingAs($user)
+            ->post(route('admin.captacao.pedidos-por-loja.captacao-concluida', [$lote, $c['cliente']]), [
+                'captacao_concluida' => true,
+            ])
+            ->assertRedirect();
+
+        $this->actingAs($user)
+            ->post(route('admin.captacao.pedidos-por-loja.captacao-concluida', [$lote, $c['cliente']]), [
+                'captacao_concluida' => false,
+            ])
+            ->assertRedirect();
+
+        $this->actingAs($user)
+            ->putJson(route('admin.captacao.pedidos-por-loja.salvar', [$lote, $c['cliente']]), [
+                'itens' => [
+                    [
+                        'id_fruta' => $c['fruta']->id,
+                        'quantidade' => '15',
+                        'preco_venda' => '12.75',
+                    ],
+                ],
+            ])
+            ->assertOk();
+
+        $this->actingAs($user)
+            ->post(route('admin.captacao.pedidos-por-loja.captacao-concluida', [$lote, $c['cliente']]), [
+                'captacao_concluida' => true,
+            ])
+            ->assertRedirect();
+
+        $this->assertDatabaseHas('pedido_itens', [
+            'id_fruta' => $c['fruta']->id,
+            'quantidade' => '15.000',
+            'preco_venda' => '12.7500',
+        ]);
+    }
+
+    public function test_salvar_pedido_com_quantidade_vazia_remove_item(): void
+    {
+        $c = $this->cenarioCaptacaoBasico();
+        $user = $this->captacaoManager();
+        $user->unidadesNegocio()->sync([$c['galpao']->id]);
+        $lote = $this->criarLoteCaptacao($c);
+
+        $this->actingAs($user)
+            ->putJson(route('admin.captacao.pedidos-por-loja.salvar', [$lote, $c['cliente']]), [
+                'itens' => [
+                    [
+                        'id_fruta' => $c['fruta']->id,
+                        'quantidade' => '4',
+                        'preco_venda' => '7.00',
+                    ],
+                ],
+            ])
+            ->assertOk();
+
+        $pedido = Pedido::query()
+            ->where('id_captacao_lote', $lote->id)
+            ->where('id_cliente', $c['cliente']->id)
+            ->firstOrFail();
+
+        $this->assertDatabaseHas('pedido_itens', [
+            'id_pedido' => $pedido->id,
+            'id_fruta' => $c['fruta']->id,
+            'quantidade' => '4.000',
+        ]);
+
+        $this->actingAs($user)
+            ->putJson(route('admin.captacao.pedidos-por-loja.salvar', [$lote, $c['cliente']]), [
+                'itens' => [
+                    [
+                        'id_fruta' => $c['fruta']->id,
+                        'quantidade' => '',
+                        'preco_venda' => '7.00',
+                    ],
+                ],
+            ])
+            ->assertOk();
+
+        $this->assertDatabaseMissing('pedido_itens', [
+            'id_pedido' => $pedido->id,
+            'id_fruta' => $c['fruta']->id,
+        ]);
+    }
+
+    public function test_pedido_concluido_bloqueia_edicao_ate_reabrir(): void
+    {
+        $c = $this->cenarioCaptacaoBasico();
+        $user = $this->captacaoManager();
+        $user->unidadesNegocio()->sync([$c['galpao']->id]);
+        $lote = $this->criarLoteCaptacao($c);
+
+        $this->actingAs($user)
+            ->putJson(route('admin.captacao.pedidos-por-loja.salvar', [$lote, $c['cliente']]), [
+                'itens' => [
+                    [
+                        'id_fruta' => $c['fruta']->id,
+                        'quantidade' => '5',
+                        'preco_venda' => '9.00',
+                    ],
+                ],
+            ])
+            ->assertOk();
+
+        $this->actingAs($user)
+            ->post(route('admin.captacao.pedidos-por-loja.captacao-concluida', [$lote, $c['cliente']]), [
+                'captacao_concluida' => true,
+            ])
+            ->assertRedirect();
+
+        $this->actingAs($user)
+            ->get(route('admin.captacao.pedidos-por-loja.show', [$lote, $c['cliente']]))
+            ->assertOk()
+            ->assertViewHas('podeEditar', false)
+            ->assertViewHas('pedidoConcluido', true)
+            ->assertSee('Reabrir pedido', false)
+            ->assertSee('Pedido finalizado', false);
+
+        $this->actingAs($user)
+            ->putJson(route('admin.captacao.pedidos-por-loja.salvar', [$lote, $c['cliente']]), [
+                'itens' => [
+                    [
+                        'id_fruta' => $c['fruta']->id,
+                        'quantidade' => '8',
+                        'preco_venda' => '11.00',
+                    ],
+                ],
+            ])
+            ->assertStatus(422)
+            ->assertJsonValidationErrors(['pedido']);
+
+        $this->assertDatabaseHas('pedido_itens', [
+            'id_fruta' => $c['fruta']->id,
+            'quantidade' => '5.000',
+            'preco_venda' => '9.0000',
+        ]);
+
+        $this->actingAs($user)
+            ->post(route('admin.captacao.pedidos-por-loja.captacao-concluida', [$lote, $c['cliente']]), [
+                'captacao_concluida' => false,
+            ])
+            ->assertRedirect();
+
+        $this->actingAs($user)
+            ->putJson(route('admin.captacao.pedidos-por-loja.salvar', [$lote, $c['cliente']]), [
+                'itens' => [
+                    [
+                        'id_fruta' => $c['fruta']->id,
+                        'quantidade' => '8',
+                        'preco_venda' => '11.00',
+                    ],
+                ],
+            ])
+            ->assertOk();
+
+        $this->assertDatabaseHas('pedido_itens', [
+            'id_fruta' => $c['fruta']->id,
+            'quantidade' => '8.000',
+            'preco_venda' => '11.0000',
+        ]);
+    }
+
     public function test_show_exibe_opcoes_saida_fisica_galpao_e_hubs(): void
     {
         $c = $this->cenarioCaptacaoBasico();
@@ -357,6 +582,72 @@ class CaptacaoPedidoPorLojaTest extends CaptacaoTestCase
             ->assertSee('|', false)
             ->assertSee('HUB TESTE PEDIDO LOJA', false)
             ->assertViewHas('idSaidaSelecionada', $c['galpao']->id);
+    }
+
+    public function test_show_exibe_campo_numero_pedido_editavel(): void
+    {
+        $c = $this->cenarioCaptacaoBasico();
+        $user = $this->captacaoManager();
+        $user->unidadesNegocio()->sync([$c['galpao']->id]);
+        $lote = $this->criarLoteCaptacao($c);
+
+        $this->actingAs($user)
+            ->get(route('admin.captacao.pedidos-por-loja.show', [$lote, $c['cliente']]))
+            ->assertOk()
+            ->assertSee('Nº pedido', false)
+            ->assertSee('id="numero-pedido-loja"', false);
+    }
+
+    public function test_pedido_por_loja_salva_numero_pedido(): void
+    {
+        $c = $this->cenarioCaptacaoBasico();
+        $user = $this->captacaoManager();
+        $user->unidadesNegocio()->sync([$c['galpao']->id]);
+        $lote = $this->criarLoteCaptacao($c);
+
+        $this->actingAs($user)
+            ->patchJson(route('admin.captacao.lotes.pedidos.numero-pedido', [$lote, $c['cliente']]), [
+                'numero_pedido' => 'PL-300',
+            ])
+            ->assertOk()
+            ->assertJsonPath('numero_pedido', 'PL-300');
+
+        $this->assertDatabaseHas('pedidos', [
+            'id_captacao_lote' => $lote->id,
+            'id_cliente' => $c['cliente']->id,
+            'numero_pedido' => 'PL-300',
+        ]);
+    }
+
+    public function test_pedido_por_loja_bloqueia_numero_pedido_quando_concluido(): void
+    {
+        $c = $this->cenarioCaptacaoBasico();
+        $user = $this->captacaoManager();
+        $user->unidadesNegocio()->sync([$c['galpao']->id]);
+        $lote = $this->criarLoteCaptacao($c);
+
+        $pedido = Pedido::query()->create([
+            'id_captacao_lote' => $lote->id,
+            'id_cliente' => $c['cliente']->id,
+            'origem' => PedidoOrigem::Web,
+            'captacao_concluida' => true,
+            'numero_pedido' => 'ORIGINAL',
+        ]);
+
+        $this->actingAs($user)
+            ->get(route('admin.captacao.pedidos-por-loja.show', [$lote, $c['cliente']]))
+            ->assertOk()
+            ->assertViewHas('pedidoConcluido', true)
+            ->assertViewHas('podeEditar', false)
+            ->assertSee('ORIGINAL', false);
+
+        $this->actingAs($user)
+            ->patchJson(route('admin.captacao.lotes.pedidos.numero-pedido', [$lote, $c['cliente']]), [
+                'numero_pedido' => 'NOVO',
+            ])
+            ->assertUnprocessable();
+
+        $this->assertSame('ORIGINAL', $pedido->fresh()->numero_pedido);
     }
 
     public function test_show_custo_usa_estoque_hub_mais_co_faturamento(): void

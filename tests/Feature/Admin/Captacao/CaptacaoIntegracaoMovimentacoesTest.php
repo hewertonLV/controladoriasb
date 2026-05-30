@@ -18,6 +18,7 @@ use App\Models\Fruta;
 use App\Models\HistoricoCOUnNg;
 use App\Models\Frete;
 use App\Models\Movimentacao;
+use App\Models\MovimentacaoEstoque;
 use App\Models\StatusMovimentacao;
 use App\Models\UnidadeNegocio;
 use App\Models\VendaNota;
@@ -313,6 +314,10 @@ class CaptacaoIntegracaoMovimentacoesTest extends CaptacaoTestCase
 
         $this->enviarNfVendaPipeline($user, $lote);
 
+        $this->concluirRotaNaMatriz($user, $lote->fresh(), $c);
+
+        $this->efetivarDemandasVendaRotaLote($user, $lote->fresh());
+
         $this->assertDatabaseHas('captacao_lote_movimentacoes', [
             'id_captacao_lote' => $lote->id,
             'tipo' => CaptacaoLoteMovimentacao::TIPO_VENDA_NOTA,
@@ -359,6 +364,70 @@ class CaptacaoIntegracaoMovimentacoesTest extends CaptacaoTestCase
         $this->actingAs($user)->post(route('admin.captacao.lotes.pipeline.iniciar-faturamento', $lote));
         $this->enviarNfVendaPipeline($user, $lote->fresh());
 
+        Estoque::factory()->create([
+            'id_unidade_negocio' => $c['galpao']->id,
+            'id_fruta' => $c['fruta']->id,
+            'qtd_fruta_kg' => '0.00',
+            'qtd_fruta_um' => '0.00',
+            'preco_medio_kg' => '5.00',
+            'preco_medio_um' => '50.00',
+            'valor_total_acumulado' => '0.00',
+        ]);
+        MovimentacaoEstoque::query()->create([
+            'id_estoque' => Estoque::query()
+                ->where('id_unidade_negocio', $c['galpao']->id)
+                ->where('id_fruta', $c['fruta']->id)
+                ->value('id'),
+            'id_unidade_negocio' => $c['galpao']->id,
+            'id_fruta' => $c['fruta']->id,
+            'qtd_fruta_kg' => '0.00',
+            'qtd_fruta_um' => '0.00',
+            'preco_medio_kg' => '5.00',
+            'preco_medio_um' => '50.00',
+            'valor_total_fruta' => '0.00',
+            'status_ultima_posicao' => true,
+        ]);
+
+        $veiculo = \App\Models\Veiculo::factory()->create([
+            'id_unidade_negocio' => $c['faturamento']->id,
+            'status' => 'ATIVO',
+        ]);
+        $this->actingAs($user)->patchJson(route('admin.captacao.lotes.rotas.motorista', [$lote, $c['rota']]), [
+            'nome_motorista' => 'Motorista Hub',
+        ])->assertOk();
+        $this->actingAs($user)->patchJson(route('admin.captacao.lotes.rotas.veiculo', [$lote, $c['rota']]), [
+            'id_veiculo' => $veiculo->id,
+        ])->assertOk();
+        $this->actingAs($user)->patchJson(route('admin.captacao.lotes.pedidos.ordem-carregamento', [$lote, $c['cliente']]), [
+            'ordem_carregamento' => 1,
+        ])->assertOk();
+        $pedido->update(['captacao_concluida' => true]);
+        $this->actingAs($user)
+            ->postJson(route('admin.captacao.lotes.rotas.concluir', [$lote, $c['rota']]))
+            ->assertOk();
+
+        $this->efetivarDemandasVendaRotaLote($user, $lote->fresh());
+
+        $vinculoTransferencia = CaptacaoLoteMovimentacao::query()
+            ->where('tipo', CaptacaoLoteMovimentacao::TIPO_TRANSFERENCIA)
+            ->where('id_captacao_lote', $lote->id)
+            ->where('id_captacao_rota', $c['rota']->id)
+            ->firstOrFail();
+
+        $this->actingAs($user)
+            ->postJson(route('admin.captacao.lotes.demandas.transferencia.iniciar', [$lote, $vinculoTransferencia]))
+            ->assertOk();
+
+        $this->actingAs($user)
+            ->post(route('admin.captacao.lotes.demandas.transferencia.nf', [$lote, $vinculoTransferencia]), [
+                'arquivo_nf' => UploadedFile::fake()->create('nf-transferencia.xml', 10, 'text/xml'),
+            ])
+            ->assertOk();
+
+        $vinculoTransferencia->refresh();
+        $this->assertNull($vinculoTransferencia->transferencia_origem_id);
+        $this->assertSame(\App\Enums\CaptacaoDemandaStatus::Concluido->value, $vinculoTransferencia->status_demanda);
+
         $numeroNf = sprintf('CAP-%s-%d-%d', $lote->data_referencia->format('Ymd'), $lote->id, $c['cliente']->id);
         $nota = VendaNota::query()->where('numero_nf', $numeroNf)->firstOrFail();
 
@@ -371,22 +440,18 @@ class CaptacaoIntegracaoMovimentacoesTest extends CaptacaoTestCase
         $this->assertSame($hub->id, (int) $venda->id_unidade_negocio_estoque);
         $this->assertSame($c['faturamento']->id, (int) $venda->id_unidade_negocio_faturamento);
         $this->assertSame('2.00', (string) $venda->valor_custo_operacional);
-        $this->assertSame('350.00', (string) $venda->valor_custo_saida);
-        $this->assertStringContainsString('Saída física em unidade HUB', (string) $venda->observacao);
-        $this->assertStringContainsString($c['faturamento']->nome, (string) $venda->observacao);
 
         $estoqueHub = Estoque::query()
             ->where('id_unidade_negocio', $hub->id)
             ->where('id_fruta', $c['fruta']->id)
             ->firstOrFail();
-        $this->assertSame('5.00', (string) $estoqueHub->preco_medio_kg);
+        $this->assertLessThan(200.0, (float) $estoqueHub->qtd_fruta_kg);
 
-        $this->assertFalse(
-            Estoque::query()
-                ->where('id_unidade_negocio', $c['galpao']->id)
-                ->where('id_fruta', $c['fruta']->id)
-                ->exists(),
-        );
+        $estoqueGalpao = Estoque::query()
+            ->where('id_unidade_negocio', $c['galpao']->id)
+            ->where('id_fruta', $c['fruta']->id)
+            ->firstOrFail();
+        $this->assertSame(0.0, (float) $estoqueGalpao->qtd_fruta_um);
     }
 
     public function test_matriz_frete_vendas_lista_loja_e_vincula_frete(): void
@@ -499,25 +564,14 @@ class CaptacaoIntegracaoMovimentacoesTest extends CaptacaoTestCase
         $user = $this->captacaoManager();
         $user->unidadesNegocio()->sync([$c['faturamento']->id, $c['galpao']->id, $hub->id]);
 
-        $gerador = app(GerarVendasCaptacaoLoteService::class);
-        $gerador->executar($lote->fresh(), $user);
+        $this->garantirEstoqueGalpaoLote($c, $lote);
+        $this->concluirRotaNaMatriz($user, $lote->fresh(), $c);
 
         $this->assertSame(1, CaptacaoLoteMovimentacao::query()
             ->where('id_captacao_lote', $lote->id)
             ->where('tipo', CaptacaoLoteMovimentacao::TIPO_VENDA_NOTA)
+            ->whereNull('id_pedido')
             ->count());
-
-        $this->actingAs($user)->post(route('admin.captacao.lotes.pedidos.store', $lote), [
-            'id_cliente' => $cliente2->id,
-            'id_captacao_rota' => $c['rota']->id,
-            'itens' => [
-                [
-                    'id_fruta' => $c['fruta']->id,
-                    'quantidade' => 3,
-                    'preco_venda' => '10.00',
-                ],
-            ],
-        ]);
 
         $pedido2 = Pedido::query()->firstOrCreate(
             [
@@ -529,7 +583,7 @@ class CaptacaoIntegracaoMovimentacoesTest extends CaptacaoTestCase
                 'id_unidade_negocio_saida_venda' => $c['galpao']->id,
             ],
         );
-        $pedido2->update(['id_unidade_negocio_saida_venda' => $c['galpao']->id]);
+        $pedido2->update(['id_unidade_negocio_saida_venda' => $c['galpao']->id, 'captacao_concluida' => true, 'ordem_carregamento' => 2]);
         PedidoItem::query()->updateOrCreate(
             [
                 'id_pedido' => $pedido2->id,
@@ -541,15 +595,30 @@ class CaptacaoIntegracaoMovimentacoesTest extends CaptacaoTestCase
             ],
         );
 
-        $gerador->executar($lote->fresh(), $user);
+        $this->garantirEstoqueGalpaoLote($c, $lote->fresh());
 
-        $this->assertSame(2, CaptacaoLoteMovimentacao::query()
+        app(GerarVendasCaptacaoLoteService::class)->gerarVendaPedidoNaConclusaoRota(
+            $lote->fresh(),
+            $c['rota'],
+            $pedido2->fresh(),
+            $user,
+        );
+
+        $demandaVenda = CaptacaoLoteMovimentacao::query()
+            ->where('id_captacao_lote', $lote->id)
+            ->where('tipo', CaptacaoLoteMovimentacao::TIPO_VENDA_NOTA)
+            ->whereNull('id_pedido')
+            ->firstOrFail();
+
+        $this->assertSame(1, CaptacaoLoteMovimentacao::query()
             ->where('id_captacao_lote', $lote->id)
             ->where('tipo', CaptacaoLoteMovimentacao::TIPO_VENDA_NOTA)
             ->count());
 
+        $this->assertSame(2, $demandaVenda->linhas()->whereNotNull('id_pedido')->count());
+
         $numeroNf2 = sprintf('CAP-%s-%d-%d', $lote->data_referencia->format('Ymd'), $lote->id, $cliente2->id);
-        $this->assertTrue(VendaNota::query()->where('numero_nf', $numeroNf2)->exists());
+        $this->assertFalse(VendaNota::query()->where('numero_nf', $numeroNf2)->exists());
     }
 
     public function test_matriz_estado_e_incremento_celula(): void

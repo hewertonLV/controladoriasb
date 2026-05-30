@@ -2,12 +2,18 @@
 
 namespace App\Services\Captacao;
 
+use App\Enums\CaptacaoLoteStatus;
 use App\Models\Captacao\CaptacaoLote;
 use App\Models\Captacao\CaptacaoLoteRota;
 use App\Models\Captacao\CaptacaoRota;
+use App\Models\Captacao\Pedido;
 use App\Models\Veiculo;
 use App\Models\Cliente;
+use App\Support\Captacao\CaptacaoPedidoPorLojaSaidaFisicaService;
+use App\Support\Captacao\SaidaEstoqueFisicoCaptacaoService;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 
 final class CaptacaoMatrizRotasService
 {
@@ -22,6 +28,7 @@ final class CaptacaoMatrizRotasService
      *     id_captacao_rota: int|null,
      *     captacao_concluida: bool,
      *     numero_pedido: string|null,
+     *     saida_fisica_nome: string,
      *     ordem_carregamento: int|null,
      *     itens: list<array{
      *         id_fruta: int,
@@ -33,6 +40,7 @@ final class CaptacaoMatrizRotasService
      * }>
      */
     public function gruposPorLoja(
+        CaptacaoLote $lote,
         Collection $clientes,
         array $frutasPorCliente,
         Collection $pedidosPorCliente,
@@ -40,6 +48,9 @@ final class CaptacaoMatrizRotasService
     ): array {
         $frutasPorId = $frutas->keyBy('id');
         $grupos = [];
+        $saidaFisicaLoja = app(CaptacaoPedidoPorLojaSaidaFisicaService::class);
+        $saidaFisicaRomaneio = app(SaidaEstoqueFisicoCaptacaoService::class);
+        $usaSaidaPorLoja = $lote->status === CaptacaoLoteStatus::CaptacaoEmAndamento;
 
         foreach ($clientes as $cliente) {
             $pedido = $pedidosPorCliente->get($cliente->id);
@@ -68,12 +79,19 @@ final class CaptacaoMatrizRotasService
                 continue;
             }
 
+            $idSaidaFisica = $pedido !== null
+                ? ($usaSaidaPorLoja
+                    ? $saidaFisicaLoja->idSaidaEfetivaParaExibicao($pedido, $lote, $cliente)
+                    : $saidaFisicaRomaneio->idSaidaEfetiva($pedido, $lote, $cliente))
+                : $saidaFisicaRomaneio->idGalpaoLote($lote);
+
             $grupos[] = [
                 'id_cliente' => $cliente->id,
                 'loja_nome' => $cliente->fantasia ?: $cliente->razao_social,
                 'id_captacao_rota' => $pedido?->id_captacao_rota,
                 'captacao_concluida' => (bool) $pedido?->captacao_concluida,
                 'numero_pedido' => $pedido?->numero_pedido,
+                'saida_fisica_nome' => $saidaFisicaLoja->labelCurtoUnidadePorId($lote, $idSaidaFisica),
                 'ordem_carregamento' => $pedido?->ordem_carregamento !== null
                     ? (int) $pedido->ordem_carregamento
                     : null,
@@ -107,10 +125,243 @@ final class CaptacaoMatrizRotasService
 
                 $rota->nome_motorista = $cfg?->nome_motorista;
                 $rota->id_veiculo = $cfg?->id_veiculo;
+                $rota->concluida = (bool) ($cfg?->concluida ?? false);
                 $rota->setRelation('veiculo', $cfg?->veiculo);
 
                 return $rota;
             });
+    }
+
+    public function rotaEstaConcluidaNoLote(CaptacaoLote $lote, int $rotaId): bool
+    {
+        return CaptacaoLoteRota::query()
+            ->where('id_captacao_lote', $lote->id)
+            ->where('id_captacao_rota', $rotaId)
+            ->where('concluida', true)
+            ->exists();
+    }
+
+    /**
+     * Rotas com ao menos um pedido com quantidade no lote.
+     *
+     * @return Collection<int, int>
+     */
+    public function idsRotasComPedidoNoLote(CaptacaoLote $lote): Collection
+    {
+        return Pedido::query()
+            ->where('id_captacao_lote', $lote->id)
+            ->whereNotNull('id_captacao_rota')
+            ->whereHas('itens', static fn ($q) => $q->where('quantidade', '>', 0))
+            ->pluck('id_captacao_rota')
+            ->map(static fn ($id) => (int) $id)
+            ->unique()
+            ->values();
+    }
+
+    public function todasRotasComPedidoEstaoConcluidasNoLote(CaptacaoLote $lote): bool
+    {
+        return $this->nomesRotasComPedidoNaoConcluidasNoLote($lote) === [];
+    }
+
+    /**
+     * @return list<string>
+     */
+    public function nomesRotasComPedidoNaoConcluidasNoLote(CaptacaoLote $lote): array
+    {
+        $ids = $this->idsRotasComPedidoNoLote($lote);
+        if ($ids->isEmpty()) {
+            return [];
+        }
+
+        $rotas = CaptacaoRota::query()
+            ->whereIn('id', $ids->all())
+            ->get(['id', 'nome'])
+            ->keyBy('id');
+
+        $pendentes = [];
+        foreach ($ids as $rotaId) {
+            if (! $this->rotaEstaConcluidaNoLote($lote, $rotaId)) {
+                $pendentes[] = (string) ($rotas->get($rotaId)?->nome ?? "Rota #{$rotaId}");
+            }
+        }
+
+        sort($pendentes, SORT_NATURAL | SORT_FLAG_CASE);
+
+        return $pendentes;
+    }
+
+    public function assertTodasRotasComPedidoConcluidasNoLote(CaptacaoLote $lote): void
+    {
+        $pendentes = $this->nomesRotasComPedidoNaoConcluidasNoLote($lote);
+        if ($pendentes === []) {
+            return;
+        }
+
+        throw ValidationException::withMessages([
+            'captacao_concluida' => 'Conclua todas as rotas na aba Por rota antes de finalizar a captação desta loja: '
+                .implode(', ', $pendentes).'.',
+        ]);
+    }
+
+    public function assertRotaAbertaNoLote(CaptacaoLote $lote, int $rotaId): void
+    {
+        if ($this->rotaEstaConcluidaNoLote($lote, $rotaId)) {
+            throw ValidationException::withMessages([
+                'id_captacao_rota' => 'Esta rota foi concluída. Reabra a rota na aba Por rota para alterar vínculos ou a ordem de carregamento.',
+            ]);
+        }
+    }
+
+    private function assertLotePermiteConcluirReabrirRota(CaptacaoLote $lote): void
+    {
+        if (! $lote->status->permiteEdicaoVinculoRota()) {
+            throw ValidationException::withMessages([
+                'status' => 'O vínculo de rota deste lote já foi concluído (vendas finalizadas).',
+            ]);
+        }
+    }
+
+    private function assertRotaDaCarteira(CaptacaoLote $lote, CaptacaoRota $rota): void
+    {
+        if ($rota->id_captacao_carteira !== $lote->id_captacao_carteira) {
+            throw ValidationException::withMessages([
+                'id_captacao_rota' => 'A rota não pertence à carteira deste lote.',
+            ]);
+        }
+    }
+
+    /**
+     * @return array{pode: bool, pendencias: list<string>}
+     */
+    public function pendenciasParaConcluirRota(CaptacaoLote $lote, int $rotaId): array
+    {
+        $pendencias = [];
+
+        $config = CaptacaoLoteRota::query()
+            ->where('id_captacao_lote', $lote->id)
+            ->where('id_captacao_rota', $rotaId)
+            ->first();
+
+        if (trim((string) ($config?->nome_motorista ?? '')) === '') {
+            $pendencias[] = 'Informe o nome do motorista.';
+        }
+
+        if ($config?->id_veiculo === null) {
+            $pendencias[] = 'Selecione o veículo da rota.';
+        }
+
+        $pedidos = Pedido::query()
+            ->where('id_captacao_lote', $lote->id)
+            ->where('id_captacao_rota', $rotaId)
+            ->with(['itens', 'cliente:id,fantasia,razao_social'])
+            ->get();
+
+        $pedidosComQuantidade = $pedidos->filter(fn (Pedido $p) => $this->pedidoTemQuantidadeCaptada($p));
+
+        if ($pedidosComQuantidade->isEmpty()) {
+            $pendencias[] = 'Vincule ao menos uma loja com quantidade captada à rota.';
+        }
+
+        foreach ($pedidosComQuantidade as $pedido) {
+            $nomeLoja = $pedido->cliente?->fantasia ?: $pedido->cliente?->razao_social ?: 'Loja';
+
+            if (! $pedido->captacao_concluida) {
+                $pendencias[] = "Conclua a captação de {$nomeLoja}.";
+            }
+
+            if ($pedido->ordem_carregamento === null) {
+                $pendencias[] = "Defina a ordem de carregamento de {$nomeLoja}.";
+            }
+        }
+
+        $quantidadeLojas = $pedidosComQuantidade->count();
+        if ($quantidadeLojas > 0) {
+            $ordensDefinidas = $pedidosComQuantidade
+                ->pluck('ordem_carregamento')
+                ->filter(static fn ($ordem) => $ordem !== null)
+                ->map(static fn ($ordem) => (int) $ordem)
+                ->sort()
+                ->values()
+                ->all();
+
+            if (count($ordensDefinidas) === $quantidadeLojas
+                && $ordensDefinidas !== range(1, $quantidadeLojas)) {
+                $pendencias[] = "Complete a sequência de carregamento de 1 a {$quantidadeLojas} em todas as lojas da rota, sem pular números.";
+            }
+        }
+
+        return [
+            'pode' => $pendencias === [],
+            'pendencias' => $pendencias,
+        ];
+    }
+
+    public function concluirRota(CaptacaoLote $lote, CaptacaoRota $rota): CaptacaoLoteRota
+    {
+        $this->assertLotePermiteConcluirReabrirRota($lote);
+        $this->assertRotaDaCarteira($lote, $rota);
+
+        if ($this->rotaEstaConcluidaNoLote($lote, $rota->id)) {
+            return $this->configRotaNoLote($lote, $rota);
+        }
+
+        $validacao = $this->pendenciasParaConcluirRota($lote, $rota->id);
+        if (! $validacao['pode']) {
+            throw ValidationException::withMessages([
+                'rota' => $validacao['pendencias'],
+            ]);
+        }
+
+        try {
+            return DB::transaction(function () use ($lote, $rota): CaptacaoLoteRota {
+                $config = CaptacaoLoteRota::query()->updateOrCreate(
+                    [
+                        'id_captacao_lote' => $lote->id,
+                        'id_captacao_rota' => $rota->id,
+                    ],
+                    [
+                        'concluida' => true,
+                    ],
+                )->refresh();
+
+                app(EfetivarDemandasMovimentacaoRotaCaptacaoService::class)->executar($lote, $rota);
+
+                return $config;
+            });
+        } catch (\InvalidArgumentException $e) {
+            throw ValidationException::withMessages([
+                'rota' => [$e->getMessage()],
+            ]);
+        }
+    }
+
+    public function reabrirRota(CaptacaoLote $lote, CaptacaoRota $rota): CaptacaoLoteRota
+    {
+        $this->assertLotePermiteConcluirReabrirRota($lote);
+        $this->assertRotaDaCarteira($lote, $rota);
+
+        return DB::transaction(function () use ($lote, $rota): CaptacaoLoteRota {
+            app(CaptacaoDemandaRotaService::class)->assertPodeReabrirRota($lote, $rota);
+            app(CaptacaoDemandaRotaService::class)->removerDemandasAoReabrir($lote, $rota);
+
+            return CaptacaoLoteRota::query()->updateOrCreate(
+                [
+                    'id_captacao_lote' => $lote->id,
+                    'id_captacao_rota' => $rota->id,
+                ],
+                [
+                    'concluida' => false,
+                ],
+            )->refresh();
+        });
+    }
+
+    private function configRotaNoLote(CaptacaoLote $lote, CaptacaoRota $rota): CaptacaoLoteRota
+    {
+        return CaptacaoLoteRota::query()
+            ->where('id_captacao_lote', $lote->id)
+            ->where('id_captacao_rota', $rota->id)
+            ->firstOrFail();
     }
 
     /**
@@ -167,6 +418,8 @@ final class CaptacaoMatrizRotasService
 
     public function atualizarVeiculoRota(CaptacaoLote $lote, CaptacaoRota $rota, ?int $veiculoId): CaptacaoLoteRota
     {
+        $this->assertRotaAbertaNoLote($lote, $rota->id);
+
         if (! $lote->status->permiteEdicaoVinculoRota()) {
             throw \Illuminate\Validation\ValidationException::withMessages([
                 'id_veiculo' => 'O vínculo de rota deste lote já foi concluído (vendas finalizadas).',
@@ -215,6 +468,8 @@ final class CaptacaoMatrizRotasService
 
     public function atualizarNomeMotorista(CaptacaoLote $lote, CaptacaoRota $rota, ?string $nomeMotorista): CaptacaoLoteRota
     {
+        $this->assertRotaAbertaNoLote($lote, $rota->id);
+
         if (! $lote->status->permiteEdicaoVinculoRota()) {
             throw \Illuminate\Validation\ValidationException::withMessages([
                 'nome_motorista' => 'O vínculo de rota deste lote já foi concluído (vendas finalizadas).',
@@ -250,11 +505,14 @@ final class CaptacaoMatrizRotasService
      *     motorista_nome: string|null,
      *     id_veiculo: int|null,
      *     veiculo_rotulo: string|null,
+     *     concluida: bool,
+     *     pode_concluir: bool,
+     *     pendencias_conclusao: list<string>,
      *     total_lojas: int,
      *     lojas: list<array<string, mixed>>,
      * }>
      */
-    public function gruposOrdemCarregamento(array $gruposLoja, Collection $rotas): array
+    public function gruposOrdemCarregamento(array $gruposLoja, Collection $rotas, ?CaptacaoLote $lote = null): array
     {
         /** @var array<int, array<string, mixed>> $porRota */
         $porRota = [];
@@ -278,6 +536,7 @@ final class CaptacaoMatrizRotasService
                     'veiculo_rotulo' => $veiculo !== null
                         ? "{$veiculo->nome} (SBS {$veiculo->id_sbs})"
                         : null,
+                    'concluida' => (bool) ($rotaModel?->concluida ?? false),
                     'lojas' => [],
                 ];
             }
@@ -306,9 +565,33 @@ final class CaptacaoMatrizRotasService
                 return strcasecmp($a['loja_nome'], $b['loja_nome']);
             });
             $grupoRota['total_lojas'] = count($grupoRota['lojas']);
+
+            if ($lote !== null && ! ($grupoRota['concluida'] ?? false)) {
+                $validacao = $this->pendenciasParaConcluirRota($lote, (int) $grupoRota['id_captacao_rota']);
+                $grupoRota['pode_concluir'] = $validacao['pode'];
+                $grupoRota['pendencias_conclusao'] = $validacao['pendencias'];
+            } else {
+                $grupoRota['pode_concluir'] = false;
+                $grupoRota['pendencias_conclusao'] = [];
+            }
+
+            $grupoRota['demandas'] = [];
         }
         unset($grupoRota);
 
         return $grupos;
+    }
+
+    private function pedidoTemQuantidadeCaptada(Pedido $pedido): bool
+    {
+        $pedido->loadMissing('itens');
+
+        foreach ($pedido->itens as $item) {
+            if ((float) $item->quantidade > 0) {
+                return true;
+            }
+        }
+
+        return false;
     }
 }

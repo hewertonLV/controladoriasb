@@ -72,6 +72,13 @@
                 </a>
             </li>
 
+            <li class="side-nav-item">
+                <a href="{{ route('modulos.index') }}" class="side-nav-link {{ request()->routeIs('modulos.*') ? 'active' : '' }}">
+                    <span class="menu-icon"><i class="ri-apps-line"></i></span>
+                    <span class="menu-text"> Módulos </span>
+                </a>
+            </li>
+
             @can(App\Enums\Permissions::OLHO_DE_FABIO_VISUALIZAR)
                 <li class="side-nav-item">
                     <a href="{{ route('olho-de-fabio.index') }}"

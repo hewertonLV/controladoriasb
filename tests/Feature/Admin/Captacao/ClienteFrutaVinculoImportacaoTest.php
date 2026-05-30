@@ -52,9 +52,9 @@ class ClienteFrutaVinculoImportacaoTest extends CaptacaoTestCase
         $fruta2 = Fruta::factory()->create(['nome' => 'MANGA IMPORT TESTE']);
 
         $path = $this->storeSpreadsheet([
-            [$c['cliente']->razao_social, $fruta2->nome],
-            [$c['cliente']->razao_social, $c['fruta']->nome],
-            ['LOJA INEXISTENTE XYZ', $fruta2->nome],
+            [$c['cliente']->id_cigam, $fruta2->id_cigam],
+            [$c['cliente']->id_cigam, $c['fruta']->id_cigam],
+            ['999999', $fruta2->id_cigam],
         ]);
 
         $importacao = ClienteFrutaImportacao::create([
@@ -137,7 +137,31 @@ class ClienteFrutaVinculoImportacaoTest extends CaptacaoTestCase
             ->assertOk()
             ->assertSee('Importação por planilha Excel', false)
             ->assertSee('fruta_loja_vinculo.xlsx', false)
-            ->assertSee('Razão social ou nome da loja', false);
+            ->assertSee('ID CIGAM do cliente', false);
+    }
+
+    public function test_tela_importar_via_clientes_com_permissao(): void
+    {
+        $user = $this->userWithPermissions([Permissions::CAPTACAO_CLIENTE_FRUTA_VINCULAR]);
+
+        $this->actingAs($user)
+            ->get(route('admin.clientes.importar-vinculo-frutas'))
+            ->assertOk()
+            ->assertSee('Importar vínculo loja × fruta', false)
+            ->assertSee('ID CIGAM da fruta', false);
+    }
+
+    public function test_clientes_listagem_exibe_botao_importar_vinculo(): void
+    {
+        $user = $this->userWithPermissions([
+            Permissions::CLIENTES_VISUALIZAR,
+            Permissions::CAPTACAO_CLIENTE_FRUTA_VINCULAR,
+        ]);
+
+        $this->actingAs($user)
+            ->get(route('admin.clientes.index'))
+            ->assertOk()
+            ->assertSee('Importar vínculo loja×fruta', false);
     }
 
     /**
@@ -147,7 +171,7 @@ class ClienteFrutaVinculoImportacaoTest extends CaptacaoTestCase
     {
         $spreadsheet = new Spreadsheet;
         $sheet = $spreadsheet->getActiveSheet();
-        $sheet->fromArray(['Loja', 'Fruta'], null, 'A1');
+        $sheet->fromArray(['id_cigam_cliente', 'id_cigam_fruta'], null, 'A1');
 
         foreach ($rows as $index => $row) {
             $sheet->fromArray($row, null, 'A'.($index + 2));

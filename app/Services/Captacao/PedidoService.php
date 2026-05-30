@@ -26,6 +26,7 @@ final class PedidoService
         private readonly CaptacaoPrecificacaoService $precificacao,
         private readonly CaptacaoHistoricoService $historico,
         private readonly ClienteFrutaVinculoService $frutaVinculos,
+        private readonly CaptacaoMatrizRotasService $matrizRotas,
     ) {}
 
     /**
@@ -65,6 +66,8 @@ final class PedidoService
             ])->save();
 
             $this->historico->registrarPedido($pedido, 'salvar', $origem, $user);
+
+            $this->assertPedidoCaptacaoNaoConcluida($pedido);
 
             foreach ($dados['itens'] as $itemDados) {
                 $this->upsertItem($lote, $pedido, $itemDados, $origem, $user);
@@ -158,7 +161,7 @@ final class PedidoService
         array $dados,
         PedidoOrigem $origem,
         ?User $user,
-    ): PedidoItem {
+    ): ?PedidoItem {
         $permiteQuantidade = $lote->status->permiteEdicaoQuantidadeCaptacao();
         $permitePreco = $lote->status->permiteEdicaoPreco();
 
@@ -202,6 +205,7 @@ final class PedidoService
      *     preco_venda?: numeric-string|float|null,
      *     id_unidade_origem_fisica?: int|null,
      *     version?: int,
+     *     remover?: bool,
      * }  $dados
      */
     private function upsertItem(
@@ -210,11 +214,20 @@ final class PedidoService
         array $dados,
         PedidoOrigem $origem,
         ?User $user,
-    ): PedidoItem {
+    ): ?PedidoItem {
         $existente = PedidoItem::query()
             ->where('id_pedido', $pedido->id)
             ->where('id_fruta', $dados['id_fruta'])
             ->first();
+
+        if ($this->itemDeveSerRemovido($dados)) {
+            if ($existente !== null) {
+                $this->historico->registrarItem($existente, 'remover', $origem, $user, $dados);
+                $existente->delete();
+            }
+
+            return null;
+        }
 
         if ($existente !== null && isset($dados['version']) && (int) $dados['version'] !== $existente->version) {
             throw ValidationException::withMessages([
@@ -228,6 +241,15 @@ final class PedidoService
         $custo = $this->resolverCustoReferenciaItemPedido($lote, $pedido, $fruta);
 
         $quantidade = $this->resolverQuantidade($existente, $dados);
+
+        if ((float) $quantidade <= 0) {
+            if ($existente !== null) {
+                $this->historico->registrarItem($existente, 'remover', $origem, $user, $dados);
+                $existente->delete();
+            }
+
+            return null;
+        }
 
         if ($existente === null) {
             $item = PedidoItem::query()->create([
@@ -246,7 +268,9 @@ final class PedidoService
 
         $existente->fill([
             'quantidade' => $quantidade,
-            'preco_venda' => $dados['preco_venda'] ?? $existente->preco_venda,
+            'preco_venda' => array_key_exists('preco_venda', $dados)
+                ? $dados['preco_venda']
+                : $existente->preco_venda,
             'custo_referencia' => $custo ?? $existente->custo_referencia,
             'id_unidade_origem_fisica' => $dados['id_unidade_origem_fisica'] ?? $existente->id_unidade_origem_fisica,
             'version' => $existente->version + 1,
@@ -270,6 +294,27 @@ final class PedidoService
         }
 
         return number_format((float) ($dados['quantidade'] ?? 0), 3, '.', '');
+    }
+
+    /**
+     * @param  array{quantidade?: mixed, incremento?: mixed, remover?: bool}  $dados
+     */
+    private function itemDeveSerRemovido(array $dados): bool
+    {
+        if (! empty($dados['remover'])) {
+            return true;
+        }
+
+        if (isset($dados['incremento']) && $dados['incremento'] !== null && $dados['incremento'] !== '') {
+            return false;
+        }
+
+        $quantidade = $dados['quantidade'] ?? null;
+        if ($quantidade === null || $quantidade === '') {
+            return true;
+        }
+
+        return (float) $quantidade <= 0;
     }
 
     public function definirCaptacaoConcluida(
@@ -296,6 +341,10 @@ final class PedidoService
             throw ValidationException::withMessages([
                 'captacao_concluida' => 'Informe ao menos uma quantidade antes de concluir a captação desta loja.',
             ]);
+        }
+
+        if (! $concluida && $pedido->id_captacao_rota !== null) {
+            $this->matrizRotas->assertRotaAbertaNoLote($lote, (int) $pedido->id_captacao_rota);
         }
 
         $pedido->captacao_concluida = $concluida;
@@ -367,6 +416,14 @@ final class PedidoService
             ],
         );
 
+        if ($rotaId !== null) {
+            $this->matrizRotas->assertRotaAbertaNoLote($lote, $rotaId);
+        }
+
+        if ($pedido->id_captacao_rota !== null) {
+            $this->matrizRotas->assertRotaAbertaNoLote($lote, (int) $pedido->id_captacao_rota);
+        }
+
         $pedido->id_captacao_rota = $rotaId;
         $pedido->ordem_carregamento = null;
         $pedido->save();
@@ -406,6 +463,7 @@ final class PedidoService
         }
 
         $rotaId = (int) $pedido->id_captacao_rota;
+        $this->matrizRotas->assertRotaAbertaNoLote($lote, $rotaId);
 
         $pedidosRota = Pedido::query()
             ->where('id_captacao_lote', $lote->id)
@@ -578,6 +636,15 @@ final class PedidoService
         }
     }
 
+    private function assertPedidoCaptacaoNaoConcluida(Pedido $pedido): void
+    {
+        if ($pedido->captacao_concluida) {
+            throw ValidationException::withMessages([
+                'pedido' => 'Captação desta loja está concluída. Reabra o pedido para alterar.',
+            ]);
+        }
+    }
+
     /**
      * Obtém ou cria o pedido do par lote×cliente com lock e retry em violação de unique (autosave concorrente).
      */
@@ -717,6 +784,7 @@ final class PedidoService
 
         return DB::transaction(function () use ($lote, $idCliente, $idUnidadeSaida, $origem, $user): Pedido {
             $pedido = $this->resolverPedidoLoteCliente($lote, $idCliente, $origem, $user);
+            $this->assertPedidoCaptacaoNaoConcluida($pedido);
             $pedido->id_unidade_negocio_saida_venda = $idUnidadeSaida;
             $pedido->save();
 

@@ -16,7 +16,6 @@ use App\Models\Captacao\CaptacaoRomaneioManualLinha;
 use App\Models\Fruta;
 use App\Models\UnidadeNegocio;
 use App\Services\Captacao\CaptacaoLoteService;
-use App\Services\Captacao\RomaneioAbastecimentoService;
 use App\Services\Captacao\RomaneioManualService;
 use App\Services\Permissoes\UnidadeNegocioAccessService;
 use App\Support\Captacao\CaptacaoLotePipelineUi;
@@ -29,7 +28,6 @@ class RomaneioManualController extends Controller
 {
     public function __construct(
         private readonly CaptacaoLoteService $lotes,
-        private readonly RomaneioAbastecimentoService $romaneioAbastecimento,
         private readonly RomaneioManualService $romaneioManual,
     ) {}
 
@@ -172,7 +170,6 @@ class RomaneioManualController extends Controller
         return view('admin.captacao.romaneio-manual.edit', [
             'lote' => $lote,
             'editavel' => $editavel,
-            'romaneioAbastecimento' => $this->romaneioAbastecimento->preview($lote),
             'proximaAcao' => CaptacaoLotePipelineUi::proximaAcao($lote),
             'hubs' => UnidadeNegocio::query()->where('is_hub', true)->orderBy('nome')->get(['id', 'nome']),
             'frutas' => Fruta::query()->orderBy('nome')->get(['id', 'nome']),

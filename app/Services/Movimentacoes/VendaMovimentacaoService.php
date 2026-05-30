@@ -143,6 +143,65 @@ final class VendaMovimentacaoService
 
     /**
      * @param  array<string, mixed>  $input
+     * @return array{nota: VendaNota, movimentacoes: Collection<int, Movimentacao>}
+     */
+    public function concluirVendaAguardandoTransferencia(VendaNota $nota, array $input, ?User $user = null): array
+    {
+        return DB::transaction(function () use ($nota, $input, $user): array {
+            $nota = VendaNota::query()->whereKey($nota->id)->lockForUpdate()->firstOrFail();
+
+            $statusAtual = $nota->status_conclusao ?? \App\Enums\VendaNotaStatusConclusao::Concluida->value;
+            $statusPermitidos = [
+                \App\Enums\VendaNotaStatusConclusao::AguardandoTransferencia->value,
+                \App\Enums\VendaNotaStatusConclusao::Pendente->value,
+            ];
+
+            if (! in_array($statusAtual, $statusPermitidos, true)) {
+                throw new InvalidArgumentException('Esta venda não está pendente de efetivação.');
+            }
+
+            [$empresaOrigem, $unidadeFaturamento, $unidadeCentroResultado, $unidadePmDebito, $empresaDestino, $frete, $dataEmissao] = $this->resolverCabecalho($input);
+            $itens = $this->normalizarItens($input['itens'] ?? []);
+
+            $nota->forceFill([
+                'id_empresa_origem' => $empresaOrigem->id,
+                'id_empresa_destino' => $empresaDestino->id,
+                'id_unidade_negocio_faturamento' => $unidadeFaturamento->id,
+                'id_unidade_negocio_centro_resultado' => $this->idCentroResultadoPersistido($unidadeFaturamento, $unidadeCentroResultado),
+                'data_emissao' => $dataEmissao,
+                'observacao' => array_key_exists('observacao', $input) ? $this->nullableTrim($input['observacao']) : $nota->observacao,
+                'status_conclusao' => \App\Enums\VendaNotaStatusConclusao::Concluida->value,
+                'id_transferencia_origem_bloqueio' => null,
+            ])->save();
+
+            $movimentacoes = collect();
+            foreach ($itens as $item) {
+                $movimentacoes->push($this->criarMovimentacaoVenda(
+                    nota: $nota,
+                    empresaOrigem: $empresaOrigem,
+                    unidadeFaturamento: $unidadeFaturamento,
+                    unidadeCentroResultado: $unidadeCentroResultado,
+                    unidadePmDebito: $unidadePmDebito,
+                    empresaDestino: $empresaDestino,
+                    frete: $frete,
+                    item: $item,
+                    dataMovimentacao: $dataEmissao,
+                    input: $input,
+                    user: $user,
+                ));
+            }
+
+            $this->atualizarValorTotalNota($nota);
+            if ($frete !== null) {
+                $this->recalcularRateioFreteParaVendas($frete->id);
+            }
+
+            return ['nota' => $nota->fresh(), 'movimentacoes' => $movimentacoes->map->fresh()];
+        });
+    }
+
+    /**
+     * @param  array<string, mixed>  $input
      */
     public function atualizarVenda(Movimentacao $movimentacao, array $input, ?User $user = null): Movimentacao
     {

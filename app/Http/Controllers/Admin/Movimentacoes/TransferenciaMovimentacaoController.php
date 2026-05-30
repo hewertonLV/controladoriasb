@@ -3,18 +3,21 @@
 namespace App\Http\Controllers\Admin\Movimentacoes;
 
 use App\Actions\Movimentacoes\Transferencia\CancelarTransferenciaAction;
+use App\Actions\Movimentacoes\Transferencia\ConfirmarRecebimentoTransferenciaAction;
 use App\Actions\Movimentacoes\Transferencia\CriarTransferenciaMovimentacaoAction;
 use App\Actions\Movimentacoes\Transferencia\VincularFreteTransferenciaAction;
 use App\Enums\CategoriaMovimentacaoTipo;
 use App\Enums\MovimentacaoStatusRegistro;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Admin\Movimentacoes\CancelarTransferenciaRequest;
+use App\Http\Requests\Admin\Movimentacoes\ConfirmarRecebimentoTransferenciaRequest;
 use App\Http\Requests\Admin\Movimentacoes\VincularFreteTransferenciaRequest;
 use App\Http\Requests\Admin\Movimentacoes\StoreTransferenciaMovimentacaoRequest;
 use App\Enums\FreteStatusSituacao;
 use App\Models\Frete;
 use App\Models\Movimentacao;
 use App\Models\StatusMovimentacao;
+use App\Services\Captacao\CaptacaoDemandasRotaExibicaoService;
 use App\Services\Movimentacoes\TransferenciaMovimentacaoService;
 use App\Services\Permissoes\UnidadeNegocioAccessService;
 use Illuminate\Http\JsonResponse;
@@ -45,6 +48,8 @@ class TransferenciaMovimentacaoController extends Controller
 
         return view('admin.movimentacoes.transferencias.index', [
             'movimentacoes' => $movimentacoes,
+            'demandasCards' => app(CaptacaoDemandasRotaExibicaoService::class)
+                ->cardsTransferenciaModulo(auth()->user()),
         ]);
     }
 
@@ -140,6 +145,23 @@ class TransferenciaMovimentacaoController extends Controller
         return redirect()
             ->route('admin.movimentacoes.transferencias.show', ['transferenciaOrigem' => $anchor])
             ->with('success', 'Frete atualizado. Rateio e estoque do destino foram recalculados.');
+    }
+
+    public function confirmarRecebimento(
+        ConfirmarRecebimentoTransferenciaRequest $request,
+        Movimentacao $transferenciaOrigem,
+        ConfirmarRecebimentoTransferenciaAction $confirmar,
+    ): JsonResponse|RedirectResponse {
+        $anchor = (int) $transferenciaOrigem->transferencia_origem_id;
+        $confirmar($request, $anchor);
+
+        if ($request->expectsJson()) {
+            return response()->json(['message' => 'Recebimento confirmado. Estoque creditado no destino.']);
+        }
+
+        return redirect()
+            ->route('admin.movimentacoes.transferencias.show', ['transferenciaOrigem' => $anchor])
+            ->with('success', 'Recebimento confirmado. Vendas vinculadas foram concluídas quando aplicável.');
     }
 
     public function cancelar(

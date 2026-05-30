@@ -18,6 +18,9 @@
                 ])
                 <div class="d-flex gap-2 mt-3">
                     <button type="submit" class="btn btn-primary">Salvar</button>
+                    <a href="{{ route('admin.captacao.carteiras.importar-lojas', $carteira) }}" class="btn btn-soft-info">
+                        <i class="ri-file-excel-2-line me-1"></i> Importar lojas (Excel)
+                    </a>
                     <a href="{{ route('admin.captacao.carteiras.index') }}" class="btn btn-light">Voltar</a>
                 </div>
             </form>

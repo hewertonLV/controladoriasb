@@ -21,6 +21,8 @@ use Illuminate\Support\Carbon;
  * @property Carbon $data_emissao
  * @property string $valor_total_nf
  * @property string $status_registro
+ * @property string $status_conclusao
+ * @property int|null $id_transferencia_origem_bloqueio
  * @property string|null $observacao
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
@@ -43,6 +45,8 @@ class VendaNota extends Model
         'data_emissao',
         'valor_total_nf',
         'status_registro',
+        'status_conclusao',
+        'id_transferencia_origem_bloqueio',
         'observacao',
     ];
 

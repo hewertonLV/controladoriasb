@@ -11,6 +11,7 @@ enum Roles: string
     case UNIDADE_COMERCIAL = 'Unidade Comercial';
     case LOGISTICA = 'Logística';
     case CONSULTA = 'Consulta';
+    case VENDEDOR = 'Vendedor';
 
     /**
      * Retorna a lista completa de roles do sistema.

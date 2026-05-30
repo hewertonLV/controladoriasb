@@ -81,4 +81,9 @@ final class SaidaEstoqueFisicoCaptacaoService
     {
         return in_array($idUnidade, $this->idsUnidadesPermitidas($lote), true);
     }
+
+    public function pedidoExigeTransferenciaParaGalpao(Pedido $pedido, CaptacaoLote $lote): bool
+    {
+        return $this->idSaidaEfetiva($pedido, $lote) !== (int) $lote->id_unidade_negocio_galpao;
+    }
 }

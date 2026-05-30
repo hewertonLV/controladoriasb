@@ -30,7 +30,7 @@ class AuthenticatedSessionController extends Controller
         $request->session()->put('theme_settings', $request->user()->themeSettings());
         $request->session()->put('theme_settings_user_id', $request->user()->getKey());
 
-        return redirect()->intended(route('dashboard', absolute: false));
+        return redirect()->intended(route('modulos.index', absolute: false));
     }
 
     /**
@@ -40,6 +40,7 @@ class AuthenticatedSessionController extends Controller
     {
         $request->session()->forget('theme_settings');
         $request->session()->forget('theme_settings_user_id');
+        $request->session()->forget('app_modulo');
 
         Auth::guard('web')->logout();
 

@@ -6,6 +6,13 @@
 @section('content')
     <x-admin.flash-messages />
 
+    @include('admin.captacao.pedidos-por-loja._card-estilos')
+
+    @include('admin.movimentacoes._demandas-modulo-grid', [
+        'demandas' => $demandasCards ?? [],
+        'titulo' => 'Demandas pendentes',
+    ])
+
     <x-admin.datatable
         title="Transferências"
         subtitle="Saída na origem e entrada pendente no destino (versão ativa)."
@@ -37,6 +44,9 @@
                 </a>
             @endcan
             @can('movimentacoes.transferencias.criar')
+                <a href="{{ route('admin.movimentacoes.transferencias.demandas.index') }}" class="btn btn-soft-secondary btn-sm">
+                    <i class="ri-file-list-3-line me-1"></i> Demandas manuais
+                </a>
                 <a href="{{ route('admin.movimentacoes.transferencias.create') }}" class="btn btn-primary btn-sm">
                     <i class="ri-add-line me-1"></i> Nova transferência
                 </a>

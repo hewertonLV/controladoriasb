@@ -165,7 +165,7 @@ final class CaptacaoLoteService
             return $lote;
         }
 
-        return $this->transicionarStatus($lote, CaptacaoLoteStatus::AguardandoTransferenciaCigan);
+        return $this->transicionarStatus($lote, CaptacaoLoteStatus::CaptacaoConcluida);
     }
 
     public function sincronizarLotesEmAndamentoQuandoDiaFinalizado(string $dataReferencia, int $idUnidadeFaturamento): int
@@ -193,7 +193,7 @@ final class CaptacaoLoteService
                     return;
                 }
 
-                $lote->update(['status' => CaptacaoLoteStatus::AguardandoTransferenciaCigan->value]);
+                $lote->update(['status' => CaptacaoLoteStatus::CaptacaoConcluida->value]);
                 $atualizados++;
             });
 

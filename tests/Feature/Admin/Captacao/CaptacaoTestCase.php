@@ -176,6 +176,68 @@ abstract class CaptacaoTestCase extends TestCase
             ->assertRedirect();
     }
 
+    protected function concluirRotaNaMatriz(
+        \App\Models\User $user,
+        \App\Models\Captacao\CaptacaoLote $lote,
+        array $c,
+        int $ordemCarregamento = 1,
+    ): void {
+        $this->seedCaptacaoMovimentacao();
+        $this->garantirEstoqueGalpaoLote($c, $lote->fresh());
+
+        $veiculo = \App\Models\Veiculo::factory()->create([
+            'id_unidade_negocio' => $c['faturamento']->id,
+            'status' => 'ATIVO',
+        ]);
+
+        $pedido = \App\Models\Captacao\Pedido::query()
+            ->where('id_captacao_lote', $lote->id)
+            ->where('id_cliente', $c['cliente']->id)
+            ->first();
+
+        $this->actingAs($user)->patchJson(route('admin.captacao.lotes.rotas.motorista', [$lote, $c['rota']]), [
+            'nome_motorista' => 'Motorista teste',
+        ])->assertOk();
+
+        $this->actingAs($user)->patchJson(route('admin.captacao.lotes.rotas.veiculo', [$lote, $c['rota']]), [
+            'id_veiculo' => $veiculo->id,
+        ])->assertOk();
+
+        if ($pedido !== null) {
+            $this->actingAs($user)->patchJson(route('admin.captacao.lotes.pedidos.ordem-carregamento', [$lote, $c['cliente']]), [
+                'ordem_carregamento' => $ordemCarregamento,
+            ])->assertOk();
+        }
+
+        $this->actingAs($user)
+            ->postJson(route('admin.captacao.lotes.rotas.concluir', [$lote, $c['rota']]))
+            ->assertOk();
+
+        if ($pedido !== null && ! $pedido->fresh()->captacao_concluida) {
+            $this->actingAs($user)->postJson(route('admin.captacao.lotes.pedidos.captacao-concluida', [$lote, $c['cliente']]), [
+                'captacao_concluida' => true,
+            ])->assertOk();
+        }
+    }
+
+    protected function efetivarDemandasVendaRotaLote(
+        \App\Models\User $user,
+        \App\Models\Captacao\CaptacaoLote $lote,
+    ): void {
+        $demandas = \App\Models\Captacao\CaptacaoLoteMovimentacao::query()
+            ->where('id_captacao_lote', $lote->id)
+            ->where('tipo', \App\Models\Captacao\CaptacaoLoteMovimentacao::TIPO_VENDA_NOTA)
+            ->whereNull('id_pedido')
+            ->where('status_demanda', '!=', \App\Enums\CaptacaoDemandaStatus::Concluido->value)
+            ->get();
+
+        foreach ($demandas as $demanda) {
+            $this->actingAs($user)
+                ->postJson(route('admin.captacao.lotes.demandas.venda.efetivar', [$lote, $demanda]))
+                ->assertOk();
+        }
+    }
+
     protected function concluirRotasECarregamentoPipeline(
         \App\Models\User $user,
         \App\Models\Captacao\CaptacaoLote $lote,
@@ -203,6 +265,10 @@ abstract class CaptacaoTestCase extends TestCase
                 ->assertOk();
         }
 
+        $this->concluirRotaNaMatriz($user, $lote->fresh(), $c, $ordemCarregamento);
+
+        $this->efetivarDemandasVendaRotaLote($user, $lote->fresh());
+
         $this->actingAs($user)
             ->post(route('admin.captacao.lotes.pipeline.concluir-vinculo-rotas', $lote))
             ->assertRedirect();
@@ -223,5 +289,62 @@ abstract class CaptacaoTestCase extends TestCase
     ): void {
         $this->concluirRotasECarregamentoPipeline($user, $lote, $c, $ordemCarregamento);
         $this->concluirFreteVendaPipeline($user, $lote->fresh());
+    }
+
+    protected function garantirEstoqueGalpaoLote(array $c, \App\Models\Captacao\CaptacaoLote $lote): void
+    {
+        if (! \App\Models\HistoricoCOUnNg::query()
+            ->where('id_unidade_negocio', $c['galpao']->id)
+            ->where('status_position', true)
+            ->exists()) {
+            $this->criarCoGalpao($c['galpao']);
+        }
+
+        $lote->loadMissing('pedidos.itens');
+
+        foreach ($lote->pedidos as $pedido) {
+            foreach ($pedido->itens as $item) {
+                if ((float) $item->quantidade <= 0) {
+                    continue;
+                }
+
+                $fruta = $item->fruta ?? \App\Models\Fruta::query()->find($item->id_fruta);
+                if ($fruta === null) {
+                    continue;
+                }
+
+                $estoque = \App\Models\Estoque::query()->firstOrCreate(
+                    [
+                        'id_unidade_negocio' => $c['galpao']->id,
+                        'id_fruta' => $fruta->id,
+                    ],
+                    [
+                        'qtd_fruta_kg' => '100.00',
+                        'qtd_fruta_um' => '10.00',
+                        'preco_medio_kg' => '5.00',
+                        'preco_medio_um' => '50.00',
+                        'valor_total_acumulado' => '500.00',
+                    ],
+                );
+
+                if (! \App\Models\MovimentacaoEstoque::query()
+                    ->where('id_unidade_negocio', $c['galpao']->id)
+                    ->where('id_fruta', $fruta->id)
+                    ->where('status_ultima_posicao', true)
+                    ->exists()) {
+                    \App\Models\MovimentacaoEstoque::query()->create([
+                        'id_estoque' => $estoque->id,
+                        'id_unidade_negocio' => $c['galpao']->id,
+                        'id_fruta' => $fruta->id,
+                        'qtd_fruta_kg' => $estoque->qtd_fruta_kg,
+                        'qtd_fruta_um' => $estoque->qtd_fruta_um,
+                        'preco_medio_kg' => $estoque->preco_medio_kg,
+                        'preco_medio_um' => $estoque->preco_medio_um,
+                        'valor_total_fruta' => $estoque->valor_total_acumulado,
+                        'status_ultima_posicao' => true,
+                    ]);
+                }
+            }
+        }
     }
 }

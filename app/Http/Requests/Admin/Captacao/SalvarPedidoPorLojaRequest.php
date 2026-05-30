@@ -27,28 +27,37 @@ class SalvarPedidoPorLojaRequest extends FormRequest
     /**
      * @return array{
      *     id_cliente: int,
-     *     itens: list<array{id_fruta: int, quantidade: string, preco_venda?: string|null}>,
+     *     itens: list<array{id_fruta: int, quantidade?: string, preco_venda?: string|null, remover?: bool}>,
      * }
      */
     public function pedidoPayload(int $idCliente): array
     {
         $itens = [];
         foreach ((array) $this->input('itens', []) as $item) {
-            $qty = $item['quantidade'] ?? '';
-            if ($qty === '' || $qty === null) {
-                continue;
+            $idFruta = (int) $item['id_fruta'];
+            $qtyRaw = $item['quantidade'] ?? '';
+            if (is_string($qtyRaw)) {
+                $qtyRaw = trim($qtyRaw);
             }
-            if ((float) $qty <= 0 && empty($item['preco_venda'])) {
+
+            if ($qtyRaw === '' || $qtyRaw === null || (float) $qtyRaw <= 0) {
+                $itens[] = [
+                    'id_fruta' => $idFruta,
+                    'remover' => true,
+                ];
+
                 continue;
             }
 
             $linha = [
-                'id_fruta' => (int) $item['id_fruta'],
-                'quantidade' => number_format((float) $qty, 3, '.', ''),
+                'id_fruta' => $idFruta,
+                'quantidade' => number_format((float) $qtyRaw, 3, '.', ''),
             ];
+
             if (isset($item['preco_venda']) && $item['preco_venda'] !== '') {
                 $linha['preco_venda'] = number_format((float) $item['preco_venda'], 4, '.', '');
             }
+
             $itens[] = $linha;
         }
 

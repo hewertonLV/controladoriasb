@@ -2,7 +2,10 @@
 
 namespace Database\Seeders;
 
+use App\Enums\AppModulo;
+use App\Enums\Permissions;
 use App\Enums\Roles;
+use App\Services\Modulos\RoleModuloService;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
 use Spatie\Permission\Models\Permission;
@@ -32,6 +35,8 @@ class RoleSeeder extends Seeder
             }
 
             $this->atribuirPermissoesNovasAoAdministrador();
+            $this->atribuirPermissoesPadraoVendedor();
+            $this->atribuirModulosPadrao();
         });
 
         app(PermissionRegistrar::class)->forgetCachedPermissions();
@@ -55,5 +60,59 @@ class RoleSeeder extends Seeder
                     $admin->givePermissionTo($permission);
                 }
             });
+    }
+
+    private function atribuirPermissoesPadraoVendedor(): void
+    {
+        $vendedor = Role::query()
+            ->where('name', Roles::VENDEDOR->value)
+            ->where('guard_name', self::GUARD)
+            ->first();
+
+        if ($vendedor === null) {
+            return;
+        }
+
+        foreach (Permissions::permissoesGrupoVendedor() as $permissionName) {
+            $permission = Permission::query()
+                ->where('guard_name', self::GUARD)
+                ->where('name', $permissionName)
+                ->first();
+
+            if ($permission !== null && ! $vendedor->hasPermissionTo($permission)) {
+                $vendedor->givePermissionTo($permission);
+            }
+        }
+    }
+
+    private function atribuirModulosPadrao(): void
+    {
+        $modulos = app(RoleModuloService::class);
+
+        $todosModulos = AppModulo::cases();
+
+        $mapa = [
+            Roles::ADMINISTRADOR->value => $todosModulos,
+            Roles::PROGRAMADOR->value => $todosModulos,
+            Roles::CONTROLADORIA->value => [AppModulo::Administrador],
+            Roles::VENDEDOR->value => [
+                AppModulo::Captacao,
+                AppModulo::Transferencia,
+                AppModulo::Venda,
+            ],
+        ];
+
+        foreach ($mapa as $nomeRole => $modulosDoGrupo) {
+            $role = Role::query()
+                ->where('name', $nomeRole)
+                ->where('guard_name', self::GUARD)
+                ->first();
+
+            if ($role === null) {
+                continue;
+            }
+
+            $modulos->sincronizarModulos($role, $modulosDoGrupo);
+        }
     }
 }

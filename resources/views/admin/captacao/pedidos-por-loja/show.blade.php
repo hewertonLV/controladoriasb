@@ -20,8 +20,22 @@
         .captacao-pedido-loja-compact .captacao-pedido-loja-input.is-valid {
             border-color: var(--bs-success, #198754);
             box-shadow: 0 0 0 0.15rem rgba(25, 135, 84, 0.2);
+            background-image: none;
+            padding-right: 0.25rem;
         }
         .captacao-pedido-loja-compact .captacao-pedido-loja-input.is-invalid {
+            border-color: var(--bs-danger, #dc3545);
+        }
+        .captacao-pedido-loja-compact .captacao-pedido-loja-numero {
+            width: 9rem;
+            min-width: 7rem;
+        }
+        .captacao-pedido-loja-compact .captacao-pedido-loja-numero.is-valid {
+            border-color: var(--bs-success, #198754);
+            box-shadow: 0 0 0 0.15rem rgba(25, 135, 84, 0.2);
+            background-image: none;
+        }
+        .captacao-pedido-loja-compact .captacao-pedido-loja-numero.is-invalid {
             border-color: var(--bs-danger, #dc3545);
         }
         #pedido-loja-sync-badge.sincronizando { background-color: var(--bs-info); }
@@ -194,13 +208,20 @@
         </div>
         @endif
 
+        @if ($possuiFrutas && ($captacaoLoteAberta ?? false) && ($pedidoConcluido ?? false))
+            <div class="alert alert-info py-1 px-2 mb-2 small">
+                Pedido finalizado. Clique em <strong>Reabrir pedido</strong> para alterar quantidades, preços e número do pedido.
+            </div>
+        @endif
+
         <div class="mb-2 d-flex flex-wrap gap-2 align-items-center">
             <a href="{{ route('admin.captacao.pedidos-por-loja.lojas', $lote) }}" class="btn btn-sm btn-light py-0">
                 <i class="ri-arrow-left-line"></i> Lojas
             </a>
-            @if ($possuiFrutas && $podeEditar)
+            @if ($captacaoLoteAberta ?? false)
                 <span id="pedido-loja-sync-badge" class="badge bg-secondary d-none">Aguardando</span>
                 <form method="post"
+                      id="form-pedido-loja-conclusao"
                       action="{{ route('admin.captacao.pedidos-por-loja.captacao-concluida', [$lote, $cliente]) }}"
                       class="d-inline">
                     @csrf
@@ -210,6 +231,23 @@
                     </button>
                 </form>
             @endif
+            <div class="ms-auto d-flex align-items-center gap-2">
+                <label for="numero-pedido-loja" class="form-label mb-0 small text-nowrap text-muted">Nº pedido</label>
+                @if ($podeEditar ?? false)
+                    <input type="text"
+                           id="numero-pedido-loja"
+                           class="form-control form-control-sm captacao-pedido-loja-numero"
+                           maxlength="60"
+                           placeholder="Digite o nº"
+                           autocomplete="off"
+                           data-url="{{ route('admin.captacao.lotes.pedidos.numero-pedido', [$lote, $cliente]) }}"
+                           value="{{ $pedidoAtual?->numero_pedido ?? '' }}">
+                @elseif ($pedidoAtual?->numero_pedido)
+                    <span class="small fw-semibold text-nowrap">{{ $pedidoAtual->numero_pedido }}</span>
+                @else
+                    <span class="small text-muted">—</span>
+                @endif
+            </div>
         </div>
 
         @if (! $possuiFrutas)
@@ -306,19 +344,21 @@
     </div>
 @endsection
 
-@if ($possuiFrutas && $podeEditar)
+@if ($podeEditar)
 @push('scripts')
 <script>
 (function () {
     const form = document.getElementById('form-pedido-loja');
     const badge = document.getElementById('pedido-loja-sync-badge');
+    const numeroInput = document.getElementById('numero-pedido-loja');
     const token = document.querySelector('meta[name="csrf-token"]')?.content;
-    if (!form) return;
+    if (!form && !numeroInput) return;
 
     let debounceTimer = null;
     let salvando = false;
     let salvarNovamente = false;
     let linhaPendente = null;
+    let pularSalvarAntesConclusao = false;
 
     function setBadge(estado, texto) {
         if (!badge) return;
@@ -346,19 +386,33 @@
         return 'Não foi possível salvar o pedido.';
     }
 
-    async function salvarPedido() {
+    async function salvarPedido(linhaFeedback) {
+        if (!form) {
+            return true;
+        }
+
         if (salvando) {
             salvarNovamente = true;
-            return;
+            return new Promise((resolve) => {
+                const aguardar = () => {
+                    if (!salvando) {
+                        resolve();
+                        return;
+                    }
+                    setTimeout(aguardar, 50);
+                };
+                aguardar();
+            });
         }
 
         salvando = true;
+        let sucesso = true;
 
         do {
             salvarNovamente = false;
             setBadge('sincronizando', 'Salvando…');
 
-            const linha = linhaPendente;
+            const linha = linhaFeedback ?? linhaPendente;
             const data = new FormData(form);
 
             try {
@@ -375,6 +429,7 @@
                 if (!res.ok) {
                     marcarLinha(linha, false);
                     setBadge('erro', 'Erro ao salvar');
+                    sucesso = false;
                     if (typeof window.AdminConfirm?.alert === 'function') {
                         window.AdminConfirm.alert({
                             title: 'Captação',
@@ -391,19 +446,36 @@
             } catch (e) {
                 marcarLinha(linha, false);
                 setBadge('erro', 'Erro ao salvar');
+                sucesso = false;
                 break;
             }
         } while (salvarNovamente);
 
         salvando = false;
-        linhaPendente = null;
+        if (!salvarNovamente) {
+            linhaPendente = null;
+        }
+
+        return sucesso;
+    }
+
+    function limparPrecoPedidoLojaSeQuantidadeVazia(input) {
+        if (!input?.classList?.contains('captacao-pedido-loja-qty') || input.value !== '') {
+            return;
+        }
+        const linha = linhaDoInput(input);
+        const preco = linha?.querySelector('.captacao-pedido-loja-preco');
+        if (preco) {
+            preco.value = '';
+        }
     }
 
     function agendarSalvo(input) {
+        limparPrecoPedidoLojaSeQuantidadeVazia(input);
         linhaPendente = linhaDoInput(input);
         setBadge('pendente', 'Alterado');
         clearTimeout(debounceTimer);
-        debounceTimer = setTimeout(salvarPedido, 450);
+        debounceTimer = setTimeout(() => salvarPedido(), 450);
     }
 
     document.querySelectorAll('.captacao-pedido-loja-input:not(:disabled)').forEach((input) => {
@@ -413,11 +485,110 @@
             if (e.key === 'Enter') {
                 e.preventDefault();
                 clearTimeout(debounceTimer);
-                agendarSalvo(input);
-                salvarPedido();
+                linhaPendente = linhaDoInput(input);
+                salvarPedido(linhaPendente);
             }
         });
     });
+
+    async function salvarNumeroPedido(input) {
+        const url = input.dataset.url;
+        if (!url || input.disabled) return;
+
+        setBadge('sincronizando', 'Salvando…');
+
+        try {
+            const res = await fetch(url, {
+                method: 'PATCH',
+                headers: {
+                    'Accept': 'application/json',
+                    'Content-Type': 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'X-CSRF-TOKEN': token,
+                },
+                body: JSON.stringify({ numero_pedido: input.value.trim() || null }),
+            });
+
+            if (!res.ok) {
+                input.classList.remove('is-valid');
+                input.classList.add('is-invalid');
+                setBadge('erro', 'Erro ao salvar');
+                if (typeof window.AdminConfirm?.alert === 'function') {
+                    window.AdminConfirm.alert({
+                        title: 'Nº pedido',
+                        message: await mensagemErro(res),
+                        variant: 'warning',
+                        confirmLabel: 'Entendi',
+                    });
+                }
+                return;
+            }
+
+            const data = await res.json().catch(() => ({}));
+            if (typeof data.numero_pedido === 'string') {
+                input.value = data.numero_pedido;
+            }
+            input.classList.remove('is-invalid');
+            input.classList.add('is-valid');
+            setBadge('sincronizado', 'Salvo');
+        } catch (e) {
+            input.classList.remove('is-valid');
+            input.classList.add('is-invalid');
+            setBadge('erro', 'Erro ao salvar');
+        }
+    }
+
+    if (numeroInput) {
+        let debounceNumero = null;
+        numeroInput.addEventListener('input', () => {
+            numeroInput.classList.remove('is-valid', 'is-invalid');
+            setBadge('pendente', 'Alterado');
+            clearTimeout(debounceNumero);
+            debounceNumero = setTimeout(() => salvarNumeroPedido(numeroInput), 450);
+        });
+        numeroInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                clearTimeout(debounceNumero);
+                salvarNumeroPedido(numeroInput);
+            }
+        });
+        numeroInput.addEventListener('blur', () => {
+            clearTimeout(debounceNumero);
+            salvarNumeroPedido(numeroInput);
+        });
+    }
+
+    const formConclusao = document.getElementById('form-pedido-loja-conclusao');
+    if (formConclusao) {
+        formConclusao.addEventListener('submit', async (event) => {
+            if (pularSalvarAntesConclusao) {
+                pularSalvarAntesConclusao = false;
+                return;
+            }
+
+            event.preventDefault();
+            clearTimeout(debounceTimer);
+
+            const btn = formConclusao.querySelector('button[type="submit"]');
+            if (btn) btn.disabled = true;
+
+            if (numeroInput) {
+                await salvarNumeroPedido(numeroInput);
+            }
+
+            if (form) {
+                const ok = await salvarPedido();
+                if (!ok) {
+                    if (btn) btn.disabled = false;
+                    return;
+                }
+            }
+
+            pularSalvarAntesConclusao = true;
+            formConclusao.submit();
+        });
+    }
 
     const cardSaida = document.getElementById('card-saida-fisica-loja');
     const statusSaida = document.querySelector('.captacao-pedido-loja-saida-status');

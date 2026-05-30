@@ -20,7 +20,7 @@ enum CaptacaoLoteAcaoPipeline: string
     public function label(): string
     {
         return match ($this) {
-            self::FinalizarCaptacaoFaturamento => 'Finalizar captação (faturamento)',
+            self::FinalizarCaptacaoFaturamento => 'Concluir captação',
             self::ConfirmarRomaneioManual => 'Confirmar solicitação',
             self::IniciarTransferencia => 'Iniciar transferência',
             self::ValidarTransferencias => 'Validar transferências',
@@ -56,7 +56,8 @@ enum CaptacaoLoteAcaoPipeline: string
     public function variant(): string
     {
         return match ($this) {
-            self::FinalizarCaptacaoFaturamento, self::ConfirmarRomaneioManual => 'warning',
+            self::FinalizarCaptacaoFaturamento => 'soft-success',
+            self::ConfirmarRomaneioManual => 'warning',
             self::IniciarTransferencia, self::ValidarTransferencias, self::ConcluirTransferenciaManual, self::ConcluirSaidaEstoqueFisico => 'info',
             self::VincularFrete => 'soft-warning',
             self::ConcluirFrete => 'secondary',

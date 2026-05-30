@@ -3,6 +3,7 @@
 namespace App\Services\Captacao;
 
 use App\Models\Captacao\CaptacaoLote;
+use App\Models\Captacao\CaptacaoLoteMovimentacao;
 use App\Models\Captacao\Pedido;
 use App\Models\Cliente;
 use App\Models\UnidadeNegocio;
@@ -64,6 +65,87 @@ final class CiganEdiNfVendaGerador
         foreach ($lote->pedidos as $pedido) {
             $bloco = $this->gerarBlocoLoja(
                 $pedido,
+                $dataEmissao,
+                $dataEntrada,
+                $serieNumero,
+                $codigoUnidadeOrigem,
+                $codigoCentroArmazenagem,
+            );
+
+            if ($bloco !== null) {
+                array_push($linhas, ...$bloco);
+            }
+        }
+
+        if ($linhas === []) {
+            throw ValidationException::withMessages([
+                'pedidos' => 'Não há itens com quantidade para gerar o arquivo de vendas Cigam.',
+            ]);
+        }
+
+        return implode("\n", $linhas)."\n";
+    }
+
+    public function gerarPorDemanda(CaptacaoLoteMovimentacao $demanda): string
+    {
+        $demanda->loadMissing([
+            'lote.unidadeFaturamento',
+            'lote.unidadeGalpao',
+            'linhas.fruta',
+            'linhas.pedido.cliente.unidadeNegocio.estado',
+        ]);
+
+        $lote = $demanda->lote;
+        if ($lote === null) {
+            throw ValidationException::withMessages(['demanda' => 'Demanda sem lote vinculado.']);
+        }
+
+        $faturamento = $lote->unidadeFaturamento;
+        if ($faturamento === null) {
+            throw ValidationException::withMessages([
+                'id_unidade_negocio_faturamento' => 'Lote sem unidade de faturamento.',
+            ]);
+        }
+
+        $codigoUnidadeOrigem = $this->campos->codigoUnidadeNegocioCigam(
+            (string) $faturamento->id_cigam,
+            'unidade de faturamento',
+        );
+        $codigoCentroArmazenagem = $this->campos->codigoCentroArmazenagemCigam($faturamento);
+
+        $idCigamFaturamento = trim((string) $faturamento->id_cigam);
+        if ($idCigamFaturamento === '') {
+            throw ValidationException::withMessages([
+                'id_cigam' => 'Cadastre o ID Cigam da unidade de faturamento «'.$faturamento->nome.'» antes de gerar o arquivo de vendas.',
+            ]);
+        }
+
+        $serieNumero = $this->campos->serieENumeroNotaFiscalCigam($idCigamFaturamento);
+        $dataEmissao = $this->campos->dataEmissaoCigam();
+        $dataEntrada = $this->campos->dataEntradaCigam();
+
+        $idsPedido = $demanda->linhas
+            ->pluck('id_pedido')
+            ->filter()
+            ->map(fn ($id) => (int) $id)
+            ->unique()
+            ->values()
+            ->all();
+
+        $pedidos = Pedido::query()
+            ->with(['cliente.unidadeNegocio.estado'])
+            ->whereIn('id', $idsPedido)
+            ->orderBy('ordem_carregamento')
+            ->orderBy('id')
+            ->get();
+
+        $linhas = [];
+
+        foreach ($pedidos as $pedido) {
+            $linhasDemanda = $demanda->linhas->where('id_pedido', $pedido->id)->values();
+            $bloco = $this->gerarBlocoLojaComLinhasDemanda(
+                $pedido,
+                $linhasDemanda,
                 $dataEmissao,
                 $dataEntrada,
                 $serieNumero,
@@ -150,6 +232,94 @@ final class CiganEdiNfVendaGerador
                 precoUnitario: (float) $precoVenda,
                 codigoUnidadeNegocio: $codigoUnidadeOrigem,
             );
+        }
+
+        $linhaN = $this->montarRegistroNota(
+            dataEmissao: $dataEmissao,
+            dataEntrada: $dataEntrada,
+            serieNotaFiscal: $serieNumero['serie'],
+            numeroNotaFiscal: $serieNumero['numero'],
+            codigoClienteCobranca: $codigoCliente,
+            nomeDestino: $nomeCliente,
+            uf: $uf,
+            cnpj: $cnpj,
+            tipoPessoa: $tipoPessoa,
+            numeroDivisao: $this->campos->numeroDivisaoCigam($cliente),
+            unidadeNegocio: $codigoUnidadeOrigem,
+            centroArmazenagem: $codigoCentroArmazenagem,
+            quantidadeItens: count($linhasI),
+        );
+
+        return array_merge([$linhaN], $linhasI);
+    }
+
+    /**
+     * @param  \Illuminate\Support\Collection<int, \App\Models\Captacao\CaptacaoLoteMovimentacaoLinha>  $linhasDemanda
+     * @param  array{serie: string, numero: string}  $serieNumero
+     * @return list<string>|null
+     */
+    private function gerarBlocoLojaComLinhasDemanda(
+        Pedido $pedido,
+        $linhasDemanda,
+        string $dataEmissao,
+        string $dataEntrada,
+        array $serieNumero,
+        string $codigoUnidadeOrigem,
+        string $codigoCentroArmazenagem,
+    ): ?array {
+        if ($linhasDemanda->isEmpty()) {
+            return null;
+        }
+
+        $cliente = $pedido->cliente;
+        if ($cliente === null) {
+            throw ValidationException::withMessages([
+                'id_cliente' => 'Pedido sem loja vinculada.',
+            ]);
+        }
+
+        $this->validarClienteLoja($cliente);
+
+        $codigoCliente = $this->codigoClienteLojaCigam($cliente);
+        $nomeCliente = $this->texto($cliente->fantasia ?: $cliente->razao_social ?: '', 60);
+        $uf = $this->campos->ufClienteCigam($cliente);
+        $cnpj = $this->documentoCigam((string) $cliente->cnpj_cpf);
+        $tipoPessoa = strlen(preg_replace('/\D/', '', $cnpj) ?? '') === 11 ? 'F' : 'J';
+
+        $linhasI = [];
+
+        foreach ($linhasDemanda as $linha) {
+            $fruta = $linha->fruta;
+            $qtdUm = (float) $linha->qtd_um;
+            if ($qtdUm <= 0) {
+                continue;
+            }
+
+            $idCigam = trim((string) ($fruta?->id_cigam ?? ''));
+            if ($idCigam === '') {
+                throw ValidationException::withMessages([
+                    'id_cigam' => 'Cadastre o ID Cigam da fruta «'.($fruta?->nome ?? '—').'» antes de gerar o arquivo de vendas.',
+                ]);
+            }
+
+            $precoVenda = $linha->preco_venda;
+            if ($precoVenda === null || (float) $precoVenda <= 0) {
+                throw ValidationException::withMessages([
+                    'preco_venda' => 'Informe o preço da fruta «'.($fruta->nome ?? '—').'» na captação antes de gerar o arquivo de vendas Cigam.',
+                ]);
+            }
+
+            $linhasI[] = $this->montarRegistroItem(
+                codigoMaterial: $this->campos->codigoMaterialCigam($idCigam),
+                descricao: $this->texto((string) ($fruta->nome ?? ''), 200),
+                quantidadeUm: $qtdUm,
+                precoUnitario: (float) $precoVenda,
+                codigoUnidadeNegocio: $codigoUnidadeOrigem,
+            );
+        }
+
+        if ($linhasI === []) {
+            return null;
         }
 
         $linhaN = $this->montarRegistroNota(

@@ -50,6 +50,11 @@
                     <i class="ri-file-excel-2-line me-1"></i> Importar Excel
                 </a>
             @endcan
+            @can('captacao.cliente_fruta.vincular')
+                <a href="{{ route('admin.clientes.importar-vinculo-frutas') }}" class="btn btn-soft-info">
+                    <i class="ri-links-line me-1"></i> Importar vínculo loja×fruta
+                </a>
+            @endcan
             @can('clientes.criar')
                 <a href="{{ route('admin.clientes.create') }}" class="btn btn-primary">
                     <i class="ri-add-line me-1"></i> Novo cliente

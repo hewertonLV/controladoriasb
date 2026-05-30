@@ -2,10 +2,12 @@
 
 namespace Tests\Support;
 
+use App\Enums\AppModulo;
 use App\Enums\Permissions;
 use App\Enums\Roles;
 use App\Models\UnidadeNegocio;
 use App\Models\User;
+use App\Services\Modulos\RoleModuloService;
 use Spatie\Permission\Models\Permission;
 use Spatie\Permission\Models\Role;
 use Spatie\Permission\PermissionRegistrar;
@@ -41,6 +43,20 @@ trait CreatesUsersWithRoles
         return $user->refresh();
     }
 
+    /**
+     * @param  list<AppModulo|string>  $modulos
+     */
+    protected function assignModulosToUser(User $user, array $modulos): User
+    {
+        $role = $user->roles()->first();
+
+        if ($role !== null) {
+            app(RoleModuloService::class)->sincronizarModulos($role, $modulos);
+        }
+
+        return $user->refresh();
+    }
+
     protected function programadorUser(): User
     {
         $this->resetPermissionCache();
@@ -52,6 +68,27 @@ trait CreatesUsersWithRoles
         ]);
 
         $user->assignRole(Role::findOrCreate(Roles::PROGRAMADOR->value, 'web'));
+
+        return $user->refresh();
+    }
+
+    protected function vendedorUser(): User
+    {
+        $this->resetPermissionCache();
+
+        $role = Role::findOrCreate(Roles::VENDEDOR->value, 'web');
+
+        foreach (Permissions::permissoesGrupoVendedor() as $permission) {
+            $role->givePermissionTo(Permission::findOrCreate($permission, 'web'));
+        }
+
+        $user = User::factory()->create([
+            'must_change_password' => false,
+            'ativo' => true,
+        ]);
+
+        $user->assignRole($role);
+        $user->unidadesNegocio()->sync(UnidadeNegocio::query()->pluck('id')->all());
 
         return $user->refresh();
     }

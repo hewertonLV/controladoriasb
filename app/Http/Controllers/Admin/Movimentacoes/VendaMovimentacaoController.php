@@ -11,6 +11,7 @@ use App\Http\Requests\Admin\Movimentacoes\StoreVendaMovimentacaoRequest;
 use App\Http\Requests\Admin\Movimentacoes\UpdateVendaMovimentacaoRequest;
 use App\Models\Movimentacao;
 use App\Models\StatusMovimentacao;
+use App\Services\Captacao\CaptacaoDemandasRotaExibicaoService;
 use App\Services\Movimentacoes\VendaMovimentacaoService;
 use App\Services\Permissoes\UnidadeNegocioAccessService;
 use Illuminate\Database\Eloquent\Collection;
@@ -38,7 +39,11 @@ class VendaMovimentacaoController extends Controller
             ->orderByDesc('id')
             ->get();
 
-        return view('admin.movimentacoes.vendas.index', ['movimentacoes' => $movimentacoes]);
+        return view('admin.movimentacoes.vendas.index', [
+            'movimentacoes' => $movimentacoes,
+            'demandasCards' => app(CaptacaoDemandasRotaExibicaoService::class)
+                ->cardsVendaModulo(auth()->user()),
+        ]);
     }
 
     public function create(VendaMovimentacaoService $vendas): View

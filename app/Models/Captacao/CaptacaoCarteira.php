@@ -59,4 +59,9 @@ class CaptacaoCarteira extends Model
     {
         return $this->hasMany(CaptacaoRota::class, 'id_captacao_carteira');
     }
+
+    public function importacoes(): HasMany
+    {
+        return $this->hasMany(CaptacaoCarteiraImportacao::class, 'id_captacao_carteira');
+    }
 }

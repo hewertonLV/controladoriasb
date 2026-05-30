@@ -45,7 +45,7 @@ final class FinalizarCaptacaoFaturamentoAction
 
             if ($dia->status === CaptacaoFaturamentoDiaStatus::CaptacaoFaturamentoFinalizada) {
                 foreach ($lotes as $lote) {
-                    $this->lotes->transicionarStatus($lote, CaptacaoLoteStatus::AguardandoTransferenciaCigan);
+                    $this->lotes->transicionarStatus($lote, CaptacaoLoteStatus::CaptacaoConcluida);
                 }
 
                 $this->lotes->sincronizarLotesEmAndamentoQuandoDiaFinalizado($dataReferencia, $idUnidadeFaturamento);
@@ -54,7 +54,7 @@ final class FinalizarCaptacaoFaturamentoAction
             }
 
             foreach ($lotes as $lote) {
-                $this->lotes->transicionarStatus($lote, CaptacaoLoteStatus::AguardandoTransferenciaCigan);
+                $this->lotes->transicionarStatus($lote, CaptacaoLoteStatus::CaptacaoConcluida);
             }
 
             $dia->update([

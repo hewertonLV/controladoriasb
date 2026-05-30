@@ -18,7 +18,18 @@ class CaptacaoLoteRota extends Model
         'id_captacao_rota',
         'nome_motorista',
         'id_veiculo',
+        'concluida',
     ];
+
+    /**
+     * @return array<string, string>
+     */
+    protected function casts(): array
+    {
+        return [
+            'concluida' => 'boolean',
+        ];
+    }
 
     public function lote(): BelongsTo
     {

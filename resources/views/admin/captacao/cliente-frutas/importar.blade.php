@@ -1,7 +1,7 @@
 @extends('layouts.app')
 
-@section('title', 'Importar vínculos — Frutas por loja')
-@section('page-title', 'Importar vínculos — Frutas por loja')
+@section('title', ($contextoImportacao ?? [])['page_title'] ?? 'Importar vínculos — Frutas por loja')
+@section('page-title', ($contextoImportacao ?? [])['page_title'] ?? 'Importar vínculos — Frutas por loja')
 
 @section('content')
     <div class="card mb-3">
@@ -9,17 +9,18 @@
             <div class="me-auto">
                 <h4 class="header-title mb-0">Importação por planilha Excel</h4>
                 <p class="text-muted mb-0">
-                    Layout (linha 1 = cabeçalho livre):
-                    <code>A</code> Razão social ou nome da loja ·
-                    <code>B</code> Nome da fruta.
+                    Layout (linha 1 = cabeçalho):
+                    <code>A</code> ID CIGAM do cliente ·
+                    <code>B</code> ID CIGAM da fruta.
+                    Um vínculo por linha; várias lojas e frutas no mesmo arquivo.
                     Modelo: <code>planilhas/fruta_loja_vinculo.xlsx</code>
                 </p>
                 @if ($faturamentoNome)
                     <p class="mb-0 small"><strong>Faturamento:</strong> {{ $faturamentoNome }}</p>
                 @endif
             </div>
-            <a href="{{ route('admin.captacao.frutas-por-loja.index', ['faturamento' => $faturamentoId]) }}" class="btn btn-light">
-                <i class="ri-arrow-left-line me-1"></i> Voltar
+            <a href="{{ ($contextoImportacao ?? [])['url_voltar'] ?? route('admin.captacao.frutas-por-loja.index', ['faturamento' => $faturamentoId]) }}" class="btn btn-light">
+                <i class="ri-arrow-left-line me-1"></i> {{ ($contextoImportacao ?? [])['voltar_label'] ?? 'Voltar' }}
             </a>
         </div>
         <div class="card-body">
@@ -135,9 +136,9 @@
                             <tr>
                                 <th style="width: 36px;"><input type="checkbox" class="form-check-input" id="check-all-novas"></th>
                                 <th>Linha</th>
-                                <th>Loja (planilha)</th>
-                                <th>Fruta</th>
-                                <th>Loja encontrada</th>
+                                <th>ID CIGAM cliente</th>
+                                <th>ID CIGAM fruta</th>
+                                <th>Cliente encontrado</th>
                             </tr>
                         </thead>
                         <tbody id="tbody-novas"></tbody>
@@ -223,8 +224,8 @@
                 <button type="button" class="btn btn-light" id="btn-nova-importacao">
                     <i class="ri-refresh-line me-1"></i> Nova importação
                 </button>
-                <a href="{{ route('admin.captacao.frutas-por-loja.index', ['faturamento' => $faturamentoId]) }}" class="btn btn-primary" id="btn-voltar-lista">
-                    <i class="ri-list-check-2 me-1"></i> Ir para Frutas por loja
+                <a href="{{ ($contextoImportacao ?? [])['url_voltar'] ?? route('admin.captacao.frutas-por-loja.index', ['faturamento' => $faturamentoId]) }}" class="btn btn-primary" id="btn-voltar-lista">
+                    <i class="ri-list-check-2 me-1"></i> {{ ($contextoImportacao ?? [])['btn_pos_confirmar'] ?? 'Ir para Frutas por loja' }}
                 </a>
             </div>
         </div>
@@ -236,7 +237,7 @@
     <script>
     (function () {
         const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
-        const urlIniciar = @json(route('admin.captacao.frutas-por-loja.importar.iniciar'));
+        const urlIniciar = @json(($contextoImportacao ?? [])['url_iniciar'] ?? route('admin.captacao.frutas-por-loja.importar.iniciar'));
 
         const formIniciar = document.getElementById('form-iniciar');
         if (!formIniciar) return;
@@ -284,7 +285,7 @@
         let pollTimer = null;
         const POLL_INTERVAL_MS = 1500;
 
-        const listagemBaseUrl = @json(route('admin.captacao.frutas-por-loja.index'));
+        const listagemBaseUrl = @json(($contextoImportacao ?? [])['url_voltar'] ?? route('admin.captacao.frutas-por-loja.index'));
 
         function urlListagem(faturamentoId) {
             const sep = listagemBaseUrl.includes('?') ? '&' : '?';

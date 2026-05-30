@@ -1,10 +1,21 @@
 <div class="color-line"></div>
 
+@php
+    use App\Enums\AppModulo;
+
+    $exibirSidebar = $exibirSidebarAdministrativa ?? true;
+    $logoUrl = $exibirSidebar ? route('dashboard') : route('modulos.index');
+    $topbarCaptacao = ($moduloAtivo ?? null)?->usaTopbarModuloCaptacao() ?? false;
+@endphp
+
+@if ($topbarCaptacao)
+    @include('layouts.partials.topbar-captacao')
+@else
 <header class="app-topbar">
     <div class="page-container topbar-menu">
         <div class="d-flex align-items-center gap-2">
 
-            <a href="{{ route('dashboard') }}" class="logo">
+            <a href="{{ $logoUrl }}" class="logo">
                 <span class="logo-light">
                     <span class="logo-lg"><img src="{{ asset('assets/images/logo.png') }}" alt="logo"></span>
                     <span class="logo-sm"><img src="{{ asset('assets/images/logo-sm.png') }}" alt="small logo"></span>
@@ -16,13 +27,25 @@
                 </span>
             </a>
 
-            <button class="sidenav-toggle-button px-2">
-                <i class="ri-menu-5-line fs-24"></i>
-            </button>
+            @if ($exibirSidebar)
+                <button class="sidenav-toggle-button px-2">
+                    <i class="ri-menu-5-line fs-24"></i>
+                </button>
 
-            <button class="topnav-toggle-button px-2" data-bs-toggle="collapse" data-bs-target="#topnav-menu-content">
-                <i class="ri-menu-5-line fs-24"></i>
-            </button>
+                <button class="topnav-toggle-button px-2" data-bs-toggle="collapse" data-bs-target="#topnav-menu-content">
+                    <i class="ri-menu-5-line fs-24"></i>
+                </button>
+            @else
+                <a href="{{ route('modulos.index') }}" class="btn btn-sm btn-light ms-1">
+                    <i class="ri-apps-line me-1"></i>
+                    Módulos
+                </a>
+                @if ($moduloAtivo ?? null)
+                    <span class="badge bg-primary-subtle text-primary ms-1 d-none d-md-inline">
+                        {{ $moduloAtivo->label() }}
+                    </span>
+                @endif
+            @endif
 
             <div class="topbar-item d-none d-md-flex">
                 <div>
@@ -33,6 +56,7 @@
 
         <div class="d-flex align-items-center gap-2">
 
+            @if ($exibirSidebar)
             <div class="topbar-item d-flex d-xl-none">
                 <button class="topbar-link" data-bs-toggle="modal" data-bs-target="#searchModal" type="button">
                     <i class="ri-search-line fs-22"></i>
@@ -44,6 +68,7 @@
                 <i class="ri-search-line fs-18"></i>
                 <span class="me-2">Filtrar menu...</span>
             </div>
+            @endif
 
             <div class="topbar-item d-none d-sm-flex">
                 <button class="topbar-link" data-bs-toggle="offcanvas" data-bs-target="#theme-settings-offcanvas" type="button">
@@ -89,7 +114,9 @@
         </div>
     </div>
 </header>
+@endif
 
+@if ($exibirSidebar ?? true)
 <div class="modal fade" id="searchModal" tabindex="-1" aria-labelledby="searchModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-lg">
         <div class="modal-content bg-transparent">
@@ -122,3 +149,4 @@
         </div>
     </div>
 </div>
+@endif

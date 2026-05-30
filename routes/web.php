@@ -5,11 +5,13 @@ use App\Http\Controllers\Admin\Captacao\CaptacaoFaturamentoController;
 use App\Http\Controllers\Admin\Captacao\CaptacaoLoteController;
 use App\Http\Controllers\Admin\Captacao\CaptacaoLoteFreteController;
 use App\Http\Controllers\Admin\Captacao\CaptacaoLotePipelineController;
+use App\Http\Controllers\Admin\Captacao\CaptacaoDemandaRotaController;
 use App\Http\Controllers\Admin\Captacao\CaptacaoMatrizController;
 use App\Http\Controllers\Admin\Captacao\CaptacaoPedidoPorLojaController;
 use App\Http\Controllers\Admin\Captacao\RomaneioManualController;
 use App\Http\Controllers\Admin\Captacao\CaptacaoRotaController;
 use App\Http\Controllers\Admin\Captacao\CaptacaoCarteiraController;
+use App\Http\Controllers\Admin\Captacao\CaptacaoCarteiraImportacaoController;
 use App\Http\Controllers\Admin\Captacao\CaptacaoConsultaController;
 use App\Http\Controllers\Admin\Captacao\ClienteFrutaVinculoController;
 use App\Http\Controllers\Admin\Captacao\ClienteFrutaVinculoImportacaoController;
@@ -54,7 +56,10 @@ use App\Http\Controllers\Admin\Movimentacoes\DevolucaoMovimentacaoController;
 use App\Http\Controllers\Admin\Movimentacoes\DoacaoMovimentacaoController;
 use App\Http\Controllers\Admin\Movimentacoes\EntradaEstoqueMovimentacaoController;
 use App\Http\Controllers\Admin\Movimentacoes\TransferenciaImportacaoController;
+use App\Http\Controllers\Admin\Movimentacoes\TransferenciaCaptacaoDemandaController;
+use App\Http\Controllers\Admin\Movimentacoes\TransferenciaDemandaController;
 use App\Http\Controllers\Admin\Movimentacoes\TransferenciaMovimentacaoController;
+use App\Http\Controllers\Admin\Movimentacoes\VendaCaptacaoDemandaController;
 use App\Http\Controllers\Admin\Movimentacoes\VendaImportacaoController;
 use App\Http\Controllers\Admin\Movimentacoes\VendaMovimentacaoController;
 use App\Http\Controllers\Admin\PracaController;
@@ -71,6 +76,7 @@ use App\Http\Controllers\Admin\VeiculoImportacaoController;
 use App\Http\Controllers\Auth\ForcePasswordChangeController;
 use App\Http\Controllers\ClientErrorController;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\ModulosController;
 use App\Http\Controllers\OlhoDeDeusController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\RequestDebugClientReportController;
@@ -78,7 +84,7 @@ use App\Http\Controllers\ThemeSettingsController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
-    return redirect()->route('dashboard');
+    return redirect()->route('modulos.index');
 });
 
 Route::post('/client-errors', [ClientErrorController::class, 'store'])
@@ -107,6 +113,9 @@ Route::middleware(['auth', 'user.active'])->group(function () {
 Route::middleware(['auth', 'verified', 'user.active', 'password.changed'])->group(function () {
     Route::post('/theme-settings', [ThemeSettingsController::class, 'update'])
         ->name('theme-settings.update');
+
+    Route::get('/modulos', [ModulosController::class, 'index'])->name('modulos.index');
+    Route::get('/modulos/{modulo}/entrar', [ModulosController::class, 'entrar'])->name('modulos.entrar');
 
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
     Route::get('/dashboard/dados', [DashboardController::class, 'dados'])
@@ -443,6 +452,26 @@ Route::middleware(['auth', 'verified', 'user.active', 'password.changed'])->grou
             Route::post('/importar/{importacao:uuid}/confirmar', [ClienteImportacaoController::class, 'confirmar'])
                 ->middleware('permission:clientes.importar-confirmar')
                 ->name('importar.confirmar');
+
+            Route::get('/importar-vinculo-frutas', [ClienteFrutaVinculoImportacaoController::class, 'importar'])
+                ->middleware('permission:captacao.cliente_fruta.vincular')
+                ->name('importar-vinculo-frutas');
+
+            Route::post('/importar-vinculo-frutas/iniciar', [ClienteFrutaVinculoImportacaoController::class, 'iniciar'])
+                ->middleware('permission:captacao.cliente_fruta.vincular')
+                ->name('importar-vinculo-frutas.iniciar');
+
+            Route::get('/importar-vinculo-frutas/{importacao:uuid}/status', [ClienteFrutaVinculoImportacaoController::class, 'status'])
+                ->middleware('permission:captacao.cliente_fruta.vincular')
+                ->name('importar-vinculo-frutas.status');
+
+            Route::get('/importar-vinculo-frutas/{importacao:uuid}/resultado', [ClienteFrutaVinculoImportacaoController::class, 'resultado'])
+                ->middleware('permission:captacao.cliente_fruta.vincular')
+                ->name('importar-vinculo-frutas.resultado');
+
+            Route::post('/importar-vinculo-frutas/{importacao:uuid}/confirmar', [ClienteFrutaVinculoImportacaoController::class, 'confirmar'])
+                ->middleware('permission:captacao.cliente_fruta.vincular')
+                ->name('importar-vinculo-frutas.confirmar');
 
             Route::get('/criar', [ClienteController::class, 'create'])
                 ->middleware('permission:clientes.criar')
@@ -950,6 +979,52 @@ Route::middleware(['auth', 'verified', 'user.active', 'password.changed'])->grou
                 ->middleware('permission:movimentacoes.transferencias.importar-confirmar')
                 ->name('importar.confirmar');
 
+            Route::prefix('demandas')->name('demandas.')->group(function () {
+                Route::get('/', [TransferenciaDemandaController::class, 'index'])
+                    ->middleware('permission:movimentacoes.transferencias.visualizar')
+                    ->name('index');
+
+                Route::get('/criar', [TransferenciaDemandaController::class, 'create'])
+                    ->middleware('permission:movimentacoes.transferencias.criar')
+                    ->name('create');
+
+                Route::post('/', [TransferenciaDemandaController::class, 'store'])
+                    ->middleware('permission:movimentacoes.transferencias.criar')
+                    ->name('store');
+
+                Route::get('/{demanda}/editar', [TransferenciaDemandaController::class, 'edit'])
+                    ->middleware('permission:movimentacoes.transferencias.editar')
+                    ->name('edit');
+
+                Route::put('/{demanda}', [TransferenciaDemandaController::class, 'update'])
+                    ->middleware('permission:movimentacoes.transferencias.editar')
+                    ->name('update');
+
+                Route::post('/{demanda}/iniciar', [TransferenciaDemandaController::class, 'iniciar'])
+                    ->middleware('permission:movimentacoes.transferencias.editar')
+                    ->name('iniciar');
+
+                Route::post('/{demanda}/nf', [TransferenciaDemandaController::class, 'uploadNf'])
+                    ->middleware('permission:movimentacoes.transferencias.editar')
+                    ->name('nf');
+
+                Route::post('/{demanda}/concluir-frete', [TransferenciaDemandaController::class, 'concluirFrete'])
+                    ->middleware('permission:movimentacoes.transferencias.editar')
+                    ->name('concluir-frete');
+
+                Route::delete('/{demanda}', [TransferenciaDemandaController::class, 'destroy'])
+                    ->middleware('permission:movimentacoes.transferencias.editar')
+                    ->name('destroy');
+            });
+
+            Route::get('/demandas-captacao/{demanda}', [TransferenciaCaptacaoDemandaController::class, 'show'])
+                ->middleware('permission:movimentacoes.transferencias.visualizar')
+                ->name('demandas-captacao.show');
+
+            Route::get('/demandas-captacao/{demanda}/cigam', [TransferenciaCaptacaoDemandaController::class, 'downloadCigam'])
+                ->middleware('permission:movimentacoes.transferencias.visualizar')
+                ->name('demandas-captacao.cigam');
+
             Route::get('/{transferenciaOrigem}', [TransferenciaMovimentacaoController::class, 'show'])
                 ->middleware('permission:movimentacoes.transferencias.visualizar')
                 ->name('show');
@@ -957,6 +1032,10 @@ Route::middleware(['auth', 'verified', 'user.active', 'password.changed'])->grou
             Route::post('/{transferenciaOrigem}/vincular-frete', [TransferenciaMovimentacaoController::class, 'vincularFrete'])
                 ->middleware('permission:movimentacoes.transferencias.editar')
                 ->name('vincular-frete');
+
+            Route::post('/{transferenciaOrigem}/confirmar-recebimento', [TransferenciaMovimentacaoController::class, 'confirmarRecebimento'])
+                ->middleware('permission:movimentacoes.transferencias.receber')
+                ->name('confirmar-recebimento');
 
             Route::post('/{transferenciaOrigem}/cancelar', [TransferenciaMovimentacaoController::class, 'cancelar'])
                 ->middleware('permission:movimentacoes.transferencias.cancelar')
@@ -1082,6 +1161,10 @@ Route::middleware(['auth', 'verified', 'user.active', 'password.changed'])->grou
                 ->middleware('permission:movimentacoes.vendas.criar')
                 ->name('store');
 
+            Route::get('/demandas-captacao/{demanda}', [VendaCaptacaoDemandaController::class, 'show'])
+                ->middleware('permission:movimentacoes.vendas.visualizar')
+                ->name('demandas-captacao.show');
+
             Route::get('/{movimentacaoVenda}', [VendaMovimentacaoController::class, 'show'])
                 ->middleware('permission:movimentacoes.vendas.visualizar')
                 ->name('show');
@@ -1182,6 +1265,10 @@ Route::middleware(['auth', 'verified', 'user.active', 'password.changed'])->grou
                 ->middleware('permission:captacao.lote.visualizar')
                 ->name('matriz.index');
 
+            Route::post('/lotes/{lote}/matriz/concluir-captacao', [CaptacaoMatrizController::class, 'concluirCaptacao'])
+                ->middleware('permission:captacao.pedido.editar')
+                ->name('matriz.concluir-captacao');
+
             Route::get('/lotes/{lote}/matriz/estado', [CaptacaoMatrizController::class, 'estado'])
                 ->middleware('permission:captacao.lote.visualizar')
                 ->name('lotes.matriz.estado');
@@ -1226,6 +1313,42 @@ Route::middleware(['auth', 'verified', 'user.active', 'password.changed'])->grou
                 ->middleware('permission:captacao.pedido.editar')
                 ->name('lotes.rotas.veiculo');
 
+            Route::post('/lotes/{lote}/rotas/{rota}/concluir', [CaptacaoMatrizController::class, 'concluirRota'])
+                ->middleware('permission:captacao.pedido.editar')
+                ->name('lotes.rotas.concluir');
+
+            Route::post('/lotes/{lote}/rotas/{rota}/reabrir', [CaptacaoMatrizController::class, 'reabrirRota'])
+                ->middleware('permission:captacao.pedido.editar')
+                ->name('lotes.rotas.reabrir');
+
+            Route::get('/lotes/{lote}/rotas/{rota}/romaneio.pdf', [CaptacaoMatrizController::class, 'downloadRomaneioRota'])
+                ->middleware('permission:captacao.pedido.editar')
+                ->name('lotes.rotas.romaneio-pdf');
+
+            Route::post('/lotes/{lote}/demandas/{demanda}/transferencia/iniciar', [CaptacaoDemandaRotaController::class, 'iniciarTransferencia'])
+                ->middleware('permission:captacao.pedido.editar')
+                ->name('lotes.demandas.transferencia.iniciar');
+
+            Route::get('/lotes/{lote}/demandas/{demanda}/transferencia/cigam', [CaptacaoDemandaRotaController::class, 'downloadCigamTransferencia'])
+                ->middleware('permission:captacao.pedido.editar')
+                ->name('lotes.demandas.transferencia.cigam');
+
+            Route::post('/lotes/{lote}/demandas/{demanda}/transferencia/nf', [CaptacaoDemandaRotaController::class, 'uploadNfTransferencia'])
+                ->middleware('permission:captacao.pedido.editar')
+                ->name('lotes.demandas.transferencia.nf');
+
+            Route::delete('/lotes/{lote}/demandas/{demanda}/transferencia', [CaptacaoDemandaRotaController::class, 'excluirTransferencia'])
+                ->middleware('permission:captacao.pedido.editar')
+                ->name('lotes.demandas.transferencia.excluir');
+
+            Route::post('/lotes/{lote}/demandas/{demanda}/venda/efetivar', [CaptacaoDemandaRotaController::class, 'efetivarVenda'])
+                ->middleware('permission:captacao.pedido.editar')
+                ->name('lotes.demandas.venda.efetivar');
+
+            Route::get('/lotes/{lote}/demandas/{demanda}/venda/cigam', [CaptacaoDemandaRotaController::class, 'downloadCigamVenda'])
+                ->middleware('permission:captacao.pedido.editar')
+                ->name('lotes.demandas.venda.cigam');
+
             Route::get('/pedidos-por-loja', [CaptacaoPedidoPorLojaController::class, 'carteiras'])
                 ->middleware('permission:captacao.pedido.editar')
                 ->name('pedidos-por-loja.carteiras');
@@ -1249,6 +1372,10 @@ Route::middleware(['auth', 'verified', 'user.active', 'password.changed'])->grou
             Route::post('/lotes/{lote}/pedidos-por-loja/{cliente}/captacao-concluida', [CaptacaoPedidoPorLojaController::class, 'toggleConclusao'])
                 ->middleware('permission:captacao.pedido.editar')
                 ->name('pedidos-por-loja.captacao-concluida');
+
+            Route::post('/lotes/{lote}/concluir-captacao', [CaptacaoPedidoPorLojaController::class, 'concluirCaptacao'])
+                ->middleware('permission:captacao.pedido.editar')
+                ->name('pedidos-por-loja.concluir-captacao');
 
             Route::get('/lotes/{lote}/fretes', [CaptacaoLoteFreteController::class, 'index'])
                 ->middleware('permission:captacao.lote.frete.vincular')
@@ -1447,6 +1574,26 @@ Route::middleware(['auth', 'verified', 'user.active', 'password.changed'])->grou
             Route::put('/carteiras/{carteira}', [CaptacaoCarteiraController::class, 'update'])
                 ->middleware('permission:captacao.lote.visualizar')
                 ->name('carteiras.update');
+
+            Route::get('/carteiras/{carteira}/importar-lojas', [CaptacaoCarteiraImportacaoController::class, 'importar'])
+                ->middleware('permission:captacao.lote.visualizar')
+                ->name('carteiras.importar-lojas');
+
+            Route::post('/carteiras/{carteira}/importar-lojas/iniciar', [CaptacaoCarteiraImportacaoController::class, 'iniciar'])
+                ->middleware('permission:captacao.lote.visualizar')
+                ->name('carteiras.importar-lojas.iniciar');
+
+            Route::get('/carteiras/{carteira}/importar-lojas/{importacoe:uuid}/status', [CaptacaoCarteiraImportacaoController::class, 'status'])
+                ->middleware('permission:captacao.lote.visualizar')
+                ->name('carteiras.importar-lojas.status');
+
+            Route::get('/carteiras/{carteira}/importar-lojas/{importacoe:uuid}/resultado', [CaptacaoCarteiraImportacaoController::class, 'resultado'])
+                ->middleware('permission:captacao.lote.visualizar')
+                ->name('carteiras.importar-lojas.resultado');
+
+            Route::post('/carteiras/{carteira}/importar-lojas/{importacoe:uuid}/confirmar', [CaptacaoCarteiraImportacaoController::class, 'confirmar'])
+                ->middleware('permission:captacao.lote.visualizar')
+                ->name('carteiras.importar-lojas.confirmar');
 
             Route::post('/carteiras/{carteira}/inativar', [CaptacaoCarteiraController::class, 'inativar'])
                 ->middleware('permission:captacao.lote.visualizar')

@@ -17,10 +17,13 @@
                 data-cliente-id="{{ $grupo['id_cliente'] }}"
                 data-fruta-id="{{ $item['id_fruta'] }}">
                 @if ($idx === 0)
-                    <td rowspan="{{ count($grupo['itens']) }}" class="align-top text-nowrap">
-                        <span class="fw-semibold">{{ $grupo['loja_nome'] }}</span>
+                    <td rowspan="{{ count($grupo['itens']) }}" class="align-top">
+                        <span class="fw-semibold d-block">{{ $grupo['loja_nome'] }}</span>
                         @if (! empty($grupo['numero_pedido']))
                             <div class="text-muted small">Pedido {{ $grupo['numero_pedido'] }}</div>
+                        @endif
+                        @if (! empty($grupo['saida_fisica_nome']))
+                            <div class="text-muted small">{{ $grupo['saida_fisica_nome'] }}</div>
                         @endif
                     </td>
                 @endif
@@ -39,8 +42,13 @@
                     @endif
                 </td>
                 @if ($idx === 0)
+                    @php
+                        $rotaAtual = $rotas->firstWhere('id', $grupo['id_captacao_rota'] ?? 0);
+                        $rotaAtualConcluida = (bool) ($rotaAtual?->concluida ?? false);
+                        $podeEditarVinculoRota = $lote->status->permiteEdicaoVinculoRota() && ! $rotaAtualConcluida;
+                    @endphp
                     <td rowspan="{{ count($grupo['itens']) }}" class="align-top">
-                        @if ($lote->status->permiteEdicaoVinculoRota())
+                        @if ($podeEditarVinculoRota)
                             <select class="form-select form-select-sm matriz-rota-select"
                                     data-search-select
                                     data-placeholder="Selecione ou pesquise a rota"
@@ -51,18 +59,26 @@
                                 @else
                                     <option value="">Selecione a rota…</option>
                                     @foreach ($rotas as $rota)
+                                        @php
+                                            $rotaConcluida = (bool) ($rota->concluida ?? false);
+                                            $selecionada = (int) ($grupo['id_captacao_rota'] ?? 0) === (int) $rota->id;
+                                        @endphp
                                         <option value="{{ $rota->id }}"
-                                                @selected((int) ($grupo['id_captacao_rota'] ?? 0) === $rota->id)>
-                                            {{ $rota->nome }}
+                                                @selected($selecionada)
+                                                @disabled($rotaConcluida && ! $selecionada)>
+                                            {{ $rota->nome }}{{ $rotaConcluida ? ' (concluída)' : '' }}
                                         </option>
                                     @endforeach
                                 @endif
                             </select>
                         @else
                             @php
-                                $rotaNome = $rotas->firstWhere('id', $grupo['id_captacao_rota'])?->nome;
+                                $rotaNome = $rotaAtual?->nome;
                             @endphp
                             {{ $rotaNome ?? '—' }}
+                            @if ($rotaAtualConcluida)
+                                <span class="badge bg-success-subtle text-success ms-1">Concluída</span>
+                            @endif
                         @endif
                     </td>
                 @endif

@@ -191,4 +191,69 @@ final class CaptacaoCarteiraService
                 ]);
         }
     }
+
+    /**
+     * Vincula lojas à carteira sem remover vínculos existentes (importação aditiva).
+     *
+     * @param  list<int>  $idClientes
+     */
+    public function adicionarLojas(CaptacaoCarteira $carteira, array $idClientes): int
+    {
+        $carteira->refresh();
+
+        $idClientes = collect($idClientes)
+            ->map(fn ($id) => (int) $id)
+            ->filter(fn ($id) => $id > 0)
+            ->unique()
+            ->values();
+
+        if ($idClientes->isEmpty()) {
+            return 0;
+        }
+
+        $faturamentoId = (int) $carteira->id_unidade_negocio_faturamento;
+        $vinculados = 0;
+
+        $elegiveis = Cliente::query()
+            ->whereIn('id', $idClientes->all())
+            ->get(['id', 'id_captacao_carteira', 'id_unidade_negocio', 'razao_social', 'fantasia']);
+
+        if ($elegiveis->count() !== $idClientes->count()) {
+            throw ValidationException::withMessages([
+                'id_clientes' => 'Uma ou mais lojas selecionadas não existem.',
+            ]);
+        }
+
+        foreach ($elegiveis as $cliente) {
+            $carteiraAtual = $cliente->id_captacao_carteira !== null
+                ? (int) $cliente->id_captacao_carteira
+                : null;
+
+            if ($carteiraAtual === (int) $carteira->id) {
+                continue;
+            }
+
+            if ($carteiraAtual !== null) {
+                $nome = $cliente->fantasia ?: $cliente->razao_social;
+                throw ValidationException::withMessages([
+                    'id_clientes' => "A loja «{$nome}» já pertence a outra carteira.",
+                ]);
+            }
+
+            if ((int) $cliente->id_unidade_negocio !== $faturamentoId) {
+                $nome = $cliente->fantasia ?: $cliente->razao_social;
+                throw ValidationException::withMessages([
+                    'id_clientes' => "A loja «{$nome}» não pertence à unidade de faturamento desta carteira.",
+                ]);
+            }
+
+            $cliente->update([
+                'id_captacao_carteira' => $carteira->id,
+                'id_unidade_negocio' => $faturamentoId,
+            ]);
+            $vinculados++;
+        }
+
+        return $vinculados;
+    }
 }

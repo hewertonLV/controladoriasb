@@ -5,6 +5,7 @@ namespace App\Enums;
 enum CaptacaoLoteStatus: string
 {
     case CaptacaoEmAndamento = 'CAPTACAO_EM_ANDAMENTO';
+    case CaptacaoConcluida = 'CAPTACAO_CONCLUIDA';
     case AguardandoTransferenciaCigan = 'AGUARDANDO_TRANSFERENCIA_CIGAN';
     case TransferenciaCiganIniciada = 'TRANSFERENCIA_CIGAN_INICIADA';
     case SaidaEstoqueFisico = 'SAIDA_ESTOQUE_FISICO';
@@ -19,6 +20,7 @@ enum CaptacaoLoteStatus: string
     {
         return match ($this) {
             self::CaptacaoEmAndamento => 'Captação em andamento',
+            self::CaptacaoConcluida => 'Captação concluída',
             self::AguardandoTransferenciaCigan => 'Aguardando transferência (Cigam)',
             self::TransferenciaCiganIniciada => 'Transferência Cigam iniciada',
             self::SaidaEstoqueFisico => 'Saída estoque físico (SB Controladoria)',
@@ -110,6 +112,7 @@ enum CaptacaoLoteStatus: string
     public function permiteEdicaoVinculoRota(): bool
     {
         return ! in_array($this, [
+            self::CaptacaoConcluida,
             self::VincularFreteVenda,
             self::VendasFinalizadas,
         ], true);
@@ -125,11 +128,17 @@ enum CaptacaoLoteStatus: string
     public function permiteEdicaoPreco(): bool
     {
         return ! in_array($this, [
+            self::CaptacaoConcluida,
             self::FaturamentoCiganIniciado,
             self::VincularRotasNosPedidos,
             self::VincularFreteVenda,
             self::VendasFinalizadas,
         ], true);
+    }
+
+    public function captacaoOperacionalEncerrada(): bool
+    {
+        return $this === self::CaptacaoConcluida;
     }
 
     /** Classe para destacar a linha na listagem de lotes (ver CSS em lotes/index). */
@@ -142,6 +151,7 @@ enum CaptacaoLoteStatus: string
     {
         return match ($this) {
             self::CaptacaoEmAndamento => 'bg-primary-subtle text-primary',
+            self::CaptacaoConcluida => 'bg-success-subtle text-success',
             self::AguardandoTransferenciaCigan,
             self::AguardandoVinculoFrete => 'bg-warning-subtle text-warning',
             self::TransferenciaCiganIniciada,
@@ -158,6 +168,7 @@ enum CaptacaoLoteStatus: string
     {
         return match ($this) {
             self::CaptacaoEmAndamento => 'captacao',
+            self::CaptacaoConcluida => 'finalizado',
             self::AguardandoTransferenciaCigan,
             self::AguardandoVinculoFrete => 'aguardando',
             self::TransferenciaCiganIniciada,

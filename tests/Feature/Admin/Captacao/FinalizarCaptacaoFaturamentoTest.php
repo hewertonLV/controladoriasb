@@ -43,7 +43,7 @@ class FinalizarCaptacaoFaturamentoTest extends CaptacaoTestCase
             ->assertSessionHas('success');
 
         $this->assertSame(
-            CaptacaoLoteStatus::AguardandoTransferenciaCigan,
+            CaptacaoLoteStatus::CaptacaoConcluida,
             $lote->fresh()->status,
         );
     }
@@ -81,7 +81,7 @@ class FinalizarCaptacaoFaturamentoTest extends CaptacaoTestCase
             ->assertSessionHas('success');
 
         $this->assertSame(
-            CaptacaoLoteStatus::AguardandoTransferenciaCigan,
+            CaptacaoLoteStatus::CaptacaoConcluida,
             $lote->fresh()->status,
         );
     }
@@ -193,7 +193,7 @@ class FinalizarCaptacaoFaturamentoTest extends CaptacaoTestCase
             ->assertSessionHas('success');
 
         $this->assertSame(
-            CaptacaoLoteStatus::AguardandoTransferenciaCigan,
+            CaptacaoLoteStatus::CaptacaoConcluida,
             $lote->fresh()->status,
         );
     }
@@ -205,7 +205,7 @@ class FinalizarCaptacaoFaturamentoTest extends CaptacaoTestCase
         $user->unidadesNegocio()->sync([$c['faturamento']->id, $c['galpao']->id]);
 
         $loteAnterior = $this->criarLoteCaptacao($c, '2026-05-27');
-        $loteAnterior->update(['status' => CaptacaoLoteStatus::AguardandoTransferenciaCigan]);
+        $loteAnterior->update(['status' => CaptacaoLoteStatus::CaptacaoConcluida]);
 
         $loteComplementar = $this->criarLoteCaptacao($c, '2026-05-27');
 
@@ -247,7 +247,7 @@ class FinalizarCaptacaoFaturamentoTest extends CaptacaoTestCase
         );
 
         $this->assertSame(
-            CaptacaoLoteStatus::AguardandoTransferenciaCigan,
+            CaptacaoLoteStatus::CaptacaoConcluida,
             $loteComplementar->fresh()->status,
         );
     }

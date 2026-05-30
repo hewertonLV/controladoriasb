@@ -4,6 +4,7 @@
 
     $anchor = $saida->transferencia_origem_id;
     $conforme = ($entrada->status_transferencia ?? '') === StatusTransferenciaOperacional::RECEBIDA_CONFORME->value;
+    $pendenteRecebimento = ($entrada->status_transferencia ?? '') === StatusTransferenciaOperacional::PENDENTE_RECEBIMENTO->value;
     $cancelada = ($entrada->status_transferencia ?? '') === StatusTransferenciaOperacional::CANCELADA->value
         || $saida->status_registro === MovimentacaoStatusRegistro::CANCELADO->value;
     $parAtivo = $saida->status_registro === MovimentacaoStatusRegistro::ATIVO->value
@@ -109,6 +110,32 @@
                                 <i class="ri-truck-line me-1"></i> Atualizar frete
                             </button>
                         </div>
+                    </form>
+                </div>
+            </div>
+        @endcan
+    @endif
+
+    @if ($pendenteRecebimento && $parAtivo)
+        @can('movimentacoes.transferencias.receber')
+            <div class="card mt-3 border-warning border-opacity-25">
+                <div class="card-header bg-warning-subtle">
+                    <h5 class="mb-0">Confirmar recebimento</h5>
+                </div>
+                <div class="card-body">
+                    <p class="text-muted small mb-3">
+                        A saída já foi registrada na origem. Confirme o recebimento para creditar o estoque no destino e concluir vendas vinculadas da captação.
+                    </p>
+                    <form method="POST"
+                          action="{{ route('admin.movimentacoes.transferencias.confirmar-recebimento', ['transferenciaOrigem' => $anchor]) }}"
+                          data-confirm="Confirmar recebimento conforme na quantidade enviada?"
+                          data-confirm-title="Confirmar recebimento"
+                          data-confirm-variant="warning"
+                          data-confirm-btn="Confirmar">
+                        @csrf
+                        <button class="btn btn-warning" type="submit">
+                            <i class="ri-check-double-line me-1"></i> Confirmar recebimento
+                        </button>
                     </form>
                 </div>
             </div>

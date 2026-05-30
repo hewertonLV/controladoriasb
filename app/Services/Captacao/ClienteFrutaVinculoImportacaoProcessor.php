@@ -107,13 +107,13 @@ class ClienteFrutaVinculoImportacaoProcessor
             $dados = $normalized['dados'];
             $errosLinha = $normalized['erros'];
 
-            $lojaChave = $dados['loja_chave'];
-            $frutaChave = $dados['fruta_chave'];
+            $lojaChave = $dados['id_cigam_cliente'];
+            $frutaChave = $dados['id_cigam_fruta'];
 
             if ($lojaChave !== '' && $frutaChave !== '') {
                 $chavePar = $lojaChave.'|'.$frutaChave;
                 if (isset($paresVistos[$chavePar])) {
-                    $errosLinha[] = "Par loja/fruta duplicado na planilha (já aparece na linha {$paresVistos[$chavePar]}).";
+                    $errosLinha[] = "Par cliente/fruta duplicado na planilha (já aparece na linha {$paresVistos[$chavePar]}).";
                 } else {
                     $paresVistos[$chavePar] = $r;
                 }
@@ -218,17 +218,15 @@ class ClienteFrutaVinculoImportacaoProcessor
 
         $clientes = Cliente::query()
             ->where('id_unidade_negocio', $faturamentoId)
-            ->get(['id', 'razao_social', 'fantasia']);
+            ->get(['id', 'id_cigam', 'razao_social', 'fantasia']);
 
         foreach ($clientes as $cliente) {
-            foreach ([$cliente->razao_social, $cliente->fantasia] as $nome) {
-                $chave = ClienteFrutaVinculoPlanilhaNormalizer::chaveNome($nome);
-                if ($chave === '') {
-                    continue;
-                }
-
-                $index[$chave][] = $cliente;
+            $chave = (string) $cliente->id_cigam;
+            if ($chave === '') {
+                continue;
             }
+
+            $index[$chave][] = $cliente;
         }
 
         return $index;
@@ -241,8 +239,8 @@ class ClienteFrutaVinculoImportacaoProcessor
     {
         $index = [];
 
-        foreach (Fruta::query()->get(['id', 'nome']) as $fruta) {
-            $chave = ClienteFrutaVinculoPlanilhaNormalizer::chaveNome($fruta->nome);
+        foreach (Fruta::query()->get(['id', 'nome', 'id_cigam']) as $fruta) {
+            $chave = (string) $fruta->id_cigam;
             if ($chave === '') {
                 continue;
             }
@@ -275,8 +273,8 @@ class ClienteFrutaVinculoImportacaoProcessor
             $rowId = $item['row_id'];
             $linha = $item['linha'];
             $dados = $item['dados'];
-            $lojaChave = $dados['loja_chave'];
-            $frutaChave = $dados['fruta_chave'];
+            $lojaChave = $dados['id_cigam_cliente'];
+            $frutaChave = $dados['id_cigam_fruta'];
 
             $matches = $clienteIndex[$lojaChave] ?? [];
             if ($matches === []) {
@@ -285,7 +283,7 @@ class ClienteFrutaVinculoImportacaoProcessor
                     'linha' => $linha,
                     'loja' => $dados['loja'],
                     'fruta' => $dados['fruta'],
-                    'erros' => ['Loja não encontrada nesta unidade de faturamento.'],
+                    'erros' => ['Cliente não encontrado nesta unidade de faturamento.'],
                 ];
 
                 continue;
@@ -298,7 +296,7 @@ class ClienteFrutaVinculoImportacaoProcessor
                     'linha' => $linha,
                     'loja' => $dados['loja'],
                     'fruta' => $dados['fruta'],
-                    'erros' => ['Mais de uma loja corresponde a este nome. Use razão social ou fantasia únicos.'],
+                    'erros' => ['Mais de um cliente corresponde a este ID CIGAM.'],
                 ];
 
                 continue;

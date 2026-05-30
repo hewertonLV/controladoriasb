@@ -6,6 +6,13 @@
 @section('content')
     <x-admin.flash-messages />
 
+    @include('admin.captacao.pedidos-por-loja._card-estilos')
+
+    @include('admin.movimentacoes._demandas-modulo-grid', [
+        'demandas' => $demandasCards ?? [],
+        'titulo' => 'Demandas pendentes',
+    ])
+
     <x-admin.datatable
         title="Vendas"
         subtitle="Saídas comerciais/fiscais por item de fruta (versão ativa)."

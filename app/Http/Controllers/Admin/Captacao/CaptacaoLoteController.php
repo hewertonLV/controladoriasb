@@ -5,12 +5,13 @@ namespace App\Http\Controllers\Admin\Captacao;
 use App\Actions\Captacao\ExcluirCaptacaoLoteAction;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Admin\Captacao\StoreCaptacaoLoteRequest;
+use App\Enums\AppModulo;
 use App\Enums\CaptacaoLoteStatus;
 use App\Enums\CaptacaoLoteTipo;
 use App\Models\Captacao\CaptacaoCarteira;
 use App\Models\Captacao\CaptacaoLote;
 use App\Services\Captacao\CaptacaoLoteService;
-use App\Services\Captacao\RomaneioAbastecimentoService;
+use App\Services\Captacao\ClienteFrutaVinculoService;
 use App\Services\Captacao\RomaneioCarregamentoService;
 use App\Services\Permissoes\UnidadeNegocioAccessService;
 use Illuminate\Http\RedirectResponse;
@@ -23,7 +24,7 @@ class CaptacaoLoteController extends Controller
         private readonly CaptacaoLoteService $lotes,
         private readonly ExcluirCaptacaoLoteAction $excluirLote,
         private readonly RomaneioCarregamentoService $romaneioCarregamento,
-        private readonly RomaneioAbastecimentoService $romaneioAbastecimento,
+        private readonly ClienteFrutaVinculoService $vinculos,
         private readonly UnidadeNegocioAccessService $unidadeAccess,
     ) {}
 
@@ -76,6 +77,17 @@ class CaptacaoLoteController extends Controller
             default => 'Nova captação aberta com sucesso.',
         };
 
+        return $this->redirectAposAbrirCaptacao($lote, $mensagem);
+    }
+
+    private function redirectAposAbrirCaptacao(CaptacaoLote $lote, string $mensagem): RedirectResponse
+    {
+        if (AppModulo::tryFromSession() === AppModulo::Captacao) {
+            return redirect()
+                ->route('admin.captacao.pedidos-por-loja.lojas', $lote)
+                ->with('success', $mensagem);
+        }
+
         return redirect()
             ->route('admin.captacao.lotes.show', $lote)
             ->with('success', $mensagem);
@@ -84,15 +96,18 @@ class CaptacaoLoteController extends Controller
     public function show(CaptacaoLote $lote): View
     {
         $lote = $this->lotes->sincronizarStatusComFaturamentoFinalizado($lote);
-        $lote->load(['carteira', 'unidadeFaturamento', 'unidadeGalpao']);
+        $lote->load(['carteira', 'unidadeFaturamento', 'unidadeGalpao', 'pedidos.itens']);
 
-        $romaneioCarregamento = $this->romaneioCarregamento->preview($lote);
+        $matriz = $this->vinculos->dadosMatriz($lote);
+        $romaneiosCarregamentoPorRota = $this->romaneioCarregamento->previewPorRotas($lote);
 
         return view('admin.captacao.lotes.show', [
             'lote' => $lote,
-            'romaneioCarregamento' => $romaneioCarregamento,
-            'romaneioCarregamentoTotaisGerais' => $this->romaneioCarregamento->totaisGerais($romaneioCarregamento),
-            'romaneioAbastecimento' => $this->romaneioAbastecimento->preview($lote),
+            'romaneiosCarregamentoPorRota' => $romaneiosCarregamentoPorRota,
+            'clientes' => $matriz['clientes'],
+            'frutas' => $matriz['frutas'],
+            'frutasPorCliente' => $matriz['frutasPorCliente'],
+            'pedidosPorCliente' => $lote->pedidos->keyBy('id_cliente'),
         ]);
     }
 

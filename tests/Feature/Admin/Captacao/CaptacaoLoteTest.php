@@ -110,7 +110,8 @@ class CaptacaoLoteTest extends CaptacaoTestCase
             ->assertOk()
             ->getContent();
 
-        $this->assertSame(1, substr_count($html, 'Finalizar captação (faturamento)'));
+        $this->assertStringContainsString('Concluir captação', $html);
+        $this->assertStringContainsString('captacao-concluir-lote-panel', $html);
         $this->assertStringNotContainsString('Iniciar transferência', $html);
     }
 

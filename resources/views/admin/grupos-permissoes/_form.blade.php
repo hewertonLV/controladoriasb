@@ -2,9 +2,14 @@
     /** @var \Spatie\Permission\Models\Role $role */
     /** @var array<string, array<int, array{id:int,name:string,action:string}>> $permissionGroups */
     /** @var \Illuminate\Support\Collection<int, int> $selectedPermissionIds */
+    /** @var \Illuminate\Support\Collection<int, string>|list<string> $selectedModulos */
+    /** @var list<\App\Enums\AppModulo> $modulosDisponiveis */
     /** @var bool $isProgramador */
     $selectedIds = collect(old('permissions', $selectedPermissionIds->all() ?? []))
         ->map(fn ($id) => (int) $id)
+        ->all();
+    $selectedModuloValues = collect(old('modulos', $selectedModulos ?? []))
+        ->map(fn ($valor) => (string) $valor)
         ->all();
     $isReadOnly = $isProgramador;
 @endphp
@@ -34,6 +39,49 @@
                 <small class="text-muted">Guard padrão do sistema.</small>
             </div>
         </div>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header">
+        <h4 class="header-title mb-0">Módulos do hub</h4>
+        <p class="text-muted mb-0">Defina quais módulos aparecem na tela inicial (/modulos) para usuários deste grupo.</p>
+    </div>
+    <div class="card-body">
+        @if ($isReadOnly)
+            <p class="text-muted mb-0">
+                O grupo Programador enxerga todos os módulos automaticamente, independentemente desta seleção.
+            </p>
+        @else
+            @error('modulos')
+                <div class="alert alert-danger">{{ $message }}</div>
+            @enderror
+            @error('modulos.*')
+                <div class="alert alert-danger">{{ $message }}</div>
+            @enderror
+
+            <div class="row g-2">
+                @foreach ($modulosDisponiveis as $modulo)
+                    <div class="col-md-6 col-xl-4">
+                        <div class="form-check border rounded p-3 h-100">
+                            <input class="form-check-input"
+                                   type="checkbox"
+                                   name="modulos[]"
+                                   value="{{ $modulo->value }}"
+                                   id="modulo-{{ $modulo->value }}"
+                                   @checked(in_array($modulo->value, $selectedModuloValues, true))>
+                            <label class="form-check-label w-100" for="modulo-{{ $modulo->value }}">
+                                <span class="fw-semibold d-flex align-items-center gap-2">
+                                    <i class="{{ $modulo->icone() }} text-{{ $modulo->corBootstrap() }}"></i>
+                                    {{ $modulo->label() }}
+                                </span>
+                                <small class="text-muted d-block mt-1">{{ $modulo->descricao() }}</small>
+                            </label>
+                        </div>
+                    </div>
+                @endforeach
+            </div>
+        @endif
     </div>
 </div>
 

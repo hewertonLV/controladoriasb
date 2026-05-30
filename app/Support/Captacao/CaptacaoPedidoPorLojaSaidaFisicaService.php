@@ -90,6 +90,17 @@ final class CaptacaoPedidoPorLojaSaidaFisicaService
         return UnidadeNegocio::query()->whereKey($idUnidade)->value('nome');
     }
 
+    public function labelCurtoUnidadePorId(CaptacaoLote $lote, int $idUnidade): string
+    {
+        foreach ($this->opcoesParaLote($lote) as $opcao) {
+            if ($opcao['id'] === $idUnidade) {
+                return $opcao['label_curto'];
+            }
+        }
+
+        return (string) (UnidadeNegocio::query()->whereKey($idUnidade)->value('nome') ?? '—');
+    }
+
     /**
      * @return Collection<int, UnidadeNegocio>
      */

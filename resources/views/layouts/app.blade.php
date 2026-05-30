@@ -1,4 +1,6 @@
 @php
+    use App\Enums\AppModulo;
+
     $sessionThemeSettings = session('theme_settings');
     $sessionThemeSettingsBelongsToUser = auth()->check()
         && session('theme_settings_user_id') === auth()->id()
@@ -7,6 +9,9 @@
     $themeSettings = ($sessionThemeSettingsBelongsToUser ? $sessionThemeSettings : null)
         ?? auth()->user()?->themeSettings()
         ?? \App\Models\User::defaultThemeSettings();
+
+    $exibirSidebar = $exibirSidebarAdministrativa ?? true;
+    $moduloCaptacaoAtivo = ($moduloAtivo ?? AppModulo::tryFromSession())?->usaTopbarModuloCaptacao() ?? false;
 @endphp
 
 <!DOCTYPE html>
@@ -28,12 +33,58 @@
         window.currentThemeSettings = window.themeSettingsFromServer;
     </script>
     @include('layouts.partials.head')
+    @if (! $exibirSidebar)
+        <style>
+            body.modulo-operacional .app-topbar,
+            body.modulo-operacional .page-content {
+                margin-inline-start: 0 !important;
+                margin-left: 0 !important;
+            }
+
+            body.modulo-captacao .topbar-menu-modulo-captacao {
+                display: grid;
+                grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+                align-items: center;
+                gap: 0.5rem;
+            }
+
+            body.modulo-captacao .topbar-captacao-start {
+                justify-self: start;
+            }
+
+            body.modulo-captacao .topbar-captacao-center {
+                justify-self: center;
+                max-width: 100%;
+            }
+
+            body.modulo-captacao .topbar-captacao-end {
+                justify-self: end;
+            }
+
+            @media (max-width: 767.98px) {
+                body.modulo-captacao .topbar-menu-modulo-captacao {
+                    grid-template-columns: 1fr auto;
+                    grid-template-rows: auto auto;
+                }
+
+                body.modulo-captacao .topbar-captacao-center {
+                    grid-column: 1 / -1;
+                    order: -1;
+                }
+            }
+        </style>
+    @endif
 </head>
 
-<body>
+<body @class([
+    'modulo-operacional' => ! $exibirSidebar,
+    'modulo-captacao' => $moduloCaptacaoAtivo,
+])>
     <div class="wrapper">
 
-        @include('layouts.partials.sidebar')
+        @if ($exibirSidebar)
+            @include('layouts.partials.sidebar')
+        @endif
 
         @include('layouts.partials.topbar')
 

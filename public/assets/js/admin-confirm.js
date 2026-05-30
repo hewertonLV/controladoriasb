@@ -46,6 +46,7 @@
 
     let pendingForm = null;
     let pendingTrigger = null;
+    let pendingProgrammaticResolve = null;
     let modalInstance = null;
     let modalMode = 'confirm';
     let actionsBound = false;
@@ -194,6 +195,47 @@
     }
 
     /**
+     * Confirmação programática (Promise) para ações AJAX.
+     *
+     * @param {{ title?: string, message: string, variant?: string, confirmLabel?: string, cancelLabel?: string }} options
+     * @returns {Promise<boolean>}
+     */
+    function openConfirmProgrammatic(options) {
+        const mensagem = options.message || 'Deseja continuar?';
+
+        return new Promise((resolve) => {
+            ensureActionsBound();
+
+            const elements = getModalElements();
+            const Modal = resolveBootstrapModal();
+            if (!elements || !Modal) {
+                resolve(window.confirm(mensagem));
+                return;
+            }
+
+            pendingProgrammaticResolve = resolve;
+            modalMode = 'programmatic';
+            pendingForm = null;
+            pendingTrigger = null;
+
+            const variantKey = (options.variant || 'primary').toLowerCase();
+            const variant = VARIANTS[variantKey] || VARIANTS.primary;
+            applyVariant(elements, variant);
+
+            elements.titleText.textContent = options.title || 'Confirmar ação';
+            elements.body.textContent = mensagem;
+            elements.confirmBtn.textContent = options.confirmLabel || 'Confirmar';
+            elements.cancelBtn.textContent = options.cancelLabel || 'Cancelar';
+            elements.cancelBtn.classList.remove('d-none');
+            elements.promptWrap.classList.add('d-none');
+            elements.promptInput.classList.remove('is-invalid');
+
+            modalInstance = getOrCreateModalInstance(elements.modalEl);
+            modalInstance?.show();
+        });
+    }
+
+    /**
      * Modal informativo (somente OK) — mesmo template visual do confirm.
      *
      * @param {{ title?: string, message: string, variant?: string, confirmLabel?: string }} options
@@ -294,11 +336,26 @@
                 return;
             }
 
+            if (modalMode === 'programmatic') {
+                const resolve = pendingProgrammaticResolve;
+                pendingProgrammaticResolve = null;
+                modalInstance?.hide();
+                resolve?.(true);
+
+                return;
+            }
+
             modalInstance?.hide();
             submitPendingForm();
         });
 
         elements.modalEl.addEventListener('hidden.bs.modal', () => {
+            if (modalMode === 'programmatic' && pendingProgrammaticResolve) {
+                const resolve = pendingProgrammaticResolve;
+                pendingProgrammaticResolve = null;
+                resolve(false);
+            }
+
             pendingForm = null;
             pendingTrigger = null;
             elements.promptWrap.classList.add('d-none');
@@ -368,6 +425,7 @@
 
     window.AdminConfirm = {
         open: openConfirm,
+        confirm: openConfirmProgrammatic,
         alert: openAlert,
     };
 

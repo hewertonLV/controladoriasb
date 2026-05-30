@@ -102,9 +102,12 @@ npm-debug.log*
 # uma planilha real na raiz por engano, ela não vai parar no repositório.
 *.xlsx
 !planilhas/estoques_importacao.xlsx
+!planilhas/carteira_lojas_vinculo.xlsx
+!planilhas/fruta_loja_vinculo.xlsx
 !planilhas/icms_importacao_modelo.xlsx
 !planilhas/transferencias_importacao.xlsx
 !planilhas/vendas_importacao.xlsx
+!planilhas/captação exemplo.xlsx
 *.xls
 *.csv
 *.ods
@@ -119,6 +122,9 @@ Homestead.yaml
 *.~lock*
 planilhas/*
 !planilhas/estoques_importacao.xlsx
+!planilhas/carteira_lojas_vinculo.xlsx
+!planilhas/fruta_loja_vinculo.xlsx
 !planilhas/icms_importacao_modelo.xlsx
 !planilhas/transferencias_importacao.xlsx
 !planilhas/vendas_importacao.xlsx
+!planilhas/captação exemplo.xlsx

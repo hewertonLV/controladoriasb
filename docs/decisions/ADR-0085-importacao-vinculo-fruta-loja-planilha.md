@@ -10,7 +10,7 @@ Operação precisa vincular muitas frutas a muitas lojas de uma vez. A tela manu
 
 ## Decisão
 
-- Planilha Excel com **coluna A** = razão social ou nome fantasia da loja; **coluna B** = nome da fruta (linha 1 = cabeçalho livre).
+- Planilha Excel com **coluna A** = `id_cigam` do cliente; **coluna B** = `id_cigam` da fruta (linha 1 = cabeçalho). Ver [ADR-0170](ADR-0170-importacao-vinculo-fruta-loja-id-cigam.md) (substitui layout por nome do MVP).
 - Importação **aditiva**: cada linha válida **adiciona** o vínculo; vínculos já existentes vão para “já vinculados”; nenhuma fruta é removida da loja.
 - Escopo restrito à **unidade de faturamento** selecionada na tela (mesmo filtro da listagem).
 - Resolução da loja: `razao_social` ou `fantasia`, comparação sem acento e case-insensitive; ambiguidade (duas lojas com a mesma chave) → erro na linha.

@@ -62,8 +62,9 @@ final class CaptacaoLoteFreteService
             ->where('id_captacao_lote', $lote->id)
             ->where('tipo', CaptacaoLoteMovimentacao::TIPO_TRANSFERENCIA)
             ->whereNotNull('transferencia_origem_id')
-            ->with('fruta:id,nome')
-            ->get();
+            ->with(['linhas.fruta:id,nome', 'fruta:id,nome'])
+            ->get()
+            ->unique('transferencia_origem_id');
 
         $transferencias = $vinculos->map(function (CaptacaoLoteMovimentacao $vinculo) {
             $saida = Movimentacao::query()

@@ -2,9 +2,13 @@
 
 namespace App\Services\Captacao;
 
+use App\Enums\CaptacaoDemandaStatus;
 use App\Enums\CaptacaoLoteTipo;
 use App\Enums\MovimentacaoStatusRegistro;
+use App\Enums\VendaNotaStatusConclusao;
 use App\Models\Captacao\CaptacaoLote;
+use App\Models\Captacao\CaptacaoLoteMovimentacaoLinha;
+use App\Models\Captacao\CaptacaoRota;
 use App\Support\Captacao\SaidaEstoqueFisicoCaptacaoService;
 use App\Models\Captacao\CaptacaoLoteFreteLinha;
 use App\Models\Captacao\CaptacaoLoteMovimentacao;
@@ -15,6 +19,7 @@ use App\Models\UnidadeNegocio;
 use App\Models\User;
 use App\Models\VendaNota;
 use App\Services\Movimentacoes\VendaMovimentacaoService;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
@@ -49,6 +54,14 @@ final class GerarVendasCaptacaoLoteService
 
         DB::transaction(function () use ($lote, $user, $faturamento, $galpao, $empresaFaturamento, $fretesPorFruta, &$notaIds): void {
             foreach ($lote->pedidos as $pedido) {
+                if ($pedido->id_captacao_rota !== null) {
+                    continue;
+                }
+
+                if (app(SaidaEstoqueFisicoCaptacaoService::class)->pedidoExigeTransferenciaParaGalpao($pedido, $lote)) {
+                    continue;
+                }
+
                 if ($this->pedidoVendaJaSincronizada($lote, $pedido)) {
                     $notaExistente = $this->vendaNotaDoPedido($lote, $pedido);
                     if ($notaExistente !== null) {
@@ -125,13 +138,170 @@ final class GerarVendasCaptacaoLoteService
 
         $notaIds = array_values(array_unique($notaIds));
 
-        if ($notaIds === [] && $this->pedidosComQuantidade($lote)->isNotEmpty()) {
+        if ($notaIds === [] && $this->pedidosComQuantidade($lote)->filter(
+            static fn (Pedido $pedido): bool => $pedido->id_captacao_rota === null,
+        )->isNotEmpty()) {
             throw ValidationException::withMessages([
                 'vendas' => 'Nenhuma venda foi gerada. Verifique itens com quantidade e preço.',
             ]);
         }
 
         return $notaIds;
+    }
+
+    /**
+     * Registra uma demanda de venda agregada por rota (romaneio), sem movimentação imediata.
+     *
+     * @param  Collection<int, Pedido>  $pedidosRota
+     */
+    public function registrarDemandaVendaRota(
+        CaptacaoLote $lote,
+        CaptacaoRota $rota,
+        Collection $pedidosRota,
+    ): ?CaptacaoLoteMovimentacao {
+        $pedidosComQtd = $pedidosRota
+            ->filter(fn (Pedido $pedido): bool => $pedido->itens->contains(
+                static fn ($item) => (float) $item->quantidade > 0,
+            ))
+            ->sortBy([
+                ['ordem_carregamento', 'asc'],
+                ['id', 'asc'],
+            ])
+            ->values();
+
+        if ($pedidosComQtd->isEmpty()) {
+            return null;
+        }
+
+        $demanda = CaptacaoLoteMovimentacao::query()
+            ->where('id_captacao_lote', $lote->id)
+            ->where('id_captacao_rota', $rota->id)
+            ->where('tipo', CaptacaoLoteMovimentacao::TIPO_VENDA_NOTA)
+            ->whereNull('id_pedido')
+            ->first();
+
+        if ($demanda === null) {
+            $demanda = CaptacaoLoteMovimentacao::query()->create([
+                'id_captacao_lote' => $lote->id,
+                'id_captacao_rota' => $rota->id,
+                'tipo' => CaptacaoLoteMovimentacao::TIPO_VENDA_NOTA,
+                'status_demanda' => CaptacaoDemandaStatus::Aberto->value,
+            ]);
+        }
+
+        $this->sincronizarLinhasVendaDemanda($demanda, $pedidosComQtd);
+
+        return $demanda->fresh(['linhas.fruta', 'linhas.pedido.cliente']);
+    }
+
+    /**
+     * @deprecated Use registrarDemandaVendaRota — mantido para testes legados pontuais.
+     */
+    public function gerarVendaPedidoNaConclusaoRota(
+        CaptacaoLote $lote,
+        CaptacaoRota $rota,
+        Pedido $pedido,
+        ?User $user = null,
+    ): ?int {
+        $lote->loadMissing(['pedidos.itens.fruta']);
+
+        $pedidosRota = $lote->pedidos
+            ->filter(fn (Pedido $p): bool => (int) $p->id_captacao_rota === (int) $rota->id
+                && $p->itens->contains(static fn ($item) => (float) $item->quantidade > 0))
+            ->values();
+
+        $this->registrarDemandaVendaRota($lote, $rota, $pedidosRota);
+
+        $demanda = CaptacaoLoteMovimentacao::query()
+            ->where('id_captacao_lote', $lote->id)
+            ->where('id_captacao_rota', $rota->id)
+            ->where('tipo', CaptacaoLoteMovimentacao::TIPO_VENDA_NOTA)
+            ->whereNull('id_pedido')
+            ->first();
+
+        return $demanda?->id;
+    }
+
+    /**
+     * @param  Collection<int, Pedido>  $pedidos
+     */
+    private function sincronizarLinhasVendaDemanda(CaptacaoLoteMovimentacao $demanda, Collection $pedidos): void
+    {
+        foreach ($pedidos as $pedido) {
+            foreach ($pedido->itens as $item) {
+                $qtdUm = (float) $item->quantidade;
+                if ($qtdUm <= 0) {
+                    continue;
+                }
+
+                $idFruta = (int) $item->id_fruta;
+
+                $linha = CaptacaoLoteMovimentacaoLinha::withTrashed()
+                    ->where('id_captacao_lote_movimentacao', $demanda->id)
+                    ->where('id_pedido', $pedido->id)
+                    ->where('id_fruta', $idFruta)
+                    ->first();
+
+                $preco = $item->preco_venda !== null ? round((float) $item->preco_venda, 2) : null;
+
+                if ($linha !== null) {
+                    if ($linha->trashed()) {
+                        $linha->restore();
+                    }
+                    $linha->update([
+                        'qtd_um' => round($qtdUm, 3),
+                        'preco_venda' => $preco,
+                    ]);
+
+                    continue;
+                }
+
+                CaptacaoLoteMovimentacaoLinha::query()->create([
+                    'id_captacao_lote_movimentacao' => $demanda->id,
+                    'id_pedido' => $pedido->id,
+                    'id_fruta' => $idFruta,
+                    'qtd_um' => round($qtdUm, 3),
+                    'preco_venda' => $preco,
+                ]);
+            }
+        }
+
+        $idsPedido = $pedidos->pluck('id')->map(fn ($id) => (int) $id)->all();
+
+        $query = $demanda->linhas()->whereNotNull('id_pedido');
+        if ($idsPedido !== []) {
+            $query->whereNotIn('id_pedido', $idsPedido);
+        }
+        $query->delete();
+
+        $demanda->forceFill([
+            'id_fruta' => null,
+            'qtd_um' => null,
+            'venda_nota_id' => null,
+        ])->saveQuietly();
+    }
+
+    /**
+     * @return list<array{id_fruta: int, qtd_fruta_um: string, valor_nf_total: string}>
+     */
+    private function montarItensVendaPedido(Pedido $pedido): array
+    {
+        $itens = [];
+
+        foreach ($pedido->itens as $item) {
+            $qtdUm = (float) $item->quantidade;
+            if ($qtdUm <= 0) {
+                continue;
+            }
+            $precoUm = (float) ($item->preco_venda ?? 0);
+            $itens[] = [
+                'id_fruta' => $item->id_fruta,
+                'qtd_fruta_um' => number_format($qtdUm, 2, '.', ''),
+                'valor_nf_total' => number_format(round($precoUm * $qtdUm, 2), 2, '.', ''),
+            ];
+        }
+
+        return $itens;
     }
 
     /**
@@ -254,5 +424,10 @@ final class GerarVendasCaptacaoLoteService
             $lote->id,
             $idCliente,
         );
+    }
+
+    public function numeroNfCaptacaoPublico(CaptacaoLote $lote, int $idCliente): string
+    {
+        return $this->numeroNfCaptacao($lote, $idCliente);
     }
 }

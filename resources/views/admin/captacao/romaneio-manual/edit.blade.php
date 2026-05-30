@@ -91,13 +91,6 @@
             </table>
         </div>
     </div>
-
-    <div class="card">
-        <div class="card-header"><strong>Romaneio 2 — Abastecimento (prévia)</strong></div>
-        <div class="card-body table-responsive">
-            @include('admin.captacao._romaneio-abastecimento-tabela', ['romaneioAbastecimento' => $romaneioAbastecimento])
-        </div>
-    </div>
 @endsection
 
 @if ($editavel)

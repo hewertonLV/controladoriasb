@@ -41,11 +41,13 @@ class ClienteFrutaVinculoImportacaoController extends Controller
         }
 
         $unidade = $faturamentos->firstWhere('id', $faturamentoId);
+        $contexto = $this->contextoImportacao($request);
 
-        return view('admin.captacao.cliente-frutas.importar', [
+        return view($contexto['view'], [
             'faturamentos' => $faturamentos,
             'faturamentoId' => $faturamentoId,
             'faturamentoNome' => $unidade?->nome,
+            'contextoImportacao' => $contexto,
         ]);
     }
 
@@ -102,13 +104,15 @@ class ClienteFrutaVinculoImportacaoController extends Controller
 
         ProcessarPreviewImportacaoClienteFrutasJob::dispatch($importacao->id);
 
+        $rotas = $this->rotasImportacao($request);
+
         return response()->json([
             'uuid' => $importacao->uuid,
             'status' => $importacao->status,
             'urls' => [
-                'status' => route('admin.captacao.frutas-por-loja.importar.status', $importacao),
-                'resultado' => route('admin.captacao.frutas-por-loja.importar.resultado', $importacao),
-                'confirmar' => route('admin.captacao.frutas-por-loja.importar.confirmar', $importacao),
+                'status' => route($rotas['status'], $importacao),
+                'resultado' => route($rotas['resultado'], $importacao),
+                'confirmar' => route($rotas['confirmar'], $importacao),
             ],
         ], 202);
     }
@@ -224,6 +228,8 @@ class ClienteFrutaVinculoImportacaoController extends Controller
 
         $this->removerArquivoTemporario($importacao);
 
+        $contexto = $this->contextoImportacao($request);
+
         return response()->json([
             'message' => 'Importação concluída.',
             'resumo' => [
@@ -231,10 +237,74 @@ class ClienteFrutaVinculoImportacaoController extends Controller
                 'ignoradas' => $ignoradas,
                 'erros' => $erros,
             ],
-            'redirect' => route('admin.captacao.frutas-por-loja.index', [
-                'faturamento' => $importacao->id_unidade_negocio_faturamento,
-            ]),
+            'redirect' => $contexto['redirect_pos_confirmar']($importacao),
         ]);
+    }
+
+    /**
+     * @return array{
+     *     view: string,
+     *     url_iniciar: string,
+     *     url_voltar: string,
+     *     voltar_label: string,
+     *     redirect_pos_confirmar: \Closure(ClienteFrutaImportacao): string,
+     * }
+     */
+    private function contextoImportacao(Request $request): array
+    {
+        if ($this->importacaoViaClientes($request)) {
+            return [
+                'view' => 'admin.captacao.cliente-frutas.importar',
+                'page_title' => 'Importar vínculo loja × fruta',
+                'url_iniciar' => route('admin.clientes.importar-vinculo-frutas.iniciar'),
+                'url_voltar' => route('admin.clientes.index'),
+                'voltar_label' => 'Voltar para Clientes',
+                'redirect_pos_confirmar' => static fn (): string => route('admin.clientes.index'),
+                'btn_pos_confirmar' => 'Ir para Clientes',
+            ];
+        }
+
+        return [
+            'view' => 'admin.captacao.cliente-frutas.importar',
+            'page_title' => 'Importar vínculos — Frutas por loja',
+            'url_iniciar' => route('admin.captacao.frutas-por-loja.importar.iniciar'),
+            'url_voltar' => route('admin.captacao.frutas-por-loja.index', [
+                'faturamento' => (int) $request->query('faturamento', 0),
+            ]),
+            'voltar_label' => 'Voltar',
+            'redirect_pos_confirmar' => static fn (ClienteFrutaImportacao $importacao): string => route(
+                'admin.captacao.frutas-por-loja.index',
+                ['faturamento' => $importacao->id_unidade_negocio_faturamento],
+            ),
+            'btn_pos_confirmar' => 'Ir para Frutas por loja',
+        ];
+    }
+
+    /**
+     * @return array{status: string, resultado: string, confirmar: string}
+     */
+    private function rotasImportacao(Request $request): array
+    {
+        if ($this->importacaoViaClientes($request)) {
+            return [
+                'status' => 'admin.clientes.importar-vinculo-frutas.status',
+                'resultado' => 'admin.clientes.importar-vinculo-frutas.resultado',
+                'confirmar' => 'admin.clientes.importar-vinculo-frutas.confirmar',
+            ];
+        }
+
+        return [
+            'status' => 'admin.captacao.frutas-por-loja.importar.status',
+            'resultado' => 'admin.captacao.frutas-por-loja.importar.resultado',
+            'confirmar' => 'admin.captacao.frutas-por-loja.importar.confirmar',
+        ];
+    }
+
+    private function importacaoViaClientes(Request $request): bool
+    {
+        $nome = (string) ($request->route()?->getName() ?? '');
+
+        return str_starts_with($nome, 'admin.clientes.importar-vinculo-frutas');
     }
 
     /**

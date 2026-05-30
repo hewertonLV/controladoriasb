@@ -8,24 +8,35 @@
 
     @include('admin.captacao._lote-timeline-status', ['lote' => $lote])
 
-    <ul class="nav nav-tabs mb-3" role="tablist">
-        <li class="nav-item"><button class="nav-link active" data-bs-toggle="tab" data-bs-target="#romaneio1" type="button">Romaneio 1 — Carregamento</button></li>
-        <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#romaneio2" type="button">Romaneio 2 — Abastecimento</button></li>
-    </ul>
-
-    <div class="tab-content">
-        <div class="tab-pane fade show active" id="romaneio1">
-            <div class="card"><div class="card-body table-responsive">
-                @include('admin.captacao._romaneio-carregamento-tabela', [
-                    'romaneioCarregamento' => $romaneioCarregamento,
-                    'romaneioCarregamentoTotaisGerais' => $romaneioCarregamentoTotaisGerais,
-                ])
-            </div></div>
+    <div class="card mb-3">
+        <div class="card-header d-flex flex-wrap justify-content-between align-items-center gap-2">
+            <strong>Captação — lojas, quantidades e preços</strong>
+            <a href="{{ route('admin.captacao.matriz.index', ['lote' => $lote->id]) }}"
+               class="btn btn-sm btn-outline-secondary">
+                Abrir matriz
+            </a>
         </div>
-        <div class="tab-pane fade" id="romaneio2">
-            <div class="card"><div class="card-body table-responsive">
-                @include('admin.captacao._romaneio-abastecimento-tabela', ['romaneioAbastecimento' => $romaneioAbastecimento])
-            </div></div>
+        <div class="card-body">
+            @include('admin.captacao._captacao-matriz-leitura', [
+                'lote' => $lote,
+                'clientes' => $clientes,
+                'frutas' => $frutas,
+                'frutasPorCliente' => $frutasPorCliente,
+                'pedidosPorCliente' => $pedidosPorCliente,
+            ])
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header">
+            <strong>Romaneio de carregamento</strong>
+        </div>
+        <div class="card-body table-responsive">
+            @include('admin.captacao._romaneio-carregamento-por-rota', [
+                'romaneiosPorRota' => $romaneiosCarregamentoPorRota,
+                'lote' => $lote,
+                'idPrefixo' => 'lote-romaneio',
+            ])
         </div>
     </div>
 @endsection
